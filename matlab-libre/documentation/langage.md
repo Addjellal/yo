@@ -95,6 +95,13 @@ end
 Sémantique de valeur. Les méthodes d'opérateur (`plus`, `minus`, `mtimes`,
 `eq`, `lt`…) sont appelées quand un opérande est un objet.
 
+Un dossier `+geo` sur le chemin fait un paquet : `+geo/distance.m` se
+nomme `geo.distance`, `+geo/Point.m` la classe `geo.Point`, et un
+`+unites` dedans `geo.unites.f`. Comme sous MATLAB, une fonction de
+paquet ne répond pas à son nom court ; une classe de paquet se dérive
+(`classdef Point3 < geo.Point`, `p@geo.Point(x, y)`), et ses méthodes
+statiques et constantes s'atteignent par `geo.Point.origine()`.
+
 ## Indexation
 
 ```matlab

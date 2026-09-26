@@ -2248,6 +2248,40 @@ int main(int argc, char** argv) {
                              noms.contains(QStringLiteral("Solver")),
                          "l'ordre maximal change ressort avec le solveur");
             }
+            {
+                // odeN et daessc : la methode d'integration d'odeN ne se
+                // regle qu'odeN choisi ; l'ordre maximal vaut pour daessc
+                // comme pour ode15s.
+                QMap<QString, QString> valeurs;
+                valeurs.insert(QStringLiteral("SolverType"), QStringLiteral("Fixed-step"));
+                valeurs.insert(QStringLiteral("Solver"), QStringLiteral("ode3"));
+                valeurs.insert(QStringLiteral("ODENIntegrationMethod"), QStringLiteral("ode3"));
+                valeurs.insert(QStringLiteral("MaxOrder"), QStringLiteral("5"));
+                DialogueConfiguration boite(
+                    QStringLiteral("m"), valeurs, {QStringLiteral("ode3"), QStringLiteral("odeN")},
+                    {QStringLiteral("ode15s"), QStringLiteral("daessc")});
+                QComboBox* methode = boite.liste(QStringLiteral("ODENIntegrationMethod"));
+                verifier(methode && !methode->isEnabled() &&
+                             methode->currentText() == QLatin1String("ode3"),
+                         "la methode d'odeN s'affiche, et ne se regle pas avec ode3");
+                boite.choixSolveur()->setCurrentIndex(
+                    boite.choixSolveur()->findText(QStringLiteral("odeN")));
+                verifier(methode && methode->isEnabled(), "odeN choisi, sa methode se regle");
+                if (methode) methode->setCurrentIndex(methode->findText(QStringLiteral("ode5")));
+                QStringList noms;
+                for (const auto& c : boite.changements())
+                    noms << c.first + QLatin1Char('=') + c.second;
+                verifier(noms == QStringList({QStringLiteral("Solver=odeN"),
+                                              QStringLiteral("ODENIntegrationMethod=ode5")}),
+                         "odeN et sa methode ressortent ensemble");
+                boite.choixType()->setCurrentIndex(
+                    boite.choixType()->findText(QStringLiteral("Variable-step")));
+                boite.choixSolveur()->setCurrentIndex(
+                    boite.choixSolveur()->findText(QStringLiteral("daessc")));
+                verifier(methode && !methode->isEnabled() &&
+                             boite.champ(QStringLiteral("MaxOrder"))->isEnabled(),
+                         "daessc choisi, son ordre maximal se regle, la methode d'odeN non");
+            }
             verifier(simulink->choixSolveur()->findText(QStringLiteral("ode45")) >= 0,
                      "la barre offre aussi les solveurs a pas variable");
             {

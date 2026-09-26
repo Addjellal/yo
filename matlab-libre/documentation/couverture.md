@@ -120,10 +120,12 @@ totalité.
    scalaires, vecteurs, matrices —, périodes d'échantillonnage, ordre de
    calcul ; chaque erreur nomme le bloc par son chemin. Les boucles
    algébriques sont résolues par la méthode de Newton. Les solveurs sont
-   ceux de Simulink, sauf odeN et daessc : ode1 à ode5, ode8, ode1be et
-   ode14x (implicites, pour les systèmes raides) et FixedStepDiscrete à
-   pas fixe ; ode45, ode23, ode113 (Adams, d'ordre 1 à 12), ode15s (NDF,
-   d'ordre 1 à MaxOrder), ode23s, ode23t et ode23tb à pas variable, qui
+   tous ceux de Simulink : ode1 à ode5, ode8, ode1be et ode14x
+   (implicites, pour les systèmes raides), odeN (la formule que choisit
+   sa méthode d'intégration) et FixedStepDiscrete à pas fixe ; ode45,
+   ode23, ode113 (Adams, d'ordre 1 à 12), ode15s (NDF, d'ordre 1 à
+   MaxOrder), daessc (BDF, d'ordre 1 à MaxOrder), ode23s, ode23t et
+   ode23tb à pas variable, qui
    s'arrêtent sur les instants d'échantillonnage et les cassures des
    sources, et localisent les passages par zéro des relais, saturations,
    aiguillages, comparaisons et intégrateurs bornés ; les solveurs à pas
@@ -142,7 +144,8 @@ totalité.
    sous-systèmes d'action, Merge — calculent quand leur garde le
    permet, et tiennent ou remettent à zéro sorties et états comme dans
    Simulink. Les blocs de code — Fcn, MATLAB Function, Interpreted
-   MATLAB Function, S-fonctions de niveau 1 — et le bloc Chart, qui fait
+   MATLAB Function, S-fonctions de niveau 1 et de niveau 2 — et le bloc
+   Chart, qui fait
    faire un pas à une machine Stateflow à chaque instant, y prennent place.
    `sim` accepte le nom
    d'un modèle et journalise dans les deux formes de Simulink,
@@ -155,15 +158,15 @@ totalité.
    sous-systèmes se masquent (`Mask`, `MaskVariables`,
    `MaskValueString`), les bibliothèques se bâtissent avec
    `new_system(nom, 'Library')` et leurs copies restent liées ; les bus
-   se forment et se défont par nom (Bus Creator, Bus Selector) ; Data
+   se forment et se défont par nom (Bus Creator, Bus Selector), et se
+   typent par `Simulink.Bus` et `Simulink.BusElement` ; Data
    Type Conversion convertit en entier, simple ou booléen, avec arrondi
    et saturation. Les sous-systèmes itérés (For Iterator, While
    Iterator) et appelés par fonction y sont aussi, comme les entrées
    externes de `sim`, les références de modèle, les tables n-D, les
    rappels du modèle (InitFcn, StopFcn...) et SimulationCommand.
-   Manquent : les objets
-   `Simulink.Bus`, les types propagés d'un bloc à l'autre, et les
-   fonctions graphiques, jonctions et tables de vérité de Stateflow.
+   Manquent : les types de données propagés d'un bloc à l'autre, et
+   les fonctions graphiques, jonctions et tables de vérité de Stateflow.
    Stateflow a ses états emboîtés, ses régions parallèles, son
    historique, sa logique temporelle — SFAFTER, SFBEFORE, SFAT, SFEVERY,
    en réveils ou en secondes — et ses étiquettes écrites en texte :

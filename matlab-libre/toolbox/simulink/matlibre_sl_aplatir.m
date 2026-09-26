@@ -289,7 +289,7 @@ function modele = deplier(modele, k)
                 struct('initiale', {initiale}, 'revient', revient);
         end
         modele.blocs{n + sorties(j)}.type = 'signalconversion';
-        modele.blocs{n + sorties(j)}.parametres = struct();
+        modele.blocs{n + sorties(j)}.parametres = typeDuPort(interieur.parametres);
     end
     % Le premier port de contrôle devient la garde ; le Trigger d'un
     % sous-système qui a aussi un Enable devient le passe-plat de son
@@ -308,8 +308,10 @@ function modele = deplier(modele, k)
             modele.liens = [modele.liens; n + controles.trigger, n + g, 2, 1];
         end
     end
+    typesEntrees = cell(1, numel(entrees));
     for j = 1:numel(entrees)
         indice = n + entrees(j);
+        typesEntrees{j} = typeDuPort(modele.blocs{indice}.parametres);
         valeur = 0;
         if isfield(modele.blocs{indice}.parametres, 'Value')
             valeur = modele.blocs{indice}.parametres.Value;
@@ -347,7 +349,7 @@ function modele = deplier(modele, k)
         end
         interieur = n + entrees(port);
         modele.blocs{interieur}.type = 'signalconversion';
-        modele.blocs{interieur}.parametres = struct();
+        modele.blocs{interieur}.parametres = typesEntrees{port};
         modele.liens(l, 2) = interieur;
         modele.liens(l, 3) = 1;
     end
@@ -366,6 +368,16 @@ function modele = deplier(modele, k)
     % Et chaque sortie du sous-système est celle de l'OUTPORT de même rang.
     for j = 1:numel(sorties)
         modele.liens = [modele.liens; n + sorties(j), k, j, 1];
+    end
+end
+
+% Un port de sous-système devenu passe-plat garde son type de bus : le
+% bus qui le traverse doit être de ce type.
+function p = typeDuPort(parametres)
+    p = struct();
+    if isfield(parametres, 'OutDataTypeStr') && ...
+       ~isempty(matlibre_sl_bus('type', parametres.OutDataTypeStr))
+        p.OutDataTypeStr = parametres.OutDataTypeStr;
     end
 end
 

@@ -147,6 +147,11 @@ function varargout = sim(modele, varargin)
     end
     variable = strcmpi(matlibre_sl_config('type', config.Solver), 'Variable-step');
     solveur = lower(char(config.Solver));
+    if strcmp(solveur, 'oden')
+        % odeN : la formule que choisit ODENIntegrationMethod, à pas fixe,
+        % sans rien adapter
+        solveur = lower(char(config.ODENIntegrationMethod));
+    end
     pas = config.FixedStep;
     if ischar(pas) && strcmpi(pas, 'auto')
         pas = (tFinal - tDebut) / 50;
@@ -589,6 +594,19 @@ function entrees = entreesExternes(modele, donnees, nomModele)
             elseif strcmpi(champ{1}, 'PortDimensions') && isnumeric(b.parametres.(champ{1})) ...
                    && all(b.parametres.(champ{1}) > 0)
                 largeur = prod(double(b.parametres.(champ{1})));
+            end
+        end
+        % une entrée typée par un Simulink.Bus : autant de colonnes que le bus
+        % a d'éléments, chacun à sa largeur
+        for champ = fieldnames(b.parametres).'
+            if strcmpi(champ{1}, 'OutDataTypeStr')
+                nomType = matlibre_sl_bus('type', b.parametres.(champ{1}));
+                if ~isempty(nomType)
+                    chemin = [nomModele '/' char(b.nom)];
+                    f = matlibre_sl_bus('forme', matlibre_sl_bus('objet', nomType, chemin), ...
+                                        chemin);
+                    largeur = sum([f.largeur]);
+                end
             end
         end
         ports(end + 1) = rang; %#ok<AGROW>

@@ -38,6 +38,18 @@ bool Interpreteur::dansMethodeDe(const std::string& classe) const {
     return false;
 }
 
+// Dans son propre accesseur, une propriété se lit et s'écrit directement :
+// « obj.X = v » dans set.X ne rappelle pas set.X, « obj.X » dans get.X ne
+// rappelle pas get.X — sans quoi l'accesseur s'appellerait sans fin.
+bool Interpreteur::dansAccesseur(const std::string& accesseur) const {
+    for (auto it = piles_.rbegin(); it != piles_.rend(); ++it) {
+        const auto& p = *it;
+        if (!p || !p->fonction) continue;
+        return p->fonction->nom == accesseur;
+    }
+    return false;
+}
+
 std::vector<Valeur> Interpreteur::appelerMethode(const Valeur& objet,
                                                  const std::string& methode,
                                                  std::vector<Valeur> args, int nargout) {
@@ -187,7 +199,7 @@ Valeur Interpreteur::lireProprieteObjet(const Valeur& objet, const std::string& 
     if (def) {
         // Une propriété dépendante passe par son accesseur get.
         std::string accesseur = "get." + nom;
-        if (def->aMethode(accesseur)) {
+        if (def->aMethode(accesseur) && !dansAccesseur(accesseur)) {
             auto r = appelerMethode(objet, accesseur, {}, 1);
             return r.empty() ? Valeur::vide() : r[0];
         }
@@ -238,7 +250,7 @@ Valeur Interpreteur::ecrireProprieteObjet(Valeur objet, const std::string& nom,
                        "'. Declared properties: " + liste + ".");
         }
         std::string accesseur = "set." + nom;
-        if (def->aMethode(accesseur)) {
+        if (def->aMethode(accesseur) && !dansAccesseur(accesseur)) {
             auto r = appelerMethode(objet, accesseur, {valeur}, 1);
             if (!r.empty()) {
                 Valeur o = r[0];

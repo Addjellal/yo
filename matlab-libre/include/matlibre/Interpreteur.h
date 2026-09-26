@@ -9,6 +9,7 @@
 #include <atomic>
 #include <functional>
 #include <iosfwd>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <random>
@@ -155,6 +156,8 @@ public:
     std::vector<std::string> nomsNatifs() const;
     std::shared_ptr<FonctionUtilisateur> fonctionFichier(const std::string& nom);
     const std::map<std::string, std::string>& indexFichiers() const { return indexM_; }
+    // Range dans l'index les fonctions et classes d'un dossier « +paquet ».
+    void indexerPaquet(const std::filesystem::path& dossier, const std::string& prefixe);
     // Le fichier .m du dossier courant qui porte ce nom, s'il existe.
     // MATLAB donne la priorité au dossier courant sur le chemin ; ici on
     // ne le consulte qu'en dernier recours, quand le nom n'est ni natif
@@ -256,6 +259,7 @@ public:
     // MATLAB n'appelle alors ni subsref ni subsasgn, l'indexation à
     // l'intérieur d'une méthode reste celle du langage.
     bool dansMethodeDe(const std::string& classe) const;
+    bool dansAccesseur(const std::string& accesseur) const;
     std::vector<Valeur> appelerMethode(const Valeur& objet, const std::string& methode,
                                        std::vector<Valeur> args, int nargout);
     Valeur concatenerObjets(const std::vector<std::vector<Valeur>>& rangees);

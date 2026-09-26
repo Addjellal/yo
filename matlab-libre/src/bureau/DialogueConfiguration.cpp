@@ -90,11 +90,14 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                              QStringLiteral("À pas fixe — ode1 : Euler ; ode2 à ode5 gagnent "
                                             "un ordre chacun, ode8 va à l'ordre huit ; "
                                             "ode14x et ode1be, implicites, pour les systèmes "
-                                            "raides ; FixedStepDiscrete : sans état continu. "
+                                            "raides ; odeN : la formule que choisit sa méthode "
+                                            "d'intégration, sans l'adapter ; "
+                                            "FixedStepDiscrete : sans état continu. "
                                             "À pas variable — ode45 : Dormand-Prince ; ode23 : "
                                             "Bogacki-Shampine ; ode113 : Adams, pour les "
                                             "tolérances fines ; ode15s, ode23s, ode23t, "
-                                            "ode23tb : pour les systèmes raides."));
+                                            "ode23tb : pour les systèmes raides ; daessc : les "
+                                            "BDF, d'ordre 1 à l'ordre maximal."));
     colonneSolveur->addWidget(groupeSolveur);
 
     auto* groupeOptions = new QGroupBox(QStringLiteral("Options du solveur"));
@@ -117,13 +120,19 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                  QStringLiteral("À pas variable : l'erreur absolue admise par pas"));
     nouveauChamp(QStringLiteral("MaxOrder"), formulaireOptions,
                  QStringLiteral("Ordre maximal"),
-                 QStringLiteral("ode15s : l'ordre le plus haut de ses formules, de 1 à 5"));
+                 QStringLiteral("ode15s et daessc : l'ordre le plus haut de leurs formules, "
+                                "de 1 à 5"));
     nouveauChamp(QStringLiteral("ExtrapolationOrder"), formulaireOptions,
                  QStringLiteral("Ordre d'extrapolation"),
                  QStringLiteral("ode14x : l'ordre atteint en extrapolant, de 1 à 4"));
     nouveauChamp(QStringLiteral("NumberNewtonIterations"), formulaireOptions,
                  QStringLiteral("Itérations de Newton"),
                  QStringLiteral("ode14x et ode1be : les itérations de Newton à chaque pas"));
+    nouvelleListe(QStringLiteral("ODENIntegrationMethod"), formulaireOptions,
+                  QStringLiteral("Méthode d'intégration"),
+                  {QStringLiteral("ode1"), QStringLiteral("ode2"), QStringLiteral("ode3"),
+                   QStringLiteral("ode4"), QStringLiteral("ode5"), QStringLiteral("ode8")},
+                  QStringLiteral("odeN : la formule appliquée à chaque pas, sans l'adapter"));
     nouvelleListe(QStringLiteral("ZeroCrossControl"), formulaireOptions,
                   QStringLiteral("Passages par zéro"),
                   {QStringLiteral("UseLocalSettings"), QStringLiteral("EnableAll"),
@@ -200,11 +209,15 @@ void DialogueConfiguration::typeChange() {
 }
 
 // Certaines options n'appartiennent qu'à un solveur : l'ordre maximal à
-// ode15s, l'extrapolation à ode14x, les itérations de Newton à ode14x et
-// ode1be. Elles ne se règlent que lui choisi.
+// ode15s et daessc, l'extrapolation à ode14x, les itérations de Newton à
+// ode14x et ode1be, la méthode d'intégration à odeN. Elles ne se règlent
+// que lui choisi.
 void DialogueConfiguration::solveurChange() {
     const QString choisi = solveur_->currentText().toLower();
-    champs_.value(QStringLiteral("MaxOrder"))->setEnabled(choisi == QLatin1String("ode15s"));
+    champs_.value(QStringLiteral("MaxOrder"))
+        ->setEnabled(choisi == QLatin1String("ode15s") || choisi == QLatin1String("daessc"));
+    listes_.value(QStringLiteral("ODENIntegrationMethod"))
+        ->setEnabled(choisi == QLatin1String("oden"));
     champs_.value(QStringLiteral("ExtrapolationOrder"))
         ->setEnabled(choisi == QLatin1String("ode14x"));
     champs_.value(QStringLiteral("NumberNewtonIterations"))

@@ -395,14 +395,25 @@ NoeudPtr Analyseur::instruction() {
     // « obj = matlibre_heriter(obj, 'Parent', args) », ce qui dit
     // exactement ce qu'il fait : construire la part de parent et la
     // verser dans l'objet en cours de construction.
+    // Le parent peut être celui d'un paquet : « obj@geo.Point(x, y) ».
+    auto nomPuisParenthese = [&]() {
+        std::size_t k = 3;
+        while (jeton(k).estOp(".") && jeton(k + 1).genre == Genre::Ident) k += 2;
+        return jeton(k).estOp("(");
+    };
     if (t.genre == Genre::Ident && jeton(1).estOp("@") && !jeton(1).espaceAvant &&
-        jeton(2).genre == Genre::Ident && jeton(3).estOp("(")) {
+        jeton(2).genre == Genre::Ident && nomPuisParenthese()) {
         int ligneParent = t.ligne;
         std::string nomObjet = t.texte;
         avancer();   // l'objet
         avancer();   // @
         std::string nomParent = jeton().texte;
         avancer();   // le parent
+        while (jeton().estOp(".") && jeton(1).genre == Genre::Ident) {
+            avancer();
+            nomParent += "." + jeton().texte;
+            avancer();
+        }
         auto appel = Noeud::creer(TypeN::Acces);
         appel->ligne = ligneParent;
         auto cible = Noeud::creer(TypeN::Ident);
@@ -751,15 +762,20 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
     if (accepterOp("<")) {
         for (;;) {
             if (jeton().genre != Genre::Ident) break;
+            // Le nom entier du parent : « matlab.mixin.Copyable »,
+            // « paquet.Base » — un paquet est une partie du nom.
             std::string parent = jeton().texte;
             avancer();
             while (jeton().estOp(".") && jeton(1).genre == Genre::Ident) {
                 avancer();
-                parent = jeton().texte;
+                parent += "." + jeton().texte;
                 avancer();
             }
             c->parents.push_back(parent);
-            if (parent == "handle") c->poignee = true;
+            if (parent == "handle" || parent == "matlab.mixin.Copyable" ||
+                parent == "matlab.mixin.SetGet" || parent == "matlab.mixin.SetGetExactNames" ||
+                parent == "dynamicprops")
+                c->poignee = true;
             if (!accepterOp("&")) break;
         }
     }

@@ -891,7 +891,7 @@ casErreurs = {
     @() sim(decalage, 'Solver', 'ode45'), 'Simulink:SampleTime:InvalidOffset', 'decalage/h'
     @() sim(m, 'Solver', 'ode45', 'RelTol', -1), 'Simulink:Config:InvalidValue', 'RelTol'
     @() sim(m, 'Solver', 'ode45', 'MinStep', 1, 'MaxStep', 0.1), 'Simulink:Config:InvalidValue', 'pas minimal'
-    @() set_param(m, 'Solver', 'daessc'), 'Simulink:Commands:SolveurInconnu', 'ode15s'
+    @() set_param(m, 'Solver', 'ode7'), 'Simulink:Commands:SolveurInconnu', 'ode15s'
     };
 for kE = 1:size(casErreurs, 1)
     vu = '';
@@ -1936,7 +1936,7 @@ casErreurs = {
     @() set_param(m, 'ExtrapolationOrder', 0), 'Simulink:Config:InvalidValue', 'de 1 a 4'
     @() set_param(m, 'NumberNewtonIterations', 0), 'Simulink:Config:InvalidValue', 'au moins'
     @() simset('MaxOrder', 9), 'Simulink:Config:InvalidValue', 'MaxOrder'
-    @() set_param(m, 'Solver', 'odeN'), 'Simulink:Commands:SolveurInconnu', 'ode113'
+    @() set_param(m, 'Solver', 'ode6'), 'Simulink:Commands:SolveurInconnu', 'ode113'
     @() sim(decroissance, 'Solver', 'ode15s', 'MaxOrder', 0), 'Simulink:Config:InvalidValue', 'MaxOrder'
     @() sim(explose, 'Solver', 'ode15s', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'ode15s'
     @() sim(explose, 'Solver', 'ode113', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'essayez ode15s'
@@ -3404,6 +3404,467 @@ fprintf('batterie : %d cas d''erreur verifies\n', size(casErreurs, 1));
 cd(dossierAvantBatterie);
 rmdir(dossierBatterie, 's');
 
+%% ------------------------------------------------------- 27. odeN et daessc
+% odeN applique à pas fixe, sans l'adapter, la formule que choisit
+% ODENIntegrationMethod — ode3 par défaut : il rend, au bit près, ce que
+% rend le solveur du même nom. daessc intègre par les BDF, d'ordre 1 à
+% MaxOrder : les NDF d'ode15s sans leur correction.
+oscillateur = new_system('oscillateur');
+oscillateur = add_block(oscillateur, 'integrator', 'v', 'InitialCondition', 1);
+oscillateur = add_block(oscillateur, 'integrator', 'x', 'InitialCondition', 0);
+oscillateur = add_block(oscillateur, 'gain', 'k', 'Gain', -4);
+oscillateur = add_block(oscillateur, 'outport', 'y');
+oscillateur = add_line(oscillateur, 'v/1', 'x/1');
+oscillateur = add_line(oscillateur, 'x/1', 'k/1');
+oscillateur = add_line(oscillateur, 'k/1', 'v/1');
+oscillateur = add_line(oscillateur, 'x/1', 'y/1');
+for methode = {'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'ode8'}
+    a = sim(oscillateur, 'Solver', 'odeN', 'ODENIntegrationMethod', methode{1}, ...
+            'FixedStep', 0.05, 'StopTime', 2);
+    b = sim(oscillateur, 'Solver', methode{1}, 'FixedStep', 0.05, 'StopTime', 2);
+    assert(isequal(a.yout, b.yout), ['odeN avec ' methode{1}]);
+end
+a = sim(oscillateur, 'Solver', 'odeN', 'FixedStep', 0.05, 'StopTime', 2);
+b = sim(oscillateur, 'Solver', 'ode3', 'FixedStep', 0.05, 'StopTime', 2);
+assert(isequal(a.yout, b.yout), 'odeN par defaut : ode3');
+avecOdeN = set_param(oscillateur, 'Solver', 'odeN', 'ODENIntegrationMethod', 'ode5');
+assert(strcmp(get_param(avecOdeN, 'SolverType'), 'Fixed-step') && ...
+       strcmp(get_param(avecOdeN, 'ODENIntegrationMethod'), 'ode5'), 'odeN est a pas fixe');
+% le réglage voyage avec le modèle, dans le .slx
+fichierSlx = [tempname() '.slx'];
+save_system(avecOdeN, fichierSlx);
+relu = load_system(fichierSlx);
+delete(fichierSlx);
+assert(strcmp(get_param(relu, 'Solver'), 'odeN') && ...
+       strcmp(get_param(relu, 'ODENIntegrationMethod'), 'ode5'), 'odeN relu du .slx');
+
+% daessc, sur un système raide : chaque ordre maximal suit la solution
+% exacte, et un ordre plus haut fait moins de pas
+raide = new_system('raide');
+raide = add_block(raide, 'integrator', 'x', 'InitialCondition', 1);
+raide = add_block(raide, 'gain', 'k', 'Gain', -1000);
+raide = add_block(raide, 'step', 'u', 'Time', 0.5, 'After', 1000);
+raide = add_block(raide, 'sum', 's', 'Signs', '++');
+raide = add_block(raide, 'outport', 'y');
+raide = add_line(raide, 'x/1', 'k/1');
+raide = add_line(raide, 'k/1', 's/1');
+raide = add_line(raide, 'u/1', 's/2');
+raide = add_line(raide, 's/1', 'x/1');
+raide = add_line(raide, 'x/1', 'y/1');
+nPas = zeros(1, 5);
+for ordre = 1:5
+    o = sim(raide, 'Solver', 'daessc', 'MaxOrder', ordre, 'StopTime', 1, ...
+            'RelTol', 1e-6, 'AbsTol', 1e-8);
+    exacte = exp(-1000 * o.tout) .* (o.tout < 0.5) + ...
+             (o.tout >= 0.5) .* (1 + (exp(-500) - 1) * exp(-1000 * (o.tout - 0.5)));
+    assert(max(abs(o.yout - exacte)) < 1e-3, sprintf('daessc, ordre maximal %d', ordre));
+    nPas(ordre) = numel(o.tout);
+end
+assert(all(diff(nPas(1:3)) < 0) && nPas(5) <= nPas(3), ...
+       'daessc : un ordre maximal plus haut fait moins de pas');
+% sur l'oscillateur, daessc suit la solution exacte sin(2t)/2
+d = sim(oscillateur, 'Solver', 'daessc', 'StopTime', 3, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+assert(max(abs(d.yout - sin(2 * d.tout) / 2)) < 1e-5, 'daessc sur un oscillateur');
+assert(strcmp(get_param(set_param(oscillateur, 'Solver', 'daessc'), 'SolverType'), ...
+              'Variable-step'), 'daessc est a pas variable');
+% les BDF et les NDF sont deux familles : daessc et ode15s ne font pas les
+% mêmes pas
+e = sim(oscillateur, 'Solver', 'ode15s', 'StopTime', 3, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+assert(numel(d.tout) ~= numel(e.tout) || max(abs(d.yout - e.yout)) > 0, ...
+       'daessc n''est pas ode15s sous un autre nom');
+
+casErreurs = {
+    @() set_param(oscillateur, 'ODENIntegrationMethod', 'ode14x'), ...
+        'Simulink:Config:InvalidValue', 'ode8'
+    @() sim(oscillateur, 'Solver', 'daessc', 'MaxOrder', 6), 'Simulink:Config:InvalidValue', ...
+        'de 1 a 5'
+    @() set_param(oscillateur, 'Solver', 'ode6'), 'Simulink:Commands:SolveurInconnu', 'daessc'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('odeN et daessc, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('odeN et daessc : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
+%% ------------------------------------------- 28. Types de bus : Simulink.Bus
+% Un type de bus se définit comme dans Simulink, par Simulink.Bus et
+% Simulink.BusElement, et se range dans l'espace de travail de base. Un
+% Bus Creator, une entrée, une sortie, un port de sous-système le
+% reçoivent par OutDataTypeStr, 'Bus: Nom' : le bus prend les noms du
+% type, et ce qui ne s'y accorde pas est refusé en nommant le bloc.
+clear elementsBus
+elementsBus(1) = Simulink.BusElement;
+elementsBus(1).Name = 'position';
+elementsBus(2) = Simulink.BusElement;
+elementsBus(2).Name = 'vitesse';
+elementsBus(2).Dimensions = 2;
+Capteurs = Simulink.Bus;
+Capteurs.Elements = elementsBus;
+assignin('base', 'Capteurs', Capteurs);
+assert(strcmp(class(Capteurs), 'Simulink.Bus') && ...
+       strcmp(class(Capteurs.Elements), 'Simulink.BusElement') && ...
+       numel(Capteurs.Elements) == 2, 'un type de bus et ses elements');
+assert(strcmp(Simulink.BusElement().Name, 'a') && Simulink.BusElement().Dimensions == 1 && ...
+       strcmp(Simulink.BusElement().DataType, 'double'), 'les defauts d''un element');
+modeleVide = Simulink.Bus.createMATLABStruct('Capteurs');
+assert(isequal(fieldnames(modeleVide), {'position'; 'vitesse'}) && ...
+       modeleVide.position == 0 && isequal(modeleVide.vitesse, [0; 0]), ...
+       'createMATLABStruct : la forme du bus, en zeros');
+assert(isequal(Simulink.Bus.createMATLABStruct(Capteurs), modeleVide), ...
+       'createMATLABStruct accepte l''objet comme son nom');
+
+% Un Bus Creator typé : les éléments prennent les noms du type.
+typeBus = new_system('typeBus');
+typeBus = add_block(typeBus, 'constant', 'p', 'Value', 3);
+typeBus = add_block(typeBus, 'constant', 'v', 'Value', [1; 2]);
+typeBus = add_block(typeBus, 'buscreator', 'bc', 'Inputs', '2', ...
+                    'OutDataTypeStr', 'Bus: Capteurs');
+typeBus = add_block(typeBus, 'busselector', 'bs', 'OutputSignals', 'vitesse,position');
+typeBus = add_block(typeBus, 'outport', 'o1');
+typeBus = add_block(typeBus, 'outport', 'o2', 'OutDataTypeStr', 'Inherit: auto');
+typeBus = add_line(typeBus, 'p/1', 'bc/1');
+typeBus = add_line(typeBus, 'v/1', 'bc/2');
+typeBus = add_line(typeBus, 'bc/1', 'bs/1');
+typeBus = add_line(typeBus, 'bs/1', 'o1/1');
+typeBus = add_line(typeBus, 'bs/2', 'o2/1');
+r = sim(typeBus, 'StopTime', 1);
+assert(isequal(r.yout(end, :), [1 2 3]), 'le Bus Selector choisit par les noms du type');
+
+% Un sous-système dont l'entrée est typée reçoit le bus, et le lit par
+% ses noms ; une sortie de modèle typée reçoit un bus de son type.
+dedans = new_system('dedans');
+dedans = add_block(dedans, 'inport', 'e', 'OutDataTypeStr', 'Bus: Capteurs');
+dedans = add_block(dedans, 'busselector', 'bs', 'OutputSignals', 'position');
+dedans = add_block(dedans, 'gain', 'g', 'Gain', 10);
+dedans = add_block(dedans, 'outport', 's');
+dedans = add_line(dedans, 'e/1', 'bs/1');
+dedans = add_line(dedans, 'bs/1', 'g/1');
+dedans = add_line(dedans, 'g/1', 's/1');
+porteur = new_system('porteur');
+porteur = add_block(porteur, 'constant', 'p', 'Value', 4);
+porteur = add_block(porteur, 'constant', 'v', 'Value', [5; 6]);
+porteur = add_block(porteur, 'buscreator', 'bc', 'Inputs', 'position,vitesse');
+porteur = add_block(porteur, 'subsystem', 'sous', 'Model', dedans);
+porteur = add_block(porteur, 'outport', 'y');
+porteur = add_block(porteur, 'outport', 'b', 'OutDataTypeStr', 'Bus: Capteurs');
+porteur = add_line(porteur, 'p/1', 'bc/1');
+porteur = add_line(porteur, 'v/1', 'bc/2');
+porteur = add_line(porteur, 'bc/1', 'sous/1');
+porteur = add_line(porteur, 'sous/1', 'y/1');
+porteur = add_line(porteur, 'bc/1', 'b/1');
+r = sim(porteur, 'StopTime', 1);
+assert(r.yout(end, 1) == 40 && isequal(r.yout(end, 2:4), [4 5 6]), ...
+       'un bus de noms accordes traverse les ports types');
+
+% Une entrée de modèle typée est un bus : l'entrée externe en donne les
+% colonnes, élément après élément.
+entreeBus = new_system('entreeBus');
+entreeBus = add_block(entreeBus, 'inport', 'e', 'OutDataTypeStr', 'Bus: Capteurs');
+entreeBus = add_block(entreeBus, 'busselector', 'bs', 'OutputSignals', 'vitesse');
+entreeBus = add_block(entreeBus, 'outport', 'y');
+entreeBus = add_line(entreeBus, 'e/1', 'bs/1');
+entreeBus = add_line(entreeBus, 'bs/1', 'y/1');
+r = sim(entreeBus, [0 1], simset('Solver', 'ode1'), [0 1 7 8; 1 1 7 8]);
+assert(isequal(r.yout(end, :), [7 8]), 'une entree de modele qui est un bus');
+
+% Un bus emboîté : un élément dont DataType vaut 'Bus: Capteurs'.
+clear elementsBus
+elementsBus(1) = Simulink.BusElement;
+elementsBus(1).Name = 'mesures';
+elementsBus(1).DataType = 'Bus: Capteurs';
+elementsBus(2) = Simulink.BusElement;
+elementsBus(2).Name = 'instant';
+Etat = Simulink.Bus;
+Etat.Elements = elementsBus;
+assignin('base', 'Etat', Etat);
+emboite = new_system('emboite');
+emboite = add_block(emboite, 'constant', 'p', 'Value', 1);
+emboite = add_block(emboite, 'constant', 'v', 'Value', [2; 3]);
+emboite = add_block(emboite, 'clock', 't');
+emboite = add_block(emboite, 'buscreator', 'capteurs', 'Inputs', '2', ...
+                    'OutDataTypeStr', 'Bus: Capteurs');
+emboite = add_block(emboite, 'buscreator', 'etat', 'Inputs', '2', 'OutDataTypeStr', 'Bus: Etat');
+emboite = add_block(emboite, 'busselector', 'bs', 'OutputSignals', 'mesures.vitesse,instant');
+emboite = add_block(emboite, 'outport', 'o1');
+emboite = add_block(emboite, 'outport', 'o2');
+emboite = add_line(emboite, 'p/1', 'capteurs/1');
+emboite = add_line(emboite, 'v/1', 'capteurs/2');
+emboite = add_line(emboite, 'capteurs/1', 'etat/1');
+emboite = add_line(emboite, 't/1', 'etat/2');
+emboite = add_line(emboite, 'etat/1', 'bs/1');
+emboite = add_line(emboite, 'bs/1', 'o1/1');
+emboite = add_line(emboite, 'bs/2', 'o2/1');
+r = sim(emboite, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 1);
+assert(isequal(r.yout(end, :), [2 3 1]), 'un bus emboite, lu par « mesures.vitesse »');
+etatVide = Simulink.Bus.createMATLABStruct('Etat');
+assert(isstruct(etatVide.mesures) && isequal(etatVide.mesures.vitesse, [0; 0]) && ...
+       etatVide.instant == 0, 'createMATLABStruct descend dans un bus emboite');
+
+% Simulink.Bus.createObject bâtit le type du bus d'un Bus Creator.
+libre = new_system('libre');
+libre = add_block(libre, 'constant', 'a', 'Value', [1 2; 3 4]);
+libre = add_block(libre, 'constant', 'b', 'Value', 5);
+libre = add_block(libre, 'buscreator', 'bc', 'Inputs', 'matrice,nombre');
+libre = add_block(libre, 'terminator', 't');
+libre = add_line(libre, 'a/1', 'bc/1');
+libre = add_line(libre, 'b/1', 'bc/2');
+libre = add_line(libre, 'bc/1', 't/1');
+info = Simulink.Bus.createObject(libre, 'libre/bc');
+cree = evalin('base', info.busName);
+assert(strcmp(info.busName, 'slBus1') && isa(cree, 'Simulink.Bus') && ...
+       isequal({cree.Elements.Name}, {'matrice', 'nombre'}) && ...
+       isequal(cree.Elements(1).Dimensions, [2 2]) && cree.Elements(2).Dimensions == 1, ...
+       'createObject : le type du bus d''un Bus Creator');
+evalin('base', 'clear slBus1');
+
+% Les erreurs.
+assignin('base', 'pasUnBus', 3);
+clear elementsBus
+elementsBus(1) = Simulink.BusElement;
+elementsBus(1).Name = 'boucle';
+elementsBus(1).DataType = 'Bus: Boucle';
+Boucle = Simulink.Bus;
+Boucle.Elements = elementsBus;
+assignin('base', 'Boucle', Boucle);
+sousMauvais = new_system('sousMauvais');
+sousMauvais = add_block(sousMauvais, 'inport', 'e', 'OutDataTypeStr', 'Bus: Capteurs');
+sousMauvais = add_block(sousMauvais, 'terminator', 't');
+sousMauvais = add_line(sousMauvais, 'e/1', 't/1');
+nomsFaux = new_system('nomsFaux');
+nomsFaux = add_block(nomsFaux, 'constant', 'p', 'Value', 1);
+nomsFaux = add_block(nomsFaux, 'constant', 'v', 'Value', [1; 2]);
+nomsFaux = add_block(nomsFaux, 'buscreator', 'bc', 'Inputs', 'x,y');
+nomsFaux = add_block(nomsFaux, 'subsystem', 'sous', 'Model', sousMauvais);
+nomsFaux = add_line(nomsFaux, 'p/1', 'bc/1');
+nomsFaux = add_line(nomsFaux, 'v/1', 'bc/2');
+nomsFaux = add_line(nomsFaux, 'bc/1', 'sous/1');
+sortieSimple = new_system('sortieSimple');
+sortieSimple = add_block(sortieSimple, 'constant', 'c', 'Value', 1);
+sortieSimple = add_block(sortieSimple, 'outport', 'o', 'OutDataTypeStr', 'Bus: Capteurs');
+sortieSimple = add_line(sortieSimple, 'c/1', 'o/1');
+casErreurs = {
+    @() sim(busCreeAvec('Bus: Inexistant', {1, 2})), 'Simulink:Bus:BusObjectNotFound', 'mauvais/bc'
+    @() sim(busCreeAvec('Bus: pasUnBus', {1, 2})), 'Simulink:Bus:NotABusObject', 'pasUnBus'
+    @() sim(busCreeAvec('Bus: Capteurs', {1, [1; 2], 3})), ...
+        'Simulink:Bus:BusCreatorElementCountMismatch', 'mauvais/bc'
+    @() sim(busCreeAvec('Bus: Capteurs', {1, 2})), 'Simulink:Bus:ElementDimensionsMismatch', ...
+        'vitesse'
+    @() sim(busCreeAvec('Bus: Etat', {1, 2})), 'Simulink:Bus:ElementNotBus', 'mesures'
+    @() sim(busCreeAvec('Bus: Boucle', {1})), 'Simulink:Bus:BusRecursive', 'mauvais/bc'
+    @() sim(nomsFaux), 'Simulink:Bus:ElementNamesMismatch', 'nomsFaux/sous/e'
+    @() sim(sortieSimple), 'Simulink:Bus:SignalNotBus', 'sortieSimple/o'
+    @() Simulink.Bus.createMATLABStruct('Inexistant'), 'Simulink:Bus:BusObjectNotFound', ...
+        'Inexistant'
+    @() Simulink.Bus.createObject(typeBus, 'typeBus/p'), ...
+        'Simulink:Bus:CreateObjectNotBusCreator', 'typeBus/p'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('types de bus, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('types de bus : %d cas d''erreur verifies\n', size(casErreurs, 1));
+evalin('base', 'clear Capteurs Etat Boucle pasUnBus');
+
+%% --------------------------------- 29. S-fonctions de niveau 2 (M-S-Function)
+% Une S-fonction de niveau 2 est une fonction MATLAB d'un argument, le
+% bloc : sa fonction setup dit ses ports, ses paramètres, sa période, ses
+% états, et enregistre ses méthodes — Outputs, Update, Derivatives,
+% InitializeConditions, PostPropagationSetup. Le bloc « Level-2 MATLAB
+% S-Function » la nomme par FunctionName, et lui passe Parameters.
+dossierSFonctions = tempname();
+mkdir(dossierSFonctions);
+sourcesSFonctions = {
+    'msfGain', {'function msfGain(block)', '    setup(block);', 'end', ...
+        'function setup(block)', '    block.NumInputPorts = 1;', ...
+        '    block.NumOutputPorts = 1;', '    block.SetPreCompInpPortInfoToDynamic;', ...
+        '    block.SetPreCompOutPortInfoToDynamic;', ...
+        '    block.InputPort(1).DirectFeedthrough = true;', '    block.NumDialogPrms = 1;', ...
+        '    block.SampleTimes = [-1 0];', '    block.RegBlockMethod(''Outputs'', @Outputs);', ...
+        'end', 'function Outputs(block)', ...
+        '    block.OutputPort(1).Data = block.DialogPrm(1).Data * block.InputPort(1).Data;', ...
+        'end'}
+    'msfIntegre', {'function msfIntegre(block)', '    setup(block);', 'end', ...
+        'function setup(block)', '    block.NumInputPorts = 1;', ...
+        '    block.NumOutputPorts = 1;', '    block.SetPreCompPortInfoToDefaults;', ...
+        '    block.NumDialogPrms = 1;', '    block.NumContStates = 1;', ...
+        '    block.SampleTimes = [0 0];', ...
+        '    block.RegBlockMethod(''InitializeConditions'', @Initialiser);', ...
+        '    block.RegBlockMethod(''Outputs'', @Outputs);', ...
+        '    block.RegBlockMethod(''Derivatives'', @Derivees);', 'end', ...
+        'function Initialiser(block)', '    block.ContStates.Data = block.DialogPrm(1).Data;', ...
+        'end', 'function Outputs(block)', ...
+        '    block.OutputPort(1).Data = block.ContStates.Data;', 'end', ...
+        'function Derivees(block)', '    block.Derivatives.Data = block.InputPort(1).Data;', ...
+        'end'}
+    'msfCompte', {'function msfCompte(block)', '    setup(block);', 'end', ...
+        'function setup(block)', '    block.NumInputPorts = 1;', ...
+        '    block.NumOutputPorts = 1;', '    block.SetPreCompPortInfoToDefaults;', ...
+        '    block.SampleTimes = [0.5 0];', ...
+        '    block.RegBlockMethod(''PostPropagationSetup'', @Travail);', ...
+        '    block.RegBlockMethod(''InitializeConditions'', @Initialiser);', ...
+        '    block.RegBlockMethod(''Outputs'', @Outputs);', ...
+        '    block.RegBlockMethod(''Update'', @MiseAJour);', 'end', ...
+        'function Travail(block)', '    block.NumDworks = 1;', ...
+        '    block.Dwork(1).Name = ''total'';', '    block.Dwork(1).Dimensions = 1;', ...
+        '    block.Dwork(1).UsedAsDiscState = true;', 'end', ...
+        'function Initialiser(block)', '    block.Dwork(1).Data = 0;', 'end', ...
+        'function Outputs(block)', '    block.OutputPort(1).Data = block.Dwork(1).Data;', 'end', ...
+        'function MiseAJour(block)', ...
+        '    block.Dwork(1).Data = block.Dwork(1).Data + block.InputPort(1).Data;', 'end'}
+    'msfDeux', {'function msfDeux(block)', '    setup(block);', 'end', ...
+        'function setup(block)', '    block.NumInputPorts = 2;', ...
+        '    block.NumOutputPorts = 2;', '    block.SetPreCompInpPortInfoToDynamic;', ...
+        '    block.SetPreCompOutPortInfoToDynamic;', ...
+        '    block.InputPort(1).DirectFeedthrough = true;', ...
+        '    block.InputPort(2).DirectFeedthrough = true;', ...
+        '    block.RegBlockMethod(''Outputs'', @Outputs);', 'end', ...
+        'function Outputs(block)', ...
+        '    block.OutputPort(1).Data = block.InputPort(1).Data + block.InputPort(2).Data;', ...
+        '    block.OutputPort(2).Data = block.InputPort(1).Data .* block.InputPort(2).Data;', ...
+        'end'}
+    'msfLarge', {'function msfLarge(block)', '    block.NumInputPorts = 1;', ...
+        '    block.NumOutputPorts = 1;', '    block.SetPreCompPortInfoToDefaults;', ...
+        '    block.InputPort(1).DirectFeedthrough = true;', ...
+        '    block.RegBlockMethod(''Outputs'', @Outputs);', 'end', ...
+        'function Outputs(block)', '    block.OutputPort(1).Data = [1 2];', 'end'}
+    'msfPanne', {'function msfPanne(block)', '    block.NumInputPorts = 1;', ...
+        '    block.NumOutputPorts = 1;', '    block.SetPreCompPortInfoToDefaults;', ...
+        '    block.SampleTimes = [0 0];', ...
+        '    block.RegBlockMethod(''Outputs'', @Outputs);', 'end', ...
+        'function Outputs(block)', '    if block.CurrentTime > 0.25', ...
+        '        error(''calcul impossible'');', '    end', ...
+        '    block.OutputPort(1).Data = 0;', 'end'}
+    'msfSetup', {'function msfSetup(block)', '    block.NumInputPorts = 1;', ...
+        '    block.PortInexistant = 3;', 'end'}
+    'msfFixe', {'function msfFixe(block)', '    block.NumInputPorts = 1;', ...
+        '    block.NumOutputPorts = 1;', '    block.InputPort(1).Dimensions = 2;', ...
+        '    block.OutputPort(1).Dimensions = 1;', ...
+        '    block.RegBlockMethod(''Outputs'', @Outputs);', 'end', ...
+        'function Outputs(block)', '    block.OutputPort(1).Data = 0;', 'end'}
+    };
+for kS = 1:size(sourcesSFonctions, 1)
+    fid = fopen(fullfile(dossierSFonctions, [sourcesSFonctions{kS, 1} '.m']), 'w');
+    fprintf(fid, '%s\n', sourcesSFonctions{kS, 2}{:});
+    fclose(fid);
+end
+addpath(dossierSFonctions);
+
+% Un gain, par son paramètre, sur un vecteur : les ports dynamiques
+% prennent les dimensions du signal.
+m = new_system('niveau2');
+m = add_block(m, 'constant', 'u', 'Value', [1; 2; 3]);
+m = add_block(m, 'msfunction', 'g', 'FunctionName', 'msfGain', 'Parameters', '4');
+m = add_block(m, 'outport', 'y');
+m = add_line(m, 'u/1', 'g/1');
+m = add_line(m, 'g/1', 'y/1');
+[ne, ns] = matlibre_sl_ports(m.blocs{2});
+assert(ne == 1 && ns == 1, 'les ports d''une S-fonction de niveau 2 se lisent dans setup');
+r = sim(m, 'StopTime', 1);
+assert(isequal(r.yout(end, :), [4 8 12]), 'une S-fonction de niveau 2 : un gain sur un vecteur');
+assert(strcmp(get_param(m, 'g', 'FunctionName'), 'msfGain'), 'FunctionName se relit');
+
+% Un état continu : x' = u, x(0) = 1, sous tous les solveurs.
+m = new_system('integre');
+m = add_block(m, 'constant', 'u', 'Value', 2);
+m = add_block(m, 'msfunction', 'i', 'FunctionName', 'msfIntegre', 'Parameters', '1');
+m = add_block(m, 'outport', 'y');
+m = add_line(m, 'u/1', 'i/1');
+m = add_line(m, 'i/1', 'y/1');
+for solveur = {'ode1', 'ode4', 'ode45', 'ode15s'}
+    r = sim(m, 'Solver', solveur{1}, 'FixedStep', 0.1, 'StopTime', 1);
+    assert(max(abs(r.yout - (1 + 2 * r.tout))) < 1e-9, ...
+           ['un etat continu de niveau 2, sous ' solveur{1}]);
+end
+% refermée sur un gain, elle suit exp(-t) : sans transmission directe,
+% elle rompt la boucle
+m = add_block(m, 'gain', 'k', 'Gain', -1);
+m = delete_line(m, 'u/1', 'i/1');
+m = add_line(m, 'i/1', 'k/1');
+m = add_line(m, 'k/1', 'i/1');
+r = sim(m, 'Solver', 'ode45', 'StopTime', 2, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+assert(max(abs(r.yout - exp(-r.tout))) < 1e-6, 'une S-fonction de niveau 2 dans une boucle');
+
+% Un état discret dans un vecteur de travail, mis à jour par Update à
+% chaque période de 0,5 s.
+m = new_system('compte');
+m = add_block(m, 'constant', 'u', 'Value', 1);
+m = add_block(m, 'msfunction', 'c', 'FunctionName', 'msfCompte');
+m = add_block(m, 'outport', 'y');
+m = add_line(m, 'u/1', 'c/1');
+m = add_line(m, 'c/1', 'y/1');
+r = sim(m, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.5, 'StopTime', 2);
+assert(isequal(r.yout(:)', 0:4), 'Update et Dwork : un compteur');
+% deux simulations de suite repartent chacune de zéro
+r = sim(m, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.5, 'StopTime', 2);
+assert(isequal(r.yout(:)', 0:4), 'chaque simulation recree le bloc');
+
+% Deux entrées, deux sorties.
+m = new_system('deux');
+m = add_block(m, 'constant', 'a', 'Value', [1; 2]);
+m = add_block(m, 'constant', 'b', 'Value', [3; 4]);
+m = add_block(m, 'msfunction', 'f', 'FunctionName', 'msfDeux');
+m = add_block(m, 'outport', 'somme');
+m = add_block(m, 'outport', 'produit');
+m = add_line(m, 'a/1', 'f/1');
+m = add_line(m, 'b/1', 'f/2');
+m = add_line(m, 'f/1', 'somme/1');
+m = add_line(m, 'f/2', 'produit/1');
+r = sim(m, 'StopTime', 1);
+assert(isequal(r.yout(end, :), [4 6 3 8]), 'deux entrees, deux sorties');
+
+% Les erreurs, chacune nommant la S-fonction et le bloc.
+casErreurs = {
+    @() sim(niveau2Avec('', '')), 'Simulink:blocks:SFunctionNotFound', 'mauvais/s'
+    @() sim(niveau2Avec('msfInexistante', '')), 'Simulink:blocks:SFunctionNotFound', ...
+        'msfInexistante'
+    @() sim(niveau2Avec('msfGain', '')), 'Simulink:blocks:SFunctionParameterCount', 'mauvais/s'
+    @() sim(niveau2Avec('msfGain', '1, 2')), 'Simulink:blocks:SFunctionParameterCount', ...
+        'attend 1'
+    @() sim(niveau2Avec('msfLarge', '')), 'Simulink:blocks:SFunctionOutputDimensions', ...
+        'mauvais/s'
+    @() sim(niveau2Avec('msfPanne', ''), 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 1), ...
+        'Simulink:blocks:SFunctionError', 'Outputs a t = 0.3'
+    @() sim(niveau2Avec('msfSetup', '')), 'Simulink:blocks:SFunctionSetupError', 'mauvais/s'
+    @() sim(niveau2Avec('msfFixe', '')), 'Simulink:blocks:SFunctionInputDimensions', ...
+        'mauvais/s'
+    @() sim(niveau2Avec('msfGain', 'inconnueDuTout')), 'Simulink:blocks:SFunctionParameters', ...
+        'inconnueDuTout'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('S-fonctions de niveau 2, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('S-fonctions de niveau 2 : %d cas d''erreur verifies\n', size(casErreurs, 1));
+rmpath(dossierSFonctions);
+rmdir(dossierSFonctions, 's');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -3548,4 +4009,27 @@ function s = batterieFautif(type, nom, valeur)
         s = add_block(s, 'outport', sprintf('o%d', j));
         s = add_line(s, sprintf('b/%d', j), sprintf('o%d/1', j));
     end
+end
+
+% Un Bus Creator typé TYPE, nourri de constantes aux valeurs VALEURS.
+function m = busCreeAvec(type, valeurs)
+    m = new_system('mauvais');
+    m = add_block(m, 'buscreator', 'bc', 'Inputs', num2str(numel(valeurs)), ...
+                  'OutDataTypeStr', type);
+    for q = 1:numel(valeurs)
+        m = add_block(m, 'constant', sprintf('c%d', q), 'Value', valeurs{q});
+        m = add_line(m, sprintf('c%d/1', q), sprintf('bc/%d', q));
+    end
+    m = add_block(m, 'terminator', 't');
+    m = add_line(m, 'bc/1', 't/1');
+end
+
+% Un modele ou une S-fonction de niveau 2, NOM, recoit PARAMETRES.
+function m = niveau2Avec(nom, parametres)
+    m = new_system('mauvais');
+    m = add_block(m, 'constant', 'u', 'Value', 1);
+    m = add_block(m, 'msfunction', 's', 'FunctionName', nom, 'Parameters', parametres);
+    m = add_block(m, 'terminator', 't');
+    m = add_line(m, 'u/1', 's/1');
+    m = add_line(m, 's/1', 't/1');
 end

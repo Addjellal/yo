@@ -133,12 +133,20 @@ function c = compiler(modele, options)
                 c.p{k} = struct('VariableName', '', 'Interpolate', 'on', ...
                                 'OutputAfterFinalValue', 'Holding final value', ...
                                 'SampleTime', 0, 'ZeroCross', 'on', ...
-                                'Donnees', entreesExternes{rang});
+                                'Donnees', entreesExternes{rang}, ...
+                                'OutDataTypeStr', champ(c.p{k}, 'OutDataTypeStr', ''));
             end
         end
         c.code(k) = codeDe(c.types{k});
         [ne, ns] = matlibre_sl_ports(struct('type', c.types{k}, 'nom', bloc.nom, ...
                                             'parametres', c.p{k}), c.types{k});
+        if strcmp(c.types{k}, 'msfunction') && any(isnan([ne ns]))
+            % Une S-fonction de niveau 2 dit ses ports dans setup : si l'on
+            % n'a pas pu les lire, c'est setup qu'on refait, pour rendre
+            % l'erreur qui dit pourquoi.
+            matlibre_sl_msfonction('preparer', c.p{k}.FunctionName, ...
+                                   parametresSFonction(c.p{k}, c.chemins{k}), c.chemins{k});
+        end
         if ~(isfinite(ne) && ne >= 0 && ne == round(ne) && isfinite(ns) && ...
              ns >= 0 && ns == round(ns))
             error('Simulink:Parameters:InvalidPortCount', ...
@@ -230,6 +238,7 @@ function c = compiler(modele, options)
     % --- 6. dimensions ------------------------------------------------------
     c.dims = propagerDimensions(c);
     c.dimsCourants = c.dims;   % la forme des bus se lit sur les dimensions
+    verifierTypesBus(c);
     c.largeur = zeros(1, c.nPorts);
     for gp = 1:c.nPorts
         c.largeur(gp) = prod(c.dims{gp});
@@ -487,7 +496,7 @@ function x = codeDe(type)
                 'if', 110; 'switchcase', 111; 'merge', 112; 'garde', 113; ...
                 'enableport', 114; 'triggerport', 115; 'actionport', 116; ...
                 'fcn', 100; 'matlabfunction', 101; 'interpretedmatlabfunction', 102; ...
-                'sfunction', 103; 'chart', 104; ...
+                'sfunction', 103; 'chart', 104; 'msfunction', 109; ...
                 'buscreator', 62; 'busselector', 63; 'datatypeconversion', 34; ...
                 'chirp', 15; 'counterfreerunning', 16; 'counterlimited', 17; ...
                 'signalgenerator', 18; 'repeatingsequencestair', 19; ...
@@ -667,6 +676,8 @@ function d = transmissionDirecte(c, k)
             d = ~strcmp(p.IntegratorMethod, 'ForwardEuler');
         case 'sfunction'
             d = c.fonctions{k}.tailles(6) ~= 0;
+        case 'msfunction'
+            d = c.fonctions{k}.direct;
         case {'discretetransferfcn', 'discretefilter'}
             [b, ~] = filtreDiscret(p.Numerator, p.Denominator, ...
                                    strcmp(c.types{k}, 'discretetransferfcn'), c.chemins{k});
@@ -940,7 +951,13 @@ function s = regleDims(c, k, dE, complet, forcer)
             s = {accorder({dimsDe(p.Minimum), dimsDe(p.Maximum), dimsDe(p.Seed)}, c, k, ...
                           {'Minimum', 'Maximum', 'Seed'})};
         case 'inport'
-            if isnumeric(p.PortDimensions) && all(p.PortDimensions > 0)
+            nomType = matlibre_sl_bus('type', champ(p, 'OutDataTypeStr', ''));
+            if ~isempty(nomType)
+                % une entrée qui est un bus : sa largeur est celle du type
+                f = matlibre_sl_bus('forme', matlibre_sl_bus('objet', nomType, c.chemins{k}), ...
+                                    c.chemins{k});
+                s = {[sum([f.largeur]) 1]};
+            elseif isnumeric(p.PortDimensions) && all(p.PortDimensions > 0)
                 d = double(p.PortDimensions);
                 if isscalar(d), d = [d 1]; end
                 s = {d(1:2)};
@@ -963,7 +980,7 @@ function s = regleDims(c, k, dE, complet, forcer)
             if ~complet && ~forcer && ~ismember(t, {'statespace', 'transferfcn', ...
                     'zeropole', 'discretetransferfcn', 'discretefilter', ...
                     'discretestatespace', 'integrator', 'delay', 'memory', ...
-                    'discreteintegrator', 'sfunction', 'secondorderintegrator', ...
+                    'discreteintegrator', 'sfunction', 'msfunction', 'secondorderintegrator', ...
                     'tappeddelay', 'ratetransition'})
                 return
             end
@@ -1297,6 +1314,25 @@ function s = regleTraitement(c, k, dE, complet, forcer)
             s = dimsFonction(c, k, dE);
         case 'chart'
             s = c.fonctions{k}.dims;
+        case 'msfunction'
+            % Ses ports dynamiques prennent les dimensions de ce qu'ils
+            % reçoivent : on attend de les connaître, sauf pour les sorties
+            % fixées, qui se connaissent seules.
+            code = c.fonctions{k};
+            if complet || forcer
+                s = matlibre_sl_msfonction('dimensions', code, dE, c.chemins{k});
+            else
+                s = {};
+                for j = 1:code.bloc.NumOutputPorts
+                    d = double(code.bloc.OutputPort(j).Dimensions);
+                    if isequal(d, -1)
+                        s = {};
+                        return
+                    end
+                    if isscalar(d), d = [d 1]; end
+                    s{j} = d; %#ok<AGROW>
+                end
+            end
         case 'sfunction'
             ny = c.fonctions{k}.tailles(3);
             if ny < 0
@@ -1495,7 +1531,7 @@ function c = periodes(c, pas)
                 c.majeurSeul(k) = true;
             case {'enableport', 'triggerport', 'actionport'}
                 c.cadence(k) = Inf;   % hors d'un sous-système : sans effet
-            case 'sfunction'
+            case {'sfunction', 'msfunction'}
                 ts = c.fonctions{k}.ts;
                 if ts(1) == -1
                     c.cadence(k) = -1;
@@ -2339,6 +2375,11 @@ function c = abaisser(c, pas, tDebut)
             case 'matlabfunction'         % [entrées; sorties]  poignée dans objets
                 c.objets{k} = c.fonctions{k}.h;
                 seg = [c.nIn(k); c.nOut(k)];
+            case 'msfunction'             % [entrées; sorties]  le bloc dans objets
+                x0 = matlibre_sl_msfonction('demarrer', c.fonctions{k}, ch);
+                c = ajouterEtat(c, k, x0);
+                c.objets{k} = c.fonctions{k};
+                seg = [c.nIn(k); c.nOut(k)];
             case 'sfunction'              % [continus; discrets; sorties; entrées]
                 T0 = c.fonctions{k};
                 nc = T0.tailles(1);
@@ -2729,6 +2770,9 @@ function code = preparerCode(c, k)
         case 'matlabfunction'
             code.h = matlibre_sl_fonction('installer', p.Script, ch);
             code.persistante = ~isempty(regexp(char(p.Script), '(^|\n)\s*persistent\s', 'once'));
+        case 'msfunction'
+            code = matlibre_sl_msfonction('preparer', p.FunctionName, ...
+                                          parametresSFonction(p, ch), ch);
         case 'sfunction'
             parametres = p.Parameters;
             if ischar(parametres) || isstring(parametres)
@@ -2750,6 +2794,23 @@ function code = preparerCode(c, k)
                 error('Simulink:blocks:SFunctionSizes', ...
                       'La S-fonction du bloc ''%s'' annonce un nombre d''etats negatif.', ch);
             end
+    end
+end
+
+% Les paramètres d'une S-fonction : la cellule que donne son paramètre
+% Parameters, un texte évalué dans l'espace de travail de base.
+function parametres = parametresSFonction(p, ch)
+    parametres = p.Parameters;
+    if ischar(parametres) || isstring(parametres)
+        try
+            parametres = evalin('base', ['{' char(parametres) '}']);
+        catch err
+            error('Simulink:blocks:SFunctionParameters', ...
+                  'Les parametres ''%s'' du bloc ''%s'' ne s''evaluent pas : %s', ...
+                  char(p.Parameters), ch, err.message);
+        end
+    elseif ~iscell(parametres)
+        parametres = {parametres};
     end
 end
 
@@ -2881,6 +2942,19 @@ function forme = formeBus(c, gp)
             return
         end
         a = c.proprio(gp);
+        % Un bloc typé — un Bus Creator, une entrée, un port de
+        % sous-système dont OutDataTypeStr vaut 'Bus: X' — donne au bus la
+        % forme de son type : VERIFIERTYPESBUS a vérifié qu'il la porte.
+        nomType = '';
+        if any(strcmp(c.types{a}, {'buscreator', 'signalconversion', 'inport', ...
+                                   'fromworkspace'}))
+            nomType = matlibre_sl_bus('type', champ(c.p{a}, 'OutDataTypeStr', ''));
+        end
+        if ~isempty(nomType)
+            forme = matlibre_sl_bus('forme', matlibre_sl_bus('objet', nomType, ...
+                                                              c.chemins{a}), c.chemins{a});
+            return
+        end
         switch c.types{a}
             case 'buscreator'
                 break
@@ -2907,6 +2981,72 @@ function forme = formeBus(c, gp)
         forme(end + 1) = struct('nom', noms{j}, 'dims', d, 'largeur', w, 'debut', debut, ...
                                 'sous', {formeBus(c, source)}); %#ok<AGROW>
         debut = debut + w;
+    end
+end
+
+% Les blocs typés par un Simulink.Bus : le type doit exister, et le bus
+% qui les traverse en être. Un Bus Creator reçoit autant d'entrées que le
+% type a d'éléments, chacune à ses dimensions — un bus emboîté du type
+% emboîté ; une entrée, une sortie, un port de sous-système reçoivent un
+% bus de leur type.
+function verifierTypesBus(c)
+    for k = 1:c.n
+        if ~any(strcmp(c.types{k}, {'buscreator', 'signalconversion', 'outport', 'inport'}))
+            continue
+        end
+        nomType = matlibre_sl_bus('type', champ(c.p{k}, 'OutDataTypeStr', ''));
+        if isempty(nomType)
+            continue
+        end
+        objet = matlibre_sl_bus('objet', nomType, c.chemins{k});
+        attendue = matlibre_sl_bus('forme', objet, c.chemins{k});
+        switch c.types{k}
+            case 'inport'
+                continue   % la source du bus : elle a la forme de son type
+            case 'buscreator'
+                if c.nIn(k) ~= numel(attendue)
+                    error('Simulink:Bus:BusCreatorElementCountMismatch', ...
+                          ['Le Bus Creator ''%s'' forme un bus de type ''%s'', qui a %d ' ...
+                           'element(s) : il lui faut autant d''entrees, et il en a %d.'], ...
+                          c.chemins{k}, nomType, numel(attendue), c.nIn(k));
+                end
+                for j = 1:c.nIn(k)
+                    source = c.entrees{k}(j);
+                    largeur = 1;
+                    if source > 0
+                        largeur = prod(c.dims{source});
+                    end
+                    if ~isempty(attendue(j).sous)
+                        vu = [];
+                        if source > 0
+                            vu = formeBus(c, source);
+                        end
+                        if isempty(vu)
+                            error('Simulink:Bus:ElementNotBus', ...
+                                  ['Le Bus Creator ''%s'' forme un bus de type ''%s'' : son ' ...
+                                   'entree %d, l''element ''%s'', doit etre un bus.'], ...
+                                  c.chemins{k}, nomType, j, attendue(j).nom);
+                        end
+                        emboite = matlibre_sl_bus('type', objet.Elements(j).DataType);
+                        matlibre_sl_bus('accorder', vu, ...
+                                        matlibre_sl_bus('objet', emboite, c.chemins{k}), ...
+                                        c.chemins{k}, emboite);
+                    elseif largeur ~= attendue(j).largeur
+                        error('Simulink:Bus:ElementDimensionsMismatch', ...
+                              ['Le Bus Creator ''%s'' forme un bus de type ''%s'' : son ' ...
+                               'entree %d, l''element ''%s'', doit etre de dimensions %s, ' ...
+                               'et elle est de largeur %d.'], c.chemins{k}, nomType, j, ...
+                              attendue(j).nom, mat2str(attendue(j).dims), largeur);
+                    end
+                end
+            otherwise   % une sortie, un port de sous-système
+                source = c.entrees{k}(1);
+                vu = [];
+                if source > 0
+                    vu = formeBus(c, source);
+                end
+                matlibre_sl_bus('accorder', vu, objet, c.chemins{k}, nomType);
+        end
     end
 end
 

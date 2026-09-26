@@ -308,19 +308,62 @@ void Interpreteur::reindexerChemin() {
         for (const auto& entree : fs::directory_iterator(*it, ec)) {
             if (!entree.is_directory()) continue;
             std::string nom = entree.path().filename().string();
-            if (nom.empty() || (nom[0] != '@' && nom[0] != '+')) continue;
+            if (nom.size() < 2 || (nom[0] != '@' && nom[0] != '+')) continue;
+            if (nom[0] == '+') {
+                indexerPaquet(entree.path(), nom.substr(1));
+                continue;
+            }
             for (const auto& f : fs::directory_iterator(entree.path(), ec)) {
                 if (!f.is_regular_file()) continue;
                 std::string fn = f.path().filename().string();
                 if (fn.size() < 3 || fn.substr(fn.size() - 2) != ".m") continue;
                 std::string base = fn.substr(0, fn.size() - 2);
-                if (nom[0] == '@' && base == nom.substr(1)) indexClasses_[base] = f.path().string();
+                if (base == nom.substr(1)) indexClasses_[base] = f.path().string();
                 else if (!indexM_.count(base)) indexM_[base] = f.path().string();
             }
         }
     }
     cacheFonctions_.clear();
     cacheClasses_.clear();
+}
+
+// Un dossier « +paquet » : ses fonctions et ses classes se nomment
+// « paquet.f », un « +sous » dedans « paquet.sous.f », une classe
+// « @C » dedans « paquet.C ». Comme sous MATLAB, elles ne répondent pas à
+// leur nom court : c'est ce qui permet à deux paquets d'avoir chacun leur
+// « Bus » sans se gêner.
+void Interpreteur::indexerPaquet(const fs::path& dossier, const std::string& prefixe) {
+    std::error_code ec;
+    for (const auto& f : fs::directory_iterator(dossier, ec)) {
+        std::string n = f.path().filename().string();
+        if (f.is_regular_file()) {
+            if (n.size() < 3 || n.substr(n.size() - 2) != ".m") continue;
+            indexM_[prefixe + "." + n.substr(0, n.size() - 2)] = f.path().string();
+        } else if (f.is_directory() && n.size() > 1 && n[0] == '+') {
+            indexerPaquet(f.path(), prefixe + "." + n.substr(1));
+        } else if (f.is_directory() && n.size() > 1 && n[0] == '@') {
+            fs::path principal = f.path() / (n.substr(1) + ".m");
+            if (fs::is_regular_file(principal, ec))
+                indexClasses_[prefixe + "." + n.substr(1)] = principal.string();
+        }
+    }
+}
+
+// Une classe lue dans un paquet porte son nom qualifié : « Simulink.Bus »,
+// non « Bus ». Le constructeur, rangé sous le nom court, suit.
+static void qualifierClasse(const std::shared_ptr<DefinitionClasse>& def,
+                            const std::string& qualifie) {
+    if (!def || def->nom == qualifie) return;
+    std::size_t point = qualifie.find_last_of('.');
+    if (point == std::string::npos || qualifie.substr(point + 1) != def->nom) return;
+    auto ctor = def->methodes.find(def->nom);
+    if (ctor != def->methodes.end()) {
+        auto f = ctor->second;
+        def->methodes.erase(ctor);
+        def->methodes[qualifie] = f;
+    }
+    def->nom = qualifie;
+    for (auto& kv : def->methodes) kv.second->classeProprietaire = qualifie;
 }
 
 static std::string lireFichier(const std::string& chemin) {
@@ -391,6 +434,7 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
         // tel et l'on ne rend rien.
         for (auto& c : u.classes) {
             relierClasse(c, u.fonctions);
+            qualifierClasse(c, nom);
             c->aide = aideDepuisSource(source);
             c->fichier = chemin;
             cacheClasses_[c->nom] = c;
@@ -564,8 +608,13 @@ void Interpreteur::heriterParents(const std::shared_ptr<DefinitionClasse>& def) 
         // « handle » n'a pas de fichier : c'est le marqueur qui dit que la
         // classe se copie par reference. Il compte quand meme comme
         // ancetre, pour que « isa(x, 'handle') » et SUPERCLASSES le disent.
-        if (nomParent == "handle") {
-            def->ancetres.push_back("handle");
+        static const std::set<std::string> poignees = {
+            "handle", "matlab.mixin.Copyable", "matlab.mixin.SetGet",
+            "matlab.mixin.SetGetExactNames", "dynamicprops"};
+        if (poignees.count(nomParent) && !classeDefinie(nomParent)) {
+            def->ancetres.push_back(nomParent);
+            if (nomParent != "handle") def->ancetres.push_back("handle");
+            def->poignee = true;
             continue;
         }
         auto parent = classeDefinie(nomParent);
@@ -622,6 +671,7 @@ std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string&
         UniteCompilee u = compiler(source, itm->second);
         if (u.classes.empty()) return nullptr;
         relierClasse(u.classes[0], u.fonctions);
+        qualifierClasse(u.classes[0], nom);
         // Le bloc de commentaires sous « classdef » est l'aide de la
         // classe, comme celui sous « function » l'est d'une fonction :
         // « help tf » doit le trouver.
@@ -635,6 +685,7 @@ std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string&
     UniteCompilee u = compiler(source, it->second);
     if (u.classes.empty()) return nullptr;
     relierClasse(u.classes[0], u.fonctions);
+    qualifierClasse(u.classes[0], nom);
     u.classes[0]->aide = aideDepuisSource(source);
     u.classes[0]->fichier = it->second;
     cacheClasses_[nom] = u.classes[0];
@@ -1906,14 +1957,67 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
             std::size_t segments = nomPointe(nom, n->acces);
             std::string compose = nom;
             for (std::size_t k = 0; k < segments; ++k) compose += "." + n->acces[k].nom;
-            std::vector<Valeur> args;
-            debut = segments;
-            if (n->acces.size() > segments && n->acces[segments].genre == '(') {
-                args = evaluerListe(n->acces[segments].args);
-                debut = segments + 1;
+            // « Simulink.Bus.createObject(...) », « paquet.C.CONSTANTE » : un
+            // membre statique d'une classe de paquet, non un objet construit.
+            std::shared_ptr<DefinitionClasse> defPaquet;
+            if (n->acces.size() > segments && n->acces[segments].genre == '.' &&
+                !natif(compose))
+                defPaquet = classeDefinie(compose);
+            bool statique = false;
+            if (defPaquet) {
+                const std::string& membre = n->acces[segments].nom;
+                if (membre == "empty" && !defPaquet->aMethode("empty")) {
+                    // « paquet.C.empty(0, 1) » : le tableau vide de la classe
+                    Dims d = {0, 0};
+                    debut = segments + 1;
+                    if (n->acces.size() > debut && n->acces[debut].genre == '(') {
+                        auto args = evaluerListe(n->acces[debut].args);
+                        d.clear();
+                        if (args.size() == 1 && args[0].nelem() > 1) {
+                            for (double x : args[0].re) d.push_back(std::max(0, (int)x));
+                        } else {
+                            for (const auto& a : args) d.push_back(std::max(0, (int)a.scal()));
+                        }
+                        while (d.size() < 2) d.push_back(d.empty() ? 0 : d[0]);
+                        debut += 1;
+                    }
+                    bool aZero = false;
+                    for (int x : d) aZero = aZero || x == 0;
+                    if (!aZero)
+                        erreur("MATLAB:class:emptyMustBeZero",
+                               "At least one dimension must be zero for 'empty'.");
+                    courant.push_back(valeurVideDeClasse(compose, d));
+                    statique = true;
+                } else if (defPaquet->aMethode(membre)) {
+                    std::vector<Valeur> args;
+                    debut = segments + 1;
+                    if (n->acces.size() > debut && n->acces[debut].genre == '(') {
+                        args = evaluerListe(n->acces[debut].args);
+                        debut += 1;
+                    }
+                    courant = appelerUtilisateur(
+                        defPaquet->methodes[membre], args,
+                        debut < n->acces.size() ? 1 : std::max(nargout, 1));
+                    statique = true;
+                } else {
+                    auto itd = defPaquet->defauts.find(membre);
+                    if (itd != defPaquet->defauts.end() && itd->second) {
+                        courant.push_back(evaluer(itd->second));
+                        debut = segments + 1;
+                        statique = true;
+                    }
+                }
             }
-            courant = appeler(compose, args,
-                              debut < n->acces.size() ? 1 : std::max(nargout, 1));
+            if (!statique) {
+                std::vector<Valeur> args;
+                debut = segments;
+                if (n->acces.size() > segments && n->acces[segments].genre == '(') {
+                    args = evaluerListe(n->acces[segments].args);
+                    debut = segments + 1;
+                }
+                courant = appeler(compose, args,
+                                  debut < n->acces.size() ? 1 : std::max(nargout, 1));
+            }
         } else if (!n->acces.empty() && n->acces[0].genre == '.' &&
                    n->acces[0].nom == "empty" && classeVide(nom) &&
                    !(classeDefinie(nom) && classeDefinie(nom)->aMethode("empty"))) {
@@ -2075,7 +2179,24 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     }
                 }
                 if (base.classe == Classe::Objet) {
-                    suivant.push_back(lireProprieteObjet(base, nom));
+                    // Un tableau d'objets : « e.Name » est la liste des
+                    // propriétés de chacun, comme pour un tableau de
+                    // structures — « {e.Name} » les réunit toutes. Un
+                    // objet qui range son contenu d'un seul tenant (une
+                    // classe de la boîte à outils qui porte ses éléments
+                    // dans ses champs) se lit comme avant.
+                    const std::size_t nb = base.nelem();
+                    bool tableau = nb > 1 && !estCarte(base) && base.st &&
+                                   base.st->champs.count(nom) &&
+                                   base.st->champs.at(nom).size() == nb;
+                    if (!tableau) {
+                        suivant.push_back(lireProprieteObjet(base, nom));
+                    } else {
+                        for (std::size_t i = 0; i < nb; ++i) {
+                            std::vector<Valeur> idx = {Valeur::scalaire((double)(i + 1))};
+                            suivant.push_back(lireProprieteObjet(indexer(base, idx, '('), nom));
+                        }
+                    }
                     continue;
                 }
                 if (!base.estStructure())

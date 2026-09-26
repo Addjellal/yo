@@ -180,6 +180,19 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
                 nEntrees = NaN;
                 nSorties = NaN;
             end
+        case 'msfunction'
+            % Une S-fonction de niveau 2 dit ses ports dans setup.
+            try
+                parametres = lire(p, 'Parameters', '');
+                if ischar(parametres) || isstring(parametres)
+                    parametres = evalin('base', ['{' char(parametres) '}']);
+                end
+                [nEntrees, nSorties] = matlibre_sl_msfonction('ports', ...
+                    lire(p, 'FunctionName', ''), parametres, bloc.nom);
+            catch
+                nEntrees = NaN;
+                nSorties = NaN;
+            end
         case 'sfunction'
             % Une S-fonction dit ses tailles au drapeau 0 : un port d'entrée
             % si elle a des entrées, un de sortie si elle a des sorties.

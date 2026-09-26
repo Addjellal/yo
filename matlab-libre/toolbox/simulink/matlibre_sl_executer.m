@@ -18,8 +18,9 @@ function varargout = matlibre_sl_executer(action, varargin)
 %   REGLAGES,IMPOSES) simule à pas variable, pour un modèle compilé avec
 %   l'option variable : ode45 (Dormand-Prince 5(4)), ode23
 %   (Bogacki-Shampine 3(2)), ode113 (Adams, d'ordre 1 à 12), et pour les
-%   systèmes raides ode15s (NDF, d'ordre 1 à MaxOrder), ode23s
-%   (Rosenbrock), ode23t (trapèzes) et ode23tb (TR-BDF2) ; ou
+%   systèmes raides ode15s (NDF, d'ordre 1 à MaxOrder), daessc (BDF,
+%   d'ordre 1 à MaxOrder), ode23s (Rosenbrock), ode23t (trapèzes) et
+%   ode23tb (TR-BDF2) ; ou
 %   VariableStepDiscrete. Le pas suit les tolérances RelTol et
 %   AbsTol de REGLAGES, borné par MaxStep et MinStep ; il s'arrête sur
 %   chaque instant d'échantillonnage, chaque cassure d'une source
@@ -345,6 +346,10 @@ function T = preparer(c)
                 end
             case 'sfunction'
                 if c.seg{k}(2) > 0
+                    T.aMettreAJour(end + 1) = k;
+                end
+            case 'msfunction'
+                if c.objets{k}.maj
                     T.aMettreAJour(end + 1) = k;
                 end
             case 'delay'
@@ -802,7 +807,7 @@ function [A, b, bEtoile, c, ordre] = tableauVariable(solveur)
             bEtoile = [];
             c = [];
             ordre = 3;
-        case {'ode15s', 'ode113'}
+        case {'ode15s', 'daessc', 'ode113'}
             A = [];
             b = [];
             bEtoile = [];
@@ -831,7 +836,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     M = struct();
     [M.A, M.b, M.bE, M.c, M.ordre] = tableauVariable(solveur);
     methodes = struct('ode23s', 'rosenbrock', 'ode23t', 'trapeze', 'ode23tb', 'trbdf2', ...
-                      'ode15s', 'ndf', 'ode113', 'adams');
+                      'ode15s', 'ndf', 'daessc', 'ndf', 'ode113', 'adams');
     M.methode = 'rk';
     if isfield(methodes, solveur)
         M.methode = methodes.(solveur);
@@ -844,6 +849,12 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         if isfield(reglages, 'MaxOrder') && ~ischar(reglages.MaxOrder)
             M.ordreMax = double(reglages.MaxOrder);
         end
+    end
+    % Les NDF d'ode15s corrigent chaque BDF d'un terme kappa ; daessc
+    % garde les BDF telles quelles.
+    M.kappa = [-0.1850, -1/9, -0.0823, -0.0415, 0];
+    if strcmp(solveur, 'daessc')
+        M.kappa = zeros(1, 5);
     end
     M.H = struct('valide', false, 'k', 1, 'h', 0, 'D', [], 'nconst', 0, 'fin', []);
     M.J = [];
@@ -1344,7 +1355,7 @@ end
 % 1/j, se résout par Newton ; X1 - X0 est la différence d'ordre k + 1, et
 % donne l'erreur.
 function [xNouveau, err, V, Z, aux] = pasNDF(T, M, V, Z, x, k1, t, h, atol, rtol, touche)
-    kappa = [-0.1850, -1/9, -0.0823, -0.0415, 0];
+    kappa = M.kappa;
     G = cumsum(1 ./ (1:5));
     H = M.H;
     if H.valide
@@ -1368,11 +1379,10 @@ function [xNouveau, err, V, Z, aux] = pasNDF(T, M, V, Z, x, k1, t, h, atol, rtol
         err = echecNewton(M);
         return
     end
-    err = normeErreur(constanteNDF(k) * aux.ecart, x, xNouveau, atol, rtol);
+    err = normeErreur(constanteNDF(k, kappa) * aux.ecart, x, xNouveau, atol, rtol);
 end
 
-function e = constanteNDF(k)
-    kappa = [-0.1850, -1/9, -0.0823, -0.0415, 0];
+function e = constanteNDF(k, kappa)
     G = cumsum(1 ./ (1:5));
     e = kappa(k) * G(k) + 1 / (k + 1);
 end
@@ -1445,8 +1455,8 @@ function [M, facteur] = retenirPas(M, aux, xNouveau, err, atol, rtol)
         for j = k:-1:1
             Dn(:, j) = D(:, j) + Dn(:, j + 1);
         end
-        erreurDe = @(q) normeErreur(constanteNDF(q) * Dn(:, q + 1), xNouveau, xNouveau, ...
-                                    atol, rtol);
+        erreurDe = @(q) normeErreur(constanteNDF(q, M.kappa) * Dn(:, q + 1), xNouveau, ...
+                                    xNouveau, atol, rtol);
     else
         Dn(:, 1) = aux.fin;
         for j = 1:k + 1
@@ -2446,6 +2456,8 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                     case 104   % chart : un pas de la machine, puis ses sorties
                         V = pasGraphe(T, k, V, p, e, t);
+                    case 109   % S-function de niveau 2 : Outputs
+                        V = sortiesNiveau2(T, k, V, x, t);
                     case 105   % sous-système itéré
                         V = iterer(T, k, V, e, t);
                     case {106, 107}   % for iterator, while iterator : le rang, s'il le montre
@@ -2682,6 +2694,28 @@ function sys = appelerSFonction(T, k, V, Z, x, t, drapeau)
     end
     S = T.objets{k};
     sys = S.f(t, etats, u, drapeau, S.p{:});
+end
+
+% Une S-fonction de niveau 2 : ses entrées, un vecteur par port ; ses
+% sorties, rangées port après port.
+function u = entreesNiveau2(T, k, V)
+    e = T.eD(k);
+    u = cell(1, T.nIn(k));
+    for j = 1:T.nIn(k)
+        u{j} = V(T.eA(e + j):T.eB(e + j));
+    end
+end
+
+function V = sortiesNiveau2(T, k, V, x, t)
+    etats = [];
+    if T.xA(k) > 0
+        etats = x(T.xA(k):T.xB(k));
+    end
+    s = matlibre_sl_msfonction('sorties', T.objets{k}, t, entreesNiveau2(T, k, V), etats);
+    pd = T.pd(k);
+    for q = 1:T.nOut(k)
+        V(T.poA(pd + q - 1):T.poB(pd + q - 1)) = s{q};
+    end
 end
 
 % Un diagramme Stateflow fait un pas par instant : le premier le démarre
@@ -3693,6 +3727,9 @@ function dx = derivees(T, V, x, t)
             case 103   % S-function : les dérivées, drapeau 1
                 sys = appelerSFonction(T, k, V, [], x, t, 1);
                 dx(a:b) = double(sys(:));
+            case 109   % S-function de niveau 2 : Derivatives
+                dx(a:b) = matlibre_sl_msfonction('derivees', T.objets{k}, t, ...
+                                                 entreesNiveau2(T, k, V), x(a:b));
             case 77   % second-order integrator : x' = dx, dx' = u
                 w = (b - a + 1) / 2;
                 dx(a:a + w - 1) = x(a + w:b);
@@ -3803,6 +3840,12 @@ function Z = majs(T, V, Z, t, touche, x)
                 if nx > 0
                     Z(z:z + nx - 1) = deriveeEtat(T, p, Z(z:z + nx - 1), u);
                 end
+            case 109   % S-function de niveau 2 : Update
+                etats = [];
+                if T.xA(k) > 0
+                    etats = x(T.xA(k):T.xB(k));
+                end
+                matlibre_sl_msfonction('maj', T.objets{k}, t, entreesNiveau2(T, k, V), etats);
             case 103   % S-function : les états discrets, drapeau 2
                 nd = T.P(p + 1);
                 if nd > 0

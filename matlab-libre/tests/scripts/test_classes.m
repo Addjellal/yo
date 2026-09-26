@@ -277,4 +277,107 @@ disp('reflexion : ok');
 
 disp('heritage : ok');
 
+%% ------------------- les paquets : +dossier
+% Un dossier « +geo » sur le chemin fait un paquet : ses fonctions et ses
+% classes se nomment « geo.f », « geo.Point », un « +unites » dedans
+% « geo.unites.f ». Comme sous MATLAB, elles ne répondent pas à leur nom
+% court. Le paquet se bâtit ici, dans un dossier temporaire.
+racinePaquet = tempname();
+mkdir(fullfile(racinePaquet, '+geo', '+unites'));
+fichiersPaquet = {
+    fullfile('+geo', 'Point.m'), {'classdef Point', '    properties', '        x = 0', ...
+        '        y = 0', '    end', '    properties (Constant)', '        DIMENSION = 2', ...
+        '    end', '    methods', '        function p = Point(x, y)', ...
+        '            if nargin > 0', '                p.x = x;', '                p.y = y;', ...
+        '            end', '        end', '        function d = norme(p)', ...
+        '            d = hypot(p.x, p.y);', '        end', '    end', ...
+        '    methods (Static)', '        function p = origine()', ...
+        '            p = geo.Point(0, 0);', '        end', '    end', 'end'}
+    fullfile('+geo', 'Point3.m'), {'classdef Point3 < geo.Point', '    properties', ...
+        '        z = 0', '    end', '    methods', '        function p = Point3(x, y, z)', ...
+        '            p@geo.Point(x, y);', '            p.z = z;', '        end', ...
+        '        function d = norme(p)', '            d = sqrt(p.x^2 + p.y^2 + p.z^2);', ...
+        '        end', '    end', 'end'}
+    fullfile('+geo', 'distance.m'), {'function d = distance(p)', '    d = p.norme();', 'end'}
+    fullfile('+geo', '+unites', 'metres.m'), {'function m = metres(km)', ...
+        '    m = 1000 * km;', 'end'}
+    };
+for kP = 1:size(fichiersPaquet, 1)
+    fid = fopen(fullfile(racinePaquet, fichiersPaquet{kP, 1}), 'w');
+    fprintf(fid, '%s\n', fichiersPaquet{kP, 2}{:});
+    fclose(fid);
+end
+addpath(racinePaquet);
+p = geo.Point(3, 4);
+assert(strcmp(class(p), 'geo.Point') && isa(p, 'geo.Point'), 'une classe de paquet porte son nom entier');
+assert(geo.distance(p) == 5, 'une fonction de paquet');
+assert(geo.unites.metres(2) == 2000, 'un paquet dans un paquet');
+assert(geo.Point.origine().x == 0, 'une methode statique de paquet');
+assert(geo.Point.DIMENSION == 2, 'une constante de paquet');
+vide = geo.Point.empty(0, 1);
+assert(isequal(size(vide), [0 1]) && strcmp(class(vide), 'geo.Point'), 'le tableau vide d''une classe de paquet');
+q = geo.Point3(1, 2, 2);
+assert(strcmp(class(q), 'geo.Point3') && isa(q, 'geo.Point') && geo.distance(q) == 3 && ...
+       q.x == 1, 'une classe derivee d''une classe de paquet, et son p@geo.Point(x, y)');
+assert(isequal(metaclass(q).SuperclassList', {'geo.Point'}), 'metaclass nomme le parent entier');
+points(1) = geo.Point(1, 0);
+points(2) = geo.Point(2, 0);
+assert(isequal([points.x], [1 2]) && isequal({points.y}, {0, 0}), ...
+       'la propriete d''un tableau d''objets est la liste des proprietes de chacun');
+poignee = @geo.distance;
+assert(poignee(p) == 5, 'une poignee vers une fonction de paquet');
+refuse = '';
+try
+    distance(p); %#ok<NASGU>
+catch err
+    refuse = err.identifier;
+end
+assert(strcmp(refuse, 'MATLAB:UndefinedFunction'), ...
+       'une fonction de paquet ne repond pas a son nom court');
+rmpath(racinePaquet);
+rmdir(racinePaquet, 's');
+clear p q points poignee vide
+disp('paquets : ok');
+
+%% ------------------- accesseurs et constructeur herite
+% Dans set.X, « obj.X = v » pose la propriété sans rappeler set.X ; dans
+% get.X, « obj.X » la lit sans rappeler get.X. Et une classe dérivée sans
+% constructeur passe ses arguments à celui de son parent.
+dossierAccesseurs = tempname();
+mkdir(dossierAccesseurs);
+sourcesAccesseurs = {
+    'ReglageDouble', {'classdef ReglageDouble < handle', '    properties', ...
+        '        Valeur = 0', '        Ecritures = 0', '    end', '    methods', ...
+        '        function set.Valeur(obj, v)', '            obj.Valeur = 2 * v;', ...
+        '            obj.Ecritures = obj.Ecritures + 1;', '        end', ...
+        '        function v = get.Valeur(obj)', '            v = obj.Valeur + 1;', ...
+        '        end', '    end', 'end'}
+    'ParentImplicite', {'classdef ParentImplicite', '    properties', ...
+        '        valeur = -1', '        nombre = 0', '    end', '    methods', ...
+        '        function o = ParentImplicite(v)', '            o.nombre = nargin;', ...
+        '            if nargin > 0', '                o.valeur = v;', '            end', ...
+        '        end', '    end', 'end'}
+    'EnfantImplicite', {'classdef EnfantImplicite < ParentImplicite', '    properties', ...
+        '        propre = 7', '    end', 'end'}
+    };
+for kA = 1:size(sourcesAccesseurs, 1)
+    fid = fopen(fullfile(dossierAccesseurs, [sourcesAccesseurs{kA, 1} '.m']), 'w');
+    fprintf(fid, '%s\n', sourcesAccesseurs{kA, 2}{:});
+    fclose(fid);
+end
+addpath(dossierAccesseurs);
+reglage = ReglageDouble;
+reglage.Valeur = 5;
+assert(reglage.Valeur == 11 && reglage.Ecritures == 1, ...
+       'set.X et get.X posent et lisent leur propriete sans se rappeler');
+enfant = EnfantImplicite(42);
+assert(enfant.valeur == 42 && enfant.nombre == 1 && enfant.propre == 7 && ...
+       isa(enfant, 'ParentImplicite'), 'sans constructeur, les arguments vont au parent');
+enfantNu = EnfantImplicite();
+assert(enfantNu.valeur == -1 && enfantNu.nombre == 0, 'et sans argument, le parent n''en recoit pas');
+rmpath(dossierAccesseurs);
+rmdir(dossierAccesseurs, 's');
+clear reglage enfant enfantNu
+disp('accesseurs et constructeur herite : ok');
+
 disp('classes : toutes les verifications passent');

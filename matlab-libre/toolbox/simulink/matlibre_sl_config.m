@@ -11,8 +11,7 @@ function varargout = matlibre_sl_config(action, varargin)
 %
 %   V = MATLIBRE_SL_CONFIG('valider',NOM,V) vérifie une valeur avant
 %   qu'on la pose, et la rend sous sa forme canonique : un nom de solveur
-%   inconnu, ou connu de Simulink mais pas encore écrit ici, est refusé en
-%   le nommant plutôt que rangé pour rien.
+%   inconnu est refusé en le nommant plutôt que rangé pour rien.
 %
 %   S = MATLIBRE_SL_CONFIG('solveurs') rend la liste des solveurs
 %   disponibles, en deux champs : fixe et variable.
@@ -27,12 +26,15 @@ function varargout = matlibre_sl_config(action, varargin)
 %     SolverType           'Fixed-step'  ou 'Variable-step'
 %     Solver               'ode1'     le solveur. À pas fixe : ode1 à
 %                                     ode5, ode8, ode14x et ode1be
-%                                     (raides), FixedStepDiscrete sans
-%                                     état continu, FixedStepAuto (ode3,
-%                                     ou le discret s'il n'y a pas
-%                                     d'état continu). À pas variable :
-%                                     ode45, ode23, ode113, ode15s,
-%                                     ode23s, ode23t et ode23tb (raides),
+%                                     (raides), odeN (la formule que
+%                                     choisit ODENIntegrationMethod),
+%                                     FixedStepDiscrete sans état
+%                                     continu, FixedStepAuto (ode3, ou
+%                                     le discret s'il n'y a pas d'état
+%                                     continu). À pas variable : ode45,
+%                                     ode23, ode113, ode15s, ode23s,
+%                                     ode23t et ode23tb (raides), daessc
+%                                     (les BDF, d'ordre 1 à MaxOrder),
 %                                     VariableStepDiscrete, et
 %                                     VariableStepAuto (ode45, ou le
 %                                     discret).
@@ -40,7 +42,10 @@ function varargout = matlibre_sl_config(action, varargin)
 %     MaxStep, MinStep, InitialStep   'auto'  bornes du pas variable
 %     RelTol               1e-3       tolérance relative du pas variable
 %     AbsTol               'auto'     tolérance absolue du pas variable
-%     MaxOrder             5          l'ordre maximal d'ode15s, de 1 à 5
+%     MaxOrder             5          l'ordre maximal d'ode15s et de
+%                                     daessc, de 1 à 5
+%     ODENIntegrationMethod 'ode3'    la formule d'odeN : ode1, ode2,
+%                                     ode3, ode4, ode5 ou ode8
 %     ExtrapolationOrder   4          l'ordre d'extrapolation d'ode14x,
 %                                     de 1 à 4
 %     NumberNewtonIterations  1       les itérations de Newton d'ode14x
@@ -109,7 +114,8 @@ function d = defauts()
                'Solver', 'ode1', 'FixedStep', 0.01, 'MaxStep', 'auto', ...
                'MinStep', 'auto', 'InitialStep', 'auto', 'RelTol', 1e-3, ...
                'AbsTol', 'auto', 'MaxOrder', 5, 'ExtrapolationOrder', 4, ...
-               'NumberNewtonIterations', 1, 'ZeroCrossControl', 'UseLocalSettings', ...
+               'NumberNewtonIterations', 1, 'ODENIntegrationMethod', 'ode3', ...
+               'ZeroCrossControl', 'UseLocalSettings', ...
                'AlgebraicLoopMsg', 'warning', 'UnconnectedInputMsg', 'warning', ...
                'UnconnectedOutputMsg', 'none', 'LoadExternalInput', 'off', ...
                'ExternalInput', '[t, u]', 'PreLoadFcn', '', 'PostLoadFcn', '', ...
@@ -118,14 +124,17 @@ function d = defauts()
                'ReturnWorkspaceOutputs', 'on', 'ReturnWorkspaceOutputsName', 'out');
 end
 
-% Les solveurs écrits ici. Simulink en a deux autres, odeN et daessc :
-% ils sont refusés en le disant, au lieu d'être acceptés et remplacés en
-% silence.
+% Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
+% l'adapter la formule que choisit ODENIntegrationMethod ; daessc, à pas
+% variable, intègre par les BDF — ce que deviennent les NDF d'ode15s sans
+% leur correction — un système dont les équations sont toutes
+% différentielles, ce qu'est tout modèle de blocs.
 function s = solveurs()
     s = struct('fixe', {{'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'ode8', 'ode14x', ...
-                         'ode1be', 'FixedStepDiscrete', 'FixedStepAuto'}}, ...
+                         'ode1be', 'odeN', 'FixedStepDiscrete', 'FixedStepAuto'}}, ...
                'variable', {{'ode45', 'ode23', 'ode113', 'ode15s', 'ode23s', 'ode23t', ...
-                             'ode23tb', 'VariableStepDiscrete', 'VariableStepAuto'}});
+                             'ode23tb', 'daessc', 'VariableStepDiscrete', ...
+                             'VariableStepAuto'}});
 end
 
 function c = lire(modele)
@@ -190,13 +199,6 @@ function v = valider(nom, v)
             v = char(v);
             trouve = find(strcmpi(v, connus), 1);
             if isempty(trouve)
-                simulinkSeul = {'odeN', 'daessc'};
-                if any(strcmpi(v, simulinkSeul))
-                    error('Simulink:Commands:SolveurInconnu', ...
-                          ['Le solveur ''%s'' est un solveur de Simulink que MatLibre ' ...
-                           'n''a pas encore ; les solveurs disponibles sont : %s.'], ...
-                          v, strjoin(connus, ', '));
-                end
                 error('Simulink:Commands:SolveurInconnu', ...
                       'Le solveur ''%s'' est inconnu ; les solveurs disponibles sont : %s.', ...
                       v, strjoin(connus, ', '));
@@ -249,6 +251,8 @@ function v = valider(nom, v)
             v = entier(nom, v, 1, 5);
         case 'ExtrapolationOrder'
             v = entier(nom, v, 1, 4);
+        case 'ODENIntegrationMethod'
+            v = choix(nom, v, {'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'ode8'});
         case 'NumberNewtonIterations'
             v = entier(nom, v, 1, Inf);
         case ''

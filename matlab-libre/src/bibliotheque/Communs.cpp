@@ -396,7 +396,24 @@ Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>
         obj.poserChamp(nom, defaut);
     }
     auto ctor = def->methodes.find(def->nom);
-    if (ctor == def->methodes.end()) return obj;
+    if (ctor == def->methodes.end()) {
+        // Sans constructeur propre, une classe dérivée passe ses arguments
+        // au constructeur de son parent, comme sous MATLAB : on n'a pas à
+        // écrire un constructeur qui ne ferait que les transmettre.
+        for (const auto& nomParent : def->parents) {
+            auto parent = it.classeDefinie(nomParent);
+            if (!parent || !parent->methodes.count(parent->nom)) continue;
+            std::vector<Valeur> appel = {obj, Valeur::texte(nomParent)};
+            for (const auto& a : args) appel.push_back(a);
+            auto r = it.appeler("matlibre_heriter", appel, 1);
+            if (!r.empty()) obj = r[0];
+            obj.classe = Classe::Objet;
+            obj.nomObjet = def->nom;
+            obj.poigneeObjet = def->poignee;
+            return obj;
+        }
+        return obj;
+    }
 
     auto f = ctor->second;
     if (!f->variadiqueEntree() && args.size() > f->entrees.size())

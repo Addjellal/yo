@@ -697,9 +697,10 @@ void FenetreSimulink::construireBarre() {
     solveur_->setToolTip(QStringLiteral(
         "Le solveur du modèle. ode1 : Euler explicite. ode2 à ode5 évaluent la "
         "dérivée en des points intermédiaires du pas et gagnent un ordre chacun ; "
-        "ode14x et ode1be, implicites, tiennent les systèmes raides. À pas variable, "
-        "ode45 d'abord, ode15s pour les systèmes raides. Le choix se pose sur le "
-        "modèle ; Ctrl+E ouvre tous les réglages."));
+        "ode14x et ode1be, implicites, tiennent les systèmes raides ; odeN applique la "
+        "formule qu'on lui choisit. À pas variable, ode45 d'abord, ode15s ou daessc "
+        "pour les systèmes raides. Le choix se pose sur le modèle ; Ctrl+E ouvre tous "
+        "les réglages."));
     connect(solveur_, &QComboBox::currentIndexChanged, this,
             &FenetreSimulink::surSolveurChoisi);
     barre->addWidget(solveur_);
