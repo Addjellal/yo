@@ -63,8 +63,12 @@ function modele = add_block(modele, type, nom, varargin)
 %     hitcrossing  HitCrossingOffset, HitCrossingDirection
 %     backlash     BacklashWidth, InitialOutput
 %     coulombfriction Offset, Gain
-%     lookup       BreakpointsData, TableData, InterpMethod, ExtrapMethod
+%     lookup       BreakpointsData, TableData, InterpMethod, ExtrapMethod ;
+%                  NumberOfTableDimensions 2 et BreakpointsForDimension2
+%                  en font une table à deux entrées (n-D Lookup Table)
 %     lookup2d     BreakpointsForDimension1, BreakpointsForDimension2, Table
+%     directlookup Table, NumberOfTableDimensions (1 ou 2) — l'élément que
+%                  désignent ses entrées, à partir de 0
 %     saturationdynamic, deadzonedynamic — trois entrées : up, u, lo
 %     wraptozero   Threshold                    zéro au-delà du seuil
 %
@@ -186,6 +190,8 @@ function modele = add_block(modele, type, nom, varargin)
 %                  conditions sur u1, u2... ; une sortie d'action par
 %                  branche
 %     switchcase   CaseConditions ('{1, [2 3]}'), ShowDefaultCase
+%     modelreference ModelName             un autre modèle — variable,
+%                  fichier .m, .slx ou .mdl —, relu à chaque simulation
 %
 %   Le sous-système porte le modèle qu'il abrège, bâti comme les autres
 %   par NEW_SYSTEM. Ses blocs INPORT sont ses entrées et ses blocs OUTPORT

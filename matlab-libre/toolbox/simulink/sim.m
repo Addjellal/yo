@@ -9,6 +9,11 @@ function varargout = sim(modele, varargin)
 %   les deux ; SIM(MODELE,INSTANTS) donne aussi le pas par l'écart de
 %   deux instants réguliers. SIM(MODELE,TFINAL,PAS) fixe le pas, et
 %   SIM(MODELE,TFINAL,SIMSET(...)) accepte un jeu d'options à la place.
+%   SIM(MODELE,INTERVALLE,OPTIONS,[T, U]) alimente les entrées du modèle :
+%   le temps, puis une colonne par élément des entrées, rangées par leur
+%   paramètre Port ; une structure à temps y sert aussi. Les réglages
+%   LoadExternalInput ('on') et ExternalInput ('[t, u]', ou des variables
+%   séparées par des virgules, une par entrée) le disent sur le modèle.
 %   SIM(MODELE,'StopTime','5','Solver','ode4',...) passe les réglages par
 %   nom, comme dans Simulink : ils valent pour cette simulation seulement,
 %   et le modèle n'en est pas changé.
@@ -129,7 +134,7 @@ function varargout = sim(modele, varargin)
                'ADD_BLOCK(M, ''%s/bloc'', NOM), et c''est le modele qui se simule.'], ...
               char(modele.nom), char(modele.nom));
     end
-    [config, imposes] = lireArguments(matlibre_sl_config('lire', modele), varargin);
+    [config, imposes, externe] = lireArguments(matlibre_sl_config('lire', modele), varargin);
     nomModele = char(modele.nom);
     tDebut = nombre(config.StartTime, nomModele, 'StartTime');
     tFinal = nombre(config.StopTime, nomModele, 'StopTime');
@@ -154,6 +159,13 @@ function varargout = sim(modele, varargin)
 
     options = struct('pas', pas, 'tDebut', tDebut, 'tFinal', tFinal, 'config', config, ...
                      'variable', variable);
+    % Les entrées externes : le quatrième argument, ou ExternalInput quand
+    % LoadExternalInput vaut 'on'. Chaque entrée du modèle y prend sa part.
+    if ~isempty(externe)
+        options.entrees = entreesExternes(modele, externe, nomModele);
+    elseif strcmpi(config.LoadExternalInput, 'on')
+        options.entrees = entreesExternes(modele, config.ExternalInput, nomModele);
+    end
     c = matlibre_sl_compiler(modele, options);
     % Les solveurs automatiques choisissent selon qu'il y a des états
     % continus ou non, comme dans Simulink.
@@ -213,8 +225,9 @@ end
 % ou options), ou les réglages par nom. Ils l'emportent sur ceux du
 % modèle, qu'ils ne changent pas. IMPOSES porte les instants donnés un à
 % un, au-delà de deux : à pas variable, ce sont les seuls relevés.
-function [config, imposes] = lireArguments(config, args)
+function [config, imposes, externe] = lireArguments(config, args)
     imposes = [];
+    externe = [];
     if isempty(args)
         return
     end
@@ -288,10 +301,11 @@ function [config, imposes] = lireArguments(config, args)
         end
     end
     if numel(args) >= 3
+        externe = args{3};
+    end
+    if numel(args) >= 4
         error('Simulink:Commands:SimArguments', ...
-              ['SIM(MODELE,INTERVALLE,OPTIONS) : les entrees externes (quatrieme ' ...
-               'argument) ne sont pas encore lues ; alimentez le modele par des ' ...
-               'blocs From Workspace.']);
+              'SIM(MODELE,INTERVALLE,OPTIONS,ENTREES) prend au plus quatre arguments.');
     end
 end
 
@@ -494,6 +508,145 @@ function deposer(c, T, J, instants)
         end
         assignin('base', char(p.VariableName), valeur);
     end
+end
+
+% Les entrées externes, découpées entre les entrées du modèle rangées par
+% leur paramètre Port. Une matrice [t, u] donne à chacune autant de
+% colonnes que sa largeur ; une structure à temps, un signal par entrée ;
+% un texte s'évalue dans l'espace de travail de base, et plusieurs
+% variables séparées par des virgules en donnent une par entrée.
+function entrees = entreesExternes(modele, donnees, nomModele)
+    ports = [];
+    largeurs = [];
+    for k = 1:numel(modele.blocs)
+        b = modele.blocs{k};
+        entree = matlibre_sl_catalogue('type', b.type);
+        if ~strcmp(entree.type, 'inport')
+            continue
+        end
+        rang = numel(ports) + 1;
+        largeur = 1;
+        for champ = fieldnames(b.parametres).'
+            if strcmpi(champ{1}, 'Port')
+                rang = double(b.parametres.(champ{1}));
+            elseif strcmpi(champ{1}, 'PortDimensions') && isnumeric(b.parametres.(champ{1})) ...
+                   && all(b.parametres.(champ{1}) > 0)
+                largeur = prod(double(b.parametres.(champ{1})));
+            end
+        end
+        ports(end + 1) = rang; %#ok<AGROW>
+        largeurs(end + 1) = largeur; %#ok<AGROW>
+    end
+    [ports, ordre] = sort(ports);
+    largeurs = largeurs(ordre);
+    n = numel(ports);
+    if ischar(donnees) || isstring(donnees)
+        noms = decouperNoms(char(donnees));
+        valeurs = cell(1, numel(noms));
+        for j = 1:numel(noms)
+            try
+                valeurs{j} = evalin('base', noms{j});
+            catch err
+                error('Simulink:SimInput:InvalidExpression', ...
+                      ['L''entree externe ''%s'' du modele ''%s'' ne s''evalue pas : %s'], ...
+                      noms{j}, nomModele, err.message);
+            end
+        end
+        if numel(valeurs) == 1
+            donnees = valeurs{1};
+        else
+            donnees = valeurs;
+        end
+    end
+    entrees = cell(1, n);
+    if iscell(donnees)
+        % une variable par entrée
+        if numel(donnees) ~= n
+            error('Simulink:SimInput:NumPortsMismatch', ...
+                  'Le modele ''%s'' a %d entree(s), et l''on en donne %d.', ...
+                  nomModele, n, numel(donnees));
+        end
+        for j = 1:n
+            d = donnees{j};
+            if isstruct(d) && isfield(d, 'time') && isfield(d, 'signals')
+                temps = double(d.time(:));
+                v = double(d.signals(1).values);
+                if size(v, 1) ~= numel(temps)
+                    v = reshape(v, numel(temps), []);
+                end
+            elseif isnumeric(d) && ismatrix(d) && size(d, 2) >= 2
+                temps = double(d(:, 1));
+                v = double(d(:, 2:end));
+            else
+                error('Simulink:SimInput:InvalidFormat', ...
+                      ['L''entree externe %d du modele ''%s'' est une matrice [t, u] ou une ' ...
+                       'structure a temps.'], j, nomModele);
+            end
+            entrees{j} = struct('temps', temps, 'valeurs', v);
+        end
+        return
+    end
+    if isstruct(donnees) && isfield(donnees, 'time') && isfield(donnees, 'signals')
+        if numel(donnees.signals) ~= n
+            error('Simulink:SimInput:NumPortsMismatch', ...
+                  'Le modele ''%s'' a %d entree(s), et la structure en porte %d.', ...
+                  nomModele, n, numel(donnees.signals));
+        end
+        temps = double(donnees.time(:));
+        for j = 1:n
+            v = double(donnees.signals(j).values);
+            if size(v, 1) ~= numel(temps)
+                v = reshape(v, numel(temps), []);
+            end
+            entrees{j} = struct('temps', temps, 'valeurs', v);
+        end
+        return
+    end
+    if ~(isnumeric(donnees) && ismatrix(donnees) && size(donnees, 2) >= 2)
+        error('Simulink:SimInput:InvalidFormat', ...
+              ['L''entree externe du modele ''%s'' est une matrice [t, u] — le temps ' ...
+               'puis une colonne par element des entrees —, une structure a temps, ou ' ...
+               'des variables separees par des virgules.'], nomModele);
+    end
+    temps = double(donnees(:, 1));
+    if any(diff(temps) < 0)
+        error('Simulink:SimInput:TimeNotMonotonic', ...
+              'Les instants de l''entree externe du modele ''%s'' doivent croitre.', nomModele);
+    end
+    colonnes = size(donnees, 2) - 1;
+    if colonnes ~= sum(largeurs)
+        error('Simulink:SimInput:NumPortsMismatch', ...
+              ['L''entree externe du modele ''%s'' porte %d colonne(s) de signal, pour %d ' ...
+               'entree(s) de largeur totale %d.'], nomModele, colonnes, n, sum(largeurs));
+    end
+    debut = 2;
+    for j = 1:n
+        entrees{j} = struct('temps', temps, ...
+                            'valeurs', double(donnees(:, debut:debut + largeurs(j) - 1)));
+        debut = debut + largeurs(j);
+    end
+end
+
+% « u1, u2 » : les noms, séparés par les virgules qui ne sont dans aucun
+% crochet ni aucune parenthèse.
+function noms = decouperNoms(texte)
+    noms = {};
+    profondeur = 0;
+    debut = 1;
+    for i = 1:numel(texte)
+        switch texte(i)
+            case {'[', '('}
+                profondeur = profondeur + 1;
+            case {']', ')'}
+                profondeur = profondeur - 1;
+            case ','
+                if profondeur == 0
+                    noms{end + 1} = strtrim(texte(debut:i - 1)); %#ok<AGROW>
+                    debut = i + 1;
+                end
+        end
+    end
+    noms{end + 1} = strtrim(texte(debut:end));
 end
 
 % Le bloc To File : une matrice dont la première ligne est le temps, et les

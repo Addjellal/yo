@@ -178,7 +178,7 @@ end
 function k = premier(modele)
     k = 0;
     for j = 1:numel(modele.blocs)
-        if strcmp(modele.blocs{j}.type, 'subsystem')
+        if any(strcmp(modele.blocs{j}.type, {'subsystem', 'modelreference'}))
             k = j;
             return
         end
@@ -365,6 +365,27 @@ function modele = deplier(modele, k)
 end
 
 function interne = contenu(bloc)
+    if strcmp(bloc.type, 'modelreference')
+        % Une référence de modèle relit son modèle à chaque simulation.
+        nom = '';
+        if isfield(bloc.parametres, 'ModelName')
+            nom = char(bloc.parametres.ModelName);
+        end
+        if isempty(nom)
+            error('Simulink:modelReference:ModelNameEmpty', ...
+                  'La reference de modele ''%s'' ne nomme pas de modele (ModelName).', ...
+                  char(bloc.nom));
+        end
+        nom = regexprep(nom, '\.(slx|mdl)$', '');
+        try
+            interne = matlibre_sl_modele(nom);
+        catch err
+            error('Simulink:modelReference:ModelNotFound', ...
+                  'La reference de modele ''%s'' designe ''%s'', introuvable : %s', ...
+                  char(bloc.nom), nom, err.message);
+        end
+        return
+    end
     if isfield(bloc.parametres, 'Model')
         interne = matlibre_sl_modele(bloc.parametres.Model);
     elseif isfield(bloc.parametres, 'Modele')

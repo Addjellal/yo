@@ -2710,6 +2710,131 @@ for kE = 1:size(casErreurs, 1)
 end
 fprintf('iteres et appeles : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% --------------------------- 23. Entrees externes, references de modele, tables
+% Les entrées externes : SIM(MODELE,INTERVALLE,OPTIONS,[t, u]), ou
+% LoadExternalInput et ExternalInput sur le modèle. Chaque entrée du
+% modèle, dans l'ordre de son paramètre Port, prend autant de colonnes
+% que sa largeur ; les valeurs s'interpolent entre les instants.
+m = new_system('externes');
+m = add_block(m, 'inport', 'a', 'Port', 1);
+m = add_block(m, 'inport', 'b', 'Port', 2, 'PortDimensions', 2);
+m = add_block(m, 'sum', 'somme', 'Signs', '|+');
+m = add_block(m, 'sum', 'total', 'Signs', '++');
+m = add_block(m, 'integrator', 'x');
+m = add_block(m, 'outport', 'y', 'Port', 1);
+m = add_line(m, 'b', 'somme');
+m = add_line(m, 'a', 'total', 1);
+m = add_line(m, 'somme', 'total', 2);
+m = add_line(m, 'total', 'x');
+m = add_line(m, 'x', 'y');
+modeleExterne = m;
+t = (0:0.5:2).';
+u = [t, t, ones(size(t)), 2 * ones(size(t))];   % a = t, b = [1 2]
+% x' = t + 3, x(2) = 2 + 6 = 8
+for solveur = {'ode4', 'ode45', 'ode15s'}
+    r = sim(m, [0 2], simset('Solver', solveur{1}, 'FixedStep', 0.01), u);
+    assert(abs(r.signaux.x(end) - 8) < 1e-6 && ...
+           max(abs(r.signaux.a - r.temps)) < 1e-12, ...
+           [solveur{1} ' : les entrees externes, interpolees, alimentent le modele']);
+end
+assignin('base', 'entreeA', [t, t]);
+assignin('base', 'entreeB', [t, ones(size(t)), 2 * ones(size(t))]);
+r = sim(set_param(m, 'LoadExternalInput', 'on', 'ExternalInput', 'entreeA, entreeB'), ...
+        'Solver', 'ode45', 'StopTime', 2);
+assert(abs(r.signaux.x(end) - 8) < 1e-9, 'ExternalInput : une variable par entree');
+assignin('base', 'entreesStructure', struct('time', t, 'signals', ...
+         struct('values', {t, [ones(size(t)), 2 * ones(size(t))]}, 'dimensions', {1, 2})));
+r = sim(set_param(m, 'LoadExternalInput', 'on', 'ExternalInput', 'entreesStructure'), ...
+        'Solver', 'ode45', 'StopTime', 2);
+assert(abs(r.signaux.x(end) - 8) < 1e-9, 'ExternalInput : une structure a temps');
+r = sim(m, [0 3], simset('Solver', 'ode45'), u);
+assert(abs(r.signaux.a(end) - 2) < 1e-12, 'apres le dernier instant, la valeur tient');
+evalin('base', 'clear entreeA entreeB entreesStructure');
+
+% Une référence de modèle relit son modèle à chaque simulation : changé,
+% il change ce que rend le bloc.
+doubleur = new_system('doubleurRef');
+doubleur = add_block(doubleur, 'inport', 'e', 'Port', 1);
+doubleur = add_block(doubleur, 'gain', 'k', 'Gain', 2);
+doubleur = add_block(doubleur, 'outport', 's', 'Port', 1);
+doubleur = add_line(add_line(doubleur, 'e', 'k'), 'k', 's');
+assignin('base', 'doubleurRef', doubleur);
+m = new_system('reference');
+m = add_block(m, 'constant', 'c', 'Value', 3);
+m = add_block(m, 'modelreference', 'modele', 'ModelName', 'doubleurRef');
+m = add_line(m, 'c', 'modele');
+[entreesRef, sortiesRef] = matlibre_sl_ports(m.blocs{2});
+assert(entreesRef == 1 && sortiesRef == 1, 'la reference a les ports du modele qu''elle nomme');
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 0.2);
+assert(all(r.signaux.modele == 6), 'la reference calcule son modele');
+assignin('base', 'doubleurRef', set_param(doubleur, 'k', 'Gain', 5));
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 0.2);
+assert(all(r.signaux.modele == 15), 'et le relit a chaque simulation');
+cheminRef = [tempname() '.slx'];
+[dossierRef, nomRef] = fileparts(cheminRef);
+save_system(doubleur, cheminRef);
+ancien = cd(dossierRef);
+r = sim(set_param(m, 'modele', 'ModelName', nomRef), 'Solver', 'ode1', 'FixedStep', 0.1, ...
+        'StopTime', 0);
+cd(ancien);
+assert(r.signaux.modele == 6, 'une reference a un fichier .slx');
+delete(cheminRef);
+evalin('base', 'clear doubleurRef');
+
+% Les tables : n-D à deux dimensions, interpolée comme la table 2-D ;
+% directe, l'élément que désignent ses entrées, à partir de 0 et bornées.
+m = new_system('tables');
+m = add_block(m, 'constant', 'x', 'Value', 0.5);
+m = add_block(m, 'constant', 'y', 'Value', 0.25);
+m = add_block(m, 'lookup', 'nd', 'NumberOfTableDimensions', 2, 'BreakpointsData', [0 1], ...
+              'BreakpointsForDimension2', [0 1], 'TableData', [0 1; 2 3]);
+m = add_block(m, 'lookup2d', 'deuxD', 'BreakpointsForDimension1', [0 1], ...
+              'BreakpointsForDimension2', [0 1], 'Table', [0 1; 2 3]);
+m = add_block(m, 'repeatingsequencestair', 'rang', 'OutValues', [0 1 2 5 -1], 'tsamp', 1);
+m = add_block(m, 'directlookup', 'direct', 'Table', [10 20 30]);
+m = add_block(m, 'directlookup', 'directe2', 'Table', [1 2; 3 4], 'NumberOfTableDimensions', 2);
+m = add_block(m, 'constant', 'un', 'Value', 1);
+m = add_line(m, 'x', 'nd', 1);
+m = add_line(m, 'y', 'nd', 2);
+m = add_line(m, 'x', 'deuxD', 1);
+m = add_line(m, 'y', 'deuxD', 2);
+m = add_line(m, 'rang', 'direct');
+m = add_line(m, 'rang', 'directe2', 1);
+m = add_line(m, 'un', 'directe2', 2);
+r = sim(m, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 4);
+assert(all(r.signaux.nd == 1.25) && isequal(r.signaux.nd, r.signaux.deuxD), ...
+       'la table n-D a deux dimensions interpole comme la table 2-D');
+assert(isequal(r.signaux.direct.', [10 20 30 30 10]) && ...
+       isequal(r.signaux.directe2.', [2 4 4 4 2]), ...
+       'la table directe rend l''element designe, a partir de 0 et borne');
+
+% Les erreurs, chacune avec son identifiant.
+casErreurs = {
+    @() sim(modeleExterne, [0 1], [], [0 1; 1 2]), 'Simulink:SimInput:NumPortsMismatch', 'colonne'
+    @() sim(modeleExterne, [0 1], [], 'pasUneVariable'), 'Simulink:SimInput:InvalidExpression', 'pasUneVariable'
+    @() sim(modeleExterne, [0 1], [], [1 0 0 0 0; 0 1 1 1 1]), 'Simulink:SimInput:TimeNotMonotonic', 'croitre'
+    @() sim(add_block(new_system('r'), 'modelreference', 'm')), 'Simulink:modelReference:ModelNameEmpty', 'ModelName'
+    @() sim(add_block(new_system('r'), 'modelreference', 'm', 'ModelName', 'modeleQuiNExistePas')), ...
+        'Simulink:modelReference:ModelNotFound', 'modeleQuiNExistePas'
+    @() sim(add_block(new_system('t'), 'lookup', 'l', 'NumberOfTableDimensions', 3)), ...
+        'Simulink:blocks:LookupNDDimensions', 'une ou deux'
+    @() set_param(new_system('c'), 'LoadExternalInput', 'parfois'), 'Simulink:Config:InvalidValue', 'LoadExternalInput'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('entrees et references, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('entrees et references : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

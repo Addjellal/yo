@@ -120,6 +120,8 @@ const BlocBibliotheque blocs[] = {
     {"Non-linéarités", "saturationdynamic", "Borne u entre les signaux lo et up", ""},
     {"Non-linéarités", "deadzonedynamic", "Annule u entre les signaux lo et up", ""},
     {"Non-linéarités", "wraptozero", "L'entrée, ou zéro au-delà du seuil", "'Threshold', 255"},
+    {"Non-linéarités", "directlookup", "L'élément de la table que l'entrée désigne",
+     "'Table', [4 5 6 7]"},
     {"Non-linéarités", "lookup2d", "Interpole dans une table à deux entrées",
      "'BreakpointsForDimension1', [0 1], 'BreakpointsForDimension2', [0 1], "
      "'Table', [0 1; 1 2]"},

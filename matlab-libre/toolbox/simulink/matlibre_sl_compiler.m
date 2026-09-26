@@ -43,6 +43,7 @@ function c = matlibre_sl_compiler(modele, options)
     silencieux = champ(options, 'silencieux', false);
     variable = champ(options, 'variable', false);
     config = champ(options, 'config', []);
+    entreesExternes = champ(options, 'entrees', {});
     if isempty(config)
         config = matlibre_sl_config('lire', modele);
     end
@@ -96,6 +97,19 @@ function c = matlibre_sl_compiler(modele, options)
         % Band-Limited White Noise à Random Number, Discrete Zero-Pole à
         % Discrete Transfer Fcn.
         [c.types{k}, c.p{k}] = normaliser(c.types{k}, c.p{k}, c.chemins{k});
+        % Une entrée du modèle qui reçoit une entrée externe la lit comme un
+        % From Workspace lirait sa variable.
+        if strcmp(c.types{k}, 'inport') && ~any(c.noms{k} == '/') && ...
+           ~isempty(entreesExternes)
+            rang = double(c.p{k}.Port);
+            if rang <= numel(entreesExternes) && ~isempty(entreesExternes{rang})
+                c.types{k} = 'fromworkspace';
+                c.p{k} = struct('VariableName', '', 'Interpolate', 'on', ...
+                                'OutputAfterFinalValue', 'Holding final value', ...
+                                'SampleTime', 0, 'ZeroCross', 'on', ...
+                                'Donnees', entreesExternes{rang});
+            end
+        end
         c.code(k) = codeDe(c.types{k});
         [ne, ns] = matlibre_sl_ports(struct('type', c.types{k}, 'nom', bloc.nom, ...
                                             'parametres', c.p{k}), c.types{k});
@@ -347,6 +361,24 @@ function [type, p] = normaliser(type, p, chemin)
             p = struct('Mean', 0, 'Variance', double(p.Cov) / Ts(1), 'Seed', p.seed, ...
                        'SampleTime', Ts);
             type = 'randomnumber';
+        case 'lookup'
+            dimensions = double(p.NumberOfTableDimensions);
+            if dimensions == 2
+                p = struct('BreakpointsForDimension1', p.BreakpointsData, ...
+                           'BreakpointsForDimension2', p.BreakpointsForDimension2, ...
+                           'Table', p.TableData, 'SampleTime', p.SampleTime);
+                type = 'lookup2d';
+            elseif dimensions ~= 1
+                error('Simulink:blocks:LookupNDDimensions', ...
+                      ['La table ''%s'' est a %g dimensions : MatLibre interpole en une ' ...
+                       'ou deux dimensions.'], chemin, dimensions);
+            end
+        case 'directlookup'
+            if ~any(double(p.NumberOfTableDimensions) == [1 2])
+                error('Simulink:blocks:LookupNDDimensions', ...
+                      ['La table directe ''%s'' est a %g dimensions : MatLibre en lit ' ...
+                       'une ou deux.'], chemin, double(p.NumberOfTableDimensions));
+            end
         case 'discretezeropole'
             numerateur = double(p.Gain) * poly(double(p.Zeros(:)));
             denominateur = poly(double(p.Poles(:)));
@@ -427,7 +459,7 @@ function x = codeDe(type)
                 'xygraph', 97; 'tofile', 98; ...
                 'datastorememory', 117; 'ratetransition', 118; ...
                 'iterateur', 105; 'foriterator', 106; 'whileiterator', 107; ...
-                'functioncallgenerator', 108};
+                'functioncallgenerator', 108; 'directlookup', 120};
         table = containers.Map(noms(:, 1)', noms(:, 2)');
     end
     x = table(type);
@@ -874,7 +906,7 @@ function s = regleDims(c, k, dE, complet, forcer)
                 s = {dimsDe(p.Value)};
             end
         case 'fromworkspace'
-            [~, valeurs] = lireSignalEspace(p.VariableName, c.chemins{k});
+            [~, valeurs] = lireSignalEspace(p, c.chemins{k});
             s = {dimsDe(zeros(size(valeurs, 2), 1))};
         case 'from'
             if isempty(c.entrees{k}) || c.entrees{k}(1) == 0
@@ -1166,7 +1198,7 @@ function s = regleTraitement(c, k, dE, complet, forcer)
         case 'intervaltest'
             s = {accorder({dE{1}, dimsDe(p.uplimit), dimsDe(p.lowlimit)}, c, k, ...
                           {'l''entree', 'uplimit', 'lowlimit'})};
-        case {'saturationdynamic', 'deadzonedynamic', 'manualswitch'}
+        case {'saturationdynamic', 'deadzonedynamic', 'manualswitch', 'directlookup'}
             s = {accorder(dE, c, k, q)};
         case 'discreteintegrator'
             s = {dimsAvecEtat(dE, p.InitialCondition, complet, forcer)};
@@ -1694,7 +1726,7 @@ function c = abaisser(c, pas, tDebut)
             case 'inport'
                 seg = etendre(p.Value, w, ch, 'Value');
             case 'fromworkspace'          % [n; w; interpole; apres; temps; valeurs]
-                [temps, valeurs] = lireSignalEspace(p.VariableName, ch);
+                [temps, valeurs] = lireSignalEspace(p, ch);
                 apres = find(strcmp(p.OutputAfterFinalValue, ...
                                     {'Setting to zero', 'Holding final value', ...
                                      'Extrapolation'})) - 1;
@@ -1917,6 +1949,12 @@ function c = abaisser(c, pas, tDebut)
                 seg = c.nIn(k);
             case 'manualswitch'
                 sub = 1 + strcmp(p.sw, '0');
+            case 'directlookup'           % [dimensions; lignes; colonnes; table(:)]
+                table = double(p.Table);
+                if p.NumberOfTableDimensions == 1
+                    table = table(:);
+                end
+                seg = [p.NumberOfTableDimensions; size(table, 1); size(table, 2); table(:)];
             case 'intervaltest'           % [haut; bas; fermé à droite; fermé à gauche]
                 seg = [etendre(p.uplimit, w, ch, 'uplimit'); ...
                        etendre(p.lowlimit, w, ch, 'lowlimit'); ...
@@ -3070,8 +3108,14 @@ end
 % base : une matrice [temps valeurs...], dont chaque colonne après la
 % première est un élément du signal, ou la structure à temps que SIM
 % journalise.
-function [temps, valeurs] = lireSignalEspace(nomVariable, nomBloc)
-    nomVariable = char(nomVariable);
+function [temps, valeurs] = lireSignalEspace(p, nomBloc)
+    nomVariable = char(p.VariableName);
+    if isfield(p, 'Donnees')
+        % une entrée externe du modèle : ses données sont déjà là
+        temps = double(p.Donnees.temps(:));
+        valeurs = double(p.Donnees.valeurs);
+        return
+    end
     if isempty(nomVariable)
         error('simulink:sim:variableAbsente', ...
               ['Le bloc ''%s'' ne dit pas quelle variable lire : donnez-lui ' ...

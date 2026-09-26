@@ -2409,6 +2409,19 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                     case 108   % function-call generator
                         V(a) = double(estInstant(t, T.P(p), T.P(p + 1)));
                 end
+            case 12
+                switch code(k)
+                    case 120   % direct lookup : l'élément désigné, à partir de 0
+                        lignes = T.P(p + 1);
+                        u = V(eA(e + 1):eB(e + 1));
+                        i = min(max(floor(u), 0), lignes - 1);
+                        if T.P(p) == 1
+                            V(a:b) = T.P(p + 3 + i);
+                        else
+                            j = min(max(floor(V(eA(e + 2):eB(e + 2))), 0), T.P(p + 2) - 1);
+                            V(a:b) = T.P(p + 3 + i + j * lignes);
+                        end
+                end
             case 11
                 switch code(k)
                     case {110, 111}   % if, switch case : une sortie d'action par branche

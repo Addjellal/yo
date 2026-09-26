@@ -63,6 +63,16 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 0;
         case 'iterateur'
             [nEntrees, nSorties] = bornesSousSysteme(p);
+        case {'lookup', 'directlookup'}
+            nEntrees = entier(lire(p, 'NumberOfTableDimensions', 1));
+        case 'modelreference'
+            nom = lire(p, 'ModelName', '');
+            if isempty(nom)
+                nEntrees = 0;
+                nSorties = 0;
+            else
+                [nEntrees, nSorties] = bornesSousSysteme(struct('Model', char(nom)));
+            end
         case 'math'
             if any(strcmpi(lire(p, 'Operator', 'square'), {'pow', 'hypot', 'rem', 'mod'}))
                 nEntrees = 2;

@@ -49,6 +49,12 @@ function varargout = matlibre_sl_config(action, varargin)
 %     AlgebraicLoopMsg     'warning'  boucle algébrique : none, warning, error
 %     UnconnectedInputMsg  'warning'  entrée non reliée : none, warning, error
 %     UnconnectedOutputMsg 'none'     sortie non reliée : none, warning, error
+%     LoadExternalInput    'off'      'on' : les entrées du modèle lisent
+%                                     ExternalInput
+%     ExternalInput        '[t, u]'   le temps puis une colonne par
+%                                     élément des entrées, ou des
+%                                     variables séparées par des virgules,
+%                                     une par entrée
 %
 %   Le solveur et son type vont ensemble, comme dans Simulink : poser
 %   Solver sur ode45 fait le type Variable-step ; poser SolverType sur
@@ -94,7 +100,8 @@ function d = defauts()
                'AbsTol', 'auto', 'MaxOrder', 5, 'ExtrapolationOrder', 4, ...
                'NumberNewtonIterations', 1, 'ZeroCrossControl', 'UseLocalSettings', ...
                'AlgebraicLoopMsg', 'warning', 'UnconnectedInputMsg', 'warning', ...
-               'UnconnectedOutputMsg', 'none');
+               'UnconnectedOutputMsg', 'none', 'LoadExternalInput', 'off', ...
+               'ExternalInput', '[t, u]');
 end
 
 % Les solveurs écrits ici. Simulink en a deux autres, odeN et daessc :
@@ -183,6 +190,17 @@ function v = valider(nom, v)
             v = connus{trouve};
         case 'SolverType'
             v = choix(nom, v, {'Fixed-step', 'Variable-step'});
+        case 'LoadExternalInput'
+            v = choix(nom, v, {'off', 'on'});
+        case 'ExternalInput'
+            if ~(ischar(v) || isstring(v) || isnumeric(v) || isstruct(v))
+                error('Simulink:Config:InvalidValue', ...
+                      ['Le reglage ExternalInput est une expression : « [t, u] », ou des ' ...
+                       'noms de variables separes par des virgules.']);
+            end
+            if isstring(v)
+                v = char(v);
+            end
         case {'AlgebraicLoopMsg', 'UnconnectedInputMsg', 'UnconnectedOutputMsg'}
             v = choix(nom, v, {'none', 'warning', 'error'});
         case 'ZeroCrossControl'
