@@ -948,7 +948,39 @@ function s = regleTraitement(c, k, dE, complet, forcer)
                     s = {d(1:2)};
             end
         case 'integrator'
-            s = {dimsAvecEtat(dE, p.InitialCondition, complet, forcer)};
+            % La condition initiale externe donne la forme de l'état, comme
+            % le ferait le paramètre ; les ports de saturation et d'état ont
+            % celle de la sortie.
+            remise = ~strcmp(p.ExternalReset, 'none');
+            externe = strcmp(p.InitialConditionSource, 'external');
+            ci = p.InitialCondition;
+            if externe
+                % l'entrée donne la largeur ; une entrée scalaire prend
+                % celle de la condition initiale
+                ci = 0;
+                rangCI = 2 + remise;
+                if numel(dE) >= rangCI && ~isempty(dE{rangCI}) && prod(dE{rangCI}) > 1 && ...
+                   (isempty(dE{1}) || prod(dE{1}) == 1)
+                    ci = zeros(dE{rangCI});
+                end
+            end
+            d = dimsAvecEtat(dE, ci, complet, forcer);
+            if complet && ~isempty(d)
+                w = prod(d);
+                for j = 2:numel(dE)
+                    if ~isempty(dE{j}) && ~any(prod(dE{j}) == [1 w])
+                        quoi = 'de remise';
+                        if j == numel(dE) && externe
+                            quoi = 'de condition initiale';
+                        end
+                        error('Simulink:Engine:DimensionMismatch', ...
+                              ['L''entree %s de ''%s'' porte %d valeur(s), pour un etat ' ...
+                               'de largeur %d : il en faut une, ou autant que l''etat.'], ...
+                              quoi, c.chemins{k}, prod(dE{j}), w);
+                    end
+                end
+            end
+            s = repmat({d}, 1, c.nOut(k));
         case {'delay', 'memory'}
             s = {dimsAvecEtat(dE, p.InitialCondition, complet, forcer)};
         case 'discreteintegrator'
@@ -1611,8 +1643,25 @@ function c = abaisser(c, pas, tDebut)
             case 'signalconversion'
                 seg = c.nIn(k);
             % --- continu ---
-            case 'integrator'             % [borne; haut; bas]
-                x0 = etendre(p.InitialCondition, w, ch, 'InitialCondition');
+            case 'integrator'             % [borne; haut; bas; remise; externe; wr; sat; etat]
+                % Z, s'il y a remise ou condition initiale externe : [vu;
+                % reset précédent (wr); instant de la remise; état d'avant
+                % elle (w)].
+                remise = find(strcmp(p.ExternalReset, {'rising', 'falling', 'either', ...
+                                                       'level', 'level hold'}));
+                if isempty(remise)
+                    remise = 0;
+                end
+                externe = strcmp(p.InitialConditionSource, 'external');
+                wr = 0;
+                if remise > 0
+                    wr = largeurEntree(c, k, 2);
+                end
+                if externe
+                    x0 = zeros(w, 1);
+                else
+                    x0 = etendre(p.InitialCondition, w, ch, 'InitialCondition');
+                end
                 haut = etendre(p.UpperSaturationLimit, w, ch, 'UpperSaturationLimit');
                 bas = etendre(p.LowerSaturationLimit, w, ch, 'LowerSaturationLimit');
                 borne = strcmp(p.LimitOutput, 'on');
@@ -1624,7 +1673,11 @@ function c = abaisser(c, pas, tDebut)
                     x0 = min(max(x0, bas), haut);
                 end
                 c = ajouterEtat(c, k, x0);
-                seg = [borne; haut; bas];
+                seg = [borne; haut; bas; remise; externe; wr; ...
+                       strcmp(p.ShowSaturationPort, 'on'); strcmp(p.ShowStatePort, 'on')];
+                if remise > 0 || externe
+                    z0 = [0; zeros(wr, 1); -Inf; zeros(w, 1)];
+                end
             case 'derivative'             % Z : [parti; t; u]
                 z0 = [0; tDebut; zeros(largeurEntree(c, k, 1), 1)];
             case {'transferfcn', 'zeropole', 'statespace'}   % [nx; ny; nu; A; B; C; D]
@@ -2454,8 +2507,11 @@ function zc = passagesParZero(c)
         p = c.p{k};
         switch type
             case 'integrator'
-                if c.seg{k}(1) == 0
-                    continue   % sans bornes, rien ne casse
+                % Les bornes cassent, et les fronts de l'entrée de remise.
+                w = (numel(c.seg{k}) - 6) / 2;
+                remise = c.seg{k}(2 + 2 * w);
+                if c.seg{k}(1) == 0 && ~(remise >= 1 && remise <= 3)
+                    continue
                 end
             case 'minmax'
                 if c.nIn(k) < 2

@@ -1958,6 +1958,182 @@ for kE = 1:size(casErreurs, 1)
 end
 fprintf('solveurs : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% --------------------------------------- 20. L'integrateur de Simulink en entier
+% La balle qui rebondit, comme dans l'exemple de Simulink : la vitesse se
+% remet quand la position franchit zéro en descendant, à -0,8 fois l'état
+% d'avant le choc, que rend le port d'état. Sa condition initiale vient
+% de son entrée ; au premier instant, l'état vaut zéro, et elle aussi.
+m = new_system('balle');
+m = add_block(m, 'constant', 'gravite', 'Value', -9.81);
+m = add_block(m, 'integrator', 'vitesse', 'ExternalReset', 'falling', ...
+              'InitialConditionSource', 'external', 'ShowStatePort', 'on');
+m = add_block(m, 'integrator', 'position', 'InitialCondition', 10);
+m = add_block(m, 'gain', 'rebond', 'Gain', -0.8);
+m = add_line(m, 'gravite', 'vitesse', 1);
+m = add_line(m, 'vitesse', 'position');
+m = add_line(m, 'position', 'vitesse', 2);
+m = add_line(m, 'vitesse/State', 'rebond');
+m = add_line(m, 'rebond', 'vitesse', 3);
+balle = m;
+[entreesBalle, sortiesBalle] = matlibre_sl_ports(m.blocs{2});
+assert(entreesBalle == 3 && sortiesBalle == 2, ...
+       'la remise et la condition initiale font deux entrees, le port d''etat une sortie');
+t1 = sqrt(2 * 10 / 9.81);
+chocs = t1 * cumsum([1, 2 * 0.8 .^ (1:3)]);
+for solveur = {'ode45', 'ode23', 'ode113', 'ode15s', 'ode23t', 'ode23tb', 'ode23s'}
+    r = sim(m, 'Solver', solveur{1}, 'StopTime', 8, 'RelTol', 1e-8);
+    iChocs = find(diff(r.signaux.vitesse) > 1).' + 1;
+    assert(numel(iChocs) == 4 && max(abs(r.temps(iChocs).' - chocs)) < 1e-6, ...
+           [solveur{1} ' : les chocs sont localises a leurs instants']);
+    assert(max(abs(r.signaux.vitesse(iChocs) + 0.8 * r.signaux.vitesse_port2(iChocs))) < 1e-9 ...
+           && abs(r.signaux.vitesse_port2(iChocs(1)) + 9.81 * t1) < 1e-6, ...
+           [solveur{1} ' : au choc, le port d''etat rend la vitesse d''avant, la sortie la neuve']);
+    assert(r.signaux.vitesse(1) == 0 && r.signaux.position(1) == 10, ...
+           [solveur{1} ' : la condition initiale externe vaut au premier instant']);
+end
+% À pas fixe, sans localisation, le choc tombe au pas qui suit.
+r = sim(m, 'Solver', 'ode4', 'FixedStep', 0.001, 'StopTime', 8);
+iChocs = find(diff(r.signaux.vitesse) > 1).' + 1;
+assert(numel(iChocs) == 4 && all(r.temps(iChocs).' - chocs >= -1e-12) && ...
+       all(r.temps(iChocs).' - chocs < 0.0011), 'a pas fixe, le choc tombe au pas suivant');
+
+% Les cinq remises, sur un créneau de période 1 : montant à 0, 1 et 2,
+% descendant à 0,5 et 1,5. L'intégrale de 1 compte le temps depuis la
+% dernière remise ; level remet tant que le créneau est haut, et au
+% moment où il retombe ; level hold tient l'état pendant ce temps.
+instants = [0.25 0.75 1.25 1.75 2.1];
+attendus = struct('rising',   [0.25 0.75 0.25 0.75 0.1], ...
+                  'falling',  [0.25 0.25 0.75 0.25 0.6], ...
+                  'either',   [0.25 0.25 0.25 0.25 0.1], ...
+                  'level',    [0 0.25 0 0.25 0], ...
+                  'level_hold', [0 0.25 0 0.25 0]);
+for type = fieldnames(attendus).'
+    m = new_system('remises');
+    m = add_block(m, 'pulsegenerator', 'porte', 'Period', 1, 'PulseWidth', 50);
+    m = add_block(m, 'constant', 'un', 'Value', 1);
+    m = add_block(m, 'integrator', 'x', 'ExternalReset', strrep(type{1}, '_', ' '));
+    m = add_line(m, 'un', 'x', 1);
+    m = add_line(m, 'porte', 'x', 2);
+    rFixe = sim(m, 'Solver', 'ode1', 'FixedStep', 0.01, 'StopTime', 2.2);
+    rVariable = sim(m, [0, instants], simset('Solver', 'ode45'));
+    rMultipas = sim(m, [0, instants], simset('Solver', 'ode15s'));
+    for kI = 1:numel(instants)
+        iF = find(abs(rFixe.temps - instants(kI)) < 1e-9, 1);
+        assert(abs(rFixe.signaux.x(iF) - attendus.(type{1})(kI)) < 1e-9 && ...
+               abs(rVariable.signaux.x(kI + 1) - attendus.(type{1})(kI)) < 1e-9 && ...
+               abs(rMultipas.signaux.x(kI + 1) - attendus.(type{1})(kI)) < 1e-9, ...
+               sprintf('remise %s, a %g : %g attendu', type{1}, instants(kI), ...
+                       attendus.(type{1})(kI)));
+    end
+end
+
+% La condition initiale externe se lit au premier instant, fût-il
+% décalé : ici l'horloge plus deux, à t = 1.
+m = new_system('initialeExterne');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'bias', 'plusDeux', 'Bias', 2);
+m = add_block(m, 'constant', 'un', 'Value', 1);
+m = add_block(m, 'integrator', 'x', 'InitialConditionSource', 'external');
+m = add_line(m, 'horloge', 'plusDeux');
+m = add_line(m, 'un', 'x', 1);
+m = add_line(m, 'plusDeux', 'x', 2);
+for solveur = {'ode1', 'ode45', 'ode113'}
+    r = sim(m, 'Solver', solveur{1}, 'StartTime', 1, 'StopTime', 3, 'FixedStep', 0.1);
+    assert(abs(r.signaux.x(1) - 3) < 1e-12 && abs(r.signaux.x(end) - 5) < 1e-9, ...
+           [solveur{1} ' : l''etat part de la condition initiale lue a t = 1']);
+end
+
+% Un état vecteur : une remise scalaire remet tout, une remise vecteur
+% chaque composante à son front.
+m = new_system('vecteurRemis');
+m = add_block(m, 'constant', 'pente', 'Value', [1; 2]);
+m = add_block(m, 'step', 'commun', 'Time', 1);
+m = add_block(m, 'step', 'premier', 'Time', 0.5);
+m = add_block(m, 'step', 'second', 'Time', 1.5);
+m = add_block(m, 'mux', 'chacun');
+m = add_block(m, 'integrator', 'tout', 'ExternalReset', 'rising', 'InitialCondition', [5; 6]);
+m = add_block(m, 'integrator', 'part', 'ExternalReset', 'rising');
+m = add_line(m, 'pente', 'tout', 1);
+m = add_line(m, 'commun', 'tout', 2);
+m = add_line(m, 'pente', 'part', 1);
+m = add_line(m, 'premier', 'chacun', 1);
+m = add_line(m, 'second', 'chacun', 2);
+m = add_line(m, 'chacun', 'part', 2);
+r = sim(m, 'Solver', 'ode45', 'StopTime', 2);
+assert(max(abs(r.signaux.tout(end, :) - [6 8])) < 1e-9, ...
+       'une remise scalaire remet toutes les composantes a leur condition initiale');
+assert(max(abs(r.signaux.part(end, :) - [1.5 1])) < 1e-9, ...
+       'une remise vecteur remet chaque composante a son propre front');
+
+% Le port de saturation : 1 à la borne haute, -1 à la basse, 0 entre.
+m = new_system('saturationMontree');
+m = add_block(m, 'sine', 'derivee', 'Amplitude', 2, 'Phase', pi / 2);
+m = add_block(m, 'integrator', 'x', 'LimitOutput', 'on', 'UpperSaturationLimit', 1.5, ...
+              'LowerSaturationLimit', -1, 'ShowSaturationPort', 'on', 'ShowStatePort', 'on');
+m = add_line(m, 'derivee', 'x');
+r = sim(m, 'Solver', 'ode45', 'StopTime', 6, 'RelTol', 1e-8);
+tHaut = asin(0.75);
+assert(all(r.signaux.x_port2(r.temps > tHaut + 1e-6 & r.temps < pi / 2 - 1e-6) == 1) && ...
+       all(r.signaux.x_port2(r.temps < tHaut - 1e-6) == 0), ...
+       'le port de saturation vaut 1 a la borne haute, 0 avant');
+assert(any(r.signaux.x_port2 == -1) && ...
+       all(r.signaux.x(r.signaux.x_port2 == -1) == -1), 'et -1 a la borne basse');
+assert(isequal(r.signaux.x_port3, r.signaux.x), ...
+       'sans remise, le port d''etat rend la sortie');
+
+% Le fichier .slx garde la remise, la condition initiale externe et le
+% port d'état, que Simulink écrit « SID#state ».
+cheminBalle = [tempname() '.slx'];
+save_system(balle, cheminBalle);
+dossierBalle = tempname();
+unzip(cheminBalle, dossierBalle);
+xmlBalle = fileread(fullfile(dossierBalle, 'simulink', 'blockdiagram.xml'));
+assert(~isempty(strfind(xmlBalle, '#state')) && ~isempty(strfind(xmlBalle, 'ExternalReset')), ...
+       'le .slx ecrit le port d''etat et la remise');
+relue = load_system(cheminBalle);
+r = sim(relue, 'Solver', 'ode45', 'StopTime', 8, 'RelTol', 1e-8);
+iChocs = find(diff(r.signaux.vitesse) > 1).' + 1;
+assert(numel(iChocs) == 4 && max(abs(r.temps(iChocs).' - chocs)) < 1e-6, ...
+       'la balle relue du .slx rebondit aux memes instants');
+delete(cheminBalle);
+rmdir(dossierBalle, 's');
+
+% Les erreurs, chacune avec son identifiant et le bloc nommé.
+sansEtat = add_block(add_block(new_system('sansEtat'), 'integrator', 'x'), 'gain', 'g');
+largeurCI = new_system('largeurCI');
+largeurCI = add_block(largeurCI, 'constant', 'u', 'Value', [1; 2; 3]);
+largeurCI = add_block(largeurCI, 'constant', 'ci', 'Value', [1; 2]);
+largeurCI = add_block(largeurCI, 'integrator', 'x', 'InitialConditionSource', 'external');
+largeurCI = add_line(add_line(largeurCI, 'u', 'x', 1), 'ci', 'x', 2);
+largeurRemise = new_system('largeurRemise');
+largeurRemise = add_block(largeurRemise, 'constant', 'u', 'Value', [1; 2; 3]);
+largeurRemise = add_block(largeurRemise, 'constant', 'r', 'Value', [0; 1]);
+largeurRemise = add_block(largeurRemise, 'integrator', 'x', 'ExternalReset', 'level');
+largeurRemise = add_line(add_line(largeurRemise, 'u', 'x', 1), 'r', 'x', 2);
+casErreurs = {
+    @() add_line(sansEtat, 'x/State', 'g'), 'Simulink:Commands:AddLineInvalidPort', 'ShowStatePort'
+    @() add_line(sansEtat, 'g/State', 'x'), 'Simulink:Commands:AddLineInvalidPort', 'port d''etat'
+    @() sim(largeurCI), 'Simulink:Engine:DimensionMismatch', 'condition initiale'
+    @() sim(largeurRemise), 'Simulink:Engine:DimensionMismatch', 'de remise'
+    @() sim(set_param(balle, 'vitesse', 'ExternalReset', 'parfois')), 'Simulink:Parameters:InvalidValue', 'level hold'
+    @() add_line(balle, 'gravite', 'vitesse', 4), 'Simulink:Commands:AddLineInvalidPort', '3 port(s)'
+    @() matlibre_sl_programme(balle), 'Simulink:programme:BlocNonEcrit', 'balle/vitesse'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('integrateur, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('integrateur : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

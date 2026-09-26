@@ -79,6 +79,14 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nSorties = compterParties(lire(p, 'Outputs', 2));
         case 'concatenate'
             nEntrees = entier(lire(p, 'NumInputs', 2));
+        case 'integrator'
+            % L'entrée de remise et celle de la condition initiale suivent
+            % l'entrée ; le port de saturation et le port d'état suivent la
+            % sortie.
+            nEntrees = 1 + ~strcmpi(char(lire(p, 'ExternalReset', 'none')), 'none') + ...
+                       strcmpi(char(lire(p, 'InitialConditionSource', 'internal')), 'external');
+            nSorties = 1 + strcmpi(char(lire(p, 'ShowSaturationPort', 'off')), 'on') + ...
+                       strcmpi(char(lire(p, 'ShowStatePort', 'off')), 'on');
         case 'goto'
             nSorties = 0;
         case {'outport', 'display', 'toworkspace', 'terminator', 'stopsimulation', ...

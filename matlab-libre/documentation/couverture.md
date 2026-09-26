@@ -127,7 +127,10 @@ totalité.
    s'arrêtent sur les instants d'échantillonnage et les cassures des
    sources, et localisent les passages par zéro des relais, saturations,
    aiguillages, comparaisons et intégrateurs bornés ; les solveurs à pas
-   multiples repartent de l'ordre 1 après chaque discontinuité. Les sous-systèmes
+   multiples repartent de l'ordre 1 après chaque discontinuité.
+   L'intégrateur a sa remise externe (fronts, niveau, niveau tenu), sa
+   condition initiale externe et ses ports de saturation et d'état : la
+   balle qui rebondit se bâtit comme dans l'exemple de Simulink. Les sous-systèmes
    conditionnels — Enable, Trigger, If et Switch Case avec leurs
    sous-systèmes d'action, Merge — calculent quand leur garde le
    permet, et tiennent ou remettent à zéro sorties et états comme dans

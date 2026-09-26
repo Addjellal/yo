@@ -83,7 +83,11 @@ function modele = add_block(modele, type, nom, varargin)
 %   Continu — l'intégrateur et les représentations d'état coupent les
 %   boucles :
 %     integrator   InitialCondition, LimitOutput, UpperSaturationLimit,
-%                  LowerSaturationLimit
+%                  LowerSaturationLimit, ExternalReset (none, rising,
+%                  falling, either, level, level hold : une entrée de
+%                  remise), InitialConditionSource (external : une entrée
+%                  de condition initiale), ShowSaturationPort,
+%                  ShowStatePort (le port d'état, 'integ/State')
 %     derivative   —                            vaut zéro au premier pas
 %     transferfcn  Numerator, Denominator
 %     statespace   A, B, C, D, X0

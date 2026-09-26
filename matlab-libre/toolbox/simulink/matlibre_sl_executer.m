@@ -186,6 +186,16 @@ function T = preparer(c)
             T.remises(end + 1) = k;
         end
     end
+    % Les intégrateurs à remise externe ou à condition initiale externe :
+    % leur état se remet au pas majeur, comme celui d'un sous-système.
+    T.reinit = [];
+    for k = find(strcmp(c.types, 'integrator'))
+        w = (numel(c.seg{k}) - 6) / 2;
+        if c.seg{k}(2 + 2 * w) > 0 || c.seg{k}(3 + 2 * w) ~= 0
+            T.reinit(end + 1) = k;
+        end
+    end
+    T.aRemettre = ~isempty(T.remises) || ~isempty(T.reinit);
     T.h = c.pas;
     T.tDebut = c.tDebut;
     T.fixe = ~(isfield(c, 'variable') && c.variable);
@@ -602,8 +612,8 @@ function J = simuler(T, instants, solveur, reprise)
         else
             [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, i, true, touche);
         end
-        if ~isempty(T.remises)
-            [x, Z, refaire] = remettre(T, V, Z, x);
+        if T.aRemettre
+            [x, Z, refaire] = remettre(T, V, Z, x, t);
             if refaire
                 [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, i, true, touche);
             end
@@ -843,8 +853,8 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     Z = T.Z0;
     touche = (abs(prochain - t) <= toleranceTemps(t)).';
     [V, Z] = passe(T, T.listeTout, T.V0, Z, x, t, 0, true, touche);
-    if ~isempty(T.remises)
-        [x, Z, refaire] = remettre(T, V, Z, x);
+    if T.aRemettre
+        [x, Z, refaire] = remettre(T, V, Z, x, t);
         if refaire
             [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, 0, true, touche);
         end
@@ -1009,8 +1019,8 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         end
         touche = (abs(prochain - t) <= toleranceTemps(t)).';
         [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, 0, true, touche);
-        if ~isempty(T.remises)
-            [x, Z, refaire] = remettre(T, V, Z, x);
+        if T.aRemettre
+            [x, Z, refaire] = remettre(T, V, Z, x, t);
             if refaire
                 [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, 0, true, touche);
             end
@@ -1561,11 +1571,18 @@ function g = passagesZero(T, V, Z, x, t) %#ok<INUSD>
                     ut = V(T.eA(e + rang + 1):T.eB(e + rang + 1));
                     g = [g; ut(:)]; %#ok<AGROW>
                 end
-            case 70   % intégrateur borné : ses bornes, et sa dérivée s'il y est tenu
-                xk = x(T.xA(k):T.xB(k));
-                g = [g; xk - T.P(p + 1:p + w); xk - T.P(p + 1 + w:p + 2 * w)]; %#ok<AGROW>
-                if isfield(T, 'satures')
-                    g = [g; (u(:) + zeros(w, 1)) .* T.satures(T.xA(k):T.xB(k))]; %#ok<AGROW>
+            case 70   % intégrateur : ses bornes, sa dérivée s'il y est tenu, sa remise
+                if T.P(p) ~= 0
+                    xk = x(T.xA(k):T.xB(k));
+                    g = [g; xk - T.P(p + 1:p + w); xk - T.P(p + 1 + w:p + 2 * w)]; %#ok<AGROW>
+                    if isfield(T, 'satures')
+                        g = [g; (u(:) + zeros(w, 1)) .* T.satures(T.xA(k):T.xB(k))]; %#ok<AGROW>
+                    end
+                end
+                remise = T.P(p + 2 * w + 1);
+                if remise >= 1 && remise <= 3
+                    r = V(T.eA(e + 2):T.eB(e + 2));
+                    g = [g; r(:)]; %#ok<AGROW>
                 end
         end
     end
@@ -2138,6 +2155,9 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                             V(a:b) = min(max(x(T.xA(k):T.xB(k)), T.P(p + 1 + w:p + 2 * w)), ...
                                          T.P(p + 1:p + w));
                         end
+                        if T.nOut(k) > 1
+                            V = portsIntegrateur(T, k, V, Z, t, p, a, b);
+                        end
                     case 71   % derivative
                         z = zA(k);
                         if Z(z) == 0
@@ -2454,8 +2474,12 @@ end
 % Un sous-système qui reprend avec StatesWhenEnabling (ou
 % InitializeStates) à reset repart de ses conditions initiales : ses
 % états, continus et discrets, y reviennent, et la passe se refait.
-function [x, Z, refaire] = remettre(T, V, Z, x)
+function [x, Z, refaire] = remettre(T, V, Z, x, t)
     refaire = false;
+    for k = T.reinit
+        [x, Z, remis] = remettreIntegrateur(T, k, V, Z, x, t);
+        refaire = refaire || remis;
+    end
     for g = T.remises
         z = T.zA(g);
         if V(T.oA(g)) ~= 0 && Z(z) ~= 0 && Z(z + 1) == 0
@@ -2470,6 +2494,112 @@ function [x, Z, refaire] = remettre(T, V, Z, x)
             end
             refaire = true;
         end
+    end
+end
+
+% Un intégrateur à remise externe revient à sa condition initiale — le
+% paramètre, ou la valeur de son entrée de condition initiale — au front
+% que demande ExternalReset : montant, descendant, l'un ou l'autre ; ou
+% tant que l'entrée de remise n'est pas nulle (level, level hold). Une
+% condition initiale externe se lit aussi au premier instant. L'état
+% d'avant la remise est gardé : le port d'état le rend à l'instant même,
+% comme dans Simulink.
+function [x, Z, remis] = remettreIntegrateur(T, k, V, Z, x, t)
+    remis = false;
+    g = T.garde(k);
+    if g > 0 && V(T.oA(g)) == 0
+        return   % sous-système à l'arrêt : l'état tient
+    end
+    p = T.pA(k);
+    a = T.xA(k);
+    b = T.xB(k);
+    w = b - a + 1;
+    q = p + 2 * w;
+    remise = T.P(q + 1);
+    externe = T.P(q + 2);
+    wr = T.P(q + 3);
+    z = T.zA(k);
+    e = T.eD(k);
+    if externe
+        rang = 2 + (remise > 0);
+        ci = V(T.eA(e + rang):T.eB(e + rang)) + zeros(w, 1);
+    else
+        ci = T.x0(a:b);
+    end
+    if T.P(p) ~= 0
+        ci = min(max(ci, T.P(p + w + 1:p + 2 * w)), T.P(p + 1:p + w));
+    end
+    masque = false(w, 1);
+    premier = Z(z) == 0;
+    if remise > 0
+        r = V(T.eA(e + 2):T.eB(e + 2));
+        avant = Z(z + 1:z + wr);
+        if premier
+            avant = r;   % pas de front au premier instant
+        end
+        switch remise
+            case 1
+                d = (avant < 0 & r >= 0) | (avant == 0 & r > 0);
+            case 2
+                d = (avant > 0 & r <= 0) | (avant == 0 & r < 0);
+            case 3
+                d = (avant < 0 & r >= 0) | (avant == 0 & r ~= 0) | (avant > 0 & r <= 0);
+            case 4
+                d = r ~= 0 | (avant ~= 0 & r == 0);
+            otherwise
+                d = r ~= 0;
+        end
+        if numel(d) == w
+            masque = d(:);
+        else
+            masque(:) = any(d);
+        end
+        Z(z + 1:z + wr) = r;
+    end
+    if premier
+        Z(z) = 1;
+        if externe
+            x(a:b) = ci;
+            remis = true;
+        end
+    end
+    if any(masque)
+        Z(z + wr + 1) = t;
+        Z(z + wr + 2:z + wr + 1 + w) = V(T.oA(k):T.oB(k));
+        rangs = a - 1 + find(masque);
+        x(rangs) = ci(masque);
+        remis = true;
+    end
+end
+
+% Les ports de saturation et d'état d'un intégrateur. Le premier vaut 1 à
+% la borne haute, -1 à la borne basse, 0 entre elles ; le second rend
+% l'état — celui d'avant la remise, à l'instant d'une remise.
+function V = portsIntegrateur(T, k, V, Z, t, p, a, b)
+    w = b - a + 1;
+    q = p + 2 * w;
+    port = 2;
+    if T.P(q + 4) ~= 0
+        s = zeros(w, 1);
+        if T.P(p) ~= 0
+            y = V(a:b);
+            s = double(y >= T.P(p + 1:p + w)) - double(y <= T.P(p + w + 1:p + 2 * w));
+        end
+        gp = T.pd(k) + port - 1;
+        V(T.poA(gp):T.poB(gp)) = s;
+        port = port + 1;
+    end
+    if T.P(q + 5) ~= 0
+        valeur = V(a:b);
+        if T.zN(k) > 0
+            z = T.zA(k);
+            wr = T.P(q + 3);
+            if Z(z + wr + 1) == t
+                valeur = Z(z + wr + 2:z + wr + 1 + w);
+            end
+        end
+        gp = T.pd(k) + port - 1;
+        V(T.poA(gp):T.poB(gp)) = valeur;
     end
 end
 
@@ -3177,6 +3307,17 @@ function dx = derivees(T, V, x, t)
         u = V(T.eA(e + 1):T.eB(e + 1));
         switch T.code(k)
             case 70   % integrator
+                if T.P(p + 2 * (b - a + 1) + 1) == 5
+                    % level hold : tenu à sa condition initiale tant que
+                    % l'entrée de remise n'est pas nulle
+                    r = V(T.eA(e + 2):T.eB(e + 2));
+                    if numel(r) == b - a + 1
+                        u = u + zeros(b - a + 1, 1);
+                        u(r ~= 0) = 0;
+                    elseif any(r ~= 0)
+                        u = zeros(b - a + 1, 1);
+                    end
+                end
                 if T.P(p) == 0
                     dx(a:b) = u;
                 else

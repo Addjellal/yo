@@ -14,7 +14,9 @@ function modele = add_line(modele, source, destination, entree, sortie)
 %   sur cette lecture. Les ports de contrôle d'un sous-système
 %   conditionnel se désignent par leur nom : 'sous/Enable',
 %   'sous/Trigger', 'sous/Ifaction' ; ce sont ses entrées qui suivent
-%   celles de ses blocs INPORT.
+%   celles de ses blocs INPORT. Le port d'état d'un intégrateur
+%   (ShowStatePort à 'on') se désigne de même, 'integrateur/State' : c'est
+%   sa dernière sortie.
 %
 %   Une sortie peut alimenter plusieurs entrées : il suffit de plusieurs
 %   liens. Une entrée, non : un second lien vers une entrée déjà reliée
@@ -116,6 +118,14 @@ function [k, port] = designer(modele, texte, role)
             return
         end
     end
+    jetons = regexp(texte, '^(.*)/State$', 'tokens', 'once', 'ignorecase');
+    if ~isempty(jetons) && strcmp(role, 'source')
+        k = chercher(modele, jetons{1});
+        if k > 0
+            port = portEtat(modele.blocs{k});
+            return
+        end
+    end
     jetons = regexp(texte, '^(.*)/(Enable|Trigger|Ifaction)$', 'tokens', 'once', ...
                     'ignorecase');
     if ~isempty(jetons) && strcmp(role, 'destination')
@@ -188,6 +198,24 @@ function port = portDeControle(bloc, nom, texte)
               strrep(voulu.(lower(nom)), 'port', ' port'), texte);
     end
     port = sum(strcmp(types, 'inport')) + rang;
+end
+
+% Le port d'état d'un intégrateur est sa dernière sortie, s'il le montre.
+function port = portEtat(bloc)
+    montre = false;
+    if strcmp(typeCanonique(bloc.type), 'integrator')
+        for champ = fieldnames(bloc.parametres).'
+            if strcmpi(champ{1}, 'ShowStatePort')
+                montre = strcmpi(char(bloc.parametres.(champ{1})), 'on');
+            end
+        end
+    end
+    if ~montre
+        error('Simulink:Commands:AddLineInvalidPort', ...
+              ['Le bloc ''%s'' n''a pas de port d''etat : seul un integrateur dont ' ...
+               'ShowStatePort vaut ''on'' en montre un.'], char(bloc.nom));
+    end
+    [~, port] = matlibre_sl_ports(bloc);
 end
 
 function t = typeCanonique(type)

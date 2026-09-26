@@ -538,7 +538,15 @@ function [modele, refuses] = construire(S, nom, defauts, refuses)
             continue
         end
         pe = portDeDestination(modele.blocs{d}, pe);
-        if isempty(pe)
+        if ischar(ps)
+            % le port d'état d'un intégrateur : sa dernière sortie
+            if strcmp(ps, 'state') && strcmp(modele.blocs{a}.type, 'integrator')
+                [~, ps] = matlibre_sl_ports(modele.blocs{a}, 'integrator');
+            else
+                ps = [];
+            end
+        end
+        if isempty(pe) || isempty(ps)
             continue
         end
         modele.liens(end + 1, :) = [a, d, pe, ps];
@@ -642,7 +650,7 @@ function [k, port] = extremite(texte, sids, blocs)
     if ~isempty(jetons)
         port = str2double(jetons{2});
     else
-        port = lower(suite);   % enable, trigger, ifaction
+        port = lower(regexprep(suite, '^out:', ''));   % enable, trigger, ifaction, state
     end
 end
 
@@ -869,9 +877,12 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
         if ~isempty(controle)
             destination = sprintf('%d#%s', sids(liens(l, 2)), controle);
         end
+        source = sprintf('%d#out:%d', sids(liens(l, 1)), liens(l, 4));
+        if portEtatEcrit(modele.blocs{liens(l, 1)}, liens(l, 4))
+            source = sprintf('%d#state', sids(liens(l, 1)));
+        end
         lignes{end + 1} = sprintf('%s  <Line>', marge); %#ok<AGROW>
-        lignes{end + 1} = sprintf('%s    <P Name="Src">%d#out:%d</P>', marge, ...
-                                  sids(liens(l, 1)), liens(l, 4)); %#ok<AGROW>
+        lignes{end + 1} = sprintf('%s    <P Name="Src">%s</P>', marge, source); %#ok<AGROW>
         lignes{end + 1} = sprintf('%s    <P Name="Dst">%s</P>', marge, destination); %#ok<AGROW>
         lignes{end + 1} = sprintf('%s  </Line>', marge); %#ok<AGROW>
     end
@@ -884,6 +895,28 @@ function oui = referenceDeBibliotheque(type)
     oui = any(strcmp(type, {'ramp', 'comparetoconstant', 'comparetozero', ...
                             'detectchange', 'detectincrease', 'detectdecrease', ...
                             'coulombfriction', 'pidcontroller', 'repeatingsequence'}));
+end
+
+% La sortie PORT d'un intégrateur est-elle son port d'état ? Simulink
+% l'écrit à part, « SID#state ».
+function oui = portEtatEcrit(bloc, port)
+    oui = false;
+    try
+        entree = matlibre_sl_catalogue('type', bloc.type);
+    catch
+        return
+    end
+    if ~strcmp(entree.type, 'integrator')
+        return
+    end
+    montre = false;
+    for champ = fieldnames(bloc.parametres).'
+        if strcmpi(champ{1}, 'ShowStatePort')
+            montre = strcmpi(char(bloc.parametres.(champ{1})), 'on');
+        end
+    end
+    [~, ns] = matlibre_sl_ports(bloc, 'integrator');
+    oui = montre && port == ns;
 end
 
 % Le nom Simulink du port de contrôle qu'est l'entrée PORT d'un
