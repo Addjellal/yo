@@ -1,5 +1,5 @@
 function [matlibre__c, matlibre__v] = matlibre_sf_evaluer(matlibre__texte, matlibre__c, u, ...
-                                                          matlibre__garde)
+                                                          matlibre__garde, matlibre__f)
 %MATLIBRE_SF_EVALUER Évalue une garde ou une action écrite en texte.
 %   [C,V] = MATLIBRE_SF_EVALUER(TEXTE,C,U,GARDE) évalue le texte d'une
 %   garde (GARDE vrai : V est sa valeur) ou d'une action (V vide), comme
@@ -20,6 +20,14 @@ function [matlibre__c, matlibre__v] = matlibre_sf_evaluer(matlibre__texte, matli
     matlibre__texte = regexprep(matlibre__source, ...
         '(^|[^A-Za-z0-9_])(after|before|at|every)\s*\(\s*([^,()]+)\s*,\s*(tick|sec)\s*\)', ...
         '$1matlibre_sf_temporel(matlibre__c, ''$2'', $3, ''$4'')');
+    % les fonctions de la machine, appelées par leur nom
+    matlibre__fonctions = {};
+    if nargin >= 5 && isstruct(matlibre__f)
+        matlibre__fonctions = fieldnames(matlibre__f);
+        for matlibre__k = 1:numel(matlibre__fonctions)
+            eval([matlibre__fonctions{matlibre__k} ' = matlibre__f.(matlibre__fonctions{matlibre__k});']);
+        end
+    end
     matlibre__noms = {};
     if isstruct(matlibre__c)
         matlibre__noms = fieldnames(matlibre__c);
@@ -49,7 +57,8 @@ function [matlibre__c, matlibre__v] = matlibre_sf_evaluer(matlibre__texte, matli
     matlibre__apres = who;
     for matlibre__nom = matlibre__apres.'
         matlibre__n = matlibre__nom{1};
-        if strncmp(matlibre__n, 'matlibre__', 10) || any(strcmp(matlibre__n, {'u', 'ans'}))
+        if strncmp(matlibre__n, 'matlibre__', 10) || any(strcmp(matlibre__n, {'u', 'ans'})) || ...
+           any(strcmp(matlibre__n, matlibre__fonctions))
             continue
         end
         if any(strcmp(matlibre__noms, matlibre__n)) || ~any(strcmp(matlibre__avant, matlibre__n))

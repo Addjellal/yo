@@ -209,23 +209,72 @@ function [R, contexte, parti] = executer(A, machine, k, R, contexte, u, t)
         if ~strcmp(tr.depuis, A.noms{k})
             continue
         end
-        [vrai, contexte] = garde(tr, contexte, u);
-        if vrai
-            [R, contexte] = franchir(A, machine, k, rang(A, tr.vers), tr, R, contexte, t, u);
+        [parcours, contexte] = suivre(machine, tr, contexte, u, 0);
+        if ~isempty(parcours)
+            [R, contexte] = franchir(A, machine, k, rang(A, parcours{end}.vers), parcours, ...
+                                     R, contexte, t, u);
             parti = true;
             return
         end
     end
     e = machine.etats{k};
-    contexte = agir(e.pendant, contexte, u, true);
+    contexte = agir(e.pendant, contexte, u, true, machine);
     [R, contexte] = executerEnfants(A, machine, k, R, contexte, u, t);
+end
+
+% Le chemin d'une transition : elle-même, si elle mène à un état et que
+% sa garde est vraie ; si elle mène à une jonction, elle suivie du premier
+% chemin valide qui part de la jonction, dans l'ordre où ses segments ont
+% été déclarés — un segment dont la suite échoue est abandonné, et l'on
+% essaie le suivant. Vide si aucun chemin n'arrive à un état. Les actions
+% de condition s'exécutent à mesure que les gardes sont vraies ; celles
+% des transitions attendent que le chemin soit pris.
+function [parcours, contexte] = suivre(machine, tr, contexte, u, profondeur)
+    parcours = {};
+    if profondeur > 64
+        error('Stateflow:BoucleDeJonctions', ...
+              ['Les jonctions de la machine ''%s'' bouclent : un chemin repasse sans fin ' ...
+               'par ''%s''.'], machine.nom, tr.vers);
+    end
+    [vrai, contexte] = garde(tr, contexte, u, machine);
+    if ~vrai
+        return
+    end
+    if ~estJonction(machine, tr.vers)
+        parcours = {tr};
+        return
+    end
+    for j = 1:numel(machine.transitions)
+        suivante = machine.transitions{j};
+        if ~strcmp(suivante.depuis, tr.vers)
+            continue
+        end
+        [suite, contexte] = suivre(machine, suivante, contexte, u, profondeur + 1);
+        if ~isempty(suite)
+            parcours = [{tr}, suite];
+            return
+        end
+    end
+end
+
+function oui = estJonction(machine, nom)
+    oui = isfield(machine, 'jonctions') && any(strcmp(machine.jonctions, nom));
+end
+
+% Les fonctions de la machine — SFFUNCTION, SFTRUTHTABLE —, que ses
+% textes appellent par leur nom.
+function f = fonctionsDe(machine)
+    f = struct();
+    if isfield(machine, 'fonctions')
+        f = machine.fonctions;
+    end
 end
 
 % Une garde : une poignée @(c, u), ou un texte — une condition, un
 % événement que l'entrée nomme, ou une étiquette « evenement[condition]
 % {action de condition}/action ». L'action de condition s'exécute dès que
 % la condition est vraie, avant la sortie de l'état.
-function [vrai, contexte] = garde(tr, contexte, u)
+function [vrai, contexte] = garde(tr, contexte, u, machine)
     g = tr.garde;
     if isa(g, 'function_handle')
         vrai = logical(g(contexte, u));
@@ -242,11 +291,11 @@ function [vrai, contexte] = garde(tr, contexte, u)
                (iscell(u) && any(strcmp(u, evenement)));
     end
     if vrai && ~isempty(condition)
-        [~, valeur] = matlibre_sf_evaluer(condition, contexte, u, true);
+        [~, valeur] = matlibre_sf_evaluer(condition, contexte, u, true, fonctionsDe(machine));
         vrai = logical(valeur);
     end
     if vrai && ~isempty(actionCondition)
-        contexte = matlibre_sf_evaluer(actionCondition, contexte, u, false);
+        contexte = matlibre_sf_evaluer(actionCondition, contexte, u, false, fonctionsDe(machine));
     end
 end
 
@@ -274,7 +323,7 @@ end
 
 % Une action : une poignée — @(c) pour l'entrée et la sortie, @(c, u)
 % pour le séjour — ou un texte du langage d'action.
-function contexte = agir(a, contexte, u, avecEntree)
+function contexte = agir(a, contexte, u, avecEntree, machine)
     if isempty(a)
         return
     end
@@ -286,7 +335,7 @@ function contexte = agir(a, contexte, u, avecEntree)
         end
         return
     end
-    contexte = matlibre_sf_evaluer(char(a), contexte, u, false);
+    contexte = matlibre_sf_evaluer(char(a), contexte, u, false, fonctionsDe(machine));
 end
 
 function contexte = poserTemps(contexte, R, k, t)
@@ -301,7 +350,7 @@ end
 % Une transition de S vers C : on sort jusqu'à leur ancêtre commun, puis
 % on entre jusqu'à la cible. Une transition vers soi-même, ou vers un
 % ancêtre, sort de lui et y rentre.
-function [R, contexte] = franchir(A, machine, s, c, tr, R, contexte, t, u)
+function [R, contexte] = franchir(A, machine, s, c, parcours, R, contexte, t, u)
     ancetresS = chemin(A, s);
     ancetresC = chemin(A, c);
     commun = 0;
@@ -327,7 +376,10 @@ function [R, contexte] = franchir(A, machine, s, c, tr, R, contexte, t, u)
             [R, contexte] = sortir(A, machine, k, R, contexte);
         end
     end
-    contexte = agir(tr.action, contexte, u, false);
+    % les actions de chaque segment du chemin, dans l'ordre
+    for q = 1:numel(parcours)
+        contexte = agir(parcours{q}.action, contexte, u, false, machine);
+    end
     % puis de COMMUN jusqu'à la cible, et ses sous-états par défaut
     descente = ancetresC(find(ancetresC == commun, 1) + 1:end);
     if commun == 0
@@ -382,7 +434,7 @@ function [R, contexte] = activer(A, machine, k, R, contexte, t)
     R.depuis(end + 1) = R.tick;
     R.debut(end + 1) = t;
     e = machine.etats{k};
-    contexte = agir(e.entree, contexte, [], false);
+    contexte = agir(e.entree, contexte, [], false, machine);
 end
 
 % Sortir de K : ses sous-états d'abord, du plus profond au plus haut, puis
@@ -395,7 +447,7 @@ function [R, contexte] = sortir(A, machine, k, R, contexte)
         end
     end
     e = machine.etats{k};
-    contexte = agir(e.sortie, contexte, [], false);
+    contexte = agir(e.sortie, contexte, [], false, machine);
     i = find(R.actifs == k, 1);
     R.actifs(i) = [];
     R.depuis(i) = [];

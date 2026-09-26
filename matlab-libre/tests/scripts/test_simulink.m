@@ -3981,6 +3981,206 @@ for kE = 1:size(casErreurs, 1)
 end
 fprintf('types de donnees : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% ------------------ 31. Stateflow : jonctions, fonctions, tables de verite
+% Une transition vers une jonction n'est prise que si un chemin de gardes
+% vraies mène jusqu'à un état ; un segment dont la suite échoue est
+% abandonné au profit du suivant. Les actions de condition s'exécutent à
+% mesure que les gardes sont vraies, celles des transitions une fois le
+% chemin choisi, segment après segment.
+m = sfchart('retour');
+m = sfstate(m, 'A');
+m = sfstate(m, 'B');
+m = sfstate(m, 'C');
+m = sfjunction(m, 'j1');
+m = sfjunction(m, 'j2');
+m = sftransition(m, 'A', 'j1', '[go == 1]{essais = essais + 1;}', 'trace = [trace 1];');
+m = sftransition(m, 'j1', 'j2', '[x > 5]', 'trace = [trace 2];');
+m = sftransition(m, 'j2', 'B', '[y > 5]', 'trace = [trace 3];');
+m = sftransition(m, 'j1', 'C', '', 'trace = [trace 4];');
+depart = struct('go', 1, 'x', 10, 'y', 0, 'essais', 0, 'trace', []);
+[h, c] = sfrun(m, 0, depart);
+assert(isequal(h, {'C'}) && isequal(c.trace, [1 4]) && c.essais == 1, ...
+       'jonctions : le chemin vers B echoue, celui vers C est pris');
+depart.y = 10;
+[h, c] = sfrun(m, 0, depart);
+assert(isequal(h, {'B'}) && isequal(c.trace, [1 2 3]), ...
+       'jonctions : le chemin complet, ses actions dans l''ordre');
+depart.go = 0;
+[h, c] = sfrun(m, 0, depart);
+assert(isequal(h, {'A'}) && isempty(c.trace) && c.essais == 0, ...
+       'jonctions : la premiere garde fausse, rien ne bouge');
+% sans chemin par défaut : on reste, mais l'action de condition a eu lieu
+m = sfchart('impasse');
+m = sfstate(m, 'A');
+m = sfstate(m, 'B');
+m = sfjunction(m, 'j');
+m = sftransition(m, 'A', 'j', '[true]{vus = vus + 1;}');
+m = sftransition(m, 'j', 'B', '[x > 100]');
+[h, c] = sfrun(m, [0 0 0], struct('x', 1, 'vus', 0));
+assert(isequal(h, {'A', 'A', 'A'}) && c.vus == 3, ...
+       'une impasse : l''etat reste, l''action de condition s''est faite a chaque essai');
+
+% Une fonction de la machine, appelée par les textes.
+m = sfchart('chauffe');
+m = sffunction(m, 'consigne', @(heure) 18 + 2 * (heure >= 8 && heure < 22));
+m = sfstate(m, 'regle', 'du: c = consigne(u);');
+m = sfstate(m, 'alarme');
+m = sftransition(m, 'regle', 'alarme', '[consigne(u) > 25]');
+[h, c] = sfrun(m, [7 9 12], struct('c', 0));
+assert(c.c == 20 && all(strcmp(h, 'regle')), 'une fonction de la machine');
+
+% Une table de vérité : la première décision qui s'accorde.
+m = sfchart('signe');
+m = sftruthtable(m, 'classe', {'x'}, {'k'}, {'x > 0', 'x < 0'}, ['TF-'; 'FT-'], ...
+                 {'k = 1;', 'k = -1;', 'k = 0;'});
+m = sfstate(m, 'mesure', 'du: s = classe(u);');
+valeurs = [3 -2 0];
+for kV = 1:numel(valeurs)
+    [~, c] = sfrun(m, [0 valeurs(kV)]);
+    assert(c.s == sign(valeurs(kV)), sprintf('table de verite sur %g', valeurs(kV)));
+end
+% dans un bloc Chart, sur un signal
+schema = new_system('tableVerite');
+schema = add_block(schema, 'sine', 'u', 'Amplitude', 2);
+schema = add_block(schema, 'chart', 'c', 'Chart', m, 'Inputs', 1, 'Outputs', {'s'}, ...
+                   'InitialContext', struct('s', 0), 'SampleTime', 0.1);
+schema = add_line(schema, 'u/1', 'c/1');
+r = sim(schema, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 3);
+iMesure = r.temps > 0.05;
+assert(all(r.signaux.c(iMesure) == sign(2 * sin(r.temps(iMesure) - 0.1)) | ...
+           r.signaux.c(iMesure) == sign(2 * sin(r.temps(iMesure)))), ...
+       'une table de verite dans un bloc Chart');
+
+% Les erreurs.
+boucle = sfchart('boucle');
+boucle = sfstate(boucle, 'A');
+boucle = sfjunction(boucle, 'j1');
+boucle = sfjunction(boucle, 'j2');
+boucle = sftransition(boucle, 'A', 'j1', '');
+boucle = sftransition(boucle, 'j1', 'j2', '');
+boucle = sftransition(boucle, 'j2', 'j1', '');
+table = sftruthtable(sfchart('t'), 'f', {'x'}, {'y'}, {'x > 0'}, 'TF', {'y = 1;', 'y = 2;'});
+casErreurs = {
+    @() sfrun(boucle, [0 0]), 'Stateflow:BoucleDeJonctions', 'bouclent'
+    @() sfjunction(sfjunction(sfchart('x'), 'j'), 'j'), 'Stateflow:JonctionDouble', 'j'
+    @() sfstate(sfjunction(sfchart('x'), 'j'), 'j'), 'Stateflow:EtatDouble', 'j'
+    @() sffunction(sfchart('x'), 'f', 3), 'Stateflow:FonctionInvalide', 'poignee'
+    @() sftruthtable(sfchart('x'), 't', {'x'}, {'y'}, {'x > 0', 'x < 0'}, 'TF', {'y=1;', 'y=2;'}), ...
+        'Stateflow:TableDeVeriteInvalide', 'une par condition'
+    @() sftruthtable(sfchart('x'), 't', {'x'}, {'y'}, {'x > 0'}, 'TX', {'y=1;', 'y=2;'}), ...
+        'Stateflow:TableDeVeriteInvalide', 'peu importe'
+    @() table.fonctions.f(1, 2), 'Stateflow:TableDeVeriteArguments', 'prend 1'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('jonctions et tables, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('jonctions et tables : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
+%% ------------------------------ 32. timeseries, Dataset et formats du journal
+% Une timeseries porte des valeurs et leurs instants. Un From Workspace la
+% lit, un To Workspace au format 'Timeseries' en rend une, SIM l'accepte
+% comme entrée externe ; SaveFormat donne à yout la forme d'une matrice,
+% d'une structure, ou d'un Simulink.SimulationData.Dataset.
+serie = timeseries([0; 2; 4], [0 1 2], 'Name', 'vitesse');
+assert(strcmp(class(serie), 'timeseries') && serie.Length == 3 && ...
+       strcmp(serie.Name, 'vitesse') && serie.TimeInfo.Increment == 1 && ...
+       serie.TimeInfo.End == 2, 'une timeseries et ses informations de temps');
+milieu = resample(serie, [0.5 1.5]);
+assert(isequal(milieu.Data, [1; 3]) && isequal(milieu.Time, [0.5; 1.5]), 'resample interpole');
+assert(isequal(getdatasamples(serie, 2), 2), 'getdatasamples');
+matricielle = timeseries(reshape(1:12, 2, 2, 3), [0 1 2]);
+assert(~matricielle.IsTimeFirst && isequal(getdatasamples(matricielle, 2), [5 7; 6 8]), ...
+       'des echantillons matriciels, l''instant en dernier');
+assert(isequal(timeseries([7 8 9]).Time, [0; 1; 2]), 'sans instants : 0, 1, 2...');
+
+% Le bloc From Workspace lit une timeseries ; To Workspace en rend une.
+assignin('base', 'vitesseLue', serie);
+m = new_system('lecture');
+m = add_block(m, 'fromworkspace', 'f', 'VariableName', 'vitesseLue');
+m = add_block(m, 'toworkspace', 'tw', 'VariableName', 'vitesseEcrite', 'SaveFormat', 'Timeseries');
+m = add_line(m, 'f/1', 'tw/1');
+sim(m, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 2);
+assert(isa(vitesseEcrite, 'timeseries') && isequal(vitesseEcrite.Data(:)', 0:4) && ...
+       isequal(vitesseEcrite.Time(:)', 0:0.5:2) && strcmp(vitesseEcrite.Name, 'vitesseEcrite'), ...
+       'From Workspace lit une timeseries, To Workspace en ecrit une');
+evalin('base', 'clear vitesseLue');
+clear vitesseEcrite
+
+% Une timeseries comme entrée externe du modèle.
+m = new_system('externe');
+m = add_block(m, 'inport', 'e');
+m = add_block(m, 'outport', 'o');
+m = add_line(m, 'e/1', 'o/1');
+r = sim(m, [0 2], simset('Solver', 'ode1', 'FixedStep', 0.5), serie);
+assert(isequal(r.yout(:)', 0:4), 'une timeseries en entree externe');
+
+% SaveFormat : Dataset, StructureWithTime, Structure.
+m = new_system('journalDs');
+m = add_block(m, 'sine', 's');
+m = add_block(m, 'gain', 'g', 'Gain', 2);
+m = add_block(m, 'outport', 'y1');
+m = add_block(m, 'outport', 'y2');
+m = add_line(m, 's/1', 'y1/1');
+m = add_line(m, 's/1', 'g/1');
+m = add_line(m, 'g/1', 'y2/1');
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 1, 'SaveFormat', 'Dataset');
+assert(isa(r.yout, 'Simulink.SimulationData.Dataset') && r.yout.numElements == 2, ...
+       'SaveFormat Dataset : un element par sortie');
+deuxieme = r.yout{2};
+valeurs = deuxieme.Values.Data;
+assert(isa(deuxieme, 'Simulink.SimulationData.Signal') && ...
+       strcmp(deuxieme.BlockPath, 'journalDs/y2') && isa(deuxieme.Values, 'timeseries') && ...
+       abs(valeurs(end) - 2 * sin(1)) < 1e-12, 'un Signal, sa timeseries');
+assert(strcmp(get(r.yout, 'y1').Name, 'y1') && isequal(getElementNames(r.yout), {'y1'; 'y2'}), ...
+       'un element par son nom');
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 1, 'SaveFormat', 'StructureWithTime');
+assert(numel(r.yout.time) == 11 && numel(r.yout.signals) == 2 && ...
+       strcmp(r.yout.signals(2).blockName, 'journalDs/y2'), 'SaveFormat StructureWithTime');
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 1, 'SaveFormat', 'Structure');
+assert(isempty(r.yout.time) && numel(r.yout.signals) == 2, 'SaveFormat Structure');
+
+deuxEntrees = new_system('deux');
+deuxEntrees = add_block(deuxEntrees, 'inport', 'a');
+deuxEntrees = add_block(deuxEntrees, 'inport', 'b', 'Port', 2);
+deuxEntrees = add_block(deuxEntrees, 'outport', 'o1');
+deuxEntrees = add_block(deuxEntrees, 'outport', 'o2');
+deuxEntrees = add_line(deuxEntrees, 'a/1', 'o1/1');
+deuxEntrees = add_line(deuxEntrees, 'b/1', 'o2/1');
+casErreurs = {
+    @() timeseries([1 2 3], [0 2 1]), 'MATLAB:timeseries:TimeNotMonotonic', 'croissants'
+    @() timeseries([1; 2; 3], [0 1]), 'MATLAB:timeseries:SizeMismatch', '2 instant'
+    @() sim(m, 'SaveFormat', 'Tableau'), 'Simulink:Config:InvalidValue', 'Dataset'
+    @() get(Simulink.SimulationData.Dataset, 'absent'), ...
+        'Simulink:SimulationData:DatasetElementNotFound', 'absent'
+    @() get(Simulink.SimulationData.Dataset, 3), ...
+        'Simulink:SimulationData:DatasetIndexOutOfRange', '0 element'
+    @() sim(deuxEntrees, [0 1], [], serie), 'Simulink:SimInput:NumPortsMismatch', 'timeseries'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('timeseries et journal, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('timeseries et journal : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

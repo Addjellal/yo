@@ -60,6 +60,11 @@ function varargout = matlibre_sl_config(action, varargin)
 %     PostSaveFcn, CloseFcn   ''      les rappels du modèle : du code
 %                                     évalué dans l'espace de travail de
 %                                     base (voir MATLIBRE_SL_RAPPEL)
+%     SaveFormat           'Array'    la forme de yout : Array (une
+%                                     matrice), Structure,
+%                                     StructureWithTime, ou Dataset (un
+%                                     Simulink.SimulationData.Dataset de
+%                                     timeseries)
 %     SimulationMode       'normal'   accelerator et les autres modes
 %                                     sont acceptés, et simulent comme
 %                                     normal
@@ -121,7 +126,8 @@ function d = defauts()
                'ExternalInput', '[t, u]', 'PreLoadFcn', '', 'PostLoadFcn', '', ...
                'InitFcn', '', 'StartFcn', '', 'StopFcn', '', 'PreSaveFcn', '', ...
                'PostSaveFcn', '', 'CloseFcn', '', 'SimulationMode', 'normal', ...
-               'ReturnWorkspaceOutputs', 'on', 'ReturnWorkspaceOutputsName', 'out');
+               'ReturnWorkspaceOutputs', 'on', 'ReturnWorkspaceOutputsName', 'out', ...
+               'SaveFormat', 'Array');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -253,6 +259,8 @@ function v = valider(nom, v)
             v = entier(nom, v, 1, 4);
         case 'ODENIntegrationMethod'
             v = choix(nom, v, {'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'ode8'});
+        case 'SaveFormat'
+            v = choix(nom, v, {'Array', 'Structure', 'StructureWithTime', 'Dataset'});
         case 'NumberNewtonIterations'
             v = entier(nom, v, 1, Inf);
         case ''

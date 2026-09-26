@@ -520,6 +520,60 @@ function resultat = assembler(c, T, J, instants)
         yout = cast(yout, matlibre_sl_types('classe', typesSorties(1)));
     end
     resultat.yout = yout;
+    % La forme de yout que demande SaveFormat : la matrice, une structure
+    % par sortie, ou un Dataset de timeseries.
+    format = 'Array';
+    if isstruct(c.config) && isfield(c.config, 'SaveFormat')
+        format = char(c.config.SaveFormat);
+    end
+    if ~strcmp(format, 'Array')
+        resultat.yout = youtForme(c, parBloc, dimsBloc, sorties(ordre), typesSorties, ...
+                                  instants, format);
+    end
+end
+
+function y = youtForme(c, parBloc, dimsBloc, sorties, typesSorties, instants, format)
+    N = numel(instants);
+    if strcmp(format, 'Dataset')
+        y = Simulink.SimulationData.Dataset;
+        for i = 1:numel(sorties)
+            k = sorties(i);
+            valeurs = parBloc{k};
+            if isempty(valeurs)
+                valeurs = zeros(N, 1);
+            end
+            if typesSorties(i) > 2
+                valeurs = cast(valeurs, matlibre_sl_types('classe', typesSorties(i)));
+            end
+            s = Simulink.SimulationData.Signal;
+            s.Name = c.noms{k};
+            s.BlockPath = c.chemins{k};
+            s.PortType = 'inport';
+            s.PortIndex = 1;
+            s.Values = timeseries(valeurs, instants, 'Name', c.noms{k});
+            y = addElement(y, s);
+        end
+        return
+    end
+    signaux = struct('values', {}, 'dimensions', {}, 'label', {}, 'blockName', {});
+    for i = 1:numel(sorties)
+        k = sorties(i);
+        valeurs = parBloc{k};
+        d = dimsBloc{k};
+        if isempty(valeurs)
+            valeurs = zeros(N, 1);
+            d = [1 1];
+        end
+        signaux(i).values = valeurs;
+        signaux(i).dimensions = dimensionsSimulink(d);
+        signaux(i).label = '';
+        signaux(i).blockName = c.chemins{k};
+    end
+    temps = [];
+    if strcmp(format, 'StructureWithTime')
+        temps = instants;
+    end
+    y = struct('time', temps, 'signals', signaux);
 end
 
 % Un relevé mis à la forme de Simulink : N x 1 pour un scalaire, N x w
@@ -568,6 +622,8 @@ function resultat = deposer(c, T, J, instants, resultat)
         switch p.SaveFormat
             case 'Array'
                 valeur = donnees;
+            case 'Timeseries'
+                valeur = timeseries(donnees, instants, 'Name', char(p.VariableName));
             otherwise
                 temps = instants;
                 if strcmp(p.SaveFormat, 'Structure')
@@ -660,7 +716,9 @@ function entrees = entreesExternes(modele, donnees, nomModele)
         end
         for j = 1:n
             d = donnees{j};
-            if isstruct(d) && isfield(d, 'time') && isfield(d, 'signals')
+            if isa(d, 'timeseries')
+                [temps, v] = matlibre_sl_serie(d);
+            elseif isstruct(d) && isfield(d, 'time') && isfield(d, 'signals')
                 temps = double(d.time(:));
                 v = double(d.signals(1).values);
                 if size(v, 1) ~= numel(temps)
@@ -671,11 +729,22 @@ function entrees = entreesExternes(modele, donnees, nomModele)
                 v = double(d(:, 2:end));
             else
                 error('Simulink:SimInput:InvalidFormat', ...
-                      ['L''entree externe %d du modele ''%s'' est une matrice [t, u] ou une ' ...
-                       'structure a temps.'], j, nomModele);
+                      ['L''entree externe %d du modele ''%s'' est une matrice [t, u], une ' ...
+                       'structure a temps ou une timeseries.'], j, nomModele);
             end
             entrees{j} = struct('temps', temps, 'valeurs', v);
         end
+        return
+    end
+    if isa(donnees, 'timeseries')
+        % une timeseries : l'unique entrée du modèle
+        if n ~= 1
+            error('Simulink:SimInput:NumPortsMismatch', ...
+                  'Le modele ''%s'' a %d entree(s), et l''on ne donne qu''une timeseries.', ...
+                  nomModele, n);
+        end
+        [temps, v] = matlibre_sl_serie(donnees);
+        entrees{1} = struct('temps', temps, 'valeurs', v);
         return
     end
     if isstruct(donnees) && isfield(donnees, 'time') && isfield(donnees, 'signals')

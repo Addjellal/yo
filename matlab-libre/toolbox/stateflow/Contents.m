@@ -7,6 +7,9 @@
 %   sftransition - Ajoute une transition gardée, avec sa priorité
 %   sfdecomposition - Rend les sous-états d'un état parallèles
 %   sfhistory    - Donne un historique à un état
+%   sfjunction   - Ajoute une jonction de connexion
+%   sffunction   - Ajoute une fonction, appelee par les textes
+%   sftruthtable - Ajoute une table de verite
 %   sfdefault    - Choisit le sous-état où l'on entre par défaut
 %
 % Logique temporelle, dans les gardes et les actions

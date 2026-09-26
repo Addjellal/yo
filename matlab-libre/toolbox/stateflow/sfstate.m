@@ -42,6 +42,10 @@ function machine = sfstate(machine, nom, entree, pendant, sortie)
 %
 %   Voir aussi SFCHART, SFTRANSITION, SFRUN, SFDECOMPOSITION, SFHISTORY.
     if nargin < 3, entree = []; end
+    if isfield(machine, 'jonctions') && any(strcmp(machine.jonctions, nom))
+        error('Stateflow:EtatDouble', ...
+              'La machine ''%s'' a deja une jonction nommee ''%s''.', machine.nom, nom);
+    end
     point = find(nom == '.', 1, 'last');
     if ~isempty(point) && ~any(cellfun(@(e) strcmp(e.nom, nom(1:point - 1)), machine.etats))
         error('Stateflow:EtatParentAbsent', ...

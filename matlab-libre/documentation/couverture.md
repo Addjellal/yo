@@ -167,8 +167,11 @@ totalité.
    rappels du modèle (InitFcn, StopFcn...) et SimulationCommand.
    Les types de données se propagent de bloc en bloc — double, single,
    entiers, booléens —, arrondis, repliés ou saturés comme dans Simulink.
-   Manquent : les fonctions graphiques, jonctions et tables de vérité de
-   Stateflow.
+   Stateflow a aussi ses jonctions de connexion, ses fonctions et ses
+   tables de vérité. Le journal prend la forme que dit SaveFormat, jusqu'au
+   `Simulink.SimulationData.Dataset` de `timeseries`. Manquent : les types
+   à virgule fixe, les signaux de taille variable, le journal des signaux
+   (logsout) et Simscape.
    Stateflow a ses états emboîtés, ses régions parallèles, son
    historique, sa logique temporelle — SFAFTER, SFBEFORE, SFAT, SFEVERY,
    en réveils ou en secondes — et ses étiquettes écrites en texte :
