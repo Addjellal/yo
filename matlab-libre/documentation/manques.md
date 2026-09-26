@@ -24,12 +24,12 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | robotique | 73 | 0 | 100 % |
 | robuste | 69 | 0 | 100 % |
 | signal | 139 | 0 | 100 % |
-| simulink | 26 | 0 | 100 % |
+| simulink | 27 | 0 | 100 % |
 | statistiques | 219 | 0 | 100 % |
 | symbolique | 36 | 0 | 100 % |
 | types | 100 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2403** | **0** | **100 %** |
+| **ensemble** | **2404** | **0** | **100 %** |
 
 ## Ce qui manque au-delà des fonctions
 
@@ -159,10 +159,34 @@ qu'ils ne font pas encore comme MATLAB.
 
 ### Systèmes asservis
 
-- **Pas de retards internes** : MATLAB garde le retard exact dans un
-  modèle d'état (`InternalDelay`). `delayss` l'approche par Padé d'ordre
-  trois, ce qui est juste en basse fréquence et s'écarte au-delà.
-  `thiran`, lui, est exact au sens du retard de groupe plat en zéro.
+- **Pas de retards internes** : `InputDelay`, `OutputDelay` et `IODelay`
+  sont portés et honorés — la réponse fréquentielle en `e^(-jwD)`, la
+  réponse temporelle par décalage, exactement —, mais un retard *dans*
+  une boucle fermée devient un retard interne, que le modèle ne porte
+  pas. `feedback`, `connect` et les synthèses par retour d'état
+  refusent donc un modèle retardé en le nommant, plutôt que de l'oublier
+  et de rendre une boucle stable là où elle ne l'est pas. `pade` en
+  donne l'approximation rationnelle, qui passe alors partout ; `thiran`
+  est exact au sens du retard de groupe plat en zéro.
+- **Pas de matrice de transferts dans un `tf`** : `tf` n'a qu'un
+  numérateur et un dénominateur. `tf({…},{…})` à plusieurs cases est
+  refusé en disant comment faire — assembler les voies,
+  `[G11 G12; G21 G22]`, ce qui rend le modèle d'état à plusieurs voies
+  que `step`, `bode`, `impulse`, `lsim`, `freqresp` et `sigma` traitent.
+- **Un modèle à une voie rend des colonnes** : `[m,p] = bode(sys)` et
+  `y = step(sys)` rendent des vecteurs colonnes, là où MATLAB rend des
+  tableaux 1 × 1 × N qu'on passe à `squeeze`. À plusieurs voies, les
+  formes sont celles de MATLAB : NY × NU × NW pour `bode`, NT × NY × NU
+  pour `step` et `impulse`.
+- **`margin`, `allmargin` et `bandwidth` ne valent que pour une voie** :
+  sur une matrice de transferts, ils refusent en le disant et en
+  renvoyant à `sys(i,j)` ; `loopmargin` traite la boucle multivariable.
+  MATLAB calcule en plus les marges « une boucle à la fois » dans
+  `allmargin`.
+- **`tzero` ne traite que les modèles carrés** à plusieurs voies : les
+  zéros de transmission y sont les valeurs finies du faisceau de
+  Rosenbrock. Un modèle qui n'a pas autant d'entrées que de sorties est
+  refusé en le nommant.
 - **`pidtool` et `sisotool`** ne sont pas interactifs : MatLibre règle le
   correcteur — comme `pidtune` — et trace les vues une fois, là où MATLAB
   ouvre une application à curseurs.

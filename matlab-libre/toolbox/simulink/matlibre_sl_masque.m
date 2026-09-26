@@ -183,7 +183,13 @@ function matlibre__v = evaluerBrut(matlibre__texte, matlibre__W, matlibre__chemi
             continue
         end
         if evalin('base', sprintf('exist(''%s'', ''var'')', matlibre__id)) == 1
-            eval([matlibre__id ' = evalin(''base'', matlibre__id);']);
+            matlibre__x = evalin('base', matlibre__id);
+            % un Simulink.Parameter y vaut sa valeur, comme hors masque
+            if isa(matlibre__x, 'Simulink.Parameter')
+                matlibre__x = matlibre_sl_parametre('valeur', matlibre__x, matlibre__id, ...
+                                                    matlibre__chemin, matlibre__nom);
+            end
+            eval([matlibre__id ' = matlibre__x;']);
         end
     end
     try

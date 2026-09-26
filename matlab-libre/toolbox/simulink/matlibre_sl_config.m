@@ -76,6 +76,11 @@ function varargout = matlibre_sl_config(action, varargin)
 %                                     élément des entrées, ou des
 %                                     variables séparées par des virgules,
 %                                     une par entrée
+%     LoadInitialState     'off'      'on' : la simulation part de
+%     InitialState         'xInitial' cet état — les états continus,
+%                                     dans l'ordre des colonnes de xout
+%     SaveFinalState       'off'      'on' : le résultat porte l'état
+%     FinalStateName       'xFinal'   final dans ce champ
 %
 %   Le solveur et son type vont ensemble, comme dans Simulink : poser
 %   Solver sur ode45 fait le type Variable-step ; poser SolverType sur
@@ -127,7 +132,9 @@ function d = defauts()
                'InitFcn', '', 'StartFcn', '', 'StopFcn', '', 'PreSaveFcn', '', ...
                'PostSaveFcn', '', 'CloseFcn', '', 'SimulationMode', 'normal', ...
                'ReturnWorkspaceOutputs', 'on', 'ReturnWorkspaceOutputsName', 'out', ...
-               'SaveFormat', 'Array');
+               'SaveFormat', 'Array', 'LoadInitialState', 'off', ...
+               'InitialState', 'xInitial', 'SaveFinalState', 'off', ...
+               'FinalStateName', 'xFinal');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -212,17 +219,27 @@ function v = valider(nom, v)
             v = connus{trouve};
         case 'SolverType'
             v = choix(nom, v, {'Fixed-step', 'Variable-step'});
-        case {'LoadExternalInput', 'ReturnWorkspaceOutputs'}
+        case {'LoadExternalInput', 'ReturnWorkspaceOutputs', 'LoadInitialState', ...
+              'SaveFinalState'}
             v = choix(nom, v, {'off', 'on'});
         case 'SimulationMode'
             v = choix(nom, v, {'normal', 'accelerator', 'rapid-accelerator', ...
                                'software-in-the-loop (sil)', ...
                                'processor-in-the-loop (pil)', 'external'});
-        case 'ReturnWorkspaceOutputsName'
+        case {'ReturnWorkspaceOutputsName', 'FinalStateName'}
             v = char(v);
             if ~isvarname(v)
                 error('Simulink:Config:InvalidValue', ...
-                      'ReturnWorkspaceOutputsName est un nom de variable ; pas ''%s''.', v);
+                      '%s est un nom de variable ; pas ''%s''.', nom, v);
+            end
+        case 'InitialState'
+            if isstring(v)
+                v = char(v);
+            end
+            if ~(ischar(v) || ((isnumeric(v) || islogical(v)) && (isvector(v) || isempty(v))))
+                error('Simulink:Config:InvalidValue', ...
+                      ['Le reglage InitialState est un vecteur — les etats continus, dans ' ...
+                       'l''ordre de xout —, ou l''expression qui le donne.']);
             end
         case {'PreLoadFcn', 'PostLoadFcn', 'InitFcn', 'StartFcn', 'StopFcn', ...
               'PreSaveFcn', 'PostSaveFcn', 'CloseFcn'}

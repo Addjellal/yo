@@ -395,10 +395,12 @@ FONCTION(fnColon) {
 FONCTION(fnRepmat) {
     INUTILISE
     exigerArguments(args, 2, 0, "repmat");
-    // Les structures sont admises — MATLAB repete un tableau de
-    // structures comme n'importe quel autre, et le corps ci-dessous sait
-    // le faire ; seuls un objet et une poignee de fonction sont refuses.
-    if (args[0].classe == Classe::Objet || args[0].classe == Classe::Fonction)
+    // Les structures et les objets de valeur sont admis — MATLAB les
+    // repete comme n'importe quel tableau, et le corps ci-dessous sait le
+    // faire. Un objet poignee ne l'est pas : ses copies designeraient un
+    // meme objet, ce que le rangement par champs ne sait pas dire.
+    if ((args[0].classe == Classe::Objet && args[0].poigneeObjet) ||
+        args[0].classe == Classe::Fonction)
         erreur("MATLAB:UndefinedFunction",
                formater("Undefined function '%s' for input arguments of type '%s'.",
                         "repmat", args[0].classeNom().c_str()));
@@ -467,7 +469,13 @@ FONCTION(fnVertcat) { INUTILISE return {concatener(args, 0)}; }
 FONCTION(fnReshape) {
     INUTILISE
     exigerArguments(args, 2, 0, "reshape");
-    exigerSansObjet(args[0], "reshape");
+    // Un tableau de structures ou d'objets se remet en forme comme un
+    // autre : ses elements gardent leur ordre, seules les dimensions
+    // changent. Une poignee de fonction n'a pas de tableau.
+    if (args[0].classe == Classe::Fonction)
+        erreur("MATLAB:UndefinedFunction",
+               formater("Undefined function '%s' for input arguments of type '%s'.",
+                        "reshape", args[0].classeNom().c_str()));
     for (std::size_t k = 1; k < args.size(); ++k) exigerNumerique(args[k], "reshape");
     Dims d;
     int inconnue = -1;

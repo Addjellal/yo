@@ -380,4 +380,41 @@ rmdir(dossierAccesseurs, 's');
 clear reglage enfant enfantNu
 disp('accesseurs et constructeur herite : ok');
 
+%% ------------------- tableaux d'objets et de structures : reshape, repmat
+% Un tableau de structures ou d'objets se remet en forme comme un autre ;
+% un objet de valeur se répète par repmat. Un objet poignée, lui, ne se
+% répète pas : ses copies désigneraient un même objet.
+formes = [FormeDeBase(1), FormeDeBase(2), FormeDeBase(3), FormeDeBase(4)];
+carre = reshape(formes, 2, 2);
+assert(isequal(size(carre), [2 2]) && carre(2, 1).cote == 2 && carre(1, 2).cote == 3 && ...
+       isa(carre, 'FormeDeBase'), 'reshape d''un tableau d''objets');
+enColonne = reshape(formes, [], 1);
+assert(isequal(size(enColonne), [4 1]) && enColonne(4).cote == 4, 'reshape avec []');
+fiches = struct('n', {1, 2, 3, 4, 5, 6});
+grille = reshape(fiches, 3, 2);
+assert(isequal(size(grille), [3 2]) && grille(1, 2).n == 4 && grille(3, 2).n == 6, ...
+       'reshape d''un tableau de structures');
+refusReshape = '';
+try
+    reshape(fiches, 4, 2);
+catch err
+    refusReshape = err.identifier;
+end
+assert(strcmp(refusReshape, 'MATLAB:getReshapeDims:notSameNumel'), ...
+       'le nombre d''elements ne change pas');
+serie = repmat(FormeDeBase(7), 2, 3);
+assert(isequal(size(serie), [2 3]) && serie(2, 3).cote == 7 && isa(serie, 'FormeDeBase'), ...
+       'repmat d''un objet de valeur');
+serie(1, 1).cote = 8;
+assert(serie(2, 2).cote == 7, 'les copies sont independantes');
+refusRepmat = '';
+try
+    repmat(CompteurAReference(), 1, 2);
+catch err
+    refusRepmat = err.identifier;
+end
+assert(strcmp(refusRepmat, 'MATLAB:UndefinedFunction'), 'repmat refuse un objet poignee');
+clear formes carre enColonne fiches grille serie
+disp('reshape et repmat de tableaux d''objets : ok');
+
 disp('classes : toutes les verifications passent');

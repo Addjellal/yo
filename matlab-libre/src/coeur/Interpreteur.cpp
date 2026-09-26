@@ -1943,11 +1943,22 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
         } else if (v) {
             courant.push_back(*v);
             // Appel d'une poignée de fonction stockée dans une variable.
+            // Comme pour une fonction nommée, l'appel en instruction ne
+            // demande aucune sortie : « f() », où f vaut
+            // @() evalin('base', 'x = 1;'), fait l'affectation au lieu de
+            // chercher une valeur à l'expression.
             if (v->classe == Classe::Fonction && !n->acces.empty() &&
                 n->acces[0].genre == '(') {
                 auto args = evaluerListe(n->acces[0].args);
-                courant = appelerValeur(*v, args, std::max(nargout, 1));
+                int demandees = n->acces.size() > 1 ? 1 : (nargout < 0 ? 1 : nargout);
+                courant = appelerValeur(*v, args, demandees);
                 debut = 1;
+                if (courant.empty()) {
+                    if (multi) { multi->clear(); return Valeur::vide(); }
+                    erreur("MATLAB:maxlhs",
+                           "Too many output arguments: function handle '" + nom +
+                               "' returned nothing.");
+                }
             }
         } else if (!n->acces.empty() && n->acces[0].genre == '.' &&
                    nomPointe(nom, n->acces) > 0) {
@@ -2140,7 +2151,10 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
             if (e.genre == '(') {
                 if (base.classe == Classe::Fonction) {
                     auto args = evaluerListe(e.args);
-                    auto r = appelerValeur(base, args, dernier ? std::max(nargout, 1) : 1);
+                    // « s.rappel() » en instruction : aucune sortie demandée,
+                    // comme pour une poignée rangée dans une variable.
+                    auto r = appelerValeur(base, args,
+                                           dernier ? (nargout < 0 ? 1 : nargout) : 1);
                     for (auto& x : r) suivant.push_back(x);
                     continue;
                 }

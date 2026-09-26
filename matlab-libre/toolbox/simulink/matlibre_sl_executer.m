@@ -158,6 +158,13 @@ function T = preparer(c)
     % L'état des sous-systèmes itérés, de même.
     T.iterateurs = containers.Map('KeyType', 'double', 'ValueType', 'any');
     T.x0 = c.x0;
+    % L'état d'où part la simulation : celui des blocs, ou celui que
+    % donne InitialState. Une remise à zéro revient, elle, à celui des
+    % blocs.
+    T.xDepart = c.x0;
+    if isfield(c, 'xDepart')
+        T.xDepart = c.xDepart;
+    end
     T.xA = c.xA;
     T.xB = c.xB;
     T.V0 = zeros(c.nV, 1);
@@ -643,7 +650,7 @@ function J = simuler(T, instants, solveur, reprise)
     else
         V = T.V0;
         Z = T.Z0;
-        x = T.x0;
+        x = T.xDepart;
         i0 = 0;
         avancerApres = false;
         premier = true;
@@ -925,7 +932,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     end
 
     t = tDebut;
-    x = T.x0;
+    x = T.xDepart;
     Z = T.Z0;
     touche = (abs(prochain - t) <= toleranceTemps(t)).';
     [V, Z] = passe(T, T.listeTout, T.V0, Z, x, t, 0, true, touche);

@@ -86,9 +86,23 @@
 %
 % Simulation
 %   sim           - Simule le modèle ; rend temps, signaux, états, sorties
+%   parsim        - Fait une série de simulations décrites par des
+%                   Simulink.SimulationInput, l'une après l'autre
 %   simset        - Rassemble les options d'une simulation
 %   simget        - Lit une option
 %   simplot       - Trace les signaux relevés
+%
+% Objets de Simulink
+%   Simulink.Parameter        - Une valeur de paramètre, son type et ses
+%                               bornes, lue par les blocs comme une variable
+%   Simulink.Signal           - Un signal nommé : il définit la mémoire
+%                               partagée globale de son nom
+%   Simulink.SimulationInput  - Variables, paramètres de blocs et réglages
+%                               le temps d'une simulation ; SIM et PARSIM
+%                               le simulent
+%   Simulink.Bus, Simulink.BusElement - Les types de bus
+%   Simulink.SimulationData.Dataset   - Le journal des sorties, en
+%                               SaveFormat 'Dataset'
 %
 % Linéarisation
 %   linmod        - Linéarise autour d'un point de fonctionnement

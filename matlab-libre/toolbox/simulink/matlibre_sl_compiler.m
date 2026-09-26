@@ -73,6 +73,7 @@ function c = compiler(modele, options)
 
     nomModele = char(modele.nom);
     modele = matlibre_sl_aplatir(modele);
+    modele = memoiresGlobales(modele);
     n = numel(modele.blocs);
 
     c = struct();
@@ -367,7 +368,10 @@ function p = lireParametres(entree, bloc, chemin)
             if (ischar(v) || isstring(v)) && isfield(bloc, 'espace')
                 v = matlibre_sl_masque('evaluer', char(v), bloc.espace, chemin, nom);
             elseif ischar(v) || isstring(v)
-                v = matlibre_sl_expression(char(v), chemin, nom);
+                v = matlibre_sl_expression(char(v), chemin, nom, 'classe');
+            elseif isa(v, 'Simulink.Parameter')
+                % l'objet donné tel quel, plutôt que par son nom
+                v = matlibre_sl_parametre('valeur', v, 'la valeur donnee', chemin, nom);
             end
             if ~(isnumeric(v) || islogical(v))
                 error('Simulink:Parameters:InvalidValue', ...
@@ -614,6 +618,84 @@ function c = resoudreMemoires(c)
                    'son systeme, ou dans un systeme qui l''englobe.'], c.chemins{k}, nom);
         end
         c.memoire(k) = meilleur;
+    end
+end
+
+% Une mémoire que lisent ou écrivent des blocs sans qu'aucun Data Store
+% Memory ne la définisse peut l'être par un Simulink.Signal de l'espace de
+% travail de base qui porte son nom : c'est une mémoire globale, que l'on
+% pose ici comme un Data Store Memory à la racine du modèle, visible de
+% partout.
+function modele = memoiresGlobales(modele)
+    definies = {};
+    cherchees = {};
+    for k = 1:numel(modele.blocs)
+        b = modele.blocs{k};
+        try
+            entree = matlibre_sl_catalogue('type', b.type);
+        catch
+            continue   % un type inconnu : la compilation le dira
+        end
+        if ~any(strcmp(entree.type, {'datastorememory', 'datastoreread', 'datastorewrite'}))
+            continue
+        end
+        nom = 'A';
+        if isfield(b, 'parametres') && isfield(b.parametres, 'DataStoreName')
+            nom = char(b.parametres.DataStoreName);
+        end
+        if strcmp(entree.type, 'datastorememory')
+            definies{end + 1} = nom; %#ok<AGROW>
+        else
+            cherchees{end + 1} = nom; %#ok<AGROW>
+        end
+    end
+    noms = {};
+    for k = 1:numel(modele.blocs)
+        noms{end + 1} = char(modele.blocs{k}.nom); %#ok<AGROW>
+    end
+    for nom = unique(setdiff(cherchees, definies))
+        if ~isvarname(nom{1}) || evalin('base', sprintf('exist(''%s'', ''var'')', nom{1})) ~= 1
+            continue
+        end
+        signal = evalin('base', nom{1});
+        if ~isa(signal, 'Simulink.Signal')
+            continue
+        end
+        origine = sprintf('Simulink.Signal %s', nom{1});
+        valeur = 0;
+        if ~isempty(strtrim(signal.InitialValue))
+            valeur = matlibre_sl_expression(signal.InitialValue, origine, 'InitialValue', ...
+                                            'classe');
+        end
+        dims = signal.Dimensions;
+        if ~isequal(dims, -1)
+            if isscalar(dims)
+                dims = [dims 1];
+            end
+            if isscalar(valeur)
+                valeur = valeur * ones(dims);
+            elseif numel(valeur) ~= prod(dims)
+                error('Simulink:DataStores:InvalidInitialValue', ...
+                      ['La memoire globale ''%s'' est definie par un Simulink.Signal de ' ...
+                       'dimensions %s, et sa valeur initiale porte %d element(s).'], ...
+                      nom{1}, mat2str(signal.Dimensions), numel(valeur));
+            end
+        end
+        if any(strcmp(signal.DataType, matlibre_sl_parametre('types'))) && ...
+           ~strcmp(signal.DataType, 'auto')
+            if strcmp(signal.DataType, 'boolean')
+                valeur = logical(valeur ~= 0);
+            else
+                valeur = cast(valeur, signal.DataType);
+            end
+        end
+        bloc = sprintf('%s (Simulink.Signal)', nom{1});
+        while any(strcmp(noms, bloc))
+            bloc = [bloc '_']; %#ok<AGROW>
+        end
+        noms{end + 1} = bloc; %#ok<AGROW>
+        modele = add_block(modele, 'datastorememory', bloc, 'DataStoreName', nom{1}, ...
+                           'InitialValue', double(valeur));
     end
 end
 

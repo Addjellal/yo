@@ -4181,6 +4181,276 @@ for kE = 1:size(casErreurs, 1)
 end
 fprintf('timeseries et journal : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% ------- 33. Simulink.Parameter, Simulink.Signal, SimulationInput et parsim
+% Un Simulink.Parameter se lit dans les paramètres des blocs comme une
+% variable, converti dans son DataType et borné par Min et Max ; un
+% Simulink.Signal définit une mémoire partagée globale ; un
+% SimulationInput change variables, paramètres de blocs et réglages le
+% temps d'une simulation, et PARSIM en fait toute une série.
+Kg = Simulink.Parameter(3);
+assert(isequal(Kg.Dimensions, [1 1]) && strcmp(Kg.Complexity, 'real') && ...
+       strcmp(Kg.DataType, 'auto') && isa(Kg.CoderInfo, 'Simulink.CoderInfo') && ...
+       strcmp(Kg.CoderInfo.StorageClass, 'Auto'), 'un Simulink.Parameter et ses proprietes');
+autreNom = Kg;
+autreNom.Value = 4;
+assert(Kg.Value == 4, 'un objet poignee : deux noms, un meme parametre');
+copie = copy(Kg);
+copie.Value = 9;
+assert(Kg.Value == 4 && copie.Value == 9, 'copy en fait un autre');
+affiche = evalc('disp(Kg)');
+assert(~isempty(strfind(affiche, 'Parameter with properties')) && ...
+       ~isempty(strfind(affiche, 'DataType: ''auto''')), 'l''affichage d''un parametre');
+Kg.Value = 3;
+
+m = new_system('parametre');
+m = add_block(m, 'constant', 'c', 'Value', 1);
+m = add_block(m, 'gain', 'g', 'Gain', '2*Kg');
+m = add_block(m, 'outport', 'y');
+m = add_line(add_line(m, 'c', 'g'), 'g', 'y');
+r = sim(m, 1);
+assert(r.yout(end) == 6, 'un gain qui lit 2*Kg, Kg un Simulink.Parameter');
+Kg.Value = 5;
+r = sim(m, 1);
+assert(r.yout(end) == 10, 'la valeur du parametre au moment de simuler');
+
+% Le DataType convertit : une constante réglée sur le paramètre sort un
+% signal de ce type ; une expression 'int8(5)' garde aussi sa classe.
+Pt = Simulink.Parameter(7);
+Pt.DataType = 'int16';
+t = new_system('typeParametre');
+t = add_block(t, 'constant', 'c', 'Value', 'Pt');
+t = add_block(t, 'outport', 'y');
+t = add_line(t, 'c', 'y');
+r = sim(t, 1);
+assert(isa(r.yout, 'int16') && r.yout(end) == 7, 'DataType int16 : un signal int16');
+r = sim(set_param(t, 'c', 'Value', 'int8(5)'), 1);
+assert(isa(r.yout, 'int8') && r.yout(end) == 5, 'une expression int8(5) donne un signal int8');
+Pt.DataType = 'boolean';
+r = sim(t, 1);
+assert(islogical(r.yout) && r.yout(end), 'DataType boolean');
+r = sim(set_param(t, 'c', 'Value', Simulink.Parameter(2.5)), 1);
+assert(r.yout(end) == 2.5, 'un Simulink.Parameter donne tel quel au bloc');
+
+% Un masque lit le paramètre comme le reste du modèle.
+dedans = new_system('dedans');
+dedans = add_block(dedans, 'inport', 'e');
+dedans = add_block(dedans, 'gain', 'k', 'Gain', 'G');
+dedans = add_block(dedans, 'outport', 'sortie');
+dedans = add_line(add_line(dedans, 'e', 'k'), 'k', 'sortie');
+mm = new_system('masqueParametre');
+mm = add_block(mm, 'constant', 'c', 'Value', 1);
+mm = add_block(mm, 'subsystem', 'sous', 'Model', dedans, 'Mask', 'on', ...
+               'MaskVariables', 'G=@1;', 'MaskValueString', 'Kg');
+mm = add_block(mm, 'outport', 'y');
+mm = add_line(add_line(mm, 'c', 'sous'), 'sous', 'y');
+r = sim(mm, 1);
+assert(r.yout(end) == 5, 'une variable de masque qui lit un Simulink.Parameter');
+
+% Un Simulink.Signal définit une mémoire globale, sans Data Store Memory ;
+% un Data Store Memory du même nom l'emporte.
+Memoire = Simulink.Signal;
+Memoire.InitialValue = '5';
+g = new_system('globale');
+g = add_block(g, 'datastoreread', 'lire', 'DataStoreName', 'Memoire');
+g = add_block(g, 'gain', 'k', 'Gain', 2);
+g = add_block(g, 'datastorewrite', 'ecrire', 'DataStoreName', 'Memoire');
+g = add_block(g, 'outport', 'y');
+g = add_line(add_line(g, 'lire', 'k'), 'k', 'ecrire');
+g = add_line(g, 'lire', 'y');
+g = set_param(g, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 3);
+r = sim(g);
+assert(isequal(r.yout(:)', [5 10 20 40]), 'une memoire globale definie par un Simulink.Signal');
+Memoire.Dimensions = 2;
+r = sim(g);
+assert(isequal(size(r.yout), [4 2]) && isequal(r.yout(1, :), [5 5]), ...
+       'Dimensions etend la valeur initiale du signal');
+r = sim(add_block(g, 'datastorememory', 'locale', 'DataStoreName', 'Memoire', 'InitialValue', 1));
+assert(isequal(r.yout(:)', [1 2 4 8]), 'un Data Store Memory du modele l''emporte sur l''objet');
+
+% L'état final d'une simulation, repris comme état initial de la suivante.
+h = new_system('reprise');
+h = add_block(h, 'constant', 'un', 'Value', 1);
+h = add_block(h, 'integrator', 'x');
+h = add_block(h, 'outport', 'y');
+h = add_line(add_line(h, 'un', 'x'), 'x', 'y');
+h = set_param(h, 'StopTime', 1, 'Solver', 'ode4', 'SaveFinalState', 'on');
+r1 = sim(h);
+assert(abs(r1.xFinal - 1) < 1e-9, 'SaveFinalState : l''etat final dans xFinal');
+r2 = sim(set_param(h, 'LoadInitialState', 'on', 'InitialState', r1.xFinal));
+assert(abs(r2.yout(1) - 1) < 1e-9 && abs(r2.xFinal - 2) < 1e-9, ...
+       'LoadInitialState reprend la simulation la ou elle s''etait arretee');
+xDepart = 10;
+r3 = sim(set_param(h, 'LoadInitialState', 'on', 'InitialState', 'xDepart', ...
+                   'FinalStateName', 'etatFin'));
+assert(r3.yout(1) == 10 && abs(r3.etatFin - 11) < 1e-9, ...
+       'InitialState donne par une expression, FinalStateName renomme le champ');
+
+% Un SimulationInput : variables, paramètres de blocs et réglages le temps
+% d'une simulation ; l'espace de base et le modèle n'en gardent rien.
+entree = new_system('entree');
+entree = add_block(entree, 'constant', 'c', 'Value', 'Kvar');
+entree = add_block(entree, 'gain', 'g', 'Gain', 2);
+entree = add_block(entree, 'outport', 'y');
+entree = add_line(add_line(entree, 'c', 'g'), 'g', 'y');
+in = Simulink.SimulationInput('entree');
+in = in.setVariable('Kvar', 5);
+in = in.setBlockParameter('entree/g', 'Gain', '3');
+in = in.setModelParameter('StopTime', '1');
+affiche = evalc('disp(in)');
+assert(~isempty(strfind(affiche, 'SimulationInput with properties')) && ...
+       ~isempty(strfind(affiche, 'Variables: [1x1 Simulink.Simulation.Variable]')), ...
+       'l''affichage d''un SimulationInput');
+out = sim(in);
+assert(out.yout(end) == 15 && out.tout(end) == 1 && isempty(out.ErrorMessage), 'sim(in)');
+assert(~exist('Kvar', 'var') && isequal(get_param(entree, 'g', 'Gain'), 2), ...
+       'ni la variable ni le parametre de bloc ne restent');
+Kvar = 1;
+out = sim(in);
+assert(out.yout(end) == 15 && Kvar == 1, 'une variable qui existait retrouve sa valeur');
+meta = out.SimulationMetadata;
+assert(strcmp(meta.ModelInfo.ModelName, 'entree') && meta.ModelInfo.StopTime == 1 && ...
+       strcmp(meta.ExecutionInfo.StopEvent, 'ReachedStopTime'), 'SimulationMetadata');
+assert(in.getVariable('Kvar') == 5 && isequal(in.getBlockParameter('entree/g', 'Gain'), '3') && ...
+       isequal(in.getModelParameter('stoptime'), '1'), 'relire ce qui est pose');
+assert(isempty(in.removeVariable('Kvar').Variables), 'removeVariable');
+in = in.setVariable('Kvar', 6);
+assert(numel(in.Variables) == 1 && in.getVariable('Kvar') == 6, 'poser deux fois remplace');
+clear Kvar
+
+% Un tableau de SimulationInput : les simulations se font l'une après
+% l'autre ; celle qui échoue range son message, les autres aboutissent.
+lot(1:3) = Simulink.SimulationInput('entree');
+for kL = 1:3
+    lot(kL) = lot(kL).setVariable('Kvar', kL);
+    lot(kL) = lot(kL).setModelParameter('StopTime', '1');
+end
+lot(2) = lot(2).setBlockParameter('entree/g', 'Gain', 'variableAbsente');
+out = sim(lot);
+assert(isequal(size(out), [1 3]) && out(1).yout(end) == 2 && out(3).yout(end) == 6 && ...
+       isempty(out(1).ErrorMessage), 'sim d''un tableau de SimulationInput');
+assert(~isempty(strfind(out(2).ErrorMessage, 'variableAbsente')) && isempty(out(2).yout) && ...
+       strcmp(out(2).SimulationMetadata.ExecutionInfo.StopEvent, 'DiagnosticError'), ...
+       'la simulation en erreur range son message');
+out = parsim(lot, 'ShowProgress', 'off', 'TransferBaseWorkspaceVariables', 'on');
+assert(out(3).yout(end) == 6 && ~isempty(out(2).ErrorMessage), 'parsim');
+journal = evalc('parsim(lot);');
+assert(~isempty(strfind(journal, 'Simulation 2 sur 3 en erreur')) && ...
+       ~isempty(strfind(journal, '3 simulation(s) faite(s), 1 en erreur')), ...
+       'parsim dit ou il en est');
+out = parsim(lot, 'ShowProgress', 'off', 'StopOnError', 'on');
+assert(isempty(out(1).ErrorMessage) && ~isempty(strfind(out(3).ErrorMessage, 'StopOnError')), ...
+       'StopOnError : les simulations suivantes ne se font pas');
+assignin('base', 'preparations', 0);
+out = parsim(lot([1 3]), 'ShowProgress', 'off', ...
+             'SetupFcn', @() evalin('base', 'preparations = preparations + 1;'), ...
+             'CleanupFcn', @() evalin('base', 'preparations = preparations + 10;'));
+assert(preparations == 11 && numel(out) == 2, 'SetupFcn et CleanupFcn, une fois chacune');
+clear preparations
+o = sim(lot(2), 'CaptureErrors', 'on');
+assert(~isempty(strfind(o.ErrorMessage, 'variableAbsente')), 'CaptureErrors');
+
+% PreSimFcn change le SimulationInput ; PostSimFcn remplace le résultat.
+avant = lot(1).setPreSimFcn(@(x) x.setVariable('Kvar', 100));
+avant = avant.setPostSimFcn(@(o) struct('fin', o.yout(end)));
+o = sim(avant);
+assert(o.fin == 200 && isequal(fieldnames(o)', {'fin', 'ErrorMessage', 'SimulationMetadata'}), ...
+       'PreSimFcn et PostSimFcn');
+
+% L'état initial et les entrées externes d'un SimulationInput.
+in = Simulink.SimulationInput(h);
+in = in.setInitialState(5);
+o = sim(in);
+assert(abs(o.yout(1) - 5) < 1e-12 && abs(o.xFinal - 6) < 1e-9, 'setInitialState');
+ext = new_system('ext');
+ext = add_block(ext, 'inport', 'e');
+ext = add_block(ext, 'outport', 'o');
+ext = add_line(ext, 'e', 'o');
+in = Simulink.SimulationInput(ext);
+in = in.setExternalInput([(0:0.5:1)', (0:2)']);
+in = in.setModelParameter('StopTime', '1', 'Solver', 'ode1', 'FixedStep', '0.5');
+o = sim(in);
+assert(isequal(o.yout(:)', 0:2), 'setExternalInput');
+
+Hors = Simulink.Parameter(7);
+Hors.Max = 5;
+Debord = Simulink.Parameter(300);
+Debord.DataType = 'int8';
+Fixe = Simulink.Parameter(1);
+Fixe.DataType = 'fixdt(1,16,4)';
+Alias = Simulink.Parameter(1);
+Alias.DataType = 'MonAlias';
+BusFaux = Simulink.Parameter(1);
+BusFaux.DataType = 'Bus: Capteurs';
+Mauvaise = Simulink.Signal;
+Mauvaise.InitialValue = '[1 2 3]';
+Mauvaise.Dimensions = 2;
+gMauvaise = set_param(set_param(g, 'lire', 'DataStoreName', 'Mauvaise'), 'ecrire', ...
+                      'DataStoreName', 'Mauvaise');
+un = Simulink.SimulationInput('entree');
+casErreurs = {
+    @() poserPropriete(Simulink.Parameter, 'DataType', '12x'), ...
+        'Simulink:Data:InvalidDataType', '12x'
+    @() poserPropriete(Simulink.Parameter, 'Min', 'a'), 'Simulink:Data:InvalidMinMax', 'Min'
+    @() poserPropriete(Simulink.Parameter, 'Value', {1}), ...
+        'Simulink:Data:InvalidParameterValue', 'cell'
+    @() poserPropriete(Simulink.Signal, 'Dimensions', 0), ...
+        'Simulink:Data:InvalidDimensions', 'Dimensions'
+    @() poserPropriete(Simulink.Signal, 'Complexity', 'imaginaire'), ...
+        'Simulink:Data:InvalidValue', 'Complexity'
+    @() sim(set_param(t, 'c', 'Value', 'Hors'), 1), 'Simulink:Data:ParameterOutOfRange', ...
+        'typeParametre/c'
+    @() sim(set_param(t, 'c', 'Value', 'Debord'), 1), 'Simulink:Data:ParameterOverflow', ...
+        '-128 a 127'
+    @() sim(set_param(t, 'c', 'Value', 'Fixe'), 1), ...
+        'Simulink:DataType:FixedPointUnsupported', 'virgule fixe'
+    @() sim(set_param(t, 'c', 'Value', 'Alias'), 1), 'Simulink:DataType:UnknownDataType', ...
+        'MonAlias'
+    @() sim(set_param(t, 'c', 'Value', 'BusFaux'), 1), ...
+        'Simulink:Data:ParameterTypeMismatch', 'structure'
+    @() sim(gMauvaise), 'Simulink:DataStores:InvalidInitialValue', '3 element'
+    @() sim(set_param(h, 'LoadInitialState', 'on', 'InitialState', [1 2])), ...
+        'Simulink:SimInput:InitialStateDimensions', '2 valeur'
+    @() set_param(h, 'FinalStateName', '1x'), 'Simulink:Config:InvalidValue', 'FinalStateName'
+    @() Simulink.SimulationInput(''), 'Simulink:Simulation:InvalidModelName', 'NEW_SYSTEM'
+    @() un.setVariable('1a', 3), 'Simulink:Simulation:InvalidVariableName', 'nom'
+    @() un.setBlockParameter('entree/g', 'Gain'), ...
+        'Simulink:Simulation:InvalidNumberOfArguments', 'triplets'
+    @() un.setModelParameter('StopTime'), 'Simulink:Simulation:InvalidNumberOfArguments', ...
+        'paires'
+    @() un.getVariable('absente'), 'Simulink:Simulation:VariableNotFound', 'absente'
+    @() un.setPreSimFcn(3), 'Simulink:Simulation:InvalidFunctionHandle', 'PreSimFcn'
+    @() validate(un.setBlockParameter('entree/zz', 'Gain', '3')), ...
+        'Simulink:Commands:InvSimulinkObjectName', 'entree/zz'
+    @() validate(un.setBlockParameter('autre/g', 'Gain', '3')), ...
+        'Simulink:Commands:InvSimulinkObjectName', 'commence par'
+    @() sim(un, 'StopTime', '3'), 'Simulink:Commands:SimArguments', 'SETMODELPARAMETER'
+    @() parsim(3), 'Simulink:parsim:InvalidInput', 'SimulationInput'
+    @() parsim(lot, 'RunInBackground', 'on'), 'Simulink:parsim:RunInBackgroundUnsupported', ...
+        'pool'
+    @() sim(lot(2)), 'Simulink:Commands:ParametreNonEvalue', 'variableAbsente'
+    @() sim(Simulink.SimulationInput('modeleQuiNExistePas')), ...
+        'Simulink:Commands:OpenSystemUnknownSystem', 'modeleQuiNExistePas'
+    @() sim(lot(1).setPreSimFcn(@(x) 3)), 'Simulink:Simulation:InvalidPreSimFcnOutput', ...
+        'double'
+    @() sim(lot(1).setPostSimFcn(@(o) 3)), 'Simulink:Simulation:InvalidPostSimFcnOutput', ...
+        'double'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('parametres et SimulationInput, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+assert(~exist('Kvar', 'var'), 'aucune simulation en erreur ne laisse sa variable');
+fprintf('parametres et SimulationInput : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -4360,4 +4630,10 @@ function m = typesDeux(type, valeurA, valeurB, parametres)
     m = add_line(m, 'a/1', 'op/1');
     m = add_line(m, 'b/1', 'op/2');
     m = add_line(m, 'op/1', 'y/1');
+end
+
+% Poser une propriété d'un objet — une affectation, qu'une fonction
+% anonyme ne peut pas écrire.
+function objet = poserPropriete(objet, nom, valeur)
+    objet.(nom) = valeur;
 end

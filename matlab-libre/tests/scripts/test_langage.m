@@ -803,6 +803,31 @@ assert(refusNettoyage);
 disp('onCleanup : ok');
 
 
+%% ------------------------- une poignee appelee en instruction
+% « f() » en instruction ne demande aucune sortie, comme un appel de
+% fonction nommée : une fonction anonyme dont le corps est une affectation
+% évaluée ailleurs la fait, au lieu d'en chercher la valeur.
+assignin('base', 'compteurPoignee', 0);
+incrementer = @() evalin('base', 'compteurPoignee = compteurPoignee + 1;');
+incrementer();
+rappels.fin = @() evalin('base', 'compteurPoignee = compteurPoignee + 10;');
+rappels.fin();
+assert(evalin('base', 'compteurPoignee') == 11, 'une poignee appelee sans sortie');
+double2 = @(x) 2 * x;
+double2(4);
+assert(ans == 8, 'une poignee qui rend une valeur la pose dans ans'); %#ok<NOANS>
+refusValeur = '';
+try
+    valeurAbsente = incrementer(); %#ok<NASGU>
+catch err
+    refusValeur = err.identifier;
+end
+assert(~isempty(refusValeur), 'demander une valeur a une poignee qui n''en rend pas');
+evalin('base', 'clear compteurPoignee');
+clear incrementer rappels double2
+disp('poignee en instruction : ok');
+
+
 %% ------------------------------------ ecrire et lire sans recopier
 % « x(i) = v » s'ecrit dans la variable meme : le resultat est celui du
 % chemin general, et une copie prise avant ne bouge pas.

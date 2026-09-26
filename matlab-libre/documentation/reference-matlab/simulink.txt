@@ -33,6 +33,7 @@ delete_param
 
 # La simulation
 sim
+parsim
 simset
 simget
 

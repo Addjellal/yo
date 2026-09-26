@@ -86,6 +86,20 @@ function varargout = sim(modele, varargin)
 %   l'espace de travail qui porte ce nom, ou un fichier NOM.m qui
 %   construit le modèle et le rend.
 %
+%   OUT = SIM(IN), IN un SIMULINK.SIMULATIONINPUT, simule son modèle avec
+%   les variables, les paramètres de blocs et les réglages qu'il pose, le
+%   temps de cette simulation ; un tableau IN se simule l'une après
+%   l'autre, comme par PARSIM. OUT porte en plus ErrorMessage et
+%   SimulationMetadata. L'erreur d'un seul SimulationInput part comme
+%   celle de SIM(NOM), sauf avec SIM(IN,'CaptureErrors','on'), qui la
+%   range dans ErrorMessage ; celle d'un tableau y est toujours rangée.
+%
+%   LoadInitialState ('on') et InitialState (un vecteur, ou l'expression
+%   qui le donne) posent l'état continu de départ, dans l'ordre des
+%   colonnes de xout ; SaveFinalState ('on') range l'état final dans le
+%   champ FinalStateName ('xFinal') du résultat. Ensemble, ils reprennent
+%   une simulation là où la précédente s'est arrêtée.
+%
 %   Le résultat porte plusieurs formes. RESULTAT.temps et
 %   RESULTAT.signaux.<nom> pour l'accès direct — un signal vecteur y est
 %   une matrice à une ligne par instant, un signal matrice un tableau
@@ -110,6 +124,22 @@ function varargout = sim(modele, varargin)
 %      abs(r.signaux.integ(end) - 2) < 1e-9       % exact : l'état est une droite
 %
 %   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SET_PARAM, SIMSET, LINMOD.
+    if isa(modele, 'Simulink.SimulationInput')
+        % Chaque SimulationInput nomme son modèle : une variable de
+        % l'appelant qui en porte le nom d'abord, comme pour SIM(NOM).
+        modeles = cell(1, numel(modele));
+        for k = 1:numel(modele)
+            nom = modele(k).ModelName;
+            if isvarname(nom) && evalin('caller', sprintf('exist(''%s'', ''var'')', nom)) == 1
+                candidat = evalin('caller', nom);
+                if isstruct(candidat) && isfield(candidat, 'blocs')
+                    modeles{k} = candidat;
+                end
+            end
+        end
+        varargout{1} = matlibre_sl_lot('sim', modele, modeles, varargin{:});
+        return
+    end
     if ischar(modele) || isstring(modele)
         % L'espace de travail à consulter est celui de l'appelant de SIM :
         % « evalin('caller') » depuis une sous-fonction ne verrait que
@@ -175,6 +205,9 @@ function varargout = sim(modele, varargin)
         options.entrees = entreesExternes(modele, config.ExternalInput, nomModele);
     end
     c = matlibre_sl_compiler(modele, options);
+    if strcmpi(config.LoadInitialState, 'on')
+        c.xDepart = etatInitial(config.InitialState, c, nomModele);
+    end
     % Les solveurs automatiques choisissent selon qu'il y a des états
     % continus ou non, comme dans Simulink.
     continus = ~isempty(c.x0);
@@ -218,6 +251,15 @@ function varargout = sim(modele, varargin)
         throw(localiser(err, deroulement));
     end
     matlibre_sl_rappel(modele, 'StopFcn');
+    % L'état final, pour reprendre plus tard là où l'on s'arrête : les
+    % états continus au dernier instant, dans l'ordre des colonnes de xout.
+    if strcmpi(config.SaveFinalState, 'on')
+        xFinal = zeros(1, size(resultat.xout, 2));
+        if ~isempty(resultat.xout)
+            xFinal = resultat.xout(end, :);
+        end
+        resultat.(char(config.FinalStateName)) = xFinal;
+    end
     if nargout == 0
         % Sans sortie, comme dans Simulink : le résultat va dans OUT — ou
         % dans tout et yout si ReturnWorkspaceOutputs vaut 'off'.
@@ -226,6 +268,9 @@ function varargout = sim(modele, varargin)
         else
             assignin('base', 'tout', resultat.tout);
             assignin('base', 'yout', resultat.yout);
+            if strcmpi(config.SaveFinalState, 'on')
+                assignin('base', char(config.FinalStateName), xFinal);
+            end
         end
     elseif nargout == 1
         varargout{1} = resultat;
@@ -418,6 +463,27 @@ function r = reglagesVariables(config, nomModele)
     end
 end
 
+% L'état de départ que donne InitialState : les états continus, dans
+% l'ordre des colonnes de xout — l'état final d'une simulation précédente
+% s'y reprend tel quel.
+function x = etatInitial(v, c, nomModele)
+    if ischar(v) || isstring(v)
+        v = matlibre_sl_expression(char(v), nomModele, 'InitialState');
+    end
+    if ~(isnumeric(v) || islogical(v)) || ~(isvector(v) || isempty(v))
+        error('Simulink:SimInput:InvalidInitialState', ...
+              ['L''etat initial du modele ''%s'' est un vecteur : ses etats continus, ' ...
+               'dans l''ordre des colonnes de xout.'], nomModele);
+    end
+    x = double(v(:));
+    if numel(x) ~= numel(c.x0)
+        error('Simulink:SimInput:InitialStateDimensions', ...
+              ['L''etat initial du modele ''%s'' porte %d valeur(s), et le modele %d ' ...
+               'etat(s) continu(s), dans l''ordre des colonnes de xout.'], nomModele, ...
+              numel(x), numel(c.x0));
+    end
+end
+
 % Un réglage numérique peut être une expression de l'espace de travail,
 % comme un paramètre de bloc.
 function v = nombre(v, modele, nom)
@@ -438,7 +504,7 @@ function [instants, J] = sansFin(T, tDebut, pas, solveur)
     while true
         morceau = tDebut + (fait + (0:tranche - 1)) * pas;
         if isempty(reprise)
-            reprise = struct('V', T.V0, 'Z', T.Z0, 'x', T.x0, 'i0', 0, 'avancer', true);
+            reprise = struct('V', T.V0, 'Z', T.Z0, 'x', T.xDepart, 'i0', 0, 'avancer', true);
             reprise.premier = true;
         end
         J = matlibre_sl_executer('simuler', T, morceau, solveur, reprise);

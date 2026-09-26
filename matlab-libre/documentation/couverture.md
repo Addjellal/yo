@@ -169,7 +169,12 @@ totalité.
    entiers, booléens —, arrondis, repliés ou saturés comme dans Simulink.
    Stateflow a aussi ses jonctions de connexion, ses fonctions et ses
    tables de vérité. Le journal prend la forme que dit SaveFormat, jusqu'au
-   `Simulink.SimulationData.Dataset` de `timeseries`. Manquent : les types
+   `Simulink.SimulationData.Dataset` de `timeseries`. Les blocs lisent les
+   `Simulink.Parameter` — type, bornes Min et Max — comme des variables,
+   un `Simulink.Signal` définit une mémoire globale, et
+   `Simulink.SimulationInput` décrit une simulation — variables,
+   paramètres de blocs, réglages, état initial — que `sim` ou `parsim`
+   font sans toucher au modèle. Manquent : les types
    à virgule fixe, les signaux de taille variable, le journal des signaux
    (logsout) et Simscape.
    Stateflow a ses états emboîtés, ses régions parallèles, son
