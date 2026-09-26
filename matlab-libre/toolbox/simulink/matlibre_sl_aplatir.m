@@ -38,6 +38,11 @@ function modele = matlibre_sl_aplatir(modele)
 %   OUTPORT intérieurs gardent leur valeur initiale et leur conduite à
 %   l'arrêt (OutputWhenDisabled) dans le champ sortieConditionnelle.
 %
+%   Un sous-système itéré — qui porte un bloc For Iterator ou While
+%   Iterator — ne se déplie pas : il calcule plusieurs fois par pas, ce
+%   qu'un schéma à plat ne sait pas dire. Il devient un bloc « iterateur »
+%   qui garde son modèle, et que la simulation fait tourner à part.
+%
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
 %   Exemple :
@@ -73,6 +78,40 @@ function modele = matlibre_sl_aplatir(modele)
                    'sous-systeme se contient lui-meme, directement ou non.']);
         end
         modele = deplier(modele, k);
+    end
+end
+
+% Un sous-système itéré reste un bloc : son modèle, dont chaque bloc garde
+% l'espace du masque qui l'englobe, tourne à part. Un seul itérateur, et
+% pas de port de contrôle, comme dans Simulink.
+function iterateur = sousSystemeItere(bloc, interne, iterateurs, g)
+    if numel(iterateurs) > 1
+        error('Simulink:blocks:IteratorDuplicate', ...
+              ['Le sous-systeme ''%s'' porte %d blocs d''iteration : un sous-systeme ' ...
+               'itere n''en a qu''un.'], char(bloc.nom), numel(iterateurs));
+    end
+    if g > 0
+        error('Simulink:blocks:IteratorWithControlPort', ...
+              ['Le sous-systeme itere ''%s'' porte un port Enable, Trigger ou Action : ' ...
+               'placez-le dans un sous-systeme conditionnel plutot.'], char(bloc.nom));
+    end
+    espace = struct();
+    if isfield(bloc, 'espace')
+        espace = bloc.espace;
+    end
+    if ~isempty(matlibre_sl_masque('variables', bloc))
+        espace = matlibre_sl_masque('espace', bloc, espace, char(bloc.nom));
+    end
+    if ~isempty(fieldnames(espace))
+        for j = 1:numel(interne.blocs)
+            interne.blocs{j}.espace = espace;
+        end
+    end
+    iterateur = bloc;
+    iterateur.type = 'iterateur';
+    iterateur.parametres = struct('Model', interne);
+    if isfield(bloc.parametres, 'Position')
+        iterateur.parametres.Position = bloc.parametres.Position;
     end
 end
 
@@ -162,6 +201,12 @@ function modele = deplier(modele, k)
     gardeParent = 0;
     if isfield(bloc, 'garde')
         gardeParent = bloc.garde;
+    end
+    types = cellfun(@(b) b.type, interne.blocs, 'UniformOutput', false);
+    iterateurs = find(ismember(types, {'foriterator', 'whileiterator'}));
+    if ~isempty(iterateurs)
+        modele.blocs{k} = sousSystemeItere(bloc, interne, iterateurs, g);
+        return
     end
     % Un masque ouvre un espace : ses variables, évaluées dans l'espace de
     % celui qui l'englobe, valent pour tous les blocs du dedans.

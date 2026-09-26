@@ -160,14 +160,26 @@ function modele = add_block(modele, type, nom, varargin)
 %   Un schéma dans un bloc :
 %     subsystem    Model                un modèle entier, abrégé en un bloc ;
 %                  'Enabled Subsystem', 'Triggered Subsystem', 'Enabled
-%                  and Triggered Subsystem', 'If Action Subsystem' et
-%                  'Switch Case Action Subsystem' en donnent un qui porte
-%                  déjà In1, Out1 et ses ports de contrôle, comme dans
-%                  la bibliothèque de Simulink
+%                  and Triggered Subsystem', 'If Action Subsystem',
+%                  'Switch Case Action Subsystem', 'Function-Call
+%                  Subsystem', 'For Iterator Subsystem' et 'While Iterator
+%                  Subsystem' en donnent un qui porte déjà In1, Out1 et
+%                  son port de contrôle ou son itérateur, comme dans la
+%                  bibliothèque de Simulink
 %     enableport   StatesWhenEnabling (held, reset)    posé dedans : il ne
 %                  calcule que quand ce port reçoit un signal positif
-%     triggerport  TriggerType (rising, falling, either)    posé dedans :
-%                  il ne calcule qu'aux fronts du signal de ce port
+%     triggerport  TriggerType (rising, falling, either, function-call)
+%                  posé dedans : il ne calcule qu'aux fronts du signal de
+%                  ce port, ou quand un Function-Call Generator l'appelle
+%     functioncallgenerator sample_time    appelle, à chaque instant de sa
+%                  période, le sous-système relié à son port
+%     foriterator  IterationLimit, IterationSource (internal, external),
+%                  IndexMode, ShowIterationPort, ResetStates (held, reset)
+%                  posé dedans : le sous-système calcule N fois par pas
+%     whileiterator WhileBlockType (while, do-while), MaxIters,
+%                  ShowIterationPort, ResetStates — posé dedans : il
+%                  calcule tant que l'entrée cond est vraie ; en while,
+%                  l'entrée IC dit s'il commence
 %     actionport   InitializeStates     posé dedans : il calcule quand un
 %                  If ou un Switch Case le désigne
 %     if           NumInputs, IfExpression, ElseIfExpressions, ShowElse —
@@ -184,7 +196,10 @@ function modele = add_block(modele, type, nom, varargin)
 %   désigne par 'sous/Enable', 'sous/Trigger' ou 'sous/Ifaction'. À
 %   l'arrêt, ses sorties tiennent leur dernière valeur, ou reviennent à
 %   leur valeur initiale (OutputWhenDisabled), et ses états tiennent, ou
-%   repartent à la reprise (StatesWhenEnabling).
+%   repartent à la reprise (StatesWhenEnabling). Un sous-système itéré ne
+%   se déplie pas : son modèle calcule plusieurs fois par pas, ses blocs à
+%   état avançant à chaque itération, et ses sorties sont celles de la
+%   dernière.
 %
 %   ADD_BLOCK(MODELE,'bibliotheque/bloc',NOM) recopie un bloc d'une
 %   bibliothèque bâtie par NEW_SYSTEM(...,'Library') — ou d'un autre
@@ -312,6 +327,12 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
             controles = {'enableport', 'Enable'; 'triggerport', 'Trigger'};
         case {'ifactionsubsystem', 'switchcaseactionsubsystem'}
             controles = {'actionport', 'Action Port'};
+        case 'function-callsubsystem'
+            controles = {'triggerport', 'function'};
+        case 'foriteratorsubsystem'
+            controles = {'foriterator', 'For Iterator'};
+        case 'whileiteratorsubsystem'
+            controles = {'whileiterator', 'While Iterator'};
         otherwise
             return
     end
@@ -321,6 +342,9 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
     gabarit = add_line(gabarit, 'In1', 'Out1');
     for k = 1:size(controles, 1)
         gabarit = add_block(gabarit, controles{k, 1}, controles{k, 2});
+    end
+    if strcmp(cle, 'function-callsubsystem')
+        gabarit = set_param(gabarit, 'function', 'TriggerType', 'function-call');
     end
 end
 

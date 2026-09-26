@@ -2501,6 +2501,215 @@ for kE = 1:size(casErreurs, 1)
 end
 fprintf('nouveaux blocs : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% ----------------------------- 22. Sous-systemes iteres et appeles par fonction
+% For Iterator : le sous-système calcule N fois par pas. Ici il ajoute u
+% fois le rang à un accumulateur : 2 (1 + 2 + 3 + 4) = 20 par pas. Ses
+% états tiennent d'un pas à l'autre (held), ou repartent (reset).
+interne = new_system('boucle');
+interne = add_block(interne, 'inport', 'u', 'Port', 1);
+interne = add_block(interne, 'foriterator', 'iteration', 'IterationLimit', 4);
+interne = add_block(interne, 'product', 'fois');
+interne = add_block(interne, 'sum', 'plus', 'Signs', '++');
+interne = add_block(interne, 'delay', 'acc', 'InitialCondition', 0);
+interne = add_block(interne, 'outport', 's', 'Port', 1);
+interne = add_line(interne, 'u', 'fois', 1);
+interne = add_line(interne, 'iteration', 'fois', 2);
+interne = add_line(interne, 'fois', 'plus', 1);
+interne = add_line(interne, 'acc', 'plus', 2);
+interne = add_line(interne, 'plus', 'acc');
+interne = add_line(interne, 'plus', 's');
+m = new_system('iteree');
+m = add_block(m, 'constant', 'deux', 'Value', 2);
+m = add_block(m, 'subsystem', 'somme', 'Model', interne);
+m = add_line(m, 'deux', 'somme');
+for solveur = {'ode1', 'ode45', 'ode15s'}
+    r = sim(m, 'Solver', solveur{1}, 'FixedStep', 1, 'StopTime', 2, 'MaxStep', 1);
+    assert(isequal(r.signaux.somme(ismember(r.temps, [0 1 2])).', [20 40 60]), ...
+           [solveur{1} ' : l''iteration accumule, et l''etat tient d''un pas a l''autre']);
+end
+r = sim(set_param(m, 'somme', 'Model', set_param(interne, 'iteration', 'ResetStates', 'reset')), ...
+        'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 2);
+assert(isequal(r.signaux.somme.', [20 20 20]), 'reset : l''etat repart a chaque pas');
+r = sim(set_param(m, 'somme', 'Model', set_param(interne, 'iteration', 'IndexMode', ...
+        'Zero-based')), 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 0);
+assert(r.signaux.somme == 12, 'Zero-based : le rang va de 0 a N - 1');
+% Le nombre d'itérations peut venir d'une entrée : ici du dehors.
+externe = set_param(interne, 'iteration', 'IterationSource', 'external');
+externe = add_block(externe, 'inport', 'n', 'Port', 2);
+externe = add_line(externe, 'n', 'iteration');
+m2 = new_system('iterationsExternes');
+m2 = add_block(m2, 'constant', 'un', 'Value', 1);
+m2 = add_block(m2, 'constant', 'combien', 'Value', 3);
+m2 = add_block(m2, 'subsystem', 'somme', 'Model', set_param(externe, 'iteration', ...
+               'ResetStates', 'reset'));
+m2 = add_line(m2, 'un', 'somme', 1);
+m2 = add_line(m2, 'combien', 'somme', 2);
+r = sim(m2, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 1);
+assert(all(r.signaux.somme == 6), 'le nombre d''iterations lu a l''entree du For Iterator');
+
+% While Iterator : do-while divise par deux tant que le résultat dépasse
+% 1 ; while ne commence pas si sa condition initiale est fausse ; MaxIters
+% borne tout.
+w = new_system('moitie');
+w = add_block(w, 'inport', 'x0', 'Port', 1);
+w = add_block(w, 'inport', 'commencer', 'Port', 2);
+w = add_block(w, 'whileiterator', 'tantque', 'WhileBlockType', 'do-while', 'MaxIters', 100, ...
+              'ShowIterationPort', 'on');
+w = add_block(w, 'delay', 'precedent', 'InitialCondition', 0);
+w = add_block(w, 'switch', 'choix', 'Threshold', 1, 'Criteria', 'u2 > Threshold');
+w = add_block(w, 'gain', 'demi', 'Gain', 0.5);
+w = add_block(w, 'comparetoconstant', 'encore', 'relop', '>', 'const', 1);
+w = add_block(w, 'outport', 'y', 'Port', 1);
+w = add_block(w, 'outport', 'n', 'Port', 2);
+w = add_line(w, 'precedent', 'choix', 1);
+w = add_line(w, 'tantque', 'choix', 2);
+w = add_line(w, 'x0', 'choix', 3);
+w = add_line(w, 'choix', 'demi');
+w = add_line(w, 'demi', 'precedent');
+w = add_line(w, 'demi', 'encore');
+w = add_line(w, 'encore', 'tantque', 1);
+w = add_line(w, 'demi', 'y');
+w = add_line(w, 'tantque', 'n');
+m = new_system('divisions');
+m = add_block(m, 'constant', 'x', 'Value', 20);
+m = add_block(m, 'constant', 'oui', 'Value', 1);
+m = add_block(m, 'subsystem', 'div', 'Model', w);
+m = add_line(m, 'x', 'div', 1);
+m = add_line(m, 'oui', 'div', 2);
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 1);
+assert(all(r.signaux.div == 0.625) && all(r.signaux.div_port2 == 5), ...
+       'do-while : cinq divisions, de 20 a 0,625');
+tantQue = set_param(w, 'tantque', 'WhileBlockType', 'while');
+tantQue = add_line(tantQue, 'commencer', 'tantque', 2);
+r = sim(set_param(m, 'div', 'Model', tantQue), 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 1);
+assert(all(r.signaux.div == 0.625), 'while, condition initiale vraie : les memes divisions');
+m3 = set_param(set_param(m, 'div', 'Model', tantQue), 'oui', 'Value', 0);
+r = sim(m3, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 1);
+assert(all(r.signaux.div == 0) && all(r.signaux.div_port2 == 0), ...
+       'while, condition initiale fausse : pas une iteration, les sorties tiennent');
+r = sim(set_param(m, 'div', 'Model', set_param(w, 'tantque', 'MaxIters', 2)), ...
+        'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 0);
+assert(r.signaux.div == 5 && r.signaux.div_port2 == 2, 'MaxIters borne les iterations');
+gabarits = add_block(new_system('gabarits'), 'While Iterator Subsystem', 'tantQue');
+gabarits = add_block(gabarits, 'For Iterator Subsystem', 'pourChaque');
+r = sim(gabarits, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 1);
+assert(isfield(r.signaux, 'tantQue') && isfield(r.signaux, 'pourChaque'), ...
+       'les gabarits itérés se simulent, sans port d''iteration');
+
+% Un sous-système itéré dans un sous-système activé n'itère que quand
+% celui-ci calcule.
+enveloppe = new_system('enveloppe');
+enveloppe = add_block(enveloppe, 'inport', 'e', 'Port', 1);
+enveloppe = add_block(enveloppe, 'subsystem', 'somme', 'Model', interne);
+enveloppe = add_block(enveloppe, 'outport', 's', 'Port', 1);
+enveloppe = add_block(enveloppe, 'enableport', 'Enable');
+enveloppe = add_line(add_line(enveloppe, 'e', 'somme'), 'somme', 's');
+m = new_system('activeIteree');
+m = add_block(m, 'constant', 'deux', 'Value', 2);
+m = add_block(m, 'pulsegenerator', 'porte', 'Period', 2, 'PulseWidth', 50, 'SampleTime', 1, ...
+              'PulseType', 'Sample based');
+m = set_param(m, 'porte', 'Period', 2, 'PulseWidth', 1);
+m = add_block(m, 'subsystem', 'actif', 'Model', enveloppe);
+m = add_line(m, 'deux', 'actif', 1);
+m = add_line(m, 'porte', 'actif/Enable');
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 4);
+assert(isequal(r.signaux.actif.', [20 20 40 40 60]), ...
+       'itere dans un sous-systeme active : seulement aux pas actifs');
+
+% Function-Call Generator et sous-système appelé par fonction : un
+% compteur qui avance à chaque appel, toutes les 0,5 s, quel que soit le
+% solveur.
+compteur = new_system('compteur');
+compteur = add_block(compteur, 'constant', 'un', 'Value', 1);
+compteur = add_block(compteur, 'sum', 'plus', 'Signs', '++');
+compteur = add_block(compteur, 'delay', 'avant', 'InitialCondition', 0);
+compteur = add_block(compteur, 'outport', 'n', 'Port', 1);
+compteur = add_block(compteur, 'triggerport', 'function', 'TriggerType', 'function-call');
+compteur = add_line(compteur, 'un', 'plus', 1);
+compteur = add_line(compteur, 'avant', 'plus', 2);
+compteur = add_line(compteur, 'plus', 'avant');
+compteur = add_line(compteur, 'plus', 'n');
+m = new_system('appels');
+m = add_block(m, 'functioncallgenerator', 'horloge', 'sample_time', 0.5);
+m = add_block(m, 'subsystem', 'appele', 'Model', compteur);
+m = add_line(m, 'horloge', 'appele/Trigger');
+for solveur = {'ode1', 'ode4', 'ode45', 'ode113'}
+    r = sim(m, 'Solver', solveur{1}, 'FixedStep', 0.1, 'StopTime', 2);
+    for instant = [0 0.3 0.5 0.9 1 1.7 2]
+        i = find(abs(r.temps - instant) < 1e-9, 1);
+        assert(r.signaux.appele(i) == floor(instant / 0.5 + 1e-9) + 1, ...
+               sprintf('%s : a %g, %d appels', solveur{1}, instant, ...
+                       floor(instant / 0.5 + 1e-9) + 1));
+    end
+end
+fc = add_block(new_system('fc'), 'Function-Call Subsystem', 'boite');
+assert(strcmp(get_param(fc.blocs{1}.parametres.Model, 'function', 'TriggerType'), ...
+              'function-call'), 'le gabarit porte un Trigger function-call');
+
+% Le .slx garde le sous-système itéré et l'appel de fonction.
+m = new_system('iteresFichier');
+m = add_block(m, 'constant', 'deux', 'Value', 2);
+m = add_block(m, 'subsystem', 'somme', 'Model', interne);
+m = add_block(m, 'functioncallgenerator', 'horloge', 'sample_time', 0.5);
+m = add_block(m, 'subsystem', 'appele', 'Model', compteur);
+m = add_line(m, 'deux', 'somme');
+m = add_line(m, 'horloge', 'appele/Trigger');
+chemin = [tempname() '.slx'];
+save_system(m, chemin);
+relu = load_system(chemin);
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 2);
+rRelu = sim(relu, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 2);
+assert(isequal(r.signaux.somme, rRelu.signaux.somme) && ...
+       isequal(r.signaux.appele, rRelu.signaux.appele), ...
+       'le .slx des sous-systemes iteres et appeles se relit a l''identique');
+delete(chemin);
+
+% Les erreurs, chacune avec son identifiant et le bloc nommé.
+continuDedans = add_line(add_block(interne, 'integrator', 'x'), 'u', 'x');
+periodeDedans = set_param(interne, 'acc', 'SampleTime', 0.5);
+deuxIterateurs = add_block(interne, 'whileiterator', 'autre');
+avecEnable = add_block(interne, 'enableport', 'Enable');
+avecEnableModele = add_block(new_system('e'), 'subsystem', 'boite', 'Model', avecEnable);
+sansGenerateur = add_line(add_block(add_block(new_system('sansGenerateur'), 'pulsegenerator', ...
+    'p'), 'subsystem', 'appele', 'Model', compteur), 'p', 'appele/Trigger');
+generateurAilleurs = add_line(add_block(add_block(new_system('generateurAilleurs'), ...
+    'functioncallgenerator', 'g'), 'gain', 'k'), 'g', 'k');
+deuxAppels = add_line(add_block(add_block(new_system('deuxAppels'), 'functioncallgenerator', ...
+    'g', 'numberOfIterations', 2), 'subsystem', 'appele', 'Model', compteur), 'g', ...
+    'appele/Trigger');
+continuAppele = add_line(add_block(compteur, 'integrator', 'x'), 'un', 'x');
+continuAppeleModele = add_line(add_block(add_block(new_system('continuAppele'), ...
+    'functioncallgenerator', 'g'), 'subsystem', 'appele', 'Model', continuAppele), 'g', ...
+    'appele/Trigger');
+avecIterateur = @(dedans) add_line(add_block(add_block(new_system('x'), 'constant', 'c'), ...
+    'subsystem', 'somme', 'Model', dedans), 'c', 'somme');
+casErreurs = {
+    @() sim(avecIterateur(continuDedans)), 'Simulink:blocks:IteratorSubsystemContinuousStates', 'somme/x'
+    @() sim(avecIterateur(periodeDedans)), 'Simulink:blocks:IteratorSubsystemSampleTime', 'somme/acc'
+    @() sim(avecIterateur(deuxIterateurs)), 'Simulink:blocks:IteratorDuplicate', 'somme'
+    @() sim(avecEnableModele), 'Simulink:blocks:IteratorWithControlPort', 'boite'
+    @() sim(avecIterateur(set_param(interne, 'iteration', 'IterationLimit', 2.5))), ...
+        'Simulink:blocks:ForIteratorInvalidLimit', 'iteration'
+    @() sim(sansGenerateur), 'Simulink:blocks:FcnCallSubsystemInputNotFcnCall', 'Function-Call Generator'
+    @() sim(generateurAilleurs), 'Simulink:blocks:FcnCallOutputToNonFcnCallInput', 'generateurAilleurs/k'
+    @() sim(deuxAppels), 'Simulink:blocks:FcnCallGenIterations', 'deuxAppels/g'
+    @() sim(continuAppeleModele), 'Simulink:blocks:TriggeredSubsystemContinuousStates', 'appele/x'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('iteres et appeles, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('iteres et appeles : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

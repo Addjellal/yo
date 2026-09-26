@@ -157,7 +157,8 @@ totalité.
    `new_system(nom, 'Library')` et leurs copies restent liées ; les bus
    se forment et se défont par nom (Bus Creator, Bus Selector) ; Data
    Type Conversion convertit en entier, simple ou booléen, avec arrondi
-   et saturation. Manquent : les sous-systèmes itérés, les objets
+   et saturation. Les sous-systèmes itérés (For Iterator, While
+   Iterator) et appelés par fonction y sont aussi. Manquent : les objets
    `Simulink.Bus`, les types propagés d'un bloc à l'autre, et les états
    hiérarchiques de Stateflow.
 5. **La génération de code couvre les matrices, les types et les

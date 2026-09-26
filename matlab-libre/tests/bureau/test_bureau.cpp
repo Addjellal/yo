@@ -1573,6 +1573,11 @@ int main(int argc, char** argv) {
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'zoh', 'echantillon', 'SampleTime', "
                         "0.01), 'echantillon', '%1');\n").arg(QLatin1String(b->type));
+                // Un sous-système appelé par fonction veut son générateur.
+                if (QLatin1String(b->type) == QLatin1String("Function-Call Subsystem"))
+                    essaiTous += QStringLiteral(
+                        "m = add_line(add_block(m, 'functioncallgenerator', 'appel', "
+                        "'sample_time', 0.01), 'appel', 'Function-Call Subsystem/Trigger');\n");
                 if (QLatin1String(b->type) == QLatin1String("busselector"))
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'buscreator', 'bus', 'Inputs', 'a,b'), "

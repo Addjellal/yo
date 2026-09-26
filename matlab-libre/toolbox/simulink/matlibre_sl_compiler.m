@@ -174,9 +174,10 @@ function c = matlibre_sl_compiler(modele, options)
         c.entrees{b}(pe) = c.portDebut(a) + ps - 1;
     end
 
-    % --- 4. Goto et From, mémoires partagées ----------------------------------
+    % --- 4. Goto et From, mémoires partagées, appels de fonction -------------
     c = resoudreGoto(c);
     c = resoudreMemoires(c);
+    verifierAppels(c);
 
     % --- 5. transmission directe -------------------------------------------
     c.direct = true(1, n);
@@ -424,7 +425,9 @@ function x = codeDe(type)
                 'secondorderintegrator', 77; ...
                 'discretederivative', 87; 'tappeddelay', 88; 'difference', 89; ...
                 'xygraph', 97; 'tofile', 98; ...
-                'datastorememory', 117; 'ratetransition', 118};
+                'datastorememory', 117; 'ratetransition', 118; ...
+                'iterateur', 105; 'foriterator', 106; 'whileiterator', 107; ...
+                'functioncallgenerator', 108};
         table = containers.Map(noms(:, 1)', noms(:, 2)');
     end
     x = table(type);
@@ -521,6 +524,40 @@ function c = resoudreMemoires(c)
     end
 end
 
+% Un sous-système appelé par fonction ne reçoit ses appels que d'un
+% générateur d'appels, et un générateur n'appelle que de tels
+% sous-systèmes : Simulink refuse l'un et l'autre mélange.
+function verifierAppels(c)
+    for g = find(strcmp(c.types, 'garde'))
+        if ~strcmp(c.p{g}.Trigger, 'function-call')
+            continue
+        end
+        rang = 1 + (c.p{g}.Enable ~= 0);
+        e = c.entrees{g};
+        if rang > numel(e) || e(rang) == 0 || ...
+           ~strcmp(c.types{c.proprio(e(rang))}, 'functioncallgenerator')
+            error('Simulink:blocks:FcnCallSubsystemInputNotFcnCall', ...
+                  ['Le sous-systeme appele par fonction dont ''%s'' est le port Trigger ' ...
+                   'doit etre relie a un Function-Call Generator.'], c.chemins{g});
+        end
+    end
+    for k = find(strcmp(c.types, 'functioncallgenerator'))
+        for b = 1:c.n
+            e = c.entrees{b};
+            if ~any(e == c.portDebut(k))
+                continue
+            end
+            appele = strcmp(c.types{b}, 'garde') && strcmp(c.p{b}.Trigger, 'function-call');
+            if ~appele
+                error('Simulink:blocks:FcnCallOutputToNonFcnCallInput', ...
+                      ['Le generateur d''appels ''%s'' est relie a ''%s'', qui n''est pas ' ...
+                       'le port Trigger d''un sous-systeme appele par fonction.'], ...
+                      c.chemins{k}, c.chemins{b});
+            end
+        end
+    end
+end
+
 function s = parent(nom)
     barre = find(nom == '/', 1, 'last');
     if isempty(barre)
@@ -541,7 +578,7 @@ function d = transmissionDirecte(c, k)
     switch c.types{k}
         case {'integrator', 'delay', 'memory'}
             d = strcmp(c.types{k}, 'delay') && p.DelayLength == 0;
-        case {'secondorderintegrator', 'width'}
+        case {'secondorderintegrator', 'width', 'foriterator', 'whileiterator'}
             d = false;
         case 'tappeddelay'
             d = strcmp(p.includeCurrent, 'on');
@@ -805,6 +842,17 @@ function s = regleDims(c, k, dE, complet, forcer)
                           {'Amplitude', 'Frequency'})};
         case 'datastoreread'
             s = {dimsDe(c.p{c.memoire(k)}.InitialValue)};
+        case {'foriterator', 'whileiterator', 'functioncallgenerator'}
+            s = repmat({[1 1]}, 1, c.nOut(k));
+        case 'iterateur'
+            if ~complet
+                return
+            end
+            [~, ci, ~, sorties] = interieurIterateur(c, k, dE);
+            s = cell(1, numel(sorties));
+            for j = 1:numel(sorties)
+                s{j} = ci.inDims{sorties(j)}{1};
+            end
         case {'enableport', 'triggerport', 'actionport'}
             s = {};
         case 'pulsegenerator'
@@ -1330,6 +1378,23 @@ function c = periodes(c, pas)
                 end
             case {'datastorememory', 'width'}
                 c.cadence(k) = Inf;
+            case 'iterateur'
+                % Un sous-système itéré calcule aux pas majeurs, ou aux
+                % instants de la période qu'il hérite.
+                c.majeurSeul(k) = true;
+            case 'functioncallgenerator'
+                if p.sample_time(1) <= 0
+                    error('Simulink:blocks:FcnCallGenSampleTime', ...
+                          'La periode du generateur d''appels ''%s'' doit etre positive.', ...
+                          c.chemins{k});
+                end
+                if p.numberOfIterations ~= 1
+                    error('Simulink:blocks:FcnCallGenIterations', ...
+                          ['Le generateur ''%s'' appelle %g fois par instant : MatLibre ' ...
+                           'n''appelle encore qu''une fois.'], c.chemins{k}, ...
+                          p.numberOfIterations);
+                end
+                [c.cadence(k), c.decalage(k)] = lirePeriode(p.sample_time);
             case 'ratetransition'
                 if p.OutPortSampleTime(1) > 0
                     [c.cadence(k), c.decalage(k)] = lirePeriode(p.OutPortSampleTime);
@@ -1460,8 +1525,9 @@ function c = periodes(c, pas)
     c.cadence(c.cadence == -1) = 0;   % une boucle d'héritiers : continue
 
     % Un IC ne se calcule pas une fois pour toutes : il rend sa valeur au
-    % premier instant, puis son entrée, fût-elle constante.
-    for k = find(strcmp(c.types, 'ic') & isinf(c.cadence))
+    % premier instant, puis son entrée, fût-elle constante. Un sous-système
+    % itéré non plus : ses états avancent à chaque pas.
+    for k = find(ismember(c.types, {'ic', 'iterateur'}) & isinf(c.cadence))
         c.cadence(k) = 0;
         c.majeurSeul(k) = true;
     end
@@ -1886,6 +1952,44 @@ function c = abaisser(c, pas, tDebut)
                 if lent
                     z0 = [x0; x0];   % la tenue, et l'entrée prise à l'instant lent
                 end
+            case 'iterateur'              % le modèle intérieur, prêt, dans objets
+                entrees = c.entrees{k};
+                dE = cell(1, numel(entrees));
+                for j = 1:numel(entrees)
+                    dE{j} = [1 1];
+                    if entrees(j) > 0
+                        dE{j} = c.dims{entrees(j)};
+                    end
+                end
+                [~, ci, lesEntrees, lesSorties, iter] = interieurIterateur(c, k, dE);
+                q = ci.p{iter};
+                O = struct('T', matlibre_sl_executer('preparer', ci), 'entrees', lesEntrees, ...
+                           'sorties', lesSorties, 'iter', iter, ...
+                           'pour', strcmp(ci.types{iter}, 'foriterator'), ...
+                           'remise', strcmp(q.ResetStates, 'reset'));
+                if O.pour
+                    O.externe = strcmp(q.IterationSource, 'external');
+                    O.N = double(q.IterationLimit);
+                    O.zero = strcmp(q.IndexMode, 'Zero-based');
+                    if ~O.externe && (O.N < 0 || O.N ~= round(O.N))
+                        error('Simulink:blocks:ForIteratorInvalidLimit', ...
+                              'Le nombre d''iterations de ''%s'' est un entier positif.', ...
+                              ci.chemins{iter});
+                    end
+                else
+                    O.faire = strcmp(q.WhileBlockType, 'do-while');
+                    O.max = double(q.MaxIters);
+                    if O.max == 0 || O.max < -1 || O.max ~= round(O.max)
+                        error('Simulink:blocks:WhileIteratorInvalidMax', ...
+                              ['Le nombre maximal d''iterations de ''%s'' est un entier ' ...
+                               'positif, ou -1 pour ne pas en mettre.'], ci.chemins{iter});
+                    end
+                end
+                c.objets{k} = O;
+            case {'foriterator', 'whileiterator'}   % [rang de l'itération]
+                seg = 0;
+            case 'functioncallgenerator'  % [période; décalage]
+                seg = [c.cadence(k); c.decalage(k)];
             case 'chirp'                  % [f1; T; f2]
                 seg = [etendre(p.f1, w, ch, 'f1'); etendre(p.T, w, ch, 'T'); ...
                        etendre(p.f2, w, ch, 'f2')];
@@ -2104,12 +2208,14 @@ function c = abaisser(c, pas, tDebut)
             % --- sous-systèmes conditionnels ---
             case 'garde'                  % [enable; front; action; remise; largeur du front]
                 % Z : [amorcée; active au pas d'avant; front d'avant]
-                fronts = struct('none', 0, 'rising', 1, 'falling', 2, 'either', 3);
+                fronts = struct('none', 0, 'rising', 1, 'falling', 2, 'either', 3, ...
+                                'function_call', 4);
                 largeurFront = 0;
                 if ~strcmp(p.Trigger, 'none')
                     largeurFront = largeurEntree(c, k, 1 + (p.Enable ~= 0));
                 end
-                seg = [p.Enable ~= 0; fronts.(p.Trigger); p.Action ~= 0; p.Reset ~= 0; ...
+                seg = [p.Enable ~= 0; fronts.(strrep(p.Trigger, '-', '_')); p.Action ~= 0; ...
+                       p.Reset ~= 0; ...
                        largeurFront];
                 z0 = [0; 0; zeros(largeurFront, 1)];
             case 'if'                     % [entrées; conditions; sinon]
@@ -2437,6 +2543,69 @@ function boucle = decouper(c, comp, succ)
     end
     boucle = struct('blocs', comp, 'ordre', [ordreRestants, dechires], ...
                     'dechires', dechires, 'z', indices);
+end
+
+% === sous-systèmes itérés =====================================================
+%
+% Le modèle d'un sous-système itéré se compile à part, ses INPORT à la
+% forme des signaux qui y entrent. Ses blocs calculent tous à chaque
+% itération : ils ne portent pas de période à eux, et pas d'état continu.
+function [interne, ci, entrees, sorties, iter] = interieurIterateur(c, k, dE)
+    interne = matlibre_sl_modele(c.p{k}.Model);
+    interne.nom = c.chemins{k};
+    types = cell(1, numel(interne.blocs));
+    for j = 1:numel(interne.blocs)
+        types{j} = matlibre_sl_catalogue('type', interne.blocs{j}.type).type;
+        P = interne.blocs{j}.parametres;
+        for champ = fieldnames(P).'
+            if any(strcmpi(champ{1}, {'SampleTime', 'tsamp', 'samptime', 'st'})) && ...
+               isnumeric(P.(champ{1})) && ~isempty(P.(champ{1})) && P.(champ{1})(1) > 0
+                error('Simulink:blocks:IteratorSubsystemSampleTime', ...
+                      ['Le bloc ''%s/%s'' porte la periode %g, mais il est dans un ' ...
+                       'sous-systeme itere : ses blocs calculent a chaque iteration, et ' ...
+                       'heritent leur periode (-1).'], c.chemins{k}, interne.blocs{j}.nom, ...
+                      P.(champ{1})(1));
+            end
+        end
+    end
+    rangs = find(strcmp(types, 'inport'));
+    ports = zeros(size(rangs));
+    for j = 1:numel(rangs)
+        P = interne.blocs{rangs(j)}.parametres;
+        ports(j) = j;
+        if isfield(P, 'Port')
+            ports(j) = double(P.Port);
+        end
+    end
+    [~, ordre] = sort(ports);
+    rangs = rangs(ordre);
+    for j = 1:numel(rangs)
+        d = [1 1];
+        if j <= numel(dE) && ~isempty(dE{j})
+            d = dE{j};
+        end
+        interne.blocs{rangs(j)}.parametres.Value = zeros(d);
+        interne.blocs{rangs(j)}.parametres.PortDimensions = -1;
+    end
+    options = struct('pas', 1, 'silencieux', true, 'variable', false, 'config', c.config);
+    ci = matlibre_sl_compiler(interne, options);
+    if ~isempty(ci.x0)
+        continu = find(ci.xA > 0, 1);
+        error('Simulink:blocks:IteratorSubsystemContinuousStates', ...
+              ['Le bloc ''%s'' a des etats continus, mais il est dans un sous-systeme ' ...
+               'itere, qui calcule plusieurs fois par pas sans avancer le temps. ' ...
+               'Prenez un bloc discret.'], ci.chemins{continu});
+    end
+    % Les INPORT et les OUTPORT, par leur rang ; le bloc d'itération.
+    entrees = rangs;
+    sorties = find(strcmp(ci.types, 'outport'));
+    ports = zeros(size(sorties));
+    for j = 1:numel(sorties)
+        ports(j) = double(ci.p{sorties(j)}.Port);
+    end
+    [~, ordre] = sort(ports);
+    sorties = sorties(ordre);
+    iter = find(ismember(ci.types, {'foriterator', 'whileiterator'}), 1);
 end
 
 % === blocs de code ============================================================

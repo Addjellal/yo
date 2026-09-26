@@ -52,6 +52,17 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nSorties = 0;
         case 'secondorderintegrator'
             nSorties = 2;   % x, dx/dt
+        case 'foriterator'
+            nEntrees = double(strcmpi(char(lire(p, 'IterationSource', 'internal')), 'external'));
+            nSorties = double(strcmpi(char(lire(p, 'ShowIterationPort', 'on')), 'on'));
+        case 'whileiterator'
+            % cond, puis IC pour un « while »
+            nEntrees = 1 + strcmpi(char(lire(p, 'WhileBlockType', 'while')), 'while');
+            nSorties = double(strcmpi(char(lire(p, 'ShowIterationPort', 'off')), 'on'));
+        case 'functioncallgenerator'
+            nEntrees = 0;
+        case 'iterateur'
+            [nEntrees, nSorties] = bornesSousSysteme(p);
         case 'math'
             if any(strcmpi(lire(p, 'Operator', 'square'), {'pow', 'hypot', 'rem', 'mod'}))
                 nEntrees = 2;

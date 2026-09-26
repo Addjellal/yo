@@ -132,6 +132,8 @@ function T = preparer(c)
     % L'état des diagrammes Stateflow : une poignée, neuve à chaque
     % préparation, que les tranches d'une simulation sans fin partagent.
     T.graphes = containers.Map('KeyType', 'double', 'ValueType', 'any');
+    % L'état des sous-systèmes itérés, de même.
+    T.iterateurs = containers.Map('KeyType', 'double', 'ValueType', 'any');
     T.x0 = c.x0;
     T.xA = c.xA;
     T.xB = c.xB;
@@ -237,6 +239,12 @@ function T = preparer(c)
         % sous-système peut dormir au premier pas. Elle se calcule aux pas
         % majeurs où il est actif.
         if isfield(c, 'garde') && c.garde(k) > 0 && T.mode(k) == 3
+            T.mode(k) = 1;
+        end
+        % Un générateur d'appels garde sa période — le solveur s'arrête à
+        % ses instants —, mais se calcule à chaque pas majeur : il dit 1 à
+        % ses instants, 0 entre eux.
+        if strcmp(c.types{k}, 'functioncallgenerator')
             T.mode(k) = 1;
         end
     end
@@ -1712,6 +1720,7 @@ end
 
 function [y, dx] = point(T, x, u)
     T.graphes = containers.Map('KeyType', 'double', 'ValueType', 'any');
+    T.iterateurs = containers.Map('KeyType', 'double', 'ValueType', 'any');
     P = T.P;
     pos = 0;
     for k = T.entreesModele
@@ -2391,6 +2400,14 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                     case 104   % chart : un pas de la machine, puis ses sorties
                         V = pasGraphe(T, k, V, p, e, t);
+                    case 105   % sous-système itéré
+                        V = iterer(T, k, V, e, t);
+                    case {106, 107}   % for iterator, while iterator : le rang, s'il le montre
+                        if a > 0
+                            V(a) = T.P(p);
+                        end
+                    case 108   % function-call generator
+                        V(a) = double(estInstant(t, T.P(p), T.P(p + 1)));
                 end
             case 11
                 switch code(k)
@@ -2447,6 +2464,119 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
 end
 
 % --- les blocs de code
+
+% Un sous-système itéré : son modèle, compilé à part, calcule N fois — For
+% Iterator — ou tant que son entrée cond est vraie — While Iterator —, ses
+% blocs à état avançant à chaque itération. Les sorties sont celles de la
+% dernière. Les états tiennent d'un pas à l'autre (held), ou repartent
+% (reset). Un pas majeur refait après une remise ne l'itère pas deux fois.
+function V = iterer(T, k, V, e, t)
+    O = T.objets{k};
+    Ti = O.T;
+    if isKey(T.iterateurs, k)
+        etat = T.iterateurs(k);
+    else
+        etat = struct('V', Ti.V0, 'Z', Ti.Z0, 't', NaN, 'sorties', {{}});
+    end
+    if etat.t == t
+        V = poserSorties(T, k, V, etat.sorties);
+        return
+    end
+    if O.remise
+        etat.Z = Ti.Z0;
+    end
+    for j = 1:numel(O.entrees)
+        q = Ti.pA(O.entrees(j));
+        largeur = Ti.oB(O.entrees(j)) - Ti.oA(O.entrees(j)) + 1;
+        Ti.P(q:q + largeur - 1) = V(T.eA(e + j):T.eB(e + j)) + zeros(largeur, 1);
+    end
+    touche = true(1, size(Ti.groupes, 1));
+    vide = zeros(0, 1);
+    qi = Ti.pA(O.iter);
+    ei = Ti.eD(O.iter);
+    Vi = etat.V;
+    Zi = etat.Z;
+    if O.pour
+        N = O.N;
+        if O.externe
+            % le nombre d'itérations se lit à l'entrée du For Iterator
+            Ti.P(qi) = 1 - O.zero;
+            [Vt, ~] = passe(Ti, Ti.listeTout, Vi, Zi, vide, t, 0, true, touche);
+            N = round(Vt(Ti.eA(ei + 1)));
+        end
+        faits = 0;
+        for rang = 1:N
+            Ti.P(qi) = rang - O.zero;
+            [Vi, Zi] = unTour(Ti, Vi, Zi, t, touche);
+            faits = rang;
+        end
+    else
+        encore = true;
+        if ~O.faire
+            % while : la condition initiale, à l'entrée IC, dit s'il faut
+            % commencer
+            Ti.P(qi) = 1;
+            [Vt, ~] = passe(Ti, Ti.listeTout, Vi, Zi, vide, t, 0, true, touche);
+            encore = Vt(Ti.eA(ei + 2)) ~= 0;
+        end
+        rang = 0;
+        limite = O.max;
+        if limite < 0
+            limite = 1e6;
+        end
+        while encore
+            rang = rang + 1;
+            Ti.P(qi) = rang;
+            [Vi, Zi] = unTour(Ti, Vi, Zi, t, touche);
+            encore = Vi(Ti.eA(ei + 1)) ~= 0;
+            if rang >= limite
+                if O.max < 0 && encore
+                    error('Simulink:blocks:WhileIteratorMaxIterations', ...
+                          ['Le sous-systeme itere ''%s'' a fait un million d''iterations ' ...
+                           'a t = %g sans que sa condition devienne fausse.'], ...
+                          T.chemins{k}, t);
+                end
+                break
+            end
+        end
+        faits = rang;
+    end
+    % Sans itération, les sorties tiennent : celles du pas d'avant, ou
+    % leur valeur initiale.
+    sorties = cell(1, numel(O.sorties));
+    for j = 1:numel(O.sorties)
+        o = O.sorties(j);
+        plage = Ti.eA(Ti.eD(o) + 1):Ti.eB(Ti.eD(o) + 1);
+        if faits > 0
+            sorties{j} = Vi(plage);
+        elseif ~isempty(etat.sorties)
+            sorties{j} = etat.sorties{j};
+        else
+            sorties{j} = Ti.V0(plage);
+        end
+    end
+    V = poserSorties(T, k, V, sorties);
+    T.iterateurs(k) = struct('V', Vi, 'Z', Zi, 't', t, 'sorties', {sorties});
+end
+
+% Une itération : la passe des sorties, les remises, les mises à jour.
+function [Vi, Zi] = unTour(Ti, Vi, Zi, t, touche)
+    [Vi, Zi] = passe(Ti, Ti.listeTout, Vi, Zi, zeros(0, 1), t, 0, true, touche);
+    if Ti.aRemettre
+        [~, Zi, refaire] = remettre(Ti, Vi, Zi, zeros(0, 1), t);
+        if refaire
+            [Vi, Zi] = passe(Ti, Ti.listeTout, Vi, Zi, zeros(0, 1), t, 0, true, touche);
+        end
+    end
+    Zi = majs(Ti, Vi, Zi, t, touche, zeros(0, 1));
+end
+
+function V = poserSorties(T, k, V, sorties)
+    for j = 1:numel(sorties)
+        gp = T.pd(k) + j - 1;
+        V(T.poA(gp):T.poB(gp)) = sorties{j};
+    end
+end
 
 % Une MATLAB Function : chaque entrée est un argument, chaque sortie un
 % port, à la forme que l'appel d'essai a mesurée.
@@ -2596,7 +2726,11 @@ function active = gardeActive(T, k, V, Z, p, e)
         active = any(V(T.eA(e + 1):T.eB(e + 1)) > 0);
     end
     front = T.P(p + 1);
-    if front > 0
+    if front == 4
+        % appelé par fonction : il calcule quand le générateur l'appelle
+        rang = rang + 1;
+        active = active && any(V(T.eA(e + rang):T.eB(e + rang)) ~= 0);
+    elseif front > 0
         rang = rang + 1;
         u = V(T.eA(e + rang):T.eB(e + rang));
         z = T.zA(k);
