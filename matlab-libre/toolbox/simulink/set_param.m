@@ -123,6 +123,10 @@ function modele = reglerModele(modele, couples)
             modele.nom = char(valeur);
             continue
         end
+        if strcmpi(nom, 'SimulationCommand')
+            commander(modele, valeur);
+            continue
+        end
         canon = matlibre_sl_config('nom', nom);
         if ~isempty(canon)
             modele.parametres.(canon) = matlibre_sl_config('valider', canon, valeur);
@@ -156,6 +160,26 @@ function modele = reglerModele(modele, couples)
                   strjoin(fieldnames(matlibre_sl_config('defauts')).', ', '));
         end
         modele.parametres.(existant) = valeur;
+    end
+end
+
+% SimulationCommand, comme les boutons de Simulink : 'update' compile le
+% modèle — ses erreurs et ses avertissements sortent —, 'start' le simule
+% et dépose le résultat dans OUT ; les autres ne font rien quand aucune
+% simulation ne tourne.
+function commander(modele, commande)
+    switch lower(char(commande))
+        case 'update'
+            matlibre_sl_compiler(modele, struct('config', matlibre_sl_config('lire', modele)));
+        case 'start'
+            resultat = sim(modele);
+            config = matlibre_sl_config('lire', modele);
+            assignin('base', char(config.ReturnWorkspaceOutputsName), resultat);
+        case {'stop', 'pause', 'continue', 'step'}
+        otherwise
+            error('Simulink:Commands:SetParamInvalidArgumentValue', ...
+                  ['SimulationCommand vaut update, start, stop, pause, continue ou ' ...
+                   'step ; pas ''%s''.'], char(commande));
     end
 end
 

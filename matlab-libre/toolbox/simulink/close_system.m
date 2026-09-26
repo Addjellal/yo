@@ -42,6 +42,9 @@ function close_system(modele, fichier)
         end
         save_system(modele, fichier);
     end
+    if ~isempty(modele)
+        matlibre_sl_rappel(modele, 'CloseFcn');
+    end
     if connu
         poignee = matlibre_sl_ouverts('figure', nom);
         if ~isempty(poignee) && ishandle(poignee)

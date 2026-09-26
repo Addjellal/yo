@@ -134,6 +134,9 @@ function varargout = sim(modele, varargin)
                'ADD_BLOCK(M, ''%s/bloc'', NOM), et c''est le modele qui se simule.'], ...
               char(modele.nom), char(modele.nom));
     end
+    % InitFcn d'abord : les variables qu'il pose servent aux réglages et
+    % aux blocs, comme dans Simulink.
+    matlibre_sl_rappel(modele, 'InitFcn');
     [config, imposes, externe] = lireArguments(matlibre_sl_config('lire', modele), varargin);
     nomModele = char(modele.nom);
     tDebut = nombre(config.StartTime, nomModele, 'StartTime');
@@ -199,22 +202,39 @@ function varargout = sim(modele, varargin)
                                'NumberNewtonIterations', config.NumberNewtonIterations, ...
                                'MaxOrder', config.MaxOrder);
 
-    if variable
-        reglages = reglagesVariables(config, nomModele);
-        J = matlibre_sl_executer('simulerVariable', T, tDebut, tFinal, solveur, reglages, ...
-                                 imposes);
-        instants = J.temps;
-    elseif isinf(tFinal)
-        [instants, J] = sansFin(T, tDebut, pas, solveur);
-    else
-        instants = tDebut:pas:tFinal;
-        J = matlibre_sl_executer('simuler', T, instants, solveur);
-        instants = instants(1:J.dernier);
+    % StartFcn quand la simulation commence, StopFcn quand elle s'achève —
+    % sur une erreur aussi.
+    matlibre_sl_rappel(modele, 'StartFcn');
+    try
+        if variable
+            reglages = reglagesVariables(config, nomModele);
+            J = matlibre_sl_executer('simulerVariable', T, tDebut, tFinal, solveur, ...
+                                     reglages, imposes);
+            instants = J.temps;
+        elseif isinf(tFinal)
+            [instants, J] = sansFin(T, tDebut, pas, solveur);
+        else
+            instants = tDebut:pas:tFinal;
+            J = matlibre_sl_executer('simuler', T, instants, solveur);
+            instants = instants(1:J.dernier);
+        end
+        resultat = assembler(c, T, J, instants(:));
+        resultat = deposer(c, T, J, instants(:), resultat);
+    catch err
+        matlibre_sl_rappel(modele, 'StopFcn');
+        rethrow(err);
     end
-
-    resultat = assembler(c, T, J, instants(:));
-    deposer(c, T, J, instants(:));
-    if nargout <= 1
+    matlibre_sl_rappel(modele, 'StopFcn');
+    if nargout == 0
+        % Sans sortie, comme dans Simulink : le résultat va dans OUT — ou
+        % dans tout et yout si ReturnWorkspaceOutputs vaut 'off'.
+        if strcmpi(config.ReturnWorkspaceOutputs, 'on')
+            assignin('base', char(config.ReturnWorkspaceOutputsName), resultat);
+        else
+            assignin('base', 'tout', resultat.tout);
+            assignin('base', 'yout', resultat.yout);
+        end
+    elseif nargout == 1
         varargout{1} = resultat;
     else
         varargout = {resultat.tout, resultat.xout, resultat.yout};
@@ -478,7 +498,7 @@ end
 % reste du programme la lira. C'est fait en dernier, pour qu'une
 % simulation interrompue par une erreur ne laisse pas une variable à
 % moitié remplie.
-function deposer(c, T, J, instants)
+function resultat = deposer(c, T, J, instants, resultat)
     N = numel(instants);
     for q = 1:numel(T.releves)
         R = T.releves(q);
@@ -507,6 +527,11 @@ function deposer(c, T, J, instants)
                                 'blockName', c.chemins{R.bloc});
         end
         assignin('base', char(p.VariableName), valeur);
+        % et dans le résultat, sous le même nom, comme Simulink le range
+        % dans sa sortie de simulation
+        if isvarname(char(p.VariableName)) && ~isfield(resultat, char(p.VariableName))
+            resultat.(char(p.VariableName)) = valeur;
+        end
     end
 end
 

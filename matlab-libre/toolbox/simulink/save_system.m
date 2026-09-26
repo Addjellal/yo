@@ -40,8 +40,10 @@ function fichier = save_system(modele, fichier)
     end
     fichier = char(fichier);
     [~, ~, extension] = fileparts(fichier);
+    matlibre_sl_rappel(modele, 'PreSaveFcn');
     if strcmpi(extension, '.slx')
         matlibre_sl_slx('ecrire', modele, fichier);
+        matlibre_sl_rappel(modele, 'PostSaveFcn');
         return
     end
     if numel(fichier) < 2 || ~strcmp(fichier(end-1:end), '.m')
@@ -76,6 +78,7 @@ function fichier = save_system(modele, fichier)
         fprintf(identifiantFichier, '%s\n', lignes{k});
     end
     fclose(identifiantFichier);
+    matlibre_sl_rappel(modele, 'PostSaveFcn');
 end
 
 % Les lignes qui bâtissent un modèle dans la variable CIBLE. Un

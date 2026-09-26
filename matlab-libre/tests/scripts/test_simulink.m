@@ -2835,6 +2835,103 @@ for kE = 1:size(casErreurs, 1)
 end
 fprintf('entrees et references : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% ------------------------------------ 24. Rappels du modele et commandes
+% Les rappels : InitFcn pose les variables que lisent les blocs, avant la
+% compilation ; StartFcn et StopFcn encadrent la simulation, StopFcn même
+% quand elle échoue ; PostLoadFcn suit le chargement, PreSaveFcn et
+% PostSaveFcn l'enregistrement, CloseFcn la fermeture.
+m = new_system('rappels');
+m = add_block(m, 'constant', 'c', 'Value', 'gainDuRappel');
+m = set_param(m, 'InitFcn', 'gainDuRappel = 4; journalRappels = {''init''};', ...
+              'StartFcn', 'journalRappels{end + 1} = ''start'';', ...
+              'StopFcn', 'journalRappels{end + 1} = ''stop'';');
+r = sim(m, 'Solver', 'ode1', 'StopTime', 0.1, 'FixedStep', 0.1);
+assert(all(r.signaux.c == 4) && isequal(evalin('base', 'journalRappels'), ...
+       {'init', 'start', 'stop'}), 'InitFcn avant la compilation, puis StartFcn et StopFcn');
+echoue = add_line(add_block(add_block(m, 'constant', 'zero', 'Value', 0), 'assertion', 'a'), ...
+                  'zero', 'a');
+try
+    sim(echoue, 'Solver', 'ode1', 'StopTime', 0.1, 'FixedStep', 0.1);
+catch
+end
+assert(strcmp(evalin('base', 'journalRappels{end}'), 'stop'), ...
+       'StopFcn s''execute aussi quand la simulation echoue');
+m = set_param(m, 'PostLoadFcn', 'chargeFait = 1;', 'PreSaveFcn', 'sauveFait = 1;', ...
+              'PostSaveFcn', 'sauveFait = sauveFait + 1;', 'CloseFcn', 'fermeFait = 1;');
+for extension = {'.slx', '.m'}
+    evalin('base', 'clear chargeFait sauveFait');
+    chemin = [tempname() extension{1}];
+    save_system(m, chemin);
+    assert(evalin('base', 'sauveFait') == 2, [extension{1} ' : PreSaveFcn puis PostSaveFcn']);
+    relu = load_system(chemin);
+    assert(evalin('base', 'chargeFait') == 1 && ...
+           strcmp(get_param(relu, 'InitFcn'), get_param(m, 'InitFcn')), ...
+           [extension{1} ' : les rappels voyagent avec le modele, PostLoadFcn au chargement']);
+    delete(chemin);
+end
+close_system(relu);
+assert(evalin('base', 'fermeFait') == 1, 'CloseFcn a la fermeture');
+evalin('base', 'clear gainDuRappel journalRappels chargeFait sauveFait fermeFait');
+
+% SimulationCommand : update compile, start simule et dépose OUT ; SIM
+% sans sortie dépose son résultat, dans OUT ou dans tout et yout. Les
+% To Workspace sont aussi dans le résultat.
+m = new_system('commandes');
+m = add_block(m, 'constant', 'c', 'Value', 3);
+m = add_block(m, 'toworkspace', 'versEspace', 'VariableName', 'simout');
+m = add_block(m, 'outport', 'y', 'Port', 1);
+m = add_line(m, 'c', 'versEspace');
+m = add_line(m, 'c', 'y');
+m = set_param(m, 'StopTime', 0.1, 'FixedStep', 0.1);
+evalin('base', 'clear out tout yout');
+set_param(m, 'SimulationCommand', 'start');
+dehors = evalin('base', 'out');
+assert(all(dehors.simout == 3) && all(dehors.yout == 3), ...
+       'SimulationCommand start : OUT porte le resultat, To Workspace compris');
+sim(set_param(m, 'ReturnWorkspaceOutputsName', 'resultatNomme'));
+assert(isfield(evalin('base', 'resultatNomme'), 'tout'), 'ReturnWorkspaceOutputsName');
+sim(set_param(m, 'ReturnWorkspaceOutputs', 'off'));
+assert(isequal(evalin('base', 'yout'), [3; 3]) && numel(evalin('base', 'tout')) == 2, ...
+       'ReturnWorkspaceOutputs off : tout et yout');
+evalin('base', 'clear out tout yout resultatNomme simout');
+r = sim(set_param(m, 'SimulationMode', 'accelerator'));
+assert(all(r.yout == 3), 'le mode accelerator simule comme normal');
+m2 = add_block(m, 'gain', 'enLair');
+avertissement = lastwarn('');
+set_param(m2, 'SimulationCommand', 'update');
+[~, idAvertissement] = lastwarn();
+assert(strcmp(idAvertissement, 'Simulink:Engine:InputNotConnected'), ...
+       'SimulationCommand update compile, et dit l''entree en l''air');
+lastwarn(avertissement);
+
+% Les erreurs.
+casErreurs = {
+    @() sim(set_param(new_system('r'), 'InitFcn', 'error(''monRappel:echec'', ''non'')')), ...
+        'Simulink:Engine:CallbackEvalErr', 'InitFcn'
+    @() set_param(new_system('r'), 'InitFcn', 3), 'Simulink:Config:InvalidValue', 'InitFcn'
+    @() set_param(new_system('r'), 'SimulationCommand', 'avancer'), ...
+        'Simulink:Commands:SetParamInvalidArgumentValue', 'avancer'
+    @() set_param(new_system('r'), 'SimulationMode', 'turbo'), 'Simulink:Config:InvalidValue', 'turbo'
+    @() set_param(new_system('r'), 'ReturnWorkspaceOutputsName', '2x'), ...
+        'Simulink:Config:InvalidValue', '2x'
+    @() set_param(add_block(new_system('u'), 'chose', 'b'), 'SimulationCommand', 'update'), ...
+        'Simulink:Commands:InvalidBlockType', 'chose'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('rappels et commandes, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('rappels et commandes : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

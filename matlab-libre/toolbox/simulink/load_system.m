@@ -8,7 +8,8 @@ function modele = load_system(nom)
 %   Le chemin peut porter l'extension .m ou non. Un fichier .slx ou .mdl,
 %   ceux qu'enregistre Simulink, se lit aussi : ses blocs, ses liens, ses
 %   sous-systèmes et sa configuration deviennent un modèle de MatLibre
-%   (voir MATLIBRE_SL_SLX).
+%   (voir MATLIBRE_SL_SLX). Les rappels PreLoadFcn et PostLoadFcn du
+%   modèle s'exécutent au chargement.
 %
 %   Exemple :
 %      m = new_system('petit');
@@ -24,7 +25,7 @@ function modele = load_system(nom)
     [dossier, base, extension] = fileparts(nom);
     if strcmpi(extension, '.slx') || strcmpi(extension, '.mdl')
         modele = matlibre_sl_slx('lire', nom);
-        matlibre_sl_ouverts('inscrire', modele.nom, modele, 0);
+        charge(modele);
         return
     end
     chemin = fullfile(dossier, [base '.m']);
@@ -32,7 +33,7 @@ function modele = load_system(nom)
         for autre = {'.slx', '.mdl'}
             if exist(fullfile(dossier, [base autre{1}]), 'file') == 2
                 modele = matlibre_sl_slx('lire', fullfile(dossier, [base autre{1}]));
-                matlibre_sl_ouverts('inscrire', modele.nom, modele, 0);
+                charge(modele);
                 return
             end
         end
@@ -51,5 +52,13 @@ function modele = load_system(nom)
         error('Simulink:Commands:InvalidModel', ...
               'Le fichier ''%s'' ne rend pas un modele.', chemin);
     end
+    charge(modele);
+end
+
+% Le modèle est chargé : ses rappels PreLoadFcn puis PostLoadFcn, et le
+% registre de la session.
+function charge(modele)
+    matlibre_sl_rappel(modele, 'PreLoadFcn');
     matlibre_sl_ouverts('inscrire', modele.nom, modele, 0);
+    matlibre_sl_rappel(modele, 'PostLoadFcn');
 end

@@ -51,6 +51,17 @@ function varargout = matlibre_sl_config(action, varargin)
 %     UnconnectedOutputMsg 'none'     sortie non reliée : none, warning, error
 %     LoadExternalInput    'off'      'on' : les entrées du modèle lisent
 %                                     ExternalInput
+%     InitFcn, StartFcn, StopFcn, PreLoadFcn, PostLoadFcn, PreSaveFcn,
+%     PostSaveFcn, CloseFcn   ''      les rappels du modèle : du code
+%                                     évalué dans l'espace de travail de
+%                                     base (voir MATLIBRE_SL_RAPPEL)
+%     SimulationMode       'normal'   accelerator et les autres modes
+%                                     sont acceptés, et simulent comme
+%                                     normal
+%     ReturnWorkspaceOutputs 'on', ReturnWorkspaceOutputsName 'out' : SIM
+%                                     appelé sans sortie dépose son
+%                                     résultat dans cette variable ; sinon
+%                                     dans tout et yout
 %     ExternalInput        '[t, u]'   le temps puis une colonne par
 %                                     élément des entrées, ou des
 %                                     variables séparées par des virgules,
@@ -101,7 +112,10 @@ function d = defauts()
                'NumberNewtonIterations', 1, 'ZeroCrossControl', 'UseLocalSettings', ...
                'AlgebraicLoopMsg', 'warning', 'UnconnectedInputMsg', 'warning', ...
                'UnconnectedOutputMsg', 'none', 'LoadExternalInput', 'off', ...
-               'ExternalInput', '[t, u]');
+               'ExternalInput', '[t, u]', 'PreLoadFcn', '', 'PostLoadFcn', '', ...
+               'InitFcn', '', 'StartFcn', '', 'StopFcn', '', 'PreSaveFcn', '', ...
+               'PostSaveFcn', '', 'CloseFcn', '', 'SimulationMode', 'normal', ...
+               'ReturnWorkspaceOutputs', 'on', 'ReturnWorkspaceOutputsName', 'out');
 end
 
 % Les solveurs écrits ici. Simulink en a deux autres, odeN et daessc :
@@ -190,8 +204,30 @@ function v = valider(nom, v)
             v = connus{trouve};
         case 'SolverType'
             v = choix(nom, v, {'Fixed-step', 'Variable-step'});
-        case 'LoadExternalInput'
+        case {'LoadExternalInput', 'ReturnWorkspaceOutputs'}
             v = choix(nom, v, {'off', 'on'});
+        case 'SimulationMode'
+            v = choix(nom, v, {'normal', 'accelerator', 'rapid-accelerator', ...
+                               'software-in-the-loop (sil)', ...
+                               'processor-in-the-loop (pil)', 'external'});
+        case 'ReturnWorkspaceOutputsName'
+            v = char(v);
+            if ~isvarname(v)
+                error('Simulink:Config:InvalidValue', ...
+                      'ReturnWorkspaceOutputsName est un nom de variable ; pas ''%s''.', v);
+            end
+        case {'PreLoadFcn', 'PostLoadFcn', 'InitFcn', 'StartFcn', 'StopFcn', ...
+              'PreSaveFcn', 'PostSaveFcn', 'CloseFcn'}
+            if iscellstr(v)
+                v = strjoin(v, char(10));
+            end
+            if isstring(v)
+                v = char(v);
+            end
+            if ~ischar(v)
+                error('Simulink:Config:InvalidValue', ...
+                      'Le rappel %s est du code MATLAB, en texte.', nom);
+            end
         case 'ExternalInput'
             if ~(ischar(v) || isstring(v) || isnumeric(v) || isstruct(v))
                 error('Simulink:Config:InvalidValue', ...

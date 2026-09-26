@@ -787,9 +787,16 @@ function ecrire(modele, fichier)
               '<ModelInformation Version="1.0">', ...
               sprintf('  <Model Name="%s">', matlibre_xml_echapper(modele.nom))};
     config = matlibre_sl_config('lire', modele);
-    for nom = {'StartTime', 'StopTime', 'SolverType', 'Solver', 'FixedStep', 'RelTol', ...
-               'AbsTol', 'MaxStep', 'MinStep', 'InitialStep', 'ZeroCrossControl', ...
-               'AlgebraicLoopMsg'}
+    toujours = {'StartTime', 'StopTime', 'SolverType', 'Solver', 'FixedStep', 'RelTol', ...
+                'AbsTol', 'MaxStep', 'MinStep', 'InitialStep', 'ZeroCrossControl', ...
+                'AlgebraicLoopMsg'};
+    % Les autres réglages — rappels, entrées externes, options d'un
+    % solveur — s'écrivent quand ils ne valent pas leur défaut.
+    defauts = matlibre_sl_config('defauts');
+    for nom = fieldnames(config).'
+        if ~any(strcmp(nom{1}, toujours)) && isequal(config.(nom{1}), defauts.(nom{1}))
+            continue
+        end
         lignes{end + 1} = sprintf('    <P Name="%s">%s</P>', nom{1}, ...
                                   matlibre_xml_echapper(texteValeur(config.(nom{1})))); %#ok<AGROW>
     end
