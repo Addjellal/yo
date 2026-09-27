@@ -4707,6 +4707,169 @@ assert(nJournalises > 300, 'la batterie journalise la plupart des blocs');
 fprintf('batterie du journal par parsim : %d simulations journalisees, %d refus nommes\n', ...
         nJournalises, nRefuses);
 
+%% ------------------------------------------- 36. Variantes : sous-systèmes et signaux
+% Un sous-système à variantes porte plusieurs variantes, chacune avec sa
+% condition VariantControl ; seule celle dont la condition est vraie au
+% moment de simuler calcule. Variant Source et Variant Sink font de même
+% pour un signal. Un Simulink.Variant range une condition sous un nom.
+doubleur = new_system('doubleur');
+doubleur = add_block(doubleur, 'inport', 'u');
+doubleur = add_block(doubleur, 'gain', 'k', 'Gain', 2);
+doubleur = add_block(doubleur, 'outport', 'y');
+doubleur = add_line(add_line(doubleur, 'u', 'k'), 'k', 'y');
+tripleur = set_param(doubleur, 'k', 'Gain', 3);
+choix = new_system('choix');
+choix = add_block(choix, 'inport', 'u');
+choix = add_block(choix, 'outport', 'y');
+choix = add_block(choix, 'subsystem', 'Double', 'Model', doubleur, 'VariantControl', 'Mode == 1');
+choix = add_block(choix, 'subsystem', 'Triple', 'Model', tripleur, 'VariantControl', 'Mode == 2');
+va = new_system('variantes');
+va = add_block(va, 'constant', 'c', 'Value', 5);
+va = add_block(va, 'subsystem', 'V', 'Model', choix, 'Variant', 'on');
+va = add_block(va, 'outport', 'y');
+va = add_line(add_line(va, 'c', 'V'), 'V', 'y');
+Mode = 1;
+r = sim(va, 1);
+assert(r.yout(end) == 10, 'la variante active : Mode == 1');
+Mode = 2;
+r = sim(va, 1);
+assert(r.yout(end) == 15, 'l''autre variante, sans toucher au modele');
+Mode = 3;
+r = sim(set_param(va, 'V/Triple', 'VariantControl', '(default)'), 1);
+assert(r.yout(end) == 15, 'la variante par defaut quand aucune condition n''est vraie');
+r = sim(set_param(va, 'V', 'AllowZeroVariantControls', 'on'), 1);
+assert(r.yout(end) == 0, 'AllowZeroVariantControls : sans variante active, zero');
+Moteur = Simulink.Variant('Mode == 3');
+assert(strcmp(Moteur.Condition, 'Mode == 3'), 'un Simulink.Variant range sa condition');
+r = sim(set_param(va, 'V/Triple', 'VariantControl', 'Moteur'), 1);
+assert(r.yout(end) == 15, 'une condition donnee par un Simulink.Variant');
+etiquettes = set_param(va, 'V', 'VariantControlMode', 'label', 'LabelModeActiveChoice', 'rapide');
+etiquettes = set_param(etiquettes, 'V/Double', 'VariantControl', 'lent');
+etiquettes = set_param(etiquettes, 'V/Triple', 'VariantControl', 'rapide');
+r = sim(etiquettes, 1);
+assert(r.yout(end) == 15, 'le mode label : l''etiquette active');
+ModeP = Simulink.Parameter(2);
+r = sim(set_param(set_param(va, 'V/Double', 'VariantControl', 'ModeP == 1'), 'V/Triple', ...
+                  'VariantControl', 'ModeP == 2'), 1);
+assert(r.yout(end) == 15, 'une condition qui lit un Simulink.Parameter');
+
+% Une variante qui n'a pas toutes les sorties : celle qui manque vaut zéro.
+deuxSorties = add_block(choix, 'outport', 'z');
+deuxSorties = set_param(deuxSorties, 'Triple', 'Model', ...
+                        add_line(add_block(tripleur, 'outport', 'z'), 'k', 'z'));
+vb = add_block(va, 'outport', 'y2');
+vb = set_param(vb, 'V', 'Model', deuxSorties);
+vb = add_line(vb, 'V/2', 'y2');
+Mode = 1;
+r = sim(vb, 1);
+assert(isequal(r.yout(end, :), [10 0]), 'la sortie que la variante n''a pas vaut zero');
+Mode = 2;
+r = sim(vb, 1);
+assert(isequal(r.yout(end, :), [15 15]), 'et celle qui l''a la rend');
+
+% Les variantes par SimulationInput : un balayage de Mode par parsim.
+balayage(1:2) = Simulink.SimulationInput(va);
+balayage(1) = balayage(1).setVariable('Mode', 1);
+balayage(2) = balayage(2).setVariable('Mode', 2);
+sortiesVariantes = parsim(balayage, 'ShowProgress', 'off');
+assert(sortiesVariantes(1).yout(end) == 10 && sortiesVariantes(2).yout(end) == 15, ...
+       'parsim balaie les variantes');
+
+% Variant Source et Variant Sink.
+vsrc = new_system('sourceVariante');
+vsrc = add_block(vsrc, 'constant', 'a', 'Value', 10);
+vsrc = add_block(vsrc, 'constant', 'b', 'Value', 20);
+vsrc = add_block(vsrc, 'variantsource', 'vs', 'VariantControls', {'Mode == 1', 'Mode == 3'});
+vsrc = add_block(vsrc, 'outport', 'y');
+vsrc = add_line(add_line(vsrc, 'a', 'vs', 1), 'b', 'vs', 2);
+vsrc = add_line(vsrc, 'vs', 'y');
+assert(isequal(get_param(vsrc, 'vs', 'Ports'), [2 1 0 0 0 0 0 0]), ...
+       'un Variant Source : une entree par condition');
+Mode = 3;
+r = sim(vsrc, 1);
+assert(r.yout(end) == 20, 'Variant Source : la deuxieme entree');
+Mode = 1;
+r = sim(vsrc, 1);
+assert(r.yout(end) == 10, 'Variant Source : la premiere');
+vsnk = new_system('puitsVariante');
+vsnk = add_block(vsnk, 'constant', 'a', 'Value', 7);
+vsnk = add_block(vsnk, 'variantsink', 'vk', 'VariantControls', {'Mode == 1', 'Mode == 2'});
+vsnk = add_block(vsnk, 'outport', 'y1');
+vsnk = add_block(vsnk, 'outport', 'y2');
+vsnk = add_line(add_line(vsnk, 'a', 'vk'), 'vk/1', 'y1');
+vsnk = add_line(vsnk, 'vk/2', 'y2');
+Mode = 2;
+r = sim(vsnk, 1);
+assert(isequal(r.yout(end, :), [0 7]), 'Variant Sink : la sortie active recoit, l''autre vaut zero');
+
+% Les variantes passent par les fichiers : le .m et le .slx.
+dossierVariantes = tempname();
+mkdir(dossierVariantes);
+fichierM = save_system(va, fullfile(dossierVariantes, 'variantesM.m'));
+Mode = 2;
+r = sim(load_system(fichierM), 1);
+assert(r.yout(end) == 15, 'le .m reprend les variantes');
+save_system(va, fullfile(dossierVariantes, 'variantesX.slx'));
+relu = load_system(fullfile(dossierVariantes, 'variantesX.slx'));
+Mode = 1;
+r = sim(relu, 1);
+assert(r.yout(end) == 10, 'le .slx aussi');
+save_system(vsrc, fullfile(dossierVariantes, 'sourceX.slx'));
+reluSource = load_system(fullfile(dossierVariantes, 'sourceX.slx'));
+Mode = 3;
+r = sim(reluSource, 1);
+assert(r.yout(end) == 20 && isequal(get_param(reluSource, 'vs', 'Ports'), [2 1 0 0 0 0 0 0]), ...
+       'un Variant Source relu garde ses conditions');
+rmdir(dossierVariantes, 's');
+
+intrus = add_block(choix, 'gain', 'g');
+mauvaisPort = set_param(choix, 'Double', 'Model', ...
+                        add_block(doubleur, 'inport', 'autre', 'Port', 2));
+Mode = 1;
+casErreurs = {
+    @() sim(set_param(va, 'V/Triple', 'VariantControl', 'Mode >= 1'), 1), ...
+        'Simulink:Variants:MultipleActiveVariants', 'variantes/V/Triple'
+    @() sim(set_param(set_param(va, 'V/Double', 'VariantControl', 'Mode == 7'), 'V/Triple', ...
+                      'VariantControl', 'Mode == 8'), 1), 'Simulink:Variants:NoActiveVariant', ...
+        'variantes/V'
+    @() sim(set_param(va, 'V/Double', 'VariantControl', 'ModeInconnu == 1'), 1), ...
+        'Simulink:Variants:InvalidVariantControl', 'ModeInconnu'
+    @() sim(set_param(va, 'V/Double', 'VariantControl', '[1 1]'), 1), ...
+        'Simulink:Variants:InvalidVariantControl', '2 valeurs'
+    @() sim(set_param(va, 'V', 'VariantControlMode', 'label'), 1), ...
+        'Simulink:Variants:NoActiveLabel', 'LabelModeActiveChoice'
+    @() sim(set_param(va, 'V', 'VariantControlMode', 'label', 'LabelModeActiveChoice', 'x'), 1), ...
+        'Simulink:Variants:InvalidLabel', '''x'''
+    @() sim(set_param(set_param(va, 'V/Double', 'VariantControl', '(default)'), 'V/Triple', ...
+                      'VariantControl', '(default)'), 1), 'Simulink:Variants:MultipleDefaults', ...
+        'par defaut'
+    @() sim(set_param(va, 'V', 'Model', intrus), 1), ...
+        'Simulink:Variants:InvalidBlockInVariant', '''g'''
+    @() sim(set_param(va, 'V', 'Model', new_system('vide')), 1), ...
+        'Simulink:Variants:NoVariantChoices', 'variantes/V'
+    @() sim(set_param(va, 'V', 'Model', mauvaisPort), 1), 'Simulink:Variants:PortMismatch', ...
+        'autre'
+    @() Simulink.Variant(3), 'Simulink:Variants:InvalidCondition', 'texte'
+    @() sim(set_param(vsrc, 'vs', 'VariantControls', {'Mode == 1', 'Mode == 1'}), 1), ...
+        'Simulink:Variants:MultipleActiveVariants', 'sourceVariante/vs'
+    };
+for kE = 1:size(casErreurs, 1)
+    Mode = 1;
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('variantes, cas %d : %s attendu, %s rendu (%s)', kE, casErreurs{kE, 2}, ...
+                   vu, message));
+end
+clear Mode ModeP Moteur
+fprintf('variantes : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

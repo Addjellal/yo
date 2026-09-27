@@ -416,11 +416,133 @@ function interne = contenu(bloc, chemin)
                   ['Le sous-systeme ''%s'' porte, dans son parametre Model, ce qui ' ...
                    'n''est pas un modele : %s'], chemin, err.message);
         end
+        if strcmpi(char(lireParametre(bloc.parametres, 'Variant', 'off')), 'on')
+            interne = choisirVariante(interne, bloc.parametres, chemin);
+        end
     else
         error('Simulink:Commands:SousSystemeVide', ...
               ['Le sous-systeme ''%s'' ne porte pas de modele : donnez-le ' ...
                'par ADD_BLOCK(...,''subsystem'',NOM,''Model'',SOUSMODELE).'], ...
               chemin);
+    end
+end
+
+% Un sous-système à variantes porte ses variantes — des sous-systèmes ou
+% des références de modèle, chacun sa condition VariantControl — entre
+% ses Inport et ses Outport, sans lien. Seule la variante active reste :
+% ses entrées et ses sorties se raccordent, par leur nom, aux ports du
+% sous-système ; une sortie qu'elle n'a pas vaut zéro. Sans variante
+% active et avec AllowZeroVariantControls à 'on', toutes les sorties
+% valent zéro.
+function nouveau = choisirVariante(interne, p, chemin)
+    types = cellfun(@(b) typeCanonique(b.type), interne.blocs, 'UniformOutput', false);
+    choix = find(ismember(types, {'subsystem', 'modelreference'}));
+    autres = find(~ismember(types, {'subsystem', 'modelreference', 'inport', 'outport'}));
+    if ~isempty(autres)
+        error('Simulink:Variants:InvalidBlockInVariant', ...
+              ['Le sous-systeme a variantes ''%s'' ne porte que ses ports et ses ' ...
+               'variantes ; ''%s'' (%s) n''y a pas sa place.'], chemin, ...
+              char(interne.blocs{autres(1)}.nom), types{autres(1)});
+    end
+    if isempty(choix)
+        error('Simulink:Variants:NoVariantChoices', ...
+              ['Le sous-systeme a variantes ''%s'' n''a pas de variante : posez-y des ' ...
+               'sous-systemes, chacun avec sa condition VariantControl.'], chemin);
+    end
+    controles = cell(1, numel(choix));
+    noms = cell(1, numel(choix));
+    for i = 1:numel(choix)
+        b = interne.blocs{choix(i)};
+        controles{i} = char(lireParametre(b.parametres, 'VariantControl', ''));
+        noms{i} = [chemin '/' char(b.nom)];
+    end
+    k = matlibre_sl_variantes('choisir', controles, ...
+                              char(lireParametre(p, 'VariantControlMode', 'expression')), ...
+                              char(lireParametre(p, 'LabelModeActiveChoice', '')), ...
+                              strcmpi(char(lireParametre(p, 'AllowZeroVariantControls', ...
+                                                         'off')), 'on'), chemin, noms);
+    nouveau = interne;
+    nouveau.blocs = {};
+    nouveau.liens = zeros(0, 4);
+    entrees = find(strcmp(types, 'inport'));
+    sorties = find(strcmp(types, 'outport'));
+    for j = [entrees, sorties]
+        nouveau.blocs{end + 1} = interne.blocs{j};
+    end
+    rangEntree = 1:numel(entrees);
+    rangSortie = numel(entrees) + (1:numel(sorties));
+    actif = 0;
+    nomsChoix = {};
+    if k > 0
+        variante = interne.blocs{choix(k)};
+        nouveau.blocs{end + 1} = variante;
+        actif = numel(nouveau.blocs);
+        dedans = contenu(variante, noms{k});
+        [nomsE, portsE] = portsNommes(dedans, 'inport');
+        [nomsS, portsS] = portsNommes(dedans, 'outport');
+        nomsChoix = nomsS;
+        for i = 1:numel(nomsE)
+            j = find(cellfun(@(b) strcmp(char(b.nom), nomsE{i}), interne.blocs(entrees)), 1);
+            if isempty(j)
+                error('Simulink:Variants:PortMismatch', ...
+                      ['La variante ''%s'' a une entree ''%s'' que le sous-systeme a ' ...
+                       'variantes ''%s'' n''a pas : ses ports se raccordent par leur ' ...
+                       'nom.'], noms{k}, nomsE{i}, chemin);
+            end
+            nouveau.liens(end + 1, :) = [rangEntree(j), actif, portsE(i), 1];
+        end
+        for i = 1:numel(nomsS)
+            if ~any(cellfun(@(b) strcmp(char(b.nom), nomsS{i}), interne.blocs(sorties)))
+                error('Simulink:Variants:PortMismatch', ...
+                      ['La variante ''%s'' a une sortie ''%s'' que le sous-systeme a ' ...
+                       'variantes ''%s'' n''a pas : ses ports se raccordent par leur ' ...
+                       'nom.'], noms{k}, nomsS{i}, chemin);
+            end
+        end
+    end
+    for j = 1:numel(sorties)
+        nomSortie = char(interne.blocs{sorties(j)}.nom);
+        i = find(strcmp(nomsChoix, nomSortie), 1);
+        if ~isempty(i)
+            nouveau.liens(end + 1, :) = [actif, rangSortie(j), 1, portsS(i)];
+        else
+            % une sortie que la variante active n'a pas : zéro
+            nouveau.blocs{end + 1} = struct('type', 'ground', ...
+                                            'nom', sprintf('%s (zero)', nomSortie), ...
+                                            'parametres', struct());
+            nouveau.liens(end + 1, :) = [numel(nouveau.blocs), rangSortie(j), 1, 1];
+        end
+    end
+end
+
+% Les Inport — ou les Outport — d'un modèle : leurs noms et leurs rangs.
+function [noms, rangs] = portsNommes(modele, type)
+    noms = {};
+    rangs = [];
+    for i = 1:numel(modele.blocs)
+        b = modele.blocs{i};
+        if ~strcmp(typeCanonique(b.type), type)
+            continue
+        end
+        noms{end + 1} = char(b.nom); %#ok<AGROW>
+        rangs(end + 1) = double(lireParametre(b.parametres, 'Port', numel(rangs) + 1)); %#ok<AGROW>
+    end
+    % le rang du port est sa place parmi les autres, comme au dépliage
+    [~, ordre] = sort(rangs);
+    rangs(ordre) = 1:numel(rangs);
+end
+
+function v = lireParametre(p, nom, defaut)
+    v = defaut;
+    champs = fieldnames(p);
+    for k = 1:numel(champs)
+        if strcmpi(champs{k}, nom)
+            v = p.(champs{k});
+            if ischar(v) && any(strcmpi(nom, {'Port'}))
+                v = str2double(v);
+            end
+            return
+        end
     end
 end
 

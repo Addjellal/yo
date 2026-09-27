@@ -175,7 +175,9 @@ totalité.
    `Simulink.SimulationInput` décrit une simulation — variables,
    paramètres de blocs, réglages, état initial — que `sim` ou `parsim`
    font sans toucher au modèle. Les signaux se nomment et se journalisent
-   par les poignées des ports, et `sim` les range dans `logsout`.
+   par les poignées des ports, et `sim` les range dans `logsout`. Les
+   sous-systèmes à variantes, Variant Source et Variant Sink ne font
+   calculer que la variante dont la condition est vraie.
    Manquent : les types à virgule fixe, les signaux de taille variable et
    Simscape.
    Stateflow a ses états emboîtés, ses régions parallèles, son

@@ -99,6 +99,10 @@ function modele = add_block(modele, type, nom, varargin)
 %     ratetransition OutPortSampleTime, X0, Deterministic — tenue vers une
 %                  période plus lente, retard d'une période lente vers une
 %                  plus rapide
+%     variantsource VariantControls ({'V == 1', 'V == 2'}), VariantControlMode,
+%                  LabelModeActiveChoice, AllowZeroVariantControls — une
+%                  entrée par condition, seule l'active passe ;
+%                  variantsink de même, une sortie par condition
 %     ic           Value                        au premier instant, puis l'entrée
 %     width        —                            le nombre d'éléments de l'entrée
 %
@@ -171,7 +175,17 @@ function modele = add_block(modele, type, nom, varargin)
 %                  Subsystem', 'For Iterator Subsystem' et 'While Iterator
 %                  Subsystem' en donnent un qui porte déjà In1, Out1 et
 %                  son port de contrôle ou son itérateur, comme dans la
-%                  bibliothèque de Simulink
+%                  bibliothèque de Simulink. Variant ('on') en fait un
+%                  sous-système à variantes : ses variantes, des
+%                  sous-systèmes posés dedans sans lien, portent chacune
+%                  sa condition VariantControl — 'Mode == 1', le nom
+%                  d'un Simulink.Variant, '(default)' —, et seule celle
+%                  dont la condition est vraie calcule ; ses ports se
+%                  raccordent par leur nom. VariantControlMode ('label')
+%                  et LabelModeActiveChoice la choisissent par étiquette,
+%                  AllowZeroVariantControls ('on') admet qu'aucune ne
+%                  le soit. 'Variant Subsystem' en donne un garni de deux
+%                  variantes, V == 1 et V == 2
 %     enableport   StatesWhenEnabling (held, reset)    posé dedans : il ne
 %                  calcule que quand ce port reçoit un signal positif
 %     triggerport  TriggerType (rising, falling, either, function-call)
@@ -288,6 +302,12 @@ function modele = add_block(modele, type, nom, varargin)
             reglages(end + 1:end + 2) = {'Model', gabarit};
         end
     end
+    % Un « Variant Subsystem » de la bibliothèque est un sous-système à
+    % variantes : Variant vaut 'on'.
+    if strcmp(entree.type, 'subsystem') && estVariante(type) && ...
+       ~any(strcmpi(reglages(1:2:end), 'Variant'))
+        reglages(end + 1:end + 2) = {'Variant', 'on'};
+    end
     if existe(modele, nom)
         if ~unique
             error('Simulink:Commands:AddBlockCantAdd', ...
@@ -348,6 +368,21 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
             controles = {'foriterator', 'For Iterator'};
         case 'whileiteratorsubsystem'
             controles = {'whileiterator', 'While Iterator'};
+        case 'variantsubsystem'
+            % deux variantes qui laissent passer leur entrée, V == 1 et
+            % V == 2, entre In1 et Out1 — sans lien, comme dans Simulink
+            gabarit = new_system(regexprep(nom, '[^A-Za-z0-9_]', '_'));
+            gabarit = add_block(gabarit, 'inport', 'In1', 'Port', 1);
+            gabarit = add_block(gabarit, 'outport', 'Out1', 'Port', 1);
+            variante = new_system('Variante');
+            variante = add_block(variante, 'inport', 'In1', 'Port', 1);
+            variante = add_block(variante, 'outport', 'Out1', 'Port', 1);
+            variante = add_line(variante, 'In1', 'Out1');
+            gabarit = add_block(gabarit, 'subsystem', 'Choix1', 'Model', variante, ...
+                                'VariantControl', 'V == 1');
+            gabarit = add_block(gabarit, 'subsystem', 'Choix2', 'Model', variante, ...
+                                'VariantControl', 'V == 2');
+            return
         otherwise
             return
     end
@@ -361,6 +396,19 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
     if strcmp(cle, 'function-callsubsystem')
         gabarit = set_param(gabarit, 'function', 'TriggerType', 'function-call');
     end
+end
+
+function oui = estVariante(designation)
+    oui = false;
+    if isstruct(designation)
+        return
+    end
+    texte = char(designation);
+    barre = find(texte == '/', 1, 'last');
+    if ~isempty(barre)
+        texte = texte(barre + 1:end);
+    end
+    oui = strcmp(lower(regexprep(texte, '\s', '')), 'variantsubsystem');
 end
 
 % Un bloc désigné par « modele/bloc », quand MODELE est une bibliothèque

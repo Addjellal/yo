@@ -74,6 +74,7 @@ function c = compiler(modele, options)
     nomModele = char(modele.nom);
     modele = matlibre_sl_aplatir(modele);
     modele = memoiresGlobales(modele);
+    modele = variantesDeSignal(modele, nomModele);
     n = numel(modele.blocs);
 
     c = struct();
@@ -702,6 +703,88 @@ function modele = memoiresGlobales(modele)
         noms{end + 1} = bloc; %#ok<AGROW>
         modele = add_block(modele, 'datastorememory', bloc, 'DataStoreName', nom{1}, ...
                            'InitialValue', double(valeur));
+    end
+end
+
+% Un Variant Source ne laisse passer que son entrée active, un Variant
+% Sink n'envoie son entrée qu'à sa sortie active : ils deviennent un
+% simple passage, et leurs autres liens sont retirés — une sortie
+% inactive d'un Variant Sink vaut zéro. Sans variante active et avec
+% AllowZeroVariantControls à 'on', rien ne passe.
+function modele = variantesDeSignal(modele, nomModele)
+    nBlocs = numel(modele.blocs);
+    for k = 1:nBlocs
+        bloc = modele.blocs{k};
+        try
+            entree = matlibre_sl_catalogue('type', bloc.type);
+        catch
+            continue
+        end
+        if ~any(strcmp(entree.type, {'variantsource', 'variantsink'}))
+            continue
+        end
+        chemin = [nomModele '/' char(bloc.nom)];
+        p = bloc.parametres;
+        controles = matlibre_sl_variantes('liste', lireReglage(p, 'VariantControls', ...
+                                                               {'V == 1', 'V == 2'}));
+        source = strcmp(entree.type, 'variantsource');
+        if source
+            noms = arrayfun(@(i) sprintf('%s, entree %d', chemin, i), 1:numel(controles), ...
+                            'UniformOutput', false);
+        else
+            noms = arrayfun(@(i) sprintf('%s, sortie %d', chemin, i), 1:numel(controles), ...
+                            'UniformOutput', false);
+        end
+        actif = matlibre_sl_variantes('choisir', controles, ...
+                    char(lireReglage(p, 'VariantControlMode', 'expression')), ...
+                    char(lireReglage(p, 'LabelModeActiveChoice', '')), ...
+                    strcmpi(char(lireReglage(p, 'AllowZeroVariantControls', 'off')), 'on'), ...
+                    chemin, noms);
+        liens = matlibre_sl_liens(modele);
+        passage = bloc;
+        passage.parametres = struct();
+        if source
+            % l'entrée active arrive sur le port 1 ; les autres liens partent
+            arrivee = find(liens(:, 2) == k);
+            garder = arrivee(liens(arrivee, 3) == actif);
+            liens(garder, 3) = 1;
+            liens(setdiff(arrivee, garder), :) = [];
+            if actif == 0
+                passage.type = 'ground';
+            else
+                passage.type = 'signalconversion';
+            end
+        else
+            depart = find(liens(:, 1) == k);
+            if actif == 0
+                passage.type = 'terminator';
+            else
+                passage.type = 'signalconversion';
+            end
+            inactifs = depart(liens(depart, 4) ~= actif);
+            liens(depart(liens(depart, 4) == actif), 4) = 1;
+            if ~isempty(inactifs)
+                masse = bloc;
+                masse.type = 'ground';
+                masse.nom = sprintf('%s (zero)', char(bloc.nom));
+                masse.parametres = struct();
+                modele.blocs{end + 1} = masse;
+                liens(inactifs, 1) = numel(modele.blocs);
+                liens(inactifs, 4) = 1;
+            end
+        end
+        modele.blocs{k} = passage;
+        modele.liens = liens;
+    end
+end
+
+function v = lireReglage(p, nom, defaut)
+    v = defaut;
+    for champ = fieldnames(p).'
+        if strcmpi(champ{1}, nom)
+            v = p.(champ{1});
+            return
+        end
     end
 end
 

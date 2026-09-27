@@ -40,6 +40,10 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 0;
         case {'saturationdynamic', 'deadzonedynamic'}
             nEntrees = 3;   % up, u, lo
+        case 'variantsource'
+            nEntrees = numel(matlibre_sl_variantes('liste', lire(p, 'VariantControls', {1, 2})));
+        case 'variantsink'
+            nSorties = numel(matlibre_sl_variantes('liste', lire(p, 'VariantControls', {1, 2})));
         case 'manualswitch'
             nEntrees = 2;
         case 'datastorememory'

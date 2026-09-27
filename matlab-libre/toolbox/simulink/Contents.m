@@ -100,10 +100,18 @@
 %   Simulink.SimulationInput  - Variables, paramètres de blocs et réglages
 %                               le temps d'une simulation ; SIM et PARSIM
 %                               le simulent
+%   Simulink.Variant          - Une condition nommée, qui active une
+%                               variante
 %   Simulink.Bus, Simulink.BusElement - Les types de bus
 %   Simulink.SimulationData.Dataset   - Le journal des sorties, en
 %                               SaveFormat 'Dataset', et celui des signaux,
 %                               logsout
+%
+% Variantes
+%   Un sous-système dont Variant vaut 'on' porte ses variantes — des
+%   sous-systèmes, chacun avec sa condition VariantControl — et seule
+%   l'active calcule ; Variant Source et Variant Sink font de même pour un
+%   signal.
 %
 % Signaux et journal
 %   GET_PARAM(M,BLOC,'PortHandles') rend les poignées des ports d'un bloc ;
