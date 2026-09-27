@@ -261,8 +261,39 @@ static std::string rendreCellule(const Valeur& v, int format, bool compact, int 
     return sortie;
 }
 
+// Une énumération : ses membres, par leur nom, rangés comme le tableau.
+static std::string rendreEnumeration(const Valeur& v) {
+    std::vector<std::string> noms;
+    for (std::size_t k = 0; k < v.nelem(); ++k)
+        noms.push_back(v.champ(Interpreteur::champMembre, k).versTexte());
+    if (noms.size() == 1) return "  " + v.nomObjet + " enumeration\n\n    " + noms[0] + "\n";
+    std::string sortie = formater("  %s %s enumeration array\n", texteDims(v.dims).c_str(),
+                                  v.nomObjet.c_str());
+    if (noms.empty()) return sortie;
+    sortie += "\n";
+    std::size_t large = 0;
+    for (const auto& n : noms) large = std::max(large, n.size());
+    int l = v.nlignes(), c = (int)(noms.size() / std::max(1, l));
+    for (int i = 0; i < l; ++i) {
+        std::string ligne = "   ";
+        for (int j = 0; j < c; ++j) {
+            const std::string& n = noms[(std::size_t)(i + j * l)];
+            ligne += " " + n;
+            if (j + 1 < c) ligne += std::string(large - n.size() + 3, ' ');
+        }
+        sortie += ligne + "\n";
+    }
+    return sortie;
+}
+
+static bool estMembre(const Valeur& v) {
+    return v.classe == Classe::Objet && v.st &&
+           v.st->champs.count(Interpreteur::champMembre) > 0;
+}
+
 static std::string rendreStructure(const Valeur& v, int format, bool compact, int largeur) {
     verifierInterruption();
+    if (estMembre(v)) return rendreEnumeration(v);
     std::string sortie;
     if (v.nelem() != 1) {
         sortie += formater("  %s struct array with fields:\n\n", texteDims(v.dims).c_str());
@@ -280,6 +311,8 @@ static std::string rendreStructure(const Valeur& v, int format, bool compact, in
             sortie += entete + "'" + e.versTexte() + "'\n";
         } else if (e.estChaine() && e.estScalaire()) {
             sortie += entete + "\"" + (e.chaines.empty() ? "" : e.chaines[0]) + "\"\n";
+        } else if (estMembre(e) && e.nelem() == 1) {
+            sortie += entete + e.champ(Interpreteur::champMembre).versTexte() + "\n";
         } else if (e.estVide()) {
             sortie += entete + "[]\n";
         } else if (e.classe == Classe::Fonction) {

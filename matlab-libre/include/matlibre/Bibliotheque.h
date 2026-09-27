@@ -69,6 +69,8 @@ bool optionOmettreNaN(std::vector<Valeur>& args);
 std::vector<double> sansNaN(const std::vector<double>& t);
 Valeur aplatirColonne(const Valeur& v);
 Classe classeDepuisNom(const std::string& nom, bool* trouve = nullptr);
+// Une valeur convertie dans une classe, comme par int32(v), char(v)...
+Valeur convertirValeurVers(const Valeur& v, Classe c);
 
 // Réductions le long d'une dimension (sum, prod, max, cumsum…).
 // Refuse une dimension negative : « all(1,-1) » indexait avant le

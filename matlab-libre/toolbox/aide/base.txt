@@ -792,23 +792,39 @@ EVENTS  Événements déclarés par une classe.
     Voir aussi METHODS, PROPERTIES, ENUMERATION, METACLASS.
 
 ### enumeration
-ENUMERATION  Membres énumérés d'une classe.
-    C = ENUMERATION(X) rend, dans une cellule, le nom de chaque membre
-    déclaré dans le bloc « enumeration » de la classe de X.
-    ENUMERATION('nom') accepte aussi le nom de la classe.
+ENUMERATION  Membres d'une énumération.
+    M = ENUMERATION(X) rend les membres de l'énumération de X, une colonne
+    d'objets de sa classe, dans l'ordre du bloc « enumeration » ;
+    ENUMERATION('Nom') accepte aussi le nom de la classe. [M, S] =
+    ENUMERATION(...) rend en plus leurs noms, dans une cellule. Sans
+    sortie, la liste s'affiche.
 
-    Seuls les noms sont rendus : les membres ne sont pas encore des
-    valeurs qu'on peut manipuler, et l'annoncer vaut mieux que de le
-    laisser découvrir.
+    Une classe qui n'est pas une énumération n'a pas de membres : M est
+    vide.
 
     Syntaxe
-       c = enumeration(x)
-       c = enumeration('nom')
+       m = enumeration(x)
+       [m, s] = enumeration('Nom')
+       enumeration Nom
 
     Exemples
        isempty(enumeration('double'))       % 1 : rien d'enumere
 
-    Voir aussi METHODS, EVENTS, PROPERTIES, METACLASS.
+    Voir aussi ISENUM, METHODS, EVENTS, PROPERTIES, METACLASS.
+
+### isenum
+ISENUM  Vrai pour un membre d'énumération.
+    TF = ISENUM(X) vaut vrai si X est un membre, ou un tableau de membres,
+    d'une énumération — Jour.Mardi pour une classe dont le bloc
+    « enumeration » déclare Mardi —, faux pour tout le reste.
+
+    Syntaxe
+       tf = isenum(x)
+
+    Exemples
+       isenum(3)                            % 0 : un nombre n'est pas un membre
+
+    Voir aussi ENUMERATION, ISOBJECT.
 
 ### metaclass
 METACLASS  Description d'une classe.

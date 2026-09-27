@@ -850,19 +850,28 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
         } else if (motDeClasse("enumeration")) {
             avancer();
             sauterSeparateurs();
-            // Le bloc etait saute en entier : ses membres se lisaient et
-            // rien n'en restait, si bien qu'« enumeration(Classe) »
-            // n'avait rien a rendre. On garde au moins leurs noms.
-            bool debutDeMembre = true;
+            // Chaque membre : son nom, puis, entre parentheses, ce qu'il
+            // passe au constructeur — la valeur d'une enumeration entiere,
+            // « Mardi (2) », ou les proprietes d'une autre. Les membres se
+            // separent par des virgules, des points-virgules ou des lignes.
             while (!fini() && !motFin()) {
-                if (debutDeMembre && jeton().genre == Genre::Ident)
+                if (jeton().genre == Genre::Ident) {
                     c->enumerations.push_back(jeton().texte);
-                // Un membre peut porter des arguments — « Rouge(1) » — :
-                // seul le nom en tete de ligne compte.
-                debutDeMembre = jeton().genre == Genre::NouvelleLigne ||
-                                jeton().estOp(",") || jeton().estOp(";");
-                avancer();
-                if (jeton().genre == Genre::NouvelleLigne) debutDeMembre = true;
+                    avancer();
+                    std::vector<NoeudPtr> args;
+                    if (jeton().estOp("(")) {
+                        avancer();
+                        args = listeArguments(")");
+                    }
+                    c->argumentsEnumeration.push_back(std::move(args));
+                } else {
+                    avancer();
+                }
+                sauterSeparateurs();
+                while (jeton().estOp(",")) {
+                    avancer();
+                    sauterSeparateurs();
+                }
             }
             exigerMotFin();
         } else {

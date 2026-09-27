@@ -879,6 +879,18 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
         if (itm != def->methodes.end()) return appelerUtilisateur(itm->second, args, nargout);
         break;  // le premier objet décide : pas de méthode, pas de dispatch
     }
+    // Une énumération : char, double, int32, isenum, ismember... la lisent
+    // par ses noms ou ses valeurs.
+    for (const auto& a : args) {
+        if (!estEnumeration(a)) continue;
+        std::vector<Valeur> resultat;
+        if (fonctionEnumeration(nom, args, resultat)) {
+            if ((int)resultat.size() > std::max(nargout, 1))
+                resultat.resize((std::size_t)std::max(nargout, 1));
+            return resultat;
+        }
+        break;
+    }
     if (!args.empty() && args[0].classe == Classe::Fonction) {
         for (std::size_t k = 1; k < args.size(); ++k) {
             if (args[k].classe != Classe::Objet) continue;
@@ -2059,6 +2071,13 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                                "At least one dimension must be zero for 'empty'.");
                     courant.push_back(valeurVideDeClasse(compose, d));
                     statique = true;
+                } else if (std::find(defPaquet->enumerations.begin(),
+                                     defPaquet->enumerations.end(),
+                                     membre) != defPaquet->enumerations.end()) {
+                    // « paquet.Couleur.Rouge » : un membre de l'énumération
+                    courant.push_back(membreEnumeration(defPaquet, membre));
+                    debut = segments + 1;
+                    statique = true;
                 } else if (defPaquet->aMethode(membre)) {
                     std::vector<Valeur> args;
                     debut = segments + 1;
@@ -2118,7 +2137,12 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
             // Méthode statique ou propriété constante d'une classe.
             auto def = classeDefinie(nom);
             const std::string& membre = n->acces[0].nom;
-            if (def->aMethode(membre)) {
+            if (std::find(def->enumerations.begin(), def->enumerations.end(), membre) !=
+                def->enumerations.end()) {
+                // « Jour.Mardi » : un membre de l'énumération
+                courant.push_back(membreEnumeration(def, membre));
+                debut = 1;
+            } else if (def->aMethode(membre)) {
                 std::vector<Valeur> args;
                 debut = 1;
                 if (n->acces.size() > 1 && n->acces[1].genre == '(') {
@@ -2381,6 +2405,8 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
                     std::vector<Valeur> args = {a, b};
                     return appelerUtilisateur(def->methodes[methode], args, 1);
                 }
+                if (estEnumeration(a) || estEnumeration(b))
+                    return {operationEnumeration(op, a, b)};
             }
             return {operationBinaire(op, a, b)};
         }
@@ -2394,6 +2420,8 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
                     std::vector<Valeur> args = {a};
                     return appelerUtilisateur(def->methodes[methode], args, 1);
                 }
+                if (estEnumeration(a))
+                    return {operationUnaire(n->texte, valeursEnumeration(a, methode.c_str()))};
             }
             return {operationUnaire(n->texte, a)};
         }

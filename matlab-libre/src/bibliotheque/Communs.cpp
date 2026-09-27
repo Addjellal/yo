@@ -237,6 +237,25 @@ Valeur construirePlage(const Valeur& debut, const Valeur& pas, const Valeur& fin
 }
 
 bool comparerCas(const Valeur& sujet, const Valeur& cas) {
+    // un membre d'énumération : son nom, face à un membre ou à un texte ;
+    // sa valeur, face à un nombre
+    auto membre = [](const Valeur& v) {
+        return v.classe == Classe::Objet && v.st &&
+               v.st->champs.count(Interpreteur::champMembre) > 0 && v.nelem() == 1;
+    };
+    if (membre(sujet) || membre(cas)) {
+        const Valeur& e = membre(sujet) ? sujet : cas;
+        const Valeur& autre = membre(sujet) ? cas : sujet;
+        const std::string nom = e.champ(Interpreteur::champMembre).versTexte();
+        if (membre(autre))
+            return autre.nomObjet == e.nomObjet &&
+                   autre.champ(Interpreteur::champMembre).versTexte() == nom;
+        if (autre.estTexte() || autre.estChaine()) return autre.versTexte() == nom;
+        if (e.aChamp(Interpreteur::champValeurEnum) && autre.estNumerique() &&
+            autre.nelem() == 1)
+            return e.champ(Interpreteur::champValeurEnum).scal() == autre.scal();
+        return false;
+    }
     if ((sujet.estTexte() || sujet.estChaine()) && (cas.estTexte() || cas.estChaine()))
         return sujet.versTexte() == cas.versTexte();
     if (sujet.estTexte() || sujet.estChaine() || cas.estTexte() || cas.estChaine()) return false;
@@ -378,6 +397,15 @@ std::string texteExpression(const NoeudPtr& n, int priorite) {
 
 Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>& def,
                        std::vector<Valeur>& args) {
+    // « Jour(2) », « Couleur('Rouge') » : une énumération ne se construit
+    // pas, elle convertit des valeurs ou des noms en ses membres
+    if (def->estEnumeration() && !it.enConstructionEnumeration) {
+        if (args.size() != 1)
+            erreur("MATLAB:class:EnumerationConstructor",
+                   "L'enumeration '" + def->nom + "' se convertit d'une valeur ou d'un nom : " +
+                       def->nom + "(2), " + def->nom + "('" + def->enumerations[0] + "').");
+        return it.convertirEnEnumeration(def, args[0]);
+    }
     // L'objet est d'abord bâti avec ses valeurs par défaut, puis le
     // constructeur — s'il y en a un — le reçoit déjà prêt dans sa variable
     // de sortie, comme le fait MATLAB : on y écrit « obj.champ = ... »

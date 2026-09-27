@@ -106,9 +106,12 @@ struct DefinitionClasse {
     std::vector<std::string> dependantes;   // propriétés calculées par get.
     std::vector<std::string> statiques;     // méthodes appelables sans objet
     std::vector<std::string> evenements;    // noms déclarés par « events »
-    // Noms déclarés par « enumeration ». Ils étaient analysés puis jetés :
-    // le bloc se lisait, et rien n'en restait.
+    // Noms déclarés par « enumeration », et les arguments de chacun —
+    // « Mardi(2) » : la valeur d'un membre d'une énumération entière, ou
+    // ce que reçoit le constructeur.
     std::vector<std::string> enumerations;
+    std::vector<std::vector<NoeudPtr>> argumentsEnumeration;
+    bool estEnumeration() const { return !enumerations.empty(); }
     // Les ancetres transitifs, parents des parents compris. « isa » les
     // consulte : un objet est de la classe de chacun d'eux.
     std::vector<std::string> ancetres;

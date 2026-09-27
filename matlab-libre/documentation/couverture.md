@@ -15,7 +15,7 @@ fichier est produit par mesure, non écrit à la main.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **681 fonctions natives** couvrant le MATLAB de base, **toutes**
+- **682 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
 - **3041 fonctions de toolbox** réparties en5 modules, écrites dans le
@@ -55,7 +55,7 @@ fichier est produit par mesure, non écrit à la main.
   exécute le C produit pour le comparer à l'interpréteur, une qui exécute
   les 664 exemples de l'aide — et 380 vérifications du bureau natif,
   pilotées sans ouvrir de fenêtre. `outils/eprouverNatives.sh` appelle en
-  plus chacune des 681 fonctions natives avec des arguments qu'elle
+  plus chacune des 682 fonctions natives avec des arguments qu'elle
   n'attend pas — une cellule, une structure, une poignée, une taille
   absurde, une dimension négative — et vérifie qu'elle rend une erreur au
   lieu de tomber.

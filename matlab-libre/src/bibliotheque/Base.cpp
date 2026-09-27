@@ -1281,6 +1281,8 @@ FONCTION(fnValidateattributes) {
 
 }  // namespace
 
+Valeur convertirValeurVers(const Valeur& v, Classe c) { return convertirVers(v, c); }
+
 void enregistrerBase(Interpreteur& it) {
     it.enregistrer("size", fnSize, "base",
                    "size  Taille d'un tableau.\n  d = size(A) rend le vecteur des "

@@ -60,7 +60,7 @@ existant appellera.
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `virgule-fixe` | Fixed-Point Designer — nombres à virgule fixe. | 17 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 112 |
-Les fonctions natives — 681, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 682, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

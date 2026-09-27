@@ -152,9 +152,46 @@ FONCTION(fnEvents) {
     return membresDeClasse(it, args, "events", 'e');
 }
 
+// [M, S] = enumeration(C) : les membres de l'énumération, et leurs noms.
+// Sans sortie, la liste s'affiche. Une seule sortie demandée — un argument
+// d'une autre fonction, « isempty(enumeration(x)) » — n'en rend qu'une.
 FONCTION(fnEnumeration) {
-    INUTILISE
-    return membresDeClasse(it, args, "enumeration", 'n');
+    exigerArguments(args, 1, 1, "enumeration");
+    std::string nomClasse = (args[0].estTexte() || args[0].estChaine())
+                                ? args[0].versTexte()
+                                : args[0].classeNom();
+    auto def = it.classeDefinie(nomClasse);
+    if (!def || !def->estEnumeration()) {
+        if (nargout == 0) {
+            it.sortie() << "No enumeration members for class '" << nomClasse << "'.\n";
+            return {};
+        }
+        std::vector<Valeur> vides = {def ? it.valeurVideDeClasse(nomClasse, {0, 1})
+                                         : Valeur::matriceDims({0, 1}),
+                                     Valeur::celluleDims({0, 1})};
+        if (nargout < 2) vides.resize(1);
+        return vides;
+    }
+    Valeur noms = Valeur::celluleDims({(int)def->enumerations.size(), 1});
+    for (std::size_t k = 0; k < def->enumerations.size(); ++k)
+        noms.cellules[k] = Valeur::texte(def->enumerations[k]);
+    if (nargout == 0) {
+        it.sortie() << "Enumeration members for class '" << def->nom << "':\n\n";
+        for (const auto& n : def->enumerations) it.sortie() << "    " << n << "\n";
+        it.sortie() << "\n";
+        return {};
+    }
+    std::vector<Valeur> r = {it.membresEnumeration(def), noms};
+    if (nargout < 2) r.resize(1);
+    return r;
+}
+
+// ISENUM(X) : vrai pour un membre d'énumération — c'est l'interpréteur qui
+// le reconnaît —, faux pour tout le reste.
+FONCTION(fnIsenum) {
+    exigerArguments(args, 1, 1, "isenum");
+    (void)nargout;
+    return {Valeur::booleen(it.estEnumeration(args[0]))};
 }
 
 // La description d'une classe, reunie en une structure : son nom, ses
@@ -257,7 +294,10 @@ FONCTION(fnFieldnames) {
     if (!args[0].estStructure())
         erreur("MATLAB:fieldnames:InvalidInputType",
                "Invalid input argument of type '" + args[0].classeNom() + "'.");
-    const auto& noms = args[0].champs();
+    // les champs cachés d'un membre d'énumération n'en sont pas
+    std::vector<std::string> noms;
+    for (const auto& nom : args[0].champs())
+        if (nom.empty() || nom[0] != '\x01') noms.push_back(nom);
     Valeur r = Valeur::celluleDims({(int)noms.size(), 1});
     for (std::size_t k = 0; k < noms.size(); ++k) r.cellules[k] = Valeur::texte(noms[k]);
     return {r};
@@ -597,6 +637,8 @@ void enregistrerStructures(Interpreteur& it) {
                    "methods  Methodes d'un objet ou d'une classe.");
     it.enregistrer("events", fnEvents, "structures",
                    "events  Evenements declares par une classe.");
+    it.enregistrer("isenum", fnIsenum, "structures",
+                   "isenum  Vrai pour un membre d'enumeration.");
     it.enregistrer("enumeration", fnEnumeration, "structures",
                    "enumeration  Membres enumeres d'une classe.");
     it.enregistrer("metaclass", fnMetaclass, "structures",

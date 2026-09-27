@@ -74,7 +74,6 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
   qui écrit dans l'objet se voit depuis toutes ses copies.
 - **Héritage** : `classdef X < Y` est analysé, mais seul `handle` a un
   effet ; les méthodes et propriétés du parent ne sont pas héritées.
-- **Énumérations** (`enumeration`) dans un `classdef`.
 - **`matlab.unittest`** : le cadre de tests à classes. Les tests de
   MatLibre sont des scripts à `assert`.
 - **Mots-clés de `classdef`** : `properties`, `methods`, `events` et

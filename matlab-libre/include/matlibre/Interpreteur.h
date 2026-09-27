@@ -181,6 +181,32 @@ public:
     bool classeVide(const std::string& nom);
     Valeur valeurVideDeClasse(const std::string& nom, const Dims& d);
 
+    // --- les énumérations ---
+    // Un membre d'énumération est un objet de sa classe dont un champ caché
+    // porte le nom et, pour une énumération qui dérive d'une classe
+    // numérique — int32, uint8, Simulink.IntEnumType... —, un autre la
+    // valeur. Chaque membre se construit une fois, à son premier usage.
+    static const std::string champMembre;
+    static const std::string champValeurEnum;
+    // Vrai pendant qu'un membre se construit : son constructeur reçoit
+    // alors ses arguments, au lieu de convertir une valeur en membre.
+    bool enConstructionEnumeration = false;
+    bool estEnumeration(const Valeur& v) const;
+    bool baseEnumeration(const std::shared_ptr<DefinitionClasse>& def, Classe& base);
+    Valeur membreEnumeration(const std::shared_ptr<DefinitionClasse>& def,
+                             const std::string& nom);
+    Valeur membresEnumeration(const std::shared_ptr<DefinitionClasse>& def);
+    std::vector<std::string> nomsMembres(const Valeur& v) const;
+    Valeur valeursEnumeration(const Valeur& v, const char* operation);
+    // « Jour(2) », « Jour('Mardi') » : des valeurs ou des noms devenus membres.
+    Valeur convertirEnEnumeration(const std::shared_ptr<DefinitionClasse>& def,
+                                  const Valeur& v);
+    Valeur operationEnumeration(const std::string& op, const Valeur& a, const Valeur& b);
+    // Les fonctions de MATLAB qui savent lire une énumération : char,
+    // double, int32, isenum, isa, ismember... Rend faux si NOM n'en est pas.
+    bool fonctionEnumeration(const std::string& nom, const std::vector<Valeur>& args,
+                             std::vector<Valeur>& resultat);
+
     // --- sorties ---
     // Posé par une interface graphique : « clc » l'appelle au lieu
     // d'écrire une séquence ANSI que la fenêtre afficherait telle quelle.
@@ -327,6 +353,7 @@ private:
     bool indexMethodesPret_ = false;
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> cacheFonctions_;
     std::map<std::string, std::shared_ptr<DefinitionClasse>> cacheClasses_;
+    std::map<std::string, Valeur> cacheEnumerations_;
     std::string racineToolbox_;
     std::vector<std::tuple<const Valeur*, int, int>> pileFin_;
     std::ostream* sortie_ = nullptr;

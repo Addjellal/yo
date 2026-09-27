@@ -255,15 +255,17 @@ assert(recalcul.CacheHits == avant.CacheHits);
 % membres se lisaient, et rien n'en restait.
 assert(isequal(sort(methods('CouleurEssai')'), {'CouleurEssai', 'doublerCouleur'}));
 assert(isequal(events('CouleurEssai')', {'Change', 'Efface'}));
-assert(isequal(enumeration('CouleurEssai')', {'Rouge', 'Vert', 'Bleu'}));
+% Comme dans MATLAB, ENUMERATION rend les membres, et leurs noms en second.
+[~, nomsCouleurs] = enumeration('CouleurEssai');
+assert(isequal(nomsCouleurs', {'Rouge', 'Vert', 'Bleu'}));
 assert(isequal(properties('CouleurEssai')', {'code'}));
 % Un objet repond comme sa classe.
-assert(isequal(methods(CouleurEssai(1)), methods('CouleurEssai')));
+assert(isequal(methods(CouleurEssai.Rouge), methods('CouleurEssai')));
 % Une classe native n'a rien de declare : le dire vaut mieux qu'une erreur.
 assert(isempty(methods('double')));
 
 % METACLASS reunit tout en une structure.
-description = metaclass(CouleurEssai(1));
+description = metaclass(CouleurEssai.Rouge);
 assert(strcmp(description.Name, 'CouleurEssai'));
 assert(numel(description.PropertyList) == 1);
 assert(numel(description.MethodList) == 2);
@@ -416,5 +418,108 @@ end
 assert(strcmp(refusRepmat, 'MATLAB:UndefinedFunction'), 'repmat refuse un objet poignee');
 clear formes carre enColonne fiches grille serie
 disp('reshape et repmat de tableaux d''objets : ok');
+
+%% ------------------- les énumérations
+% Un membre d'énumération est un objet de sa classe : il se compare aux
+% autres membres et à son nom ; une énumération entière calcule sur ses
+% valeurs, dans sa classe de base.
+j = JourEssai.Mardi;
+assert(isa(j, 'JourEssai') && isenum(j) && ~isenum(2) && strcmp(class(j), 'JourEssai'));
+assert(j == JourEssai.Mardi && j ~= JourEssai.Lundi && j == 'Mardi');
+assert(int32(j) == 2 && isa(int32(j), 'int32') && double(j) == 2 && strcmp(char(j), 'Mardi'));
+assert(j > JourEssai.Lundi && j + 1 == 3 && isa(j + 1, 'int32') && -j == -2);
+assert(isa(j, 'int32') && isa(j, 'integer') && isa(j, 'numeric'));
+semaine = [JourEssai.Lundi, JourEssai.Mardi, JourEssai.Mercredi];
+assert(isequal(size(semaine), [1 3]) && isequal(semaine == JourEssai.Mardi, [false true false]));
+assert(isequal(int32(semaine), int32([1 2 3])) && semaine(3) == JourEssai.Mercredi);
+assert(isequal(cellstr(semaine), {'Lundi', 'Mardi', 'Mercredi'}));
+assert(isequal(string(semaine), ["Lundi", "Mardi", "Mercredi"]));
+assert(isequal(char([JourEssai.Lundi; JourEssai.Mardi]), ['Lundi'; 'Mardi']));
+[membres, noms] = enumeration('JourEssai');
+assert(isequal(noms, {'Lundi'; 'Mardi'; 'Mercredi'}) && numel(membres) == 3 && ...
+       membres(2) == JourEssai.Mardi && isequal(size(membres), [3 1]));
+[~, nomsObjet] = enumeration(j);
+assert(isequal(nomsObjet, noms));
+% « Jour(3) », « Jour('Lundi') » : des valeurs et des noms devenus membres
+assert(JourEssai(3) == JourEssai.Mercredi && JourEssai('Lundi') == JourEssai.Lundi);
+assert(isequal(JourEssai([1 3]) == [JourEssai.Lundi, JourEssai.Mercredi], [true true]));
+switch j
+    case JourEssai.Lundi
+        choix = 1;
+    case {JourEssai.Mardi, JourEssai.Mercredi}
+        choix = 2;
+    otherwise
+        choix = 0;
+end
+assert(choix == 2);
+switch j
+    case 'Mardi'
+        parSonNom = true;
+    otherwise
+        parSonNom = false;
+end
+assert(parSonNom);
+assert(ismember(JourEssai.Lundi, semaine) && ~ismember(JourEssai.Lundi, semaine(2:3)));
+[dedans, rang] = ismember([JourEssai.Mercredi, JourEssai.Lundi], semaine);
+assert(isequal(dedans, [true true]) && isequal(rang, [3 1]));
+assert(ismember('Mardi', semaine));
+nombre = 0;
+for jour = semaine
+    nombre = nombre + double(jour);
+end
+assert(nombre == 6);
+% trier, dédoublonner, borner : sur les valeurs, puis rendus membres
+melange = [JourEssai.Mercredi, JourEssai.Lundi, JourEssai.Mercredi];
+[tries, ordre] = sort(melange);
+assert(isequal(tries == [JourEssai.Lundi, JourEssai.Mercredi, JourEssai.Mercredi], ...
+               [true true true]) && isequal(ordre, [2 1 3]));
+assert(isequal(unique(melange) == [JourEssai.Lundi, JourEssai.Mercredi], [true true]));
+assert(max(melange) == JourEssai.Mercredi && min(melange) == JourEssai.Lundi);
+assert(isequal(fliplr(semaine) == [JourEssai.Mercredi, JourEssai.Mardi, JourEssai.Lundi], ...
+               [true true true]));
+feux = [FeuEssai.Vert, FeuEssai.Rouge, FeuEssai.Vert];
+assert(isequal(cellstr(unique(feux)), {'Rouge', 'Vert'}));
+% sans valeur, les membres passent par le constructeur
+f = FeuEssai.Orange;
+assert(f.Duree == 5 && isequal(fieldnames(f), {'Duree'}) && FeuEssai.Rouge ~= FeuEssai.Vert);
+assert(FeuEssai.Vert.Duree == 25);
+% l'affichage nomme la classe et les membres
+texteEnum = evalc('j');
+assert(~isempty(strfind(texteEnum, 'JourEssai enumeration')) && ...
+       ~isempty(strfind(texteEnum, 'Mardi')));
+texteEnum = evalc('disp(semaine)');
+assert(~isempty(strfind(texteEnum, 'JourEssai enumeration array')) && ...
+       ~isempty(strfind(texteEnum, 'Mercredi')));
+enveloppe.jour = JourEssai.Lundi;
+assert(~isempty(strfind(evalc('disp(enveloppe)'), 'jour: Lundi')));
+texteEnum = evalc('enumeration JourEssai');
+assert(~isempty(strfind(texteEnum, 'Enumeration members for class ''JourEssai''')));
+% Simulink.IntEnumType : une énumération entière, en int32
+n = NiveauEssai.Haut;
+assert(isa(int32(n), 'int32') && int32(n) == 10 && isa(n, 'Simulink.IntEnumType') && ...
+       n > NiveauEssai.Bas);
+assert(isempty(NiveauEssai.getDescription()));
+% ce qu'une énumération refuse
+refusEnum = {
+    @() JourEssai(7), 'MATLAB:class:CannotConvert'
+    @() JourEssai('Dimanche'), 'MATLAB:class:CannotConvert'
+    @() FeuEssai.Rouge + 1, 'MATLAB:UndefinedFunction'
+    @() double(FeuEssai.Rouge), 'MATLAB:invalidConversion'
+    @() JourEssai.Jeudi, 'MATLAB:noSuchMethodOrField'
+    @() JourEssai.Lundi == FeuEssai.Rouge, 'MATLAB:UndefinedFunction'
+    @() JourEssai(1, 2), 'MATLAB:class:EnumerationConstructor'
+    @() sort(feux), 'MATLAB:UndefinedFunction'
+    };
+for kE = 1:size(refusEnum, 1)
+    vu = '';
+    try
+        refusEnum{kE, 1}();
+    catch err
+        vu = err.identifier;
+    end
+    assert(strcmp(vu, refusEnum{kE, 2}), sprintf('enumeration, cas %d : %s attendu, %s rendu', ...
+                                                 kE, refusEnum{kE, 2}, vu));
+end
+disp('enumerations : ok');
 
 disp('classes : toutes les verifications passent');
