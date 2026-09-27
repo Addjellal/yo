@@ -61,7 +61,14 @@ function modele = add_block(modele, type, nom, varargin)
 %                  sqrt, pow, conj, reciprocal, hypot, rem, mod,
 %                  transpose, hermitian
 %     trigonometry Operator : sin, cos, tan, asin, acos, atan, atan2, sinh,
-%                  cosh, tanh, asinh, acosh, atanh, sincos (deux sorties)
+%                  cosh, tanh, asinh, acosh, atanh, sincos (deux sorties),
+%                  cos + jsin (exp(ju), complexe)
+%     complextorealimag Output (Real and imag, Real, Imag) ;
+%                  complextomagnitudeangle Output (Magnitude and angle,
+%                  Magnitude, Angle) — les parties d'un signal complexe
+%     realimagtocomplex, magnitudeangletocomplex Input, ConstantPart — un
+%                  signal complexe de ses deux parties, ou d'une partie
+%                  et de la constante ConstantPart
 %     minmax       Function (min, max), Inputs
 %     rounding     Operator : floor, ceil, round, fix
 %     polynomial   coefs                        polyval(coefs, u)

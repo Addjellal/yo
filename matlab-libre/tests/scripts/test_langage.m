@@ -1049,6 +1049,20 @@ rmpath(dossierVie);
 rmdir(dossierVie, 's');
 disp('vie des fichiers : ok')
 
+% Un extrait d'un tableau complexe dont les parties imaginaires sont
+% nulles est réel, comme dans MATLAB ; le tableau, lui, reste complexe, et
+% le contenu d'une cellule ou d'un champ n'est pas un extrait.
+z = [1 + 2i, 3, -4];
+assert(~isreal(z) && isreal(z(2)) && ~isreal(z(1)) && isreal(z(2:3)) && ~isreal(z(1:2)));
+assert(isequal(z(3), -4) && max(z(2:3)) == 3, 'un extrait reel se compare en reel');
+w = complex(1, 0);
+assert(~isreal(w) && isreal(w(1)) && ~isreal(w()), 'w() rend w tel quel');
+M = complex(eye(2));
+assert(isreal(M(:, 1)) && isreal(M(2, :)) && ~isreal(M));
+C = {complex(2, 0)};
+S.a = complex(2, 0);
+assert(~isreal(C{1}) && ~isreal(S.a), 'une cellule, un champ gardent leur complexe');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

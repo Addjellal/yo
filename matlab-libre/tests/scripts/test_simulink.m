@@ -3365,7 +3365,7 @@ casErreurs = {
         'Simulink:SolverConfig:StopTimeBeforeStartTime', 'duree'
     @() sim(add_block(new_system('fw'), 'fromworkspace', 'f')), ...
         'Simulink:blocks:FromWorkspaceVariableNotFound', 'fw/f'
-    @() sim(add_block(new_system('cplx'), 'gain', 'g', 'Gain', 1 + 2i)), ...
+    @() sim(add_block(new_system('cplx'), 'saturation', 's', 'UpperLimit', 1 + 2i)), ...
         'Simulink:Parameters:InvParamSetting', 'complexe'
     @() sim(add_block(new_system('vide'), 'constant', 'c', 'Value', [])), ...
         'Simulink:Parameters:InvParamSetting', 'vide/c'
@@ -6145,12 +6145,12 @@ for kE = 1:size(casContrainte, 1)
 end
 fprintf('contrainte algebrique et bus : %d cas d''erreur verifies\n', size(casContrainte, 1));
 
-%% ---------------------------- 46. Signal Editor ; les signaux complexes refusés
+%% ------------------------------------------------------------ 46. Signal Editor
 % Le Signal Editor rejoue un scénario, un Dataset de timeseries rangé dans
-% un fichier MAT, une sortie par signal. MatLibre ne simule que des
-% signaux réels : un signal qui deviendrait complexe — la sortie d'une
-% MATLAB Function, une donnée de l'espace de travail — est refusé en
-% nommant le bloc, au lieu de fausser les autres.
+% un fichier MAT, une sortie par signal. Une MATLAB Function dont la
+% sortie, compilée réelle, deviendrait complexe en route est refusée en
+% nommant le bloc : Simulink fixe la complexité d'un signal avant de
+% simuler (voir la section 48 pour les signaux complexes).
 Scenario = Simulink.SimulationData.Dataset;
 Scenario = addElement(Scenario, timeseries([0; 2; 4], [0; 1; 2], 'Name', 'rampe'));
 Scenario = addElement(Scenario, timeseries([1 10; 3 30], [0; 2], 'Name', 'paire'));
@@ -6172,23 +6172,14 @@ r = sim(set_param(editeur, 'ed', 'ActiveScenario', 'Autre'), 'Solver', 'ode4', .
 assert(isequal(r.yout(:, 1)', [0 1 2]), 'ActiveScenario choisit le scenario');
 nombre = 12; %#ok<NASGU>
 save(fichierScenario, 'Scenario', 'nombre');
-% les complexes
-assignin('base', 'signalComplexe', [0 1+1i; 1 2]);
-espace = new_system('espace');
-espace = add_block(espace, 'fromworkspace', 'f', 'VariableName', 'signalComplexe');
-espace = add_line(add_block(espace, 'outport', 'y'), 'f', 'y');
+% une sortie qui deviendrait complexe
 fonction = new_system('fonction');
 fonction = add_block(fonction, 'constant', 'c', 'Value', -4);
 fonction = add_block(fonction, 'matlabfunction', 'm', 'Script', ...
                      sprintf('function y = fcn(u)\ny = sqrt(u);\n'));
 fonction = add_line(add_line(add_block(fonction, 'outport', 'y'), 'c', 'm'), 'm', 'y');
 casComplexe = {
-    @() sim(espace, 1), 'Simulink:DataType:ComplexSignalNotSupported', 'espace/f'
     @() sim(fonction, 1), 'Simulink:DataType:ComplexSignalNotSupported', 'fonction/m'
-    @() sim(set_param(fonction, 'm', 'Script', sprintf('function y = fcn(u)\ny = u + 1i;\n')), 1), ...
-        'Simulink:DataType:ComplexSignalNotSupported', 'fonction/m'
-    @() sim(set_param(fonction, 'c', 'Value', 1 + 2i), 1), ...
-        'Simulink:Parameters:InvParamSetting', 'fonction/c'
     @() sim(set_param(editeur, 'ed', 'ActiveScenario', 'Absent'), 1), ...
         'Simulink:SignalEditor:ScenarioNotFound', 'editeur/ed'
     @() sim(set_param(editeur, 'ed', 'ActiveScenario', 'nombre'), 1), ...
@@ -6210,7 +6201,7 @@ for kE = 1:size(casComplexe, 1)
                    casComplexe{kE, 2}, vu, message));
 end
 delete(fichierScenario);
-fprintf('scenarios et signaux complexes : %d cas d''erreur verifies\n', size(casComplexe, 1));
+fprintf('scenarios : %d cas d''erreur verifies\n', size(casComplexe, 1));
 
 %% ------------------------------------------- 47. Batterie de modèles tirés au hasard
 % Des modèles tirés au hasard, reproductibles : une source, puis une chaîne
@@ -6339,6 +6330,208 @@ end
 rmdir(dossierAlea, 's');
 fprintf(['batterie de modeles tires au hasard : %d simulations, %d refus nommes, ' ...
          '%d relectures identiques\n'], statsAlea);
+
+%% --------------------------------------------------------- 48. Signaux complexes
+% Un signal est réel ou complexe, et le reste de bout en bout : une
+% constante, un gain, une donnée complexes le rendent complexe, un calcul
+% le transmet, Abs ou Complex to Real-Imag le rendent réel. La racine d'un
+% signal complexe dont la valeur du moment est négative est imaginaire,
+% et non NaN. Un bloc qui ne calcule qu'en réel le refuse en se nommant.
+parties = new_system('parties');
+parties = add_block(parties, 'constant', 'c', 'Value', 1 + 2i);
+parties = add_block(parties, 'gain', 'g', 'Gain', 2);
+parties = add_block(parties, 'complextorealimag', 'ri');
+parties = add_block(add_block(parties, 'outport', 're'), 'outport', 'im');
+parties = add_line(add_line(add_line(parties, 'c', 'g'), 'g', 'ri'), 'ri/1', 're');
+parties = add_line(parties, 'ri/2', 'im');
+r = sim(parties, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 1);
+assert(isreal(r.yout) && isequal(r.yout, repmat([2 4], 3, 1)), ...
+       'Complex to Real-Imag rend deux signaux reels');
+conjugue = new_system('conjugue');
+conjugue = add_block(conjugue, 'constant', 'c', 'Value', 3);
+conjugue = add_block(conjugue, 'realimagtocomplex', 'rc', 'Input', 'Real', 'ConstantPart', -1);
+conjugue = add_block(conjugue, 'math', 'f', 'Operator', 'conj');
+conjugue = add_block(conjugue, 'abs', 'a');
+conjugue = add_block(add_block(conjugue, 'outport', 'y'), 'outport', 'm');
+conjugue = add_line(add_line(add_line(conjugue, 'c', 'rc'), 'rc', 'f'), 'f', 'y');
+conjugue = add_line(add_line(conjugue, 'f', 'a'), 'a', 'm');
+r = sim(conjugue, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 1);
+assert(isequal(r.yout(:, 1), [3 + 1i; 3 + 1i]) && ...
+       max(abs(r.yout(:, 2) - sqrt(10))) < 1e-12, 'conj, puis le module');
+cumul = new_system('cumul');
+cumul = add_block(cumul, 'constant', 'c', 'Value', 1i);
+cumul = add_block(cumul, 'sum', 's', 'Signs', '++');
+cumul = add_block(cumul, 'unitdelay', 'd', 'SampleTime', 1);
+cumul = add_line(add_block(cumul, 'outport', 'y'), 'd', 'y');
+cumul = add_line(add_line(add_line(cumul, 'c', 's/1'), 'd', 's/2'), 's', 'd');
+r = sim(cumul, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 3);
+assert(isequal(r.yout, [0; 1i; 2i; 3i]), 'une boucle porte le complexe au retard');
+racineCx = new_system('racineCx');
+racineCx = add_block(racineCx, 'constant', 'c', 'Value', -4);
+racineCx = add_block(racineCx, 'constant', 'z', 'Value', 0i);
+racineCx = add_block(racineCx, 'sum', 's', 'Signs', '++');
+racineCx = add_block(racineCx, 'sqrt', 'r');
+racineCx = add_block(racineCx, 'math', 'l', 'Operator', 'log');
+racineCx = add_block(racineCx, 'trigonometry', 'as', 'Operator', 'acos');
+racineCx = add_block(add_block(add_block(racineCx, 'outport', 'y'), 'outport', 'ln'), 'outport', 'ac');
+racineCx = add_line(add_line(add_line(racineCx, 'c', 's/1'), 'z', 's/2'), 's', 'r');
+racineCx = add_line(add_line(add_line(racineCx, 's', 'l'), 's', 'as'), 'r', 'y');
+racineCx = add_line(add_line(racineCx, 'l', 'ln'), 'as', 'ac');
+r = sim(racineCx, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 1);
+assert(isequal(r.yout(1, 1), 2i) && abs(r.yout(1, 2) - log(-4)) < 1e-12 && ...
+       abs(r.yout(1, 3) - acos(-4)) < 1e-12, ...
+       'un signal complexe de valeur reelle negative : racine, log et acos complexes');
+% module et argument, aller et retour ; hermitienne et produit scalaire
+polaire = new_system('polaire');
+polaire = add_block(polaire, 'constant', 'm', 'Value', 2);
+polaire = add_block(polaire, 'constant', 'a', 'Value', pi / 3);
+polaire = add_block(polaire, 'magnitudeangletocomplex', 'p');
+polaire = add_block(polaire, 'complextomagnitudeangle', 'q');
+polaire = add_block(polaire, 'trigonometry', 'e', 'Operator', 'cos + jsin');
+polaire = add_block(polaire, 'constant', 'M', 'Value', [1 + 1i, 2; 3, 4i]);
+polaire = add_block(polaire, 'math', 'h', 'Operator', 'hermitian');
+polaire = add_block(polaire, 'math', 't', 'Operator', 'transpose');
+polaire = add_block(polaire, 'math', 'm2', 'Operator', 'magnitude^2');
+polaire = add_block(polaire, 'constant', 'v', 'Value', [1i; 2]);
+polaire = add_block(polaire, 'dotproduct', 'dp');
+noms = {'mo', 'ar', 'ex', 'he', 'tr', 'ca', 'ps'};
+for i = 1:numel(noms)
+    polaire = add_block(polaire, 'outport', noms{i});
+end
+polaire = add_line(add_line(add_line(polaire, 'm', 'p/1'), 'a', 'p/2'), 'p', 'q');
+polaire = add_line(add_line(add_line(polaire, 'q/1', 'mo'), 'q/2', 'ar'), 'a', 'e');
+polaire = add_line(add_line(add_line(polaire, 'e', 'ex'), 'M', 'h'), 'h', 'he');
+polaire = add_line(add_line(add_line(polaire, 'M', 't'), 't', 'tr'), 'M', 'm2');
+polaire = add_line(add_line(add_line(polaire, 'm2', 'ca'), 'v', 'dp/1'), 'v', 'dp/2');
+polaire = add_line(polaire, 'dp', 'ps');
+r = sim(polaire, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 0);
+y = r.yout(1, :);
+M = [1 + 1i, 2; 3, 4i];
+assert(abs(y(1) - 2) < 1e-12 && abs(y(2) - pi / 3) < 1e-12, 'Magnitude-Angle, aller et retour');
+assert(abs(y(3) - exp(1i * pi / 3)) < 1e-12, 'cos + jsin rend exp(ju)');
+Mh = M';
+Mt = M.';
+assert(isequal(y(4:7), Mh(:).') && isequal(y(8:11), Mt(:).'), ...
+       'hermitian conjugue, transpose non');
+assert(isequal(y(12:15), real(M(:).' .* conj(M(:).'))) && y(16) == 5, ...
+       'magnitude^2 est reel ; Dot Product vaut sum(conj(u1) .* u2)');
+% des données complexes : espace de travail, MATLAB Function, aiguillage
+assignin('base', 'signalComplexe', [0 1+1i; 1 3+3i]);
+donnees = new_system('donnees');
+donnees = add_block(donnees, 'fromworkspace', 'f', 'VariableName', 'signalComplexe');
+donnees = add_block(donnees, 'matlabfunction', 'mf', 'Script', ...
+                    sprintf('function y = fcn(u)\ny = u * 1i;\n'));
+donnees = add_block(donnees, 'constant', 'k', 'Value', 0.5);
+donnees = add_block(donnees, 'clock', 'h');
+donnees = add_block(donnees, 'switch', 'sw', 'Threshold', 0.5);
+donnees = add_block(donnees, 'relational', 'eg', 'Operator', '==');
+donnees = add_block(add_block(add_block(donnees, 'outport', 'y'), 'outport', 'a'), 'outport', 'b');
+donnees = add_line(add_line(add_line(donnees, 'f', 'mf'), 'mf', 'y'), 'f', 'sw/1');
+donnees = add_line(add_line(add_line(donnees, 'h', 'sw/2'), 'mf', 'sw/3'), 'sw', 'a');
+donnees = add_line(add_line(add_line(donnees, 'f', 'eg/1'), 'mf', 'eg/2'), 'eg', 'b');
+r = sim(donnees, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 1);
+assert(max(abs(r.yout(:, 1) - [-1 + 1i; -2 + 2i; -3 + 3i])) < 1e-12, ...
+       'From Workspace complexe, interpole ; MATLAB Function complexe');
+assert(max(abs(r.yout(:, 2) - [-1 + 1i; 2 + 2i; 3 + 3i])) < 1e-12 && isequal(r.yout(:, 3), [0; 0; 0]), ...
+       'le Switch aiguille des complexes sur une commande reelle ; == compare');
+fichierCx = [tempname() '.slx'];
+save_system(donnees, fichierCx);
+r2 = sim(load_system(fichierCx), 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 1);
+assert(isequal(r2.yout, r.yout), 'relu du .slx, un modele complexe rend la meme chose');
+save_system(polaire, fichierCx);
+r2 = sim(load_system(fichierCx), 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 0);
+assert(max(abs(r2.yout(1, :) - y)) < 1e-12, 'une constante complexe se relit du .slx');
+delete(fichierCx);
+fir = new_system('fir');
+fir = add_block(fir, 'constant', 'c', 'Value', 2i);
+fir = add_block(fir, 'discretefirfilter', 'f', 'Coefficients', [0.5 0.5], 'SampleTime', 1);
+fir = add_line(add_line(add_block(fir, 'outport', 'y'), 'c', 'f'), 'f', 'y');
+r = sim(fir, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 2);
+assert(isequal(r.yout, [1i; 2i; 2i]), 'un filtre FIR filtre un complexe');
+% ce que Simulink refuse
+refus = @(type, varargin) aleaRefusComplexe(type, varargin{:});
+casCx = {
+    refus('saturation'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('integrator'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('minmax'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('transferfcn'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('relational', 'Operator', '<'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('realimagtocomplex', 'Input', 'Real'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('trigonometry', 'Operator', 'atan2'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('math', 'Operator', 'rem'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('lookup'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('signalspecification', 'SignalType', 'real'), 'Simulink:DataType:SignalSpecificationMismatch', 'refus/b'
+    refus('multiportswitch', 'Inputs', '1'), 'Simulink:DataType:InputPortComplexityMismatch', 'refus/b'
+    refus('saturation', 'UpperLimit', 1i), 'Simulink:Parameters:InvParamSetting', 'refus/b'
+    };
+for kC = 1:size(casCx, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('sim(casCx{kC, 1}, 1);');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casCx{kC, 2}) && ~isempty(strfind(message, casCx{kC, 3})), ...
+           sprintf('complexes, cas %d : %s attendu, %s rendu (%s)', kC, casCx{kC, 2}, vu, message));
+end
+reel = new_system('reel');
+reel = add_block(add_block(reel, 'constant', 'c', 'Value', 2), 'signalspecification', 's', ...
+                 'SignalType', 'complex');
+reel = add_line(add_line(add_block(reel, 'outport', 'y'), 'c', 's'), 's', 'y');
+vu = '';
+try
+    evalc('sim(reel, 1);');
+catch err
+    vu = err.identifier;
+end
+assert(strcmp(vu, 'Simulink:DataType:SignalSpecificationMismatch'), ...
+       'Signal Specification complexe recoit un signal reel');
+sortie = new_system('sortie');
+sortie = add_block(sortie, 'constant', 'c', 'Value', 1i);
+sortie = add_line(add_block(sortie, 'outport', 'y', 'SignalType', 'complex'), 'c', 'y');
+r = sim(sortie, 1);
+assert(isequal(r.yout(end), 1i), 'une sortie complexe recoit un complexe');
+for cas = {{1i, 'real'}, {1, 'complex'}}
+    vu = '';
+    message = '';
+    try
+        evalc('sim(set_param(set_param(sortie, ''c'', ''Value'', cas{1}{1}), ''y'', ''SignalType'', cas{1}{2}), 1);');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, 'Simulink:DataType:InputPortComplexityMismatch') && ...
+           ~isempty(strfind(message, 'sortie/y')), sprintf('SignalType %s : %s', cas{1}{2}, message));
+end
+Scenario = Simulink.SimulationData.Dataset;
+Scenario = addElement(Scenario, timeseries([0; 2 + 2i], [0; 2], 'Name', 'z'));
+fichierScenario = [tempname() '.mat'];
+save(fichierScenario, 'Scenario');
+editeurCx = new_system('editeurCx');
+editeurCx = add_block(editeurCx, 'signaleditor', 'ed', 'FileName', fichierScenario);
+editeurCx = add_line(add_block(editeurCx, 'outport', 'y'), 'ed', 'y');
+r = sim(editeurCx, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 3);
+assert(isequal(r.yout, [0; 1 + 1i; 2 + 2i; 2 + 2i]), 'un scenario complexe se rejoue complexe');
+delete(fichierScenario);
+% le module ou l'égalité d'un complexe n'a pas de passage par zéro à
+% chercher : le pas variable avance sans basculer
+lisse = new_system('lisse');
+lisse = add_block(lisse, 'sinewave', 's');
+lisse = add_block(lisse, 'constant', 'j', 'Value', 1i);
+lisse = add_block(lisse, 'product', 'p');
+lisse = add_block(lisse, 'abs', 'a');
+lisse = add_block(lisse, 'relational', 'r', 'Operator', '==');
+lisse = add_block(lisse, 'constant', 'z', 'Value', 0);
+lisse = add_block(add_block(lisse, 'outport', 'y1'), 'outport', 'y2');
+lisse = add_line(add_line(add_line(lisse, 's', 'p/1'), 'j', 'p/2'), 'p', 'a');
+lisse = add_line(add_line(add_line(lisse, 'a', 'y1'), 'p', 'r/1'), 'z', 'r/2');
+lisse = add_line(lisse, 'r', 'y2');
+r = sim(lisse, 'Solver', 'ode45', 'StopTime', 10);
+assert(isreal(r.yout) && max(abs(r.yout(:, 1) - abs(sin(r.tout)))) < 1e-12, ...
+       'Abs d''un complexe sous ode45, sans passage par zero');
+fprintf('signaux complexes : %d refus nommes verifies\n', size(casCx, 1) + 3);
 
 disp('simulink : toutes les verifications passent');
 
@@ -6534,9 +6727,13 @@ function [m, texte] = aleaBatir(nom, types, cat)
     m = new_system(nom);
     texte = '';
     valeurEntree = 1.5;
-    if rand() < 0.3
+    tirage = rand();
+    if tirage < 0.3
         valeurEntree = [0.5; 1.5; 2.5];
         texte = ' entrees=vecteur';
+    elseif tirage < 0.45
+        valeurEntree = 1.5 - 0.5i;   % un complexe, que bien des blocs refusent
+        texte = ' entrees=complexe';
     end
     for q = 1:numel(types)
         e = cat(strcmp({cat.type}, types{q}));
@@ -6549,7 +6746,7 @@ function [m, texte] = aleaBatir(nom, types, cat)
                 texte = sprintf('%s %s.%s=%s', texte, types{q}, e.params{i, 1}, valeur);
             elseif strcmp(nature, 'nombre') && isnumeric(e.params{i, 2}) && ...
                    isscalar(e.params{i, 2}) && rand() < 0.15
-                genantes = {0, -1, 2, 0.5, [1 2]};
+                genantes = {0, -1, 2, 0.5, [1 2], 1i};
                 valeur = genantes{randi(numel(genantes))};
                 reglages(end + 1:end + 2) = {e.params{i, 1}, valeur}; %#ok<AGROW>
                 texte = sprintf('%s %s.%s=%s', texte, types{q}, e.params{i, 1}, mat2str(valeur));
@@ -6603,4 +6800,22 @@ function oui = aleaMemesValeurs(a, b)
     a = double(a(:));
     b = double(b(:));
     oui = all(a == b | (isnan(a) & isnan(b)) | abs(a - b) <= 1e-9 * max(1, abs(a)));
+end
+
+% Un modèle où un signal complexe arrive sur l'entrée 1 du bloc b ; ses
+% autres entrées reçoivent des réels.
+function m = aleaRefusComplexe(type, varargin)
+    m = new_system('refus');
+    m = add_block(m, 'constant', 'c', 'Value', 1 + 1i);
+    m = add_block(m, 'constant', 'r', 'Value', 1);
+    m = add_block(m, type, 'b', varargin{:});
+    [ne, ns] = matlibre_sl_ports(m.blocs{end});
+    m = add_line(m, 'c', 'b/1');
+    for j = 2:ne
+        m = add_line(m, 'r', sprintf('b/%d', j));
+    end
+    for q = 1:ns
+        nom = sprintf('y%d', q);
+        m = add_line(add_block(m, 'outport', nom), sprintf('b/%d', q), nom);
+    end
 end

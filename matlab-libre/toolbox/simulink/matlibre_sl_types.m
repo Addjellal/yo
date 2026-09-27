@@ -16,6 +16,13 @@ function varargout = matlibre_sl_types(action, varargin)
 %   type ; une entrée ou une sortie typée reçoit son type. Chaque refus
 %   est une erreur Simulink:DataType:… qui nomme le bloc.
 %
+%   X = MATLIBRE_SL_TYPES('complexite',C) rend, pour chaque port de
+%   sortie, vrai si son signal est complexe : une constante, un gain, une
+%   donnée de l'espace de travail complexes le rendent complexe, un calcul
+%   le transmet, Abs ou Complex to Real-Imag le rendent réel. Un bloc qui
+%   ne calcule qu'en réel — une saturation, un intégrateur, une table... —
+%   refuse une entrée complexe : Simulink:DataType:InputPortComplexityMismatch.
+%
 %   C = MATLIBRE_SL_TYPES('code',NOM) rend le code d'un nom de type
 %   ('int8', 'boolean'...), 0 pour un type hérité ; N =
 %   MATLIBRE_SL_TYPES('nom',CODE) le nom ; K =
@@ -31,6 +38,8 @@ function varargout = matlibre_sl_types(action, varargin)
     switch action
         case 'propager'
             varargout{1} = propager(varargin{1});
+        case 'complexite'
+            varargout{1} = complexite(varargin{1});
         case 'code'
             varargout{1} = codeDe(varargin{1});
         case 'nom'
@@ -333,5 +342,212 @@ function verifier(c, k, tE, t)
                           mat2str(p.Value, 6), ch, nomDe(attendu), b(1), b(2));
                 end
             end
+    end
+end
+
+% --- la complexité des signaux ------------------------------------------
+
+% Un signal ne fait que devenir complexe : une boucle peut apporter un
+% complexe à un bloc qui ne voyait que du réel, jamais l'inverse. On
+% répète donc les règles jusqu'à ce que plus rien ne change.
+function x = complexite(c)
+    x = false(1, c.nPorts);
+    sondes = cell(1, c.n);
+    for tour = 1:(2 * c.n + 5)
+        change = false;
+        for k = 1:c.n
+            if c.nOut(k) == 0
+                continue
+            end
+            ports = c.portDebut(k) + (0:c.nOut(k) - 1);
+            [s, sondes{k}] = regleComplexe(c, k, complexitesEntrees(c, k, x), sondes{k});
+            nouveau = x(ports) | s;
+            if any(nouveau ~= x(ports))
+                x(ports) = nouveau;
+                change = true;
+            end
+        end
+        if ~change
+            break
+        end
+    end
+    for k = 1:c.n
+        verifierComplexe(c, k, complexitesEntrees(c, k, x));
+    end
+end
+
+function xE = complexitesEntrees(c, k, x)
+    e = c.entrees{k};
+    xE = false(1, numel(e));
+    for j = 1:numel(e)
+        if e(j) > 0
+            xE(j) = x(e(j));
+        end
+    end
+end
+
+function oui = complexeValeur(p, nom)
+    oui = isfield(p, nom) && isnumeric(p.(nom)) && ~isreal(p.(nom));
+end
+
+% Les blocs qui calculent aussi bien en complexe, entrée par entrée : ce
+% que dit la documentation de chaque bloc de Simulink.
+function admis = entreesComplexesAdmises(c, k, nE)
+    p = c.p{k};
+    admis = false(1, nE);
+    switch c.types{k}
+        case {'gain', 'sum', 'product', 'bias', 'unaryminus', 'abs', 'mux', 'demux', ...
+              'concatenate', 'selector', 'reshape', 'merge', 'signalconversion', ...
+              'datatypeconversion', 'ic', 'zoh', 'memory', 'ratetransition', 'tappeddelay', ...
+              'difference', 'outport', 'terminator', 'scope', 'display', 'toworkspace', ...
+              'manualswitch', 'dotproduct', 'width'}
+            admis(:) = true;
+        case 'delay'
+            admis(1) = true;   % le signal retardé ; longueur, activation, remise sont réelles
+        case 'discretefilter'
+            % un Discrete FIR Filter, ramené à un filtre de dénominateur 1
+            admis(:) = isfield(p, 'Bibliotheque') && strcmp(p.Bibliotheque, 'discretefirfilter');
+        case 'switch'
+            admis([1 min(3, end)]) = true;   % les données, pas la commande
+        case 'multiportswitch'
+            admis(2:end) = true;
+        case 'relational'
+            admis(:) = any(strcmp(p.Operator, {'==', '~='}));
+        case 'math'
+            admis(:) = ~any(strcmp(p.Operator, {'hypot', 'rem', 'mod'}));
+        case 'sqrt'
+            admis(:) = ~strcmp(p.Operator, 'signedSqrt');
+        case 'trigonometry'
+            admis(:) = ~any(strcmp(p.Operator, {'atan2', 'sincos', 'cos + jsin'}));
+        case 'matlabfunction'
+            if ~isfield(p, 'Bibliotheque')
+                admis(:) = true;   % une MATLAB Function écrite par l'utilisateur
+            else
+                admis(:) = any(strcmp(p.Bibliotheque, {'complextorealimag', ...
+                    'complextomagnitudeangle', 'assignment', 'permutedimensions', ...
+                    'squeeze', 'discretefirfilter'}));
+            end
+    end
+end
+
+function [s, sonde] = regleComplexe(c, k, xE, sonde)
+    p = c.p{k};
+    s = false(1, c.nOut(k));
+    tous = any(xE & entreesComplexesAdmises(c, k, numel(xE)));
+    switch c.types{k}
+        case 'constant'
+            s(:) = complexeValeur(p, 'Value');
+        case 'gain'
+            s(:) = tous || complexeValeur(p, 'Gain');
+        case 'bias'
+            s(:) = tous || complexeValeur(p, 'Bias');
+        case {'ic', 'delay', 'memory', 'difference', 'tappeddelay'}
+            s(:) = tous || complexeValeur(p, 'Value') || complexeValeur(p, 'InitialCondition') ...
+                   || complexeValeur(p, 'ICPrevInput') || complexeValeur(p, 'vinit');
+        case {'sum', 'product', 'unaryminus', 'mux', 'demux', 'concatenate', 'selector', ...
+              'reshape', 'merge', 'signalconversion', 'datatypeconversion', 'zoh', ...
+              'ratetransition', 'manualswitch', 'dotproduct', 'switch', 'multiportswitch', ...
+              'discretefilter'}
+            s(:) = tous;
+        case 'math'
+            s(:) = tous && ~strcmp(p.Operator, 'magnitude^2');
+        case {'sqrt', 'trigonometry'}
+            s(:) = tous || strcmp(p.Operator, 'cos + jsin');
+        case 'fromworkspace'
+            s(:) = isfield(c, 'sourceComplexe') && c.sourceComplexe(k);
+        case 'matlabfunction'
+            [s, sonde] = complexiteFonction(c, k, xE, sonde);
+    end
+end
+
+% Ce que rend une MATLAB Function se sonde. Sur des zéros, un calcul
+% complexe peut s'annuler en réel — 0 * 1i vaut 0 — : on la sonde donc
+% aussi sur des valeurs quelconques, 0,7 pour une entrée réelle, 0,7 +
+% 0,3i pour une complexe ; qu'elle échoue alors ne dit rien. Une sortie
+% complexe à l'une des deux sondes est complexe.
+function [s, sonde] = complexiteFonction(c, k, xE, sonde)
+    if ~isempty(sonde) && isequal(sonde.xE, xE)
+        s = sonde.s;
+        return
+    end
+    s = false(1, c.nOut(k));
+    if isfield(c, 'fonctions') && isstruct(c.fonctions{k}) && isfield(c.fonctions{k}, 'h')
+        h = c.fonctions{k}.h;
+        for essai = 1:2
+            u = cell(1, c.nIn(k));
+            for j = 1:c.nIn(k)
+                d = [1 1];
+                classe = 'double';
+                if c.entrees{k}(j) > 0
+                    d = c.dims{c.entrees{k}(j)};
+                    if isfield(c, 'typePort')
+                        classe = classeDe(c.typePort(c.entrees{k}(j)));
+                    end
+                end
+                valeur = (essai - 1) * complex(0.7, 0.3 * xE(j));
+                if ~xE(j)
+                    valeur = real(valeur);
+                end
+                u{j} = cast(valeur * ones(d), classe);
+                if xE(j)
+                    u{j} = complex(u{j});
+                end
+            end
+            sorties = cell(1, c.nOut(k));
+            try
+                [sorties{:}] = h(u{:});
+                for q = 1:c.nOut(k)
+                    s(q) = s(q) || (isnumeric(sorties{q}) && ~isreal(sorties{q}));
+                end
+            catch err
+                if essai == 1
+                    clear(func2str(h));
+                    if strncmp(err.identifier, 'Simulink:', 9) && ...
+                       ~isempty(strfind(err.message, c.chemins{k}))
+                        rethrow(err);
+                    end
+                    error('Simulink:blocks:MATLABFunctionError', ...
+                          'La fonction du bloc ''%s'' echoue sur des entrees nulles : %s', ...
+                          c.chemins{k}, err.message);
+                end
+            end
+            clear(func2str(h));
+        end
+    end
+    sonde = struct('xE', xE, 's', s);
+end
+
+function verifierComplexe(c, k, xE)
+    p = c.p{k};
+    ch = c.chemins{k};
+    if isfield(p, 'ComplexiteVerifiee') && ~isempty(xE)
+        % Signal Specification : la complexité annoncée doit être celle de
+        % l'entrée
+        if (strcmp(p.ComplexiteVerifiee, 'real') && xE(1)) || ...
+           (strcmp(p.ComplexiteVerifiee, 'complex') && ~xE(1))
+            noms = {'reel', 'complexe'};
+            error('Simulink:DataType:SignalSpecificationMismatch', ...
+                  ['Le bloc Signal Specification ''%s'' annonce un signal %s, et son entree ' ...
+                   'est un signal %s.'], ch, noms{1 + ~xE(1)}, noms{1 + xE(1)});
+        end
+    end
+    if strcmp(c.types{k}, 'outport') && isfield(p, 'SignalType') && ~isempty(xE) && ...
+       c.entrees{k}(1) > 0 && ((strcmp(p.SignalType, 'real') && xE(1)) || ...
+                               (strcmp(p.SignalType, 'complex') && ~xE(1)))
+        noms = {'reel', 'complexe'};
+        error('Simulink:DataType:InputPortComplexityMismatch', ...
+              '''%s'' attend un signal %s (SignalType), et recoit un signal %s.', ch, ...
+              noms{1 + ~xE(1)}, noms{1 + xE(1)});
+    end
+    if ~any(xE)
+        return
+    end
+    admis = entreesComplexesAdmises(c, k, numel(xE));
+    j = find(xE & ~admis, 1);
+    if ~isempty(j)
+        error('Simulink:DataType:InputPortComplexityMismatch', ...
+              ['L''entree %d de ''%s'' recoit un signal complexe, mais ce bloc ne traite ' ...
+               'que des signaux reels : separez parties reelle et imaginaire (Complex to ' ...
+               'Real-Imag), ou prenez le module (Abs).'], j, ch);
     end
 end

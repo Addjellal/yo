@@ -58,11 +58,6 @@ function signaux = matlibre_sl_scenario(fichier, scenario, chemin)
                    'timeseries.'], q, scenario, chemin, class(element));
         end
         [temps, valeurs] = matlibre_sl_serie(element);
-        if ~isreal(valeurs)
-            error('Simulink:DataType:ComplexSignalNotSupported', ...
-                  ['Le signal %d du scenario ''%s'' que lit ''%s'' est complexe : MatLibre ne ' ...
-                   'simule que des signaux reels.'], q, scenario, chemin);
-        end
         methode = 'linear';
         try
             if strcmpi(char(element.DataInfo.Interpolation.Name), 'zoh')

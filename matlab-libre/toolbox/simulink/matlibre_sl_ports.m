@@ -96,6 +96,17 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             if any(strcmpi(lire(p, 'Operator', 'square'), {'pow', 'hypot', 'rem', 'mod'}))
                 nEntrees = 2;
             end
+        case {'complextorealimag', 'complextomagnitudeangle'}
+            % deux sorties, ou l'une des deux parties
+            if any(strcmp(char(lire(p, 'Output', 'Real and imag')), ...
+                          {'Real and imag', 'Magnitude and angle'}))
+                nSorties = 2;
+            end
+        case {'realimagtocomplex', 'magnitudeangletocomplex'}
+            if any(strcmp(char(lire(p, 'Input', 'Real and imag')), ...
+                          {'Real and imag', 'Magnitude and angle'}))
+                nEntrees = 2;
+            end
         case 'trigonometry'
             operateur = lower(char(lire(p, 'Operator', 'sin')));
             if strcmp(operateur, 'atan2')

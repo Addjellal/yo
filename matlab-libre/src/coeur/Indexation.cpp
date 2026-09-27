@@ -276,6 +276,9 @@ std::vector<Valeur> Interpreteur::indexerListe(const Valeur& base, std::vector<V
         for (std::size_t k = 0; k < r.cellules.size(); ++k) liste.push_back(r.cellules[k]);
         return liste;
     }
+    // Un extrait d'un tableau complexe dont les parties imaginaires sont
+    // toutes nulles est réel, comme dans MATLAB : z = [1+2i 3] ; z(2) vaut 3.
+    r.compacter();
     return {r};
 }
 

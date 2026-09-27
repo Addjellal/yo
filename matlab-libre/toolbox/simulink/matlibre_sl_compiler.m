@@ -130,7 +130,11 @@ function c = compiler(modele, options)
         % Un bloc qui n'est qu'une autre façon d'en écrire un se ramène à lui :
         % Band-Limited White Noise à Random Number, Discrete Zero-Pole à
         % Discrete Transfer Fcn.
+        origine = c.types{k};
         [c.types{k}, c.p{k}] = normaliser(c.types{k}, c.p{k}, c.chemins{k});
+        if strcmp(c.types{k}, 'matlabfunction') && ~strcmp(origine, 'matlabfunction')
+            c.p{k}.Bibliotheque = origine;   % ce qu'il accepte, en complexe, est le sien
+        end
         % Une entrée du modèle qui reçoit une entrée externe la lit comme un
         % From Workspace lirait sa variable.
         if strcmp(c.types{k}, 'inport') && ~any(c.noms{k} == '/') && ...
@@ -250,6 +254,14 @@ function c = compiler(modele, options)
 
     % --- 6 bis. types de données ---------------------------------------------
     c.typePort = matlibre_sl_types('propager', c);
+    % --- 6 ter. complexité : ce qui est complexe, ce qui le refuse ---------
+    c.sourceComplexe = false(1, n);
+    for k = find(strcmp(c.types, 'fromworkspace'))
+        enCours('bloc', k);
+        [~, valeurs] = lireSignalEspace(c.p{k}, c.chemins{k});
+        c.sourceComplexe(k) = ~isreal(valeurs);
+    end
+    c.complexePort = matlibre_sl_types('complexite', c);
     [c.castK, c.arrondiK, c.saturerK] = conversionsDesSorties(c);
     c.largeur = zeros(1, c.nPorts);
     for gp = 1:c.nPorts
@@ -410,7 +422,8 @@ function p = lireParametres(entree, bloc, chemin)
                                 'OutPortSampleTime'}))
                 verifierPeriode(v, entree.params{i, 2}, chemin, nom);
             else
-                verifierNombre(v, entree.params{i, 2}, chemin, nom);
+                verifierNombre(v, entree.params{i, 2}, chemin, nom, ...
+                               complexeAdmis(entree.type, nom));
             end
             p.(nom) = double(v);
         elseif strcmp(nature, 'texte')
@@ -575,7 +588,8 @@ function [type, p] = normaliser(type, p, chemin)
                       'Le filtre ''%s'' n''a pas de coefficients.', chemin);
             end
             if all(double(p.InitialStates(:)) == 0)
-                p = struct('Numerator', b, 'Denominator', 1, 'SampleTime', p.SampleTime);
+                p = struct('Numerator', b, 'Denominator', 1, 'SampleTime', p.SampleTime, ...
+                           'Bibliotheque', 'discretefirfilter');
                 type = 'discretefilter';
             else
                 p = struct('Script', scriptRIF(b, double(p.InitialStates), chemin), ...
@@ -652,6 +666,46 @@ function [type, p] = normaliser(type, p, chemin)
         case 'bustovector'
             p = struct('Script', sprintf('function y = fcn(u)\ny = u(:);\n'), 'SampleTime', -1);
             type = 'matlabfunction';
+        case {'complextorealimag', 'complextomagnitudeangle'}
+            % les deux parties d'un complexe, ou l'une d'elles
+            if strcmp(type, 'complextorealimag')
+                f = {'real(u)', 'imag(u)'};
+                choix = {'Real and imag', 'Real', 'Imag'};
+            else
+                f = {'abs(u)', 'angle(u)'};
+                choix = {'Magnitude and angle', 'Magnitude', 'Angle'};
+            end
+            switch find(strcmp(p.Output, choix))
+                case 1
+                    texte = sprintf('function [a, b] = fcn(u)\na = %s;\nb = %s;\n', f{:});
+                case 2
+                    texte = sprintf('function y = fcn(u)\ny = %s;\n', f{1});
+                otherwise
+                    texte = sprintf('function y = fcn(u)\ny = %s;\n', f{2});
+            end
+            p = struct('Script', texte, 'SampleTime', p.SampleTime);
+            type = 'matlabfunction';
+        case {'realimagtocomplex', 'magnitudeangletocomplex'}
+            % un complexe de ses deux parties ; une partie qui manque est
+            % ConstantPart
+            constante = mat2str(double(p.ConstantPart), 17);
+            if strcmp(type, 'realimagtocomplex')
+                forme = 'y = complex(a + 0 * b, b + 0 * a);';
+                choix = {'Real and imag', 'Real', 'Imag'};
+            else
+                forme = 'y = complex(a .* cos(b), a .* sin(b));';
+                choix = {'Magnitude and angle', 'Magnitude', 'Angle'};
+            end
+            switch find(strcmp(p.Input, choix))
+                case 1
+                    texte = sprintf('function y = fcn(a, b)\n%s\n', forme);
+                case 2
+                    texte = sprintf('function y = fcn(a)\nb = %s;\n%s\n', constante, forme);
+                otherwise
+                    texte = sprintf('function y = fcn(b)\na = %s;\n%s\n', constante, forme);
+            end
+            p = struct('Script', texte, 'SampleTime', p.SampleTime);
+            type = 'matlabfunction';
         case 'environmentcontroller'
             % en simulation, l'entrée Sim ; Coder ne sert qu'au code produit
             p = struct('Script', sprintf('function y = fcn(Sim, Coder)\ny = Sim;\n'), ...
@@ -672,17 +726,10 @@ function [type, p] = normaliser(type, p, chemin)
             p = struct('ConversionOutput', 'Signal copy', 'NombreDePorts', 1, ...
                        'OutDataTypeStr', 'Inherit: auto', ...
                        'DimensionsVerifiees', double(p.Dimensions), ...
-                       'TypeVerifie', char(p.OutDataTypeStr));
+                       'TypeVerifie', char(p.OutDataTypeStr), ...
+                       'ComplexiteVerifiee', char(p.SignalType));
             type = 'signalconversion';
     end
-end
-
-% Une donnée complexe qu'un bloc voudrait lire.
-function erreurComplexe(nomVariable, nomBloc)
-    error('Simulink:DataType:ComplexSignalNotSupported', ...
-          ['Les valeurs de ''%s'' que lit ''%s'' sont complexes : MatLibre ne simule que ' ...
-           'des signaux reels. Separez-les en parties reelle et imaginaire (real, imag).'], ...
-          nomVariable, nomBloc);
 end
 
 % Le signal d'un fichier MAT, comme l'écrit To File : une matrice dont la
@@ -934,12 +981,25 @@ function script = scriptScenario(p, chemin)
     for q = 1:n
         tk = signaux(q).temps;
         vk = signaux(q).valeurs;
-        if numel(tk) == 1
-            L{end + 1} = sprintf('y%d = %s;', q, mat2str(vk(:), 17)); %#ok<AGROW>
+        parties = {real(vk)};
+        if ~isreal(vk)
+            parties{2} = imag(vk);
+        end
+        texte = cell(1, numel(parties));
+        for i = 1:numel(parties)
+            if numel(tk) == 1
+                texte{i} = mat2str(parties{i}(:), 17);
+            else
+                texte{i} = sprintf('interp1(%s, %s, min(max(t, %s), %s), ''%s'').''', ...
+                                   mat2str(tk, 17), mat2str(parties{i}, 17), ...
+                                   mat2str(tk(1), 17), mat2str(tk(end), 17), ...
+                                   signaux(q).methode);
+            end
+        end
+        if numel(parties) == 1
+            L{end + 1} = sprintf('y%d = %s;', q, texte{1}); %#ok<AGROW>
         else
-            L{end + 1} = sprintf(['y%d = interp1(%s, %s, min(max(t, %s), %s), ''%s'').'';'], ...
-                                 q, mat2str(tk, 17), mat2str(vk, 17), mat2str(tk(1), 17), ...
-                                 mat2str(tk(end), 17), signaux(q).methode); %#ok<AGROW>
+            L{end + 1} = sprintf('y%d = complex(%s, %s);', q, texte{:}); %#ok<AGROW>
         end
     end
     script = [strjoin(L, sprintf('\n')), sprintf('\n')];
@@ -2276,9 +2336,6 @@ function s = regleDims(c, k, dE, complet, forcer)
             end
         case 'fromworkspace'
             [~, valeurs] = lireSignalEspace(p, c.chemins{k});
-            if ~isreal(valeurs)
-                erreurComplexe(char(p.VariableName), c.chemins{k});
-            end
             s = {dimsDe(zeros(size(valeurs, 2), 1))};
         case 'from'
             if isempty(c.entrees{k}) || c.entrees{k}(1) == 0
@@ -3215,7 +3272,8 @@ function c = abaisser(c, pas, tDebut)
             case 'trigonometry'
                 sub = find(strcmp(p.Operator, {'sin', 'cos', 'tan', 'asin', 'acos', 'atan', ...
                                                'atan2', 'sinh', 'cosh', 'tanh', 'asinh', ...
-                                               'acosh', 'atanh', 'sincos'}));
+                                               'acosh', 'atanh', 'sincos', ...
+                                               'cos + jsin'}));
             case 'minmax'
                 sub = 1 + strcmp(p.Function, 'max');
                 seg = c.nIn(k);
@@ -4376,14 +4434,6 @@ function s = dimsFonction(c, k, dE)
     sorties = cell(1, c.nOut(k));
     try
         [sorties{:}] = h(u{:});
-        for q = 1:numel(sorties)
-            if (isnumeric(sorties{q}) || islogical(sorties{q})) && ~isreal(sorties{q})
-                error('Simulink:DataType:ComplexSignalNotSupported', ...
-                      ['La sortie %d du bloc ''%s'' est complexe : MatLibre ne simule que ' ...
-                       'des signaux reels. Separez-la en parties reelle et imaginaire ' ...
-                       '(real, imag).'], q, c.chemins{k});
-            end
-        end
     catch err
         % une erreur de Simulink qui nomme déjà le bloc passe telle quelle
         if strncmp(err.identifier, 'Simulink:', 9) && ~isempty(strfind(err.message, c.chemins{k}))
@@ -4888,9 +4938,6 @@ function [temps, valeurs] = lireSignalEspace(p, nomBloc)
         % une entrée externe du modèle : ses données sont déjà là
         temps = double(p.Donnees.temps(:));
         valeurs = double(p.Donnees.valeurs);
-        if ~isreal(valeurs)
-            erreurComplexe(nomVariable, nomBloc);
-        end
         return
     end
     if isempty(nomVariable)
@@ -4906,9 +4953,6 @@ function [temps, valeurs] = lireSignalEspace(p, nomBloc)
                'l''espace de travail de base.'], nomBloc, nomVariable);
     else
         donnees = evalin('base', nomVariable);
-    end
-    if isnumeric(donnees) && ~isreal(donnees)
-        erreurComplexe(nomVariable, nomBloc);
     end
     if isa(donnees, 'timeseries')
         [temps, valeurs] = matlibre_sl_serie(donnees);
@@ -5008,11 +5052,20 @@ end
 % des signaux réels), une valeur vide là où le bloc en attend une, un
 % nombre de ports ou de retards qui n'est pas un entier positif, un
 % retard négatif ou infini.
-function verifierNombre(v, defaut, chemin, nom)
-    if ~isreal(v)
+% Les paramètres qu'un nombre complexe n'embarrasse pas : ceux des blocs
+% qui calculent en complexe.
+function oui = complexeAdmis(type, nom)
+    admis = {'constant.Value', 'gain.Gain', 'bias.Bias', 'ic.Value', ...
+             'delay.InitialCondition', 'memory.InitialCondition', 'difference.ICPrevInput', ...
+             'tappeddelay.vinit', 'realimagtocomplex.ConstantPart'};
+    oui = any(strcmp([type '.' nom], admis));
+end
+
+function verifierNombre(v, defaut, chemin, nom, complexe)
+    if ~isreal(v) && ~(nargin >= 5 && complexe)
         error('Simulink:Parameters:InvParamSetting', ...
-              ['Le parametre ''%s'' de ''%s'' vaut %s, un nombre complexe : MatLibre ne ' ...
-               'simule que des signaux reels.'], nom, chemin, apercu(v));
+              ['Le parametre ''%s'' de ''%s'' vaut %s, un nombre complexe : ce parametre ' ...
+               'n''admet que des reels.'], nom, chemin, apercu(v));
     end
     if isempty(v) && ~isempty(defaut) && ...
        ~any(strcmp(nom, {'Zeros', 'Poles', 'A', 'B', 'C', 'D', 'X0'}))

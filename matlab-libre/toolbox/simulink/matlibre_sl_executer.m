@@ -96,6 +96,18 @@ function T = preparer(c)
     % Les types des sorties : une sortie qui n'est pas double se ramène à
     % son type après chaque calcul du bloc (voir MATLIBRE_SL_TYPES).
     T.typePort = c.typePort;
+    % La complexité des sorties, et pour chaque bloc s'il reçoit un
+    % complexe : il calcule alors en complexe — la racine d'un négatif est
+    % imaginaire, et non NaN —, même quand la valeur du moment est réelle.
+    T.complexePort = false(1, numel(c.typePort));
+    if isfield(c, 'complexePort')
+        T.complexePort = c.complexePort;
+    end
+    T.cxE = false(1, n);
+    for k = 1:n
+        sources = c.entrees{k};
+        T.cxE(k) = any(T.complexePort(sources(sources > 0)));
+    end
     T.castK = c.castK;
     T.arrondiK = c.arrondiK;
     T.saturerK = c.saturerK;
@@ -420,7 +432,10 @@ function T = preparer(c)
     % d'impulsions, dont les fronts se calculent en marchant.
     T.zc = [];
     if isfield(c, 'zc')
-        T.zc = find(c.zc);
+        % le module ou l'égalité d'un complexe n'a pas de signe qui
+        % change : Simulink n'y cherche pas de passage par zéro
+        lisse = T.cxE & ismember(c.types, {'abs', 'relational'});
+        T.zc = find(c.zc & ~lisse);
     end
     T.cassures = zeros(0, 1);
     T.impulsions = [];
@@ -2133,8 +2148,8 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                     case 28   % bias
                         V(a:b) = u + T.P(p:p + b - a);
-                    case 29   % dot product
-                        V(a) = sum(u .* V(eA(e + 2):eB(e + 2)));
+                    case 29   % dot product : sum(conj(u1) .* u2)
+                        V(a) = sum(conj(u) .* V(eA(e + 2):eB(e + 2)));
                 end
             case 3
                 u = V(eA(e + 1):eB(e + 1));
@@ -2189,11 +2204,11 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                     case 33   % sqrt
                         switch sub(k)
                             case 1
-                                V(a:b) = racine(u);
+                                V(a:b) = racine(u, T.cxE(k));
                             case 2
                                 V(a:b) = sign(u) .* sqrt(abs(u));
                             otherwise
-                                V(a:b) = 1 ./ racine(u);
+                                V(a:b) = 1 ./ racine(u, T.cxE(k));
                         end
                 end
             case 4
@@ -2840,12 +2855,13 @@ function V = appelerFonction(T, k, V, p, e)
         a = T.poA(pd + q - 1);
         b = T.poB(pd + q - 1);
         y = double(sorties{q});
-        if ~isreal(y)
-            % un signal complexe gâterait tout le vecteur des valeurs
+        if ~isreal(y) && ~T.complexePort(pd + q - 1)
+            % compilée réelle, la sortie ne peut devenir complexe en route :
+            % Simulink fixe la complexité d'un signal avant de simuler
             error('Simulink:DataType:ComplexSignalNotSupported', ...
-                  ['La sortie %d du bloc ''%s'' devient complexe : MatLibre ne simule que ' ...
-                   'des signaux reels. Separez-la en parties reelle et imaginaire ' ...
-                   '(real, imag).'], q, T.chemins{k});
+                  ['La sortie %d du bloc ''%s'' devient complexe, alors que la compilation ' ...
+                   'l''a trouvee reelle : rendez-la complexe des le depart (complex), ou ' ...
+                   'gardez-la reelle (real, abs).'], q, T.chemins{k});
         end
         if numel(y) ~= b - a + 1
             error('Simulink:blocks:MATLABFunctionOutputSize', ...
@@ -3661,7 +3677,13 @@ end
 
 % --- les calculs un peu longs, sortis de la passe pour qu'elle reste lisible
 
-function y = racine(u)
+% La racine d'un signal réel : NaN sous zéro ; celle d'un signal complexe
+% est complexe.
+function y = racine(u, complexe)
+    if nargin >= 2 && complexe
+        y = sqrt(u);
+        return
+    end
     y = sqrt(abs(u));
     y(u < 0) = NaN;
 end
@@ -3717,36 +3739,45 @@ function y = produit(T, k, V, u, p, e)
 end
 
 function V = fonctionMath(T, k, V, u, p, e, a, b)
+    complexe = T.cxE(k);
     switch T.sub(k)
         case 1
             V(a:b) = exp(u);
         case 2
+            if complexe
+                V(a:b) = log(u);
+                return
+            end
             y = log(abs(u));
             y(u < 0) = NaN;
             V(a:b) = y;
         case 3
             V(a:b) = 10 .^ u;
         case 4
+            if complexe
+                V(a:b) = log10(u);
+                return
+            end
             y = log10(abs(u));
             y(u < 0) = NaN;
             V(a:b) = y;
-        case 5
-            V(a:b) = u .* u;
+        case 5   % magnitude^2 : réel, même d'un complexe
+            V(a:b) = real(u .* conj(u));
         case 6
             V(a:b) = u .^ 2;
         case 7
-            V(a:b) = racine(u);
+            V(a:b) = racine(u, complexe);
         case 8
             u2 = V(T.eA(e + 2):T.eB(e + 2));
             y = u .^ u2;
-            if ~isreal(y)
+            if ~isreal(y) && ~complexe
                 imaginaire = imag(y) ~= 0;
                 y = real(y);
                 y(imaginaire) = NaN;
             end
             V(a:b) = y;
         case 9
-            V(a:b) = u;
+            V(a:b) = conj(u);
         case 10
             V(a:b) = 1 ./ u;
         case 11
@@ -3755,13 +3786,22 @@ function V = fonctionMath(T, k, V, u, p, e, a, b)
             V(a:b) = rem(u, V(T.eA(e + 2):T.eB(e + 2)));
         case 13
             V(a:b) = mod(u, V(T.eA(e + 2):T.eB(e + 2)));
-        otherwise   % transpose, hermitian : des nombres réels, donc le même
+        case 14   % transpose
             M = reshape(u, T.P(p), T.P(p + 1)).';
+            V(a:b) = M(:);
+        otherwise   % hermitian : la transposée conjuguée
+            M = reshape(u, T.P(p), T.P(p + 1))';
             V(a:b) = M(:);
     end
 end
 
 function V = trigonometrie(T, k, V, u, e, a, b)
+    if T.cxE(k) && any(T.sub(k) == [4 5 12 13])
+        % d'un complexe, les réciproques sont définies partout
+        fonctions = {[], [], [], @asin, @acos, [], [], [], [], [], [], @acosh, @atanh};
+        V(a:b) = fonctions{T.sub(k)}(u);
+        return
+    end
     switch T.sub(k)
         case 1
             V(a:b) = sin(u);
@@ -3797,10 +3837,12 @@ function V = trigonometrie(T, k, V, u, e, a, b)
             y = atanh(max(min(u, 1), -1));
             y(abs(u) > 1) = NaN;
             V(a:b) = y;
-        otherwise   % sincos : deux sorties
+        case 14   % sincos : deux sorties
             V(a:b) = sin(u);
             pd = T.pd(k);
             V(T.poA(pd + 1):T.poB(pd + 1)) = cos(u);
+        otherwise   % cos + jsin : exp(ju), complexe
+            V(a:b) = complex(cos(u), sin(u));
     end
 end
 
