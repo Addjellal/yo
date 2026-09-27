@@ -477,10 +477,48 @@ FONCTION(fnCell2struct) {
 
 FONCTION(fnNum2cell) {
     INUTILISE
-    exigerArguments(args, 1, 1, "num2cell");
+    exigerArguments(args, 1, 2, "num2cell");
     const Valeur& v = args[0];
-    Valeur r = Valeur::celluleDims(v.dims);
-    for (std::size_t k = 0; k < v.nelem(); ++k) r.cellules[k] = extraireElement(v, k);
+    if (args.size() == 1) {
+        Valeur r = Valeur::celluleDims(v.dims);
+        for (std::size_t k = 0; k < v.nelem(); ++k) r.cellules[k] = extraireElement(v, k);
+        return {r};
+    }
+    // « num2cell(A, dims) » : chaque cellule porte A tout entier le long des
+    // dimensions données, une par position des autres. num2cell(A, 1) rend
+    // les colonnes de A.
+    exigerNumerique(args[1], "num2cell");
+    std::vector<bool> reunie;
+    for (std::size_t k = 0; k < args[1].nelem(); ++k) {
+        double d = args[1].re[k];
+        if (d < 1 || d != std::floor(d))
+            erreur("MATLAB:num2cell:InvalidDimension",
+                   "num2cell : les dimensions sont des entiers positifs.");
+        if ((std::size_t)d > reunie.size()) reunie.resize((std::size_t)d, false);
+        reunie[(std::size_t)d - 1] = true;
+    }
+    Dims source = v.dims;
+    std::size_t nd = std::max(source.size(), reunie.size());
+    source.resize(nd, 1);
+    reunie.resize(nd, false);
+    Dims taille = source;
+    for (std::size_t d = 0; d < nd; ++d)
+        if (reunie[d]) taille[d] = 1;
+    while (taille.size() > 2 && taille.back() == 1) taille.pop_back();
+    nd = std::max<std::size_t>(nd, taille.size());
+    Valeur r = Valeur::celluleDims(taille);
+    std::size_t n = produitDims(taille);
+    for (std::size_t k = 0; k < n; ++k) {
+        std::size_t reste = k;
+        std::vector<Valeur> idx(nd);
+        for (std::size_t d = 0; d < nd; ++d) {
+            std::size_t t = d < taille.size() ? (std::size_t)std::max(1, taille[d]) : 1;
+            std::size_t coord = reste % t;
+            reste /= t;
+            idx[d] = reunie[d] ? Valeur::texte(":") : Valeur::scalaire((double)coord + 1);
+        }
+        r.cellules[k] = it.indexer(v, idx, '(');
+    }
     return {r};
 }
 

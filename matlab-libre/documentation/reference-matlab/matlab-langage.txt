@@ -11,7 +11,8 @@ exist exp expm eye factorial false fclose feof feval fft fftshift fgetl fgets
 fieldnames filter find fix fliplr flipud floor fopen fprintf fread fscanf
 full func2str function_handle functions fwrite gamma gcd genvarname get
 getfield gradient histcounts horzcat hypot idivide ifft imag ind2sub inf
-inputname inputParser int2str int8 int16 int32 int64 interp1 intersect inv
+inputname inputParser int2str int8 int16 int32 int64 interp1 interp2 interp3 interpn
+intersect inv
 ipermute iscell iscellstr ischar iscolumn isdiag isempty isequal isequaln
 isfield isfinite isfloat isinf isinteger islogical ismatrix ismember isnan
 isnumeric isreal isrow isscalar issorted isspace isstring isstruct isvector

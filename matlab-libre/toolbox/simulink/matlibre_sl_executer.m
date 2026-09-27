@@ -180,10 +180,18 @@ function T = preparer(c)
         T.objets = c.objets;
     end
     T.formes = cell(1, n);
+    T.classesEntree = cell(1, n);
     for k = find(strcmp(c.types, 'matlabfunction'))
         T.formes{k} = cell(1, c.nIn(k));
+        % une entrée typée arrive à la fonction dans sa classe, comme dans
+        % Simulink : un int8 y calcule en int8
+        T.classesEntree{k} = repmat({''}, 1, c.nIn(k));
         for j = 1:c.nIn(k)
             T.formes{k}{j} = c.inDims{k}{j};
+            source = c.entrees{k}(j);
+            if source > 0 && isfield(c, 'typePort') && c.typePort(source) > 2
+                T.classesEntree{k}{j} = matlibre_sl_types('classe', c.typePort(source));
+            end
         end
     end
     T.revient = false(1, n);
@@ -2287,18 +2295,32 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                     case 61   % multiport switch
                         commande = V(eA(e + 1));
                         rang = fix(commande) + T.P(p + 1);
-                        if ~(rang >= 1 && rang <= T.P(p))
-                            if T.P(p + 1)
-                                base = 'a partir de zero';
-                            else
-                                base = 'a partir de un';
-                            end
-                            error('Simulink:blocks:MultiPortSwitchIndexOutOfRange', ...
-                                  ['L''entree de commande de ''%s'' vaut %g a t = %g : elle ' ...
-                                   'doit designer l''une de ses %d entrees de donnees, ' ...
-                                   'numerotees %s.'], T.chemins{k}, commande, t, T.P(p), base);
+                        if T.P(p + 1)
+                            base = 'a partir de zero';
+                        else
+                            base = 'a partir de un';
                         end
-                        V(a:b) = V(eA(e + 1 + rang):eB(e + 1 + rang));
+                        if T.P(p) == 1
+                            % une seule entrée de données : l'Index Vector en
+                            % choisit un élément
+                            donnees = V(eA(e + 2):eB(e + 2));
+                            if ~(rang >= 1 && rang <= numel(donnees))
+                                error('Simulink:blocks:MultiPortSwitchIndexOutOfRange', ...
+                                      ['L''entree de commande de ''%s'' vaut %g a t = %g : elle ' ...
+                                       'doit designer l''un des %d elements de son entree de ' ...
+                                       'donnees, numerotes %s.'], T.chemins{k}, commande, t, ...
+                                      numel(donnees), base);
+                            end
+                            V(a:b) = donnees(rang);
+                        else
+                            if ~(rang >= 1 && rang <= T.P(p))
+                                error('Simulink:blocks:MultiPortSwitchIndexOutOfRange', ...
+                                      ['L''entree de commande de ''%s'' vaut %g a t = %g : elle ' ...
+                                       'doit designer l''une de ses %d entrees de donnees, ' ...
+                                       'numerotees %s.'], T.chemins{k}, commande, t, T.P(p), base);
+                            end
+                            V(a:b) = V(eA(e + 1 + rang):eB(e + 1 + rang));
+                        end
                     case {62, 65}   % mux, concatenate
                         if code(k) == 65 && sub(k) == 2
                             V(a:b) = concatener(T, p, V, e);
@@ -2533,8 +2555,8 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         if any(V(eA(e + 1):eB(e + 1)) ~= 0)
                             Z(1) = 1;
                         end
-                    case 96   % assertion
-                        if T.P(p) ~= 0 && majeur && any(V(eA(e + 1):eB(e + 1)) == 0)
+                    case 96   % assertion et blocs de vérification
+                        if T.P(p) ~= 0 && majeur && ~verifie(T, p, V, e, eA, eB)
                             if T.P(p + 1) ~= 0
                                 error('Simulink:blocks:AssertionAssert', ...
                                       'Assertion detectee dans ''%s'' a t = %g.', ...
@@ -2548,6 +2570,53 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
         if castK(k)
             V = convertirSorties(T, k, V);
         end
+    end
+end
+
+% Ce que vérifie une assertion : que son entrée ne s'annule pas, ou, pour un
+% bloc de vérification, que le signal reste dans ses bornes — des
+% paramètres (Check Static) ou des signaux (Check Dynamic). Vrai si tout va
+% bien.
+function ok = verifie(T, p, V, e, eA, eB)
+    genre = T.P(p + 2);
+    switch genre
+        case 0   % Assertion
+            ok = all(V(eA(e + 1):eB(e + 1)) ~= 0);
+            return
+        case {1, 2, 3, 4}   % Check Static : le signal est la seule entrée
+            u = V(eA(e + 1):eB(e + 1));
+            nb = T.P(p + 5);
+            bas = T.P(p + 6:p + 5 + nb);
+            nh = T.P(p + 6 + nb);
+            haut = T.P(p + 7 + nb:p + 6 + nb + nh);
+            minInclus = T.P(p + 3) ~= 0;
+            maxInclus = T.P(p + 4) ~= 0;
+        case {5, 8}   % Check Dynamic Range et Gap : max, sig, min
+            haut = V(eA(e + 1):eB(e + 1));
+            u = V(eA(e + 2):eB(e + 2));
+            bas = V(eA(e + 3):eB(e + 3));
+            % l'intervalle est ouvert ; l'écart aussi : ses bornes sont
+            % permises au signal
+            minInclus = genre == 8;
+            maxInclus = genre == 8;
+        case 6   % Check Dynamic Lower Bound : min, sig
+            bas = V(eA(e + 1):eB(e + 1));
+            u = V(eA(e + 2):eB(e + 2));
+            minInclus = false;
+        case 7   % Check Dynamic Upper Bound : max, sig
+            haut = V(eA(e + 1):eB(e + 1));
+            u = V(eA(e + 2):eB(e + 2));
+            maxInclus = false;
+    end
+    switch genre
+        case {1, 5}   % dans l'intervalle
+            ok = all((u > bas | (minInclus & u == bas)) & (u < haut | (maxInclus & u == haut)));
+        case {2, 6}   % au-dessus de la borne basse
+            ok = all(u > bas | (minInclus & u == bas));
+        case {3, 7}   % au-dessous de la borne haute
+            ok = all(u < haut | (maxInclus & u == haut));
+        otherwise     % hors de l'intervalle
+            ok = all(u < bas | (minInclus & u == bas) | u > haut | (maxInclus & u == haut));
     end
 end
 
@@ -2689,6 +2758,9 @@ function V = appelerFonction(T, k, V, p, e)
     u = cell(1, nIn);
     for j = 1:nIn
         u{j} = reshape(V(T.eA(e + j):T.eB(e + j)), T.formes{k}{j});
+        if ~isempty(T.classesEntree{k}{j})
+            u{j} = cast(u{j}, T.classesEntree{k}{j});
+        end
     end
     sorties = cell(1, nOut);
     [sorties{:}] = T.objets{k}(u{:});

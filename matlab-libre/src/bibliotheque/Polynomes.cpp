@@ -528,8 +528,10 @@ FONCTION(fnInterp1) {
         if (methode == "nearest") {
             double meilleur = NAN;
             double distance = INFINITY;
+            // à égale distance de deux points, le plus grand l'emporte,
+            // comme dans MATLAB
             for (std::size_t i = 0; i < x.size(); ++i)
-                if (std::fabs(x[i] - xi) < distance) {
+                if (std::fabs(x[i] - xi) <= distance) {
                     distance = std::fabs(x[i] - xi);
                     meilleur = y[i];
                 }
@@ -621,57 +623,6 @@ FONCTION(fnPchip) {
 FONCTION(fnMakima) {
     INUTILISE
     return hermitePublique(args, "makima", true, true);
-}
-
-FONCTION(fnInterp2) {
-    INUTILISE
-    exigerArguments(args, 3, 6, "interp2");
-    // La methode n'est pas encore un choix : seule la bilineaire est
-    // ecrite. La nommer autrement ne doit donc pas passer sans bruit —
-    // « interp2(...,'spline') » rendait une interpolation lineaire en se
-    // faisant passer pour une spline.
-    for (std::size_t k = 3; k < args.size(); ++k) {
-        if (!(args[k].estTexte() || args[k].estChaine())) continue;
-        std::string methode = args[k].versTexte();
-        for (auto& c : methode) c = (char)std::tolower((unsigned char)c);
-        if (methode == "linear" || methode == "bilinear") continue;
-        if (methode == "nearest" || methode == "cubic" || methode == "spline" ||
-            methode == "makima")
-            erreur("MATLAB:interp2:NotSupported",
-                   "INTERP2 ne sait faire que 'linear' ; '" + args[k].versTexte() +
-                       "' n'est pas encore ecrite.");
-        erreur("MATLAB:interp2:InvalidMethod",
-               "Unrecognized interpolation method '" + args[k].versTexte() + "'.");
-    }
-    // Interpolation bilinéaire sur une grille régulière.
-    const Valeur& X = versDouble(args[0]);
-    const Valeur& Y = versDouble(args[1]);
-    const Valeur& Z = versDouble(args[2]);
-    const Valeur& xi = versDouble(args[3]);
-    const Valeur& yi = versDouble(args[4 < args.size() ? 4 : 3]);
-    std::vector<double> xs, ys;
-    for (int j = 0; j < X.ncolonnes(); ++j) xs.push_back(X.re[(std::size_t)j * X.nlignes()]);
-    for (int i = 0; i < Y.nlignes(); ++i) ys.push_back(Y.re[(std::size_t)i]);
-    Valeur r = xi;
-    for (std::size_t k = 0; k < xi.nelem(); ++k) {
-        double px = xi.re[k], py = yi.re[std::min(k, yi.nelem() - 1)];
-        auto trouver = [](const std::vector<double>& v, double p) {
-            std::size_t i = 0;
-            while (i + 2 < v.size() && v[i + 1] < p) ++i;
-            return i;
-        };
-        std::size_t a = trouver(xs, px), b = trouver(ys, py);
-        double tx = (xs.size() > 1) ? (px - xs[a]) / (xs[a + 1] - xs[a]) : 0.0;
-        double ty = (ys.size() > 1) ? (py - ys[b]) / (ys[b + 1] - ys[b]) : 0.0;
-        int l = Z.nlignes();
-        double z00 = Z.re[b + a * (std::size_t)l];
-        double z01 = Z.re[b + (a + 1) * (std::size_t)l];
-        double z10 = Z.re[(b + 1) + a * (std::size_t)l];
-        double z11 = Z.re[(b + 1) + (a + 1) * (std::size_t)l];
-        r.re[k] = z00 * (1 - tx) * (1 - ty) + z01 * tx * (1 - ty) + z10 * (1 - tx) * ty +
-                  z11 * tx * ty;
-    }
-    return {r};
 }
 
 // Spline cubique naturelle, évaluée directement.
@@ -818,7 +769,6 @@ void enregistrerPolynomes(Interpreteur& it) {
     it.enregistrer("polyint", fnPolyint, "polynomes", "polyint  Primitive d'un polynome.");
     it.enregistrer("deconv", fnDeconv, "polynomes", "deconv  Division polynomiale.");
     it.enregistrer("interp1", fnInterp1, "polynomes", "interp1  Interpolation 1-D.");
-    it.enregistrer("interp2", fnInterp2, "polynomes", "interp2  Interpolation 2-D bilineaire.");
     it.enregistrer("spline", fnSpline, "polynomes", "spline  Spline cubique.");
     it.enregistrer("pchip", fnPchip, "polynomes",
                    "pchip  Interpolation cubique qui preserve la forme.");

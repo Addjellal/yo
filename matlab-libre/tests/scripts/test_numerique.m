@@ -445,6 +445,77 @@ end
 % des deux : la division d'essai ne s'arrête pas trop tôt.
 assert(isequal(factor(7919 * 7907), [7907 7919]));
 
+% interpn : l'interpolation sur une grille à N dimensions. Une fonction
+% affine est rendue exactement ; hors de la grille, NaN ou EXTRAPVAL.
+[x1, x2, x3] = ndgrid(0:1, 0:2, 0:3);
+Vn = x1 + 10 * x2 + 100 * x3;
+assert(abs(interpn(0:1, 0:2, 0:3, Vn, 0.5, 1.5, 2) - 215.5) < 1e-12);
+assert(isnan(interpn(0:1, 0:2, 0:3, Vn, 2, 0, 0)));
+assert(interpn(0:1, 0:2, 0:3, Vn, 2, 0, 0, 'linear', -1) == -1);
+assert(max(abs(interpn(x1, x2, x3, Vn, [0.25 0.75], [1 2], [3 0]) - [310.25 20.75])) < 1e-12);
+assert(abs(interpn(Vn, 1.5, 2, 3) - 210.5) < 1e-12);
+assert(interpn(0:1, 0:2, 0:3, Vn, 0.4, 1.6, 2.5, 'nearest') == 320);
+assert(isequal(size(interpn(0:1, 0:2, 0:3, Vn, [0 1], [0 1 2], 0)), [2 3]));
+assert(abs(interpn([1 2 3], [10 20 30], 2.5) - 25) < 1e-12);
+assert(abs(interpn([10 20 30], 2.5) - 25) < 1e-12);
+q = interpn(0:2, [0 10 20], [0.5 1.5 3]);
+assert(isequal(q(1:2), [5 15]) && isnan(q(3)));
+assert(strcmp(identifiantErreur(@() interpn(0:1, 0:2, Vn(:, :, 1), 0, 0, 'bicubique')), ...
+              'MATLAB:interpn:InvalidMethod'));
+assert(strcmp(identifiantErreur(@() interpn(0:1, [0 2 1], zeros(2, 3), 0, 0)), ...
+              'MATLAB:interpn:GridNotMonotonic'));
+assert(strcmp(identifiantErreur(@() interpn(0:1, 0:2, zeros(2, 4), 0, 0)), ...
+              'MATLAB:interpn:GridSize'));
+% Les méthodes d'ordre trois s'appliquent dimension après dimension : la
+% spline et la convolution cubique rendent exactement un polynôme de
+% degré trois en x1 et deux en x2.
+[g1, g2] = ndgrid(0:5, 0:4);
+F = g1.^3 - 2 * g2.^2 + g1 .* g2;
+exact = 2.5^3 - 2 * 1.5^2 + 2.5 * 1.5;
+assert(abs(interpn(0:5, 0:4, F, 2.5, 1.5, 'spline') - exact) < 1e-10);
+assert(abs(interpn(0:5, 0:4, F, 2.5, 1.5, 'cubic') - exact) < 1e-10);
+assert(abs(interpn(0:5, 0:4, F, 2.5, 1.5, 'makima') - exact) < 0.1);
+assert(abs(interpn(0:5, 0:4, F, 6, 1.5, 'spline', 'extrap') - (216 - 4.5 + 9)) < 1e-9);
+% interp2 : la grille de MESHGRID, en vecteurs ligne ou colonne, ou en
+% tableaux ; NaN hors de la grille ; interp2(V, K) raffine la grille.
+[X2, Y2] = meshgrid(0:2, 0:1);
+V2 = X2 + 10 * Y2;
+assert(abs(interp2(X2, Y2, V2, 1.5, 0.5) - 6.5) < 1e-12);
+assert(isnan(interp2(X2, Y2, V2, 3, 0)) && interp2(X2, Y2, V2, 3, 0, 'linear', -7) == -7);
+assert(abs(interp2(1:3, 1:3, magic(3), 2.5, 1.5) - 4.75) < 1e-12);
+T2 = sqrt((1:11)' * (1:11));
+assert(abs(interp2(10:10:110, (10:10:110)', T2, 42, 25) - interp2(T2, 4.2, 2.5)) < 1e-12);
+assert(isequal(interp2(0:2, 0:1, V2, [0 1 2], [0; 1]), [0 1 2; 10 11 12]));
+assert(isequal(size(interp2(magic(4))), [7 7]) && isequal(size(interp2(magic(4), 2)), [13 13]));
+assert(interp2(X2, Y2, V2, 1.4, 0.6, 'nearest') == 11);
+assert(strcmp(identifiantErreur(@() interp2(X2, Y2, V2, 1, 1, 'bilineaire')), ...
+              'MATLAB:interp2:InvalidMethod'));
+% interp1 : à égale distance de deux points, le plus proche est le plus
+% grand.
+assert(interp1([0 1], [0 10], 0.5, 'nearest') == 10);
+% interp3 suit l'ordre de MESHGRID : les colonnes portent X, les lignes Y.
+[X3, Y3, Z3] = meshgrid(0:2, 0:1, 0:3);
+W3 = X3 + 10 * Y3 + 100 * Z3;
+assert(abs(interp3(X3, Y3, Z3, W3, 1.5, 0.5, 2) - 206.5) < 1e-12);
+assert(abs(interp3(W3, 2.5, 1.5, 3) - 206.5) < 1e-12);
+assert(isequal(size(interp3(0:2, 0:1, 0:3, W3, [0 1 2], [0 1], 1)), [2 3]));
+
+% num2cell(A, DIMS) : une cellule par position des dimensions non réunies.
+A = magic(3);
+C = num2cell(A, 1);
+assert(isequal(size(C), [1 3]) && isequal(C{2}, A(:, 2)));
+C = num2cell(A, 2);
+assert(isequal(size(C), [3 1]) && isequal(C{3}, A(3, :)));
+C = num2cell(A, [1 2]);
+assert(isequal(size(C), [1 1]) && isequal(C{1}, A));
+C = num2cell(reshape(1:8, 2, 2, 2), 3);
+assert(isequal(size(C), [2 2]) && isequal(C{2, 1}(:)', [2 6]));
+C = num2cell(zeros(0, 3), 1);
+assert(isequal(size(C), [1 3]) && isequal(size(C{1}), [0 1]));
+C = num2cell({1, 'a'; 2, 'b'}, 1);
+assert(iscell(C{2}) && isequal(C{2}, {'a'; 'b'}));
+assert(strcmp(identifiantErreur(@() num2cell(A, 0)), 'MATLAB:num2cell:InvalidDimension'));
+
 disp('numerique : toutes les verifications passent');
 
 function [valeur, arret, sens] = evenementSol(t, y)
@@ -471,4 +542,14 @@ function [valeur, arret, sens] = evenementSeuil(t, y)
     valeur = y(1) - 0.5;
     arret = 1;
     sens = 0;
+end
+
+function id = identifiantErreur(f)
+%IDENTIFIANTERREUR L'identifiant de l'erreur que leve F, '' s'il n'en leve pas.
+    id = '';
+    try
+        f();
+    catch err
+        id = err.identifier;
+    end
 end

@@ -593,7 +593,14 @@ function resultat = assembler(c, T, J, instants)
     [~, ordre] = sort(rangs);
     typesSorties = zeros(1, numel(sorties));
     for k = sorties(ordre)
-        yout = [yout, reshape(parBloc{k}, N, [])]; %#ok<AGROW>
+        valeurs = parBloc{k};
+        d = dimsBloc{k};
+        if numel(d) >= 2 && d(1) > 1 && d(2) > 1
+            % une matrice est relevée m x n x N : une ligne par instant,
+            % ses éléments colonne après colonne
+            valeurs = reshape(valeurs, d(1) * d(2), N).';
+        end
+        yout = [yout, reshape(valeurs, N, [])]; %#ok<AGROW>
     end
     for i = 1:numel(sorties)
         source = c.entrees{sorties(i)}(1);

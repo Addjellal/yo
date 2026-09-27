@@ -288,6 +288,19 @@ function verifier(c, k, tE, t)
             end
         end
     end
+    if strcmp(c.types{k}, 'matlabfunction') && isfield(p, 'EntiersSeuls') && p.EntiersSeuls
+        % les opérations bit à bit de la bibliothèque : des entiers seulement
+        % (une entrée libre est une masse, qui prend le type qu'on attend)
+        for j = 1:numel(tE)
+            libre = j > numel(c.entrees{k}) || c.entrees{k}(j) == 0;
+            if ~libre && tE(j) > 0 && ~(tE(j) >= 4 && tE(j) <= 9)
+                error('Simulink:DataType:BitOperationInputType', ...
+                      ['L''entree %d de ''%s'' recoit un signal de type %s : ce bloc opere ' ...
+                       'sur les bits d''un entier (int8 a uint32). Convertissez le signal ' ...
+                       '(Data Type Conversion).'], j, ch, nomDe(tE(j)));
+            end
+        end
+    end
     switch c.types{k}
         case 'merge'
             if any(tE ~= tE(1))

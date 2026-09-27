@@ -440,16 +440,27 @@ function [type, p] = normaliser(type, p, chemin)
                            'BreakpointsForDimension2', p.BreakpointsForDimension2, ...
                            'Table', p.TableData, 'SampleTime', p.SampleTime);
                 type = 'lookup2d';
+            elseif any(dimensions == 3:6)
+                % au-delà de deux dimensions, la table s'interpole par une
+                % fonction, que le bloc MATLAB Function calcule
+                p = struct('Script', scriptTableND(p, dimensions, chemin), ...
+                           'SampleTime', p.SampleTime);
+                type = 'matlabfunction';
             elseif dimensions ~= 1
                 error('Simulink:blocks:LookupNDDimensions', ...
-                      ['La table ''%s'' est a %g dimensions : MatLibre interpole en une ' ...
-                       'ou deux dimensions.'], chemin, dimensions);
+                      ['La table ''%s'' est a %g dimensions : MatLibre interpole de une ' ...
+                       'a six dimensions.'], chemin, dimensions);
             end
         case 'directlookup'
-            if ~any(double(p.NumberOfTableDimensions) == [1 2])
+            dimensions = double(p.NumberOfTableDimensions);
+            if any(dimensions == 3:6)
+                p = struct('Script', scriptTableDirecte(p, dimensions, chemin), ...
+                           'SampleTime', p.SampleTime);
+                type = 'matlabfunction';
+            elseif ~any(dimensions == [1 2])
                 error('Simulink:blocks:LookupNDDimensions', ...
                       ['La table directe ''%s'' est a %g dimensions : MatLibre en lit ' ...
-                       'une ou deux.'], chemin, double(p.NumberOfTableDimensions));
+                       'de une a six.'], chemin, dimensions);
             end
         case 'discretezeropole'
             numerateur = double(p.Gain) * poly(double(p.Zeros(:)));
@@ -486,6 +497,90 @@ function [type, p] = normaliser(type, p, chemin)
             p = struct('Script', scriptLogiqueCombinatoire(p, chemin), ...
                        'SampleTime', p.SampleTime);
             type = 'matlabfunction';
+        case {'detectrisepositive', 'detectrisenonnegative', 'detectfallnegative', ...
+              'detectfallnonpositive'}
+            p = struct('Script', scriptDetection(type, p), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'intervaltestdynamic'
+            droite = '<=';
+            if strcmp(p.IntervalClosedRight, 'off')
+                droite = '<';
+            end
+            gauche = '>=';
+            if strcmp(p.IntervalClosedLeft, 'off')
+                gauche = '>';
+            end
+            p = struct('Script', sprintf('function y = fcn(up, u, lo)\ny = (u %s up) & (u %s lo);\n', ...
+                                         droite, gauche), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case {'bitwiseoperator', 'bitset', 'bitclear', 'shiftarithmetic'}
+            p = struct('Script', scriptBits(type, p, chemin), 'SampleTime', -1, ...
+                       'EntiersSeuls', true);
+            type = 'matlabfunction';
+        case 'sinewavefunction'
+            if strcmp(p.SineType, 'Sample based')
+                error('Simulink:blocks:SineWaveFunctionSampleBased', ...
+                      ['Le bloc ''%s'' est regle sur ''Sample based'' : MatLibre calcule la ' ...
+                       'sinusoide de son entree en ''Time based'', A sin(F u + P) + B.'], chemin);
+            end
+            p = struct('Script', sprintf('function y = fcn(u)\ny = %s .* sin(%s .* u + %s) + %s;\n', ...
+                                         texteValeur(p.Amplitude), texteValeur(p.Frequency), ...
+                                         texteValeur(p.Phase), texteValeur(p.Bias)), ...
+                       'SampleTime', p.SampleTime);
+            type = 'matlabfunction';
+        case 'permutedimensions'
+            ordre = double(p.Order(:).');
+            if numel(ordre) < 2 || ~isequal(sort(ordre), 1:numel(ordre))
+                error('Simulink:blocks:PermuteDimensionsOrder', ...
+                      ['L''ordre %s du bloc ''%s'' n''est pas une permutation de 1 a N, ' ...
+                       'N etant au moins 2.'], mat2str(ordre), chemin);
+            end
+            p = struct('Script', sprintf('function y = fcn(u)\ny = permute(u, %s);\n', ...
+                                         mat2str(ordre)), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'squeeze'
+            p = struct('Script', sprintf('function y = fcn(u)\ny = squeeze(u);\n'), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'lookuptabledynamic'
+            p = struct('Script', scriptTableDynamique(p, chemin), 'SampleTime', p.SampleTime);
+            type = 'matlabfunction';
+        case 'prelookup'
+            p = struct('Script', scriptPrerecherche(p, chemin), 'SampleTime', p.SampleTime);
+            type = 'matlabfunction';
+        case 'interpolationusingprelookup'
+            p = struct('Script', scriptInterpolationPrerecherche(p, chemin), ...
+                       'SampleTime', p.SampleTime);
+            type = 'matlabfunction';
+        case 'sinecosine'
+            p = struct('Script', scriptSinusCosinus(p, chemin), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'discretefirfilter'
+            b = double(p.Coefficients(:).');
+            if isempty(b)
+                error('Simulink:blocks:DiscreteFirCoefficients', ...
+                      'Le filtre ''%s'' n''a pas de coefficients.', chemin);
+            end
+            if all(double(p.InitialStates(:)) == 0)
+                p = struct('Numerator', b, 'Denominator', 1, 'SampleTime', p.SampleTime);
+                type = 'discretefilter';
+            else
+                p = struct('Script', scriptRIF(b, double(p.InitialStates), chemin), ...
+                           'SampleTime', p.SampleTime);
+                type = 'matlabfunction';
+            end
+        case {'transferfcnfirstorder', 'transferfcnleadorlag', 'transferfcnrealzero'}
+            p = struct('Script', scriptPremierOrdre(type, p), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'environmentcontroller'
+            % en simulation, l'entrée Sim ; Coder ne sert qu'au code produit
+            p = struct('Script', sprintf('function y = fcn(Sim, Coder)\ny = Sim;\n'), ...
+                       'SampleTime', -1);
+            type = 'matlabfunction';
+        case {'checkstaticrange', 'checkstaticlowerbound', 'checkstaticupperbound', ...
+              'checkstaticgap', 'checkdynamicrange', 'checkdynamiclowerbound', ...
+              'checkdynamicupperbound', 'checkdynamicgap'}
+            p = verification(type, p, chemin);
+            type = 'assertion';
         case 'signalspecification'
             % un passage qui vérifie ses dimensions et son type
             p = struct('ConversionOutput', 'Signal copy', 'NombreDePorts', 1, ...
@@ -674,6 +769,371 @@ function script = scriptLogiqueCombinatoire(p, chemin)
                       '    error(''Simulink:blocks:CombinatorialLogicRows'', ''%s'', n, n);\n' ...
                       'end\nk = 1 + sum((u(:).'' ~= 0) .* 2.^(n - 1:-1:0));\ny = T(k, :).'';\n'], ...
                      mat2str(table), message);
+end
+
+% Une table à N dimensions : ses points de rupture, vérifiés, et son
+% interpolation, confiée à MATLIBRE_SL_TABLEND.
+function script = scriptTableND(p, n, chemin)
+    T = double(p.TableData);
+    tailles = size(T);
+    tailles(end + 1:n) = 1;
+    points = cell(1, n);
+    for d = 1:n
+        if d == 1
+            b = p.BreakpointsData;
+        else
+            b = p.(sprintf('BreakpointsForDimension%d', d));
+        end
+        b = double(b(:).');
+        if any(diff(b) <= 0)
+            error('Simulink:blocks:LookupBreakpointsNotMonotonic', ...
+                  ['Les points de rupture de la dimension %d de la table ''%s'' ne ' ...
+                   'croissent pas strictement.'], d, chemin);
+        end
+        if numel(b) ~= tailles(d)
+            error('Simulink:blocks:LookupTableSizeMismatch', ...
+                  ['La table ''%s'' a %d element(s) sur sa dimension %d, et %d point(s) ' ...
+                   'de rupture pour elle.'], chemin, tailles(d), d, numel(b));
+        end
+        points{d} = mat2str(b, 17);
+    end
+    if numel(tailles) > n && any(tailles(n + 1:end) > 1)
+        error('Simulink:blocks:LookupTableSizeMismatch', ...
+              'La table ''%s'' a plus de %d dimensions.', chemin, n);
+    end
+    arguments_ = arrayfun(@(d) sprintf('u%d', d), 1:n, 'UniformOutput', false);
+    script = sprintf(['function y = fcn(%s)\nT = reshape(%s, %s);\nB = {%s};\n' ...
+                      'y = matlibre_sl_tablend(T, B, {%s}, ''%s'', ''%s'');\n'], ...
+                     strjoin(arguments_, ', '), mat2str(T(:).', 17), mat2str(tailles(1:n)), ...
+                     strjoin(points, ', '), strjoin(arguments_, ', '), char(p.InterpMethod), ...
+                     char(p.ExtrapMethod));
+end
+
+% Une table directe à N dimensions : ses entrées, à partir de 0, ramenées
+% dans les bornes, désignent l'élément rendu.
+function script = scriptTableDirecte(p, n, chemin)
+    T = double(p.Table);
+    tailles = size(T);
+    tailles(end + 1:n) = 1;
+    if numel(tailles) > n && any(tailles(n + 1:end) > 1)
+        error('Simulink:blocks:LookupTableSizeMismatch', ...
+              'La table directe ''%s'' a plus de %d dimensions.', chemin, n);
+    end
+    arguments_ = arrayfun(@(d) sprintf('u%d', d), 1:n, 'UniformOutput', false);
+    indices = arrayfun(@(d) sprintf('min(max(floor(double(u%d(:))), 0), %d) + 1', d, ...
+                                    tailles(d) - 1), 1:n, 'UniformOutput', false);
+    script = sprintf(['function y = fcn(%s)\nT = reshape(%s, %s);\n' ...
+                      'y = T(sub2ind(%s, %s));\n'], strjoin(arguments_, ', '), ...
+                     mat2str(T(:).', 17), mat2str(tailles(1:n)), mat2str(tailles(1:n)), ...
+                     strjoin(indices, ', '));
+end
+
+% Un texte écrit dans le code d'une fonction, entre apostrophes.
+function t = litteral(texte)
+    t = ['''' strrep(texte, '''', '''''') ''''];
+end
+
+% Une valeur écrite dans le code d'une fonction : un vecteur en colonne,
+% comme les signaux.
+function t = texteValeur(v)
+    v = double(v);
+    if isvector(v) && ~isscalar(v)
+        v = v(:);
+    end
+    t = mat2str(v, 17);
+end
+
+% Les détections de franchissement : l'entrée comparée à zéro, et ce même
+% test au pas d'avant, dont vinit donne la valeur au départ.
+function script = scriptDetection(type, p)
+    tests = struct('detectrisepositive', 'u > 0', 'detectrisenonnegative', 'u >= 0', ...
+                   'detectfallnegative', 'u < 0', 'detectfallnonpositive', 'u <= 0');
+    script = sprintf(['function y = fcn(u)\npersistent avant\nif isempty(avant)\n' ...
+                      '    avant = (zeros(size(u)) + %s) ~= 0;\nend\nvrai = %s;\n' ...
+                      'y = vrai & ~avant;\navant = vrai;\n'], texteValeur(p.vinit), tests.(type));
+end
+
+% Les opérations bit à bit, sur des entiers : le type des entrées est
+% vérifié avec les autres types (EntiersSeuls).
+function script = scriptBits(type, p, chemin)
+    switch type
+        case 'bitwiseoperator'
+            op = char(p.logicop);
+            masque = strcmp(p.UseBitMask, 'on');
+            if strcmp(op, 'NOT')
+                script = sprintf('function y = fcn(u)\ny = bitcmp(u);\n');
+                return
+            end
+            base = struct('AND', 'bitand', 'OR', 'bitor', 'NAND', 'bitand', 'NOR', 'bitor', ...
+                          'XOR', 'bitxor');
+            if masque
+                m = double(p.BitMask);
+                if any(m(:) < 0 | m(:) ~= round(m(:)))
+                    error('Simulink:blocks:BitwiseOperatorMask', ...
+                          'Le masque du bloc ''%s'' doit etre un entier positif ou nul.', chemin);
+                end
+                corps = sprintf('y = %s(u, cast(%s, ''like'', u));\n', base.(op), texteValeur(m));
+                entrees = 'u';
+            else
+                n = double(p.NumInputPorts);
+                if ~(isscalar(n) && n >= 2 && n == round(n))
+                    error('Simulink:blocks:BitwiseOperatorInputs', ...
+                          ['Sans masque, le bloc ''%s'' opere entre ses entrees : il lui en ' ...
+                           'faut au moins deux, pas %s.'], chemin, mat2str(n));
+                end
+                noms = arrayfun(@(j) sprintf('u%d', j), 1:n, 'UniformOutput', false);
+                entrees = strjoin(noms, ', ');
+                corps = sprintf('y = u1;\n');
+                for j = 2:n
+                    corps = [corps, sprintf('y = %s(y, u%d);\n', base.(op), j)]; %#ok<AGROW>
+                end
+            end
+            if any(strcmp(op, {'NAND', 'NOR'}))
+                corps = [corps, sprintf('y = bitcmp(y);\n')];
+            end
+            script = sprintf('function y = fcn(%s)\n%s', entrees, corps);
+        case {'bitset', 'bitclear'}
+            rang = double(p.iBit);
+            if ~(isscalar(rang) && rang >= 0 && rang == round(rang) && rang < 32)
+                error('Simulink:blocks:BitIndex', ...
+                      ['Le bit %s du bloc ''%s'' n''existe pas : les bits se comptent de 0 ' ...
+                       'a la largeur du type moins un.'], mat2str(rang), chemin);
+            end
+            script = sprintf(['function y = fcn(u)\nif %d >= 8 * numel(typecast(u(1), ''uint8''))\n' ...
+                              '    error(''Simulink:blocks:BitIndex'', ''%%s'', [%s class(u) ''.'']);\n' ...
+                              'end\ny = bitset(u, %d, %d);\n'], rang, ...
+                             litteral(sprintf('Le bit %d du bloc ''%s'' depasse la largeur d''un ', ...
+                                              rang, chemin)), rang + 1, strcmp(type, 'bitset'));
+        case 'shiftarithmetic'
+            n = double(p.BitShiftNumber);
+            if ~(all(n(:) == round(n(:))))
+                error('Simulink:blocks:ShiftArithmeticNumber', ...
+                      'Le decalage du bloc ''%s'' doit etre un nombre entier de bits.', chemin);
+            end
+            if double(p.BinPtShiftNumber) ~= 0
+                error('Simulink:blocks:ShiftArithmeticBinaryPoint', ...
+                      ['Le bloc ''%s'' deplace la virgule binaire : MatLibre n''a pas de ' ...
+                       'types a virgule fixe, BinPtShiftNumber doit valoir 0.'], chemin);
+            end
+            switch p.BitShiftDirection
+                case 'Left'
+                    decalage = texteValeur(abs(n));
+                case 'Right'
+                    decalage = ['-' texteValeur(abs(n))];
+                otherwise
+                    decalage = texteValeur(n);   % positif à gauche, négatif à droite
+            end
+            % à droite, un entier signé garde son signe : la division par
+            % une puissance de deux arrondie vers moins l'infini
+            script = sprintf(['function y = fcn(u)\nd = %s + zeros(size(u));\ny = u;\n' ...
+                              'g = d > 0;\ny(g) = bitshift(u(g), d(g));\n' ...
+                              'r = d < 0;\ny(r) = cast(floor(double(u(r)) ./ 2 .^ -d(r)), ''like'', u);\n'], ...
+                             decalage);
+    end
+end
+
+% Lookup Table Dynamic : la table arrive par ses entrées xdat et ydat.
+function script = scriptTableDynamique(p, chemin)
+    methodes = struct('Interpolation_Extrapolation', 'linear'', ''extrap', ...
+                      'Interpolation_Use_End_Values', 'linear', ...
+                      'Use_Input_Nearest', 'nearest', 'Use_Input_Below', 'previous', ...
+                      'Use_Input_Above', 'next');
+    cle = strrep(strrep(char(p.LookUpMeth), '-', '_'), ' ', '_');
+    borner = 'x = min(max(double(x), xdat(1)), xdat(end));\n';
+    if strcmp(cle, 'Interpolation_Extrapolation')
+        borner = 'x = double(x);\n';
+    end
+    % des entrées toutes nulles sont celles qui sondent les dimensions
+    script = sprintf(['function y = fcn(x, xdat, ydat)\nxdat = double(xdat(:));\n' ...
+                      'ydat = double(ydat(:));\n' ...
+                      'if numel(xdat) ~= numel(ydat)\n' ...
+                      '    error(''Simulink:blocks:LookupTableDynamicSize'', ''%%s'', ' ...
+                      'sprintf(%s, numel(xdat), numel(ydat)));\nend\n' ...
+                      'if all(xdat == 0) && all(ydat == 0)\n    y = zeros(size(x));\n    return\nend\n' ...
+                      'if numel(xdat) < 2 || any(diff(xdat) <= 0)\n' ...
+                      '    error(''Simulink:blocks:LookupTableDynamicBreakpoints'', ''%%s'', %s);\nend\n' ...
+                      borner 'y = reshape(interp1(xdat, ydat, x(:), ''%s''), size(x));\n'], ...
+                     litteral(strrep(sprintf(['Le bloc ''%s'' recoit %%d point(s) xdat et %%d ' ...
+                                              'valeur(s) ydat : il en faut autant.'], chemin), ...
+                                     '\', '\\')), ...
+                     litteral(sprintf(['Les points xdat du bloc ''%s'' doivent etre au moins ' ...
+                                       'deux et croitre strictement.'], chemin)), methodes.(cle));
+end
+
+% Prelookup : l'indice k, compté à partir de 0, de l'intervalle où tombe
+% l'entrée, et la fraction f qu'elle y parcourt.
+function script = scriptPrerecherche(p, chemin)
+    b = double(p.BreakpointsData(:));
+    if numel(b) < 2 || any(diff(b) <= 0)
+        error('Simulink:blocks:PrelookupBreakpoints', ...
+              ['Les points de rupture du bloc ''%s'' doivent etre au moins deux et ' ...
+               'croitre strictement.'], chemin);
+    end
+    dernier = strcmp(p.UseLastBreakpoint, 'on');
+    lineaire = strcmp(p.ExtrapMethod, 'Linear');
+    sorties = 'k, f';
+    if strcmp(p.OutputSelection, 'Index only')
+        sorties = 'k';
+    end
+    script = sprintf(['function [%s] = fcn(u)\nb = %s;\nn = numel(b);\nx = double(u(:));\n' ...
+                      'k = sum(x >= b.'', 2);\nk = min(max(k, 1), n - 1);\n' ...
+                      'f = (x - b(k)) ./ (b(k + 1) - b(k));\n' ...
+                      'if ~%d\n    f = min(max(f, 0), 1);\nend\n' ...
+                      'if %d\n    fin = f >= 1 & x >= b(n);\n    k(fin) = n;\n    f(fin) = 0;\nend\n' ...
+                      'k = reshape(uint32(k - 1), size(u));\nf = reshape(f, size(u));\n'], ...
+                     sorties, mat2str(b, 17), lineaire, dernier && ~lineaire);
+end
+
+% Interpolation Using Prelookup : chaque dimension reçoit un indice k et une
+% fraction f ; k + f est la place du point parmi les indices de la table.
+function script = scriptInterpolationPrerecherche(p, chemin)
+    n = double(p.NumberOfTableDimensions);
+    if ~(isscalar(n) && any(n == 1:6))
+        error('Simulink:blocks:LookupNDDimensions', ...
+              ['La table ''%s'' est a %s dimensions : MatLibre interpole de une ' ...
+               'a six dimensions.'], chemin, mat2str(n));
+    end
+    T = double(p.Table);
+    if n == 1
+        T = T(:);
+    end
+    tailles = size(T);
+    tailles(end + 1:n) = 1;
+    if numel(tailles) > n && any(tailles(n + 1:end) > 1)
+        error('Simulink:blocks:LookupTableSizeMismatch', ...
+              'La table ''%s'' a plus de %d dimensions.', chemin, n);
+    end
+    tailles = tailles(1:n);
+    if any(tailles < 2)
+        error('Simulink:blocks:LookupTableSizeMismatch', ...
+              'La table ''%s'' doit avoir au moins deux valeurs sur chaque dimension.', chemin);
+    end
+    noms = cell(1, 2 * n);
+    places = cell(1, n);
+    points = cell(1, n);
+    for d = 1:n
+        noms{2 * d - 1} = sprintf('k%d', d);
+        noms{2 * d} = sprintf('f%d', d);
+        fraction = sprintf('double(f%d)', d);
+        if strcmp(p.InterpMethod, 'Flat')
+            fraction = '0';
+        end
+        if strcmp(p.ValidIndexMayReachLast, 'on')
+            places{d} = sprintf('double(k%d) + %s', d, fraction);
+        else
+            places{d} = sprintf('min(double(k%d), %d) + %s', d, tailles(d) - 2, fraction);
+        end
+        points{d} = sprintf('0:%d', tailles(d) - 1);
+    end
+    methode = char(p.InterpMethod);
+    if strcmp(methode, 'Flat')
+        methode = 'Linear';   % la fraction est déjà nulle
+    end
+    script = sprintf(['function y = fcn(%s)\nT = reshape(%s, %s);\n' ...
+                      'y = matlibre_sl_tablend(T, {%s}, {%s}, ''%s'', ''%s'');\n'], ...
+                     strjoin(noms, ', '), mat2str(T(:).', 17), mat2str([tailles 1]), ...
+                     strjoin(points, ', '), strjoin(places, ', '), methode, char(p.ExtrapMethod));
+end
+
+% Sine, Cosine : sin(2 pi u) et cos(2 pi u), lus dans une table d'un quart
+% d'onde de NumDataPoints points, interpolée linéairement.
+function script = scriptSinusCosinus(p, chemin)
+    n = double(p.NumDataPoints);
+    if ~(isscalar(n) && n >= 2 && n == round(n))
+        error('Simulink:blocks:SineCosineTableSize', ...
+              'La table du bloc ''%s'' doit avoir au moins deux points, pas %s.', ...
+              chemin, mat2str(n));
+    end
+    table = sprintf('q = linspace(0, 0.25, %d);\ntab = sin(2 * pi * q);\n', n);
+    sinus = 'quartOnde(mod(double(u), 1), q, tab)';
+    cosinus = 'quartOnde(mod(double(u) + 0.25, 1), q, tab)';
+    switch p.Formula
+        case 'sin(2*pi*u)'
+            script = sprintf('function y = fcn(u)\n%sy = %s;\n', table, sinus);
+        case 'cos(2*pi*u)'
+            script = sprintf('function y = fcn(u)\n%sy = %s;\n', table, cosinus);
+        otherwise
+            script = sprintf('function [s, c] = fcn(u)\n%ss = %s;\nc = %s;\n', table, sinus, cosinus);
+    end
+    script = [script, sprintf(['\nfunction y = quartOnde(v, q, tab)\n' ...
+                               '%% le sinus sur une période, par symétrie du premier quart\n' ...
+                               'y = zeros(size(v));\nfor e = 1:numel(v)\n    x = v(e);\n' ...
+                               '    signe = 1;\n    if x >= 0.5\n        x = x - 0.5;\n' ...
+                               '        signe = -1;\n    end\n    if x > 0.25\n' ...
+                               '        x = 0.5 - x;\n    end\n' ...
+                               '    y(e) = signe * interp1(q, tab, x);\nend\n'])];
+end
+
+% Discrete FIR Filter dont les états de départ ne sont pas nuls : les
+% entrées passées, tenues dans une variable persistante.
+function script = scriptRIF(b, etats, chemin)
+    m = numel(b) - 1;
+    if m == 0
+        script = sprintf('function y = fcn(u)\ny = %s * u;\n', mat2str(b, 17));
+        return
+    end
+    if ~(isscalar(etats) || numel(etats) == m)
+        error('Simulink:blocks:DiscreteFirInitialStates', ...
+              ['Le filtre ''%s'' a %d etat(s) : InitialStates en donne %d ; il en faut un, ' ...
+               'ou un par etat.'], chemin, m, numel(etats));
+    end
+    script = sprintf(['function y = fcn(u)\npersistent z\nif isempty(z)\n' ...
+                      '    z = %s + zeros(%d, numel(u));\nend\nb = %s;\nx = double(u(:)).'';\n' ...
+                      'y = reshape(b(1) * x + b(2:end) * z, size(u));\nz = [x; z(1:end - 1, :)];\n'], ...
+                     texteValeur(etats), m, mat2str(b, 17));
+end
+
+% Les transmittances discrètes de la bibliothèque, écrites en récurrence.
+function script = scriptPremierOrdre(type, p)
+    switch type
+        case 'transferfcnfirstorder'   % (1 - p) z / (z - p)
+            script = sprintf(['function y = fcn(u)\npersistent yAvant\nif isempty(yAvant)\n' ...
+                              '    yAvant = %s + zeros(size(u));\nend\n' ...
+                              'y = %s .* yAvant + (1 - %s) .* double(u);\nyAvant = y;\n'], ...
+                             texteValeur(p.ICPrevOutput), texteValeur(p.PoleZ), texteValeur(p.PoleZ));
+        case 'transferfcnleadorlag'    % K (z - zéro) / (z - pôle)
+            script = sprintf(['function y = fcn(u)\npersistent yAvant uAvant\nif isempty(yAvant)\n' ...
+                              '    yAvant = %s + zeros(size(u));\n    uAvant = %s + zeros(size(u));\nend\n' ...
+                              'y = %s .* yAvant + %s .* (double(u) - %s .* uAvant);\n' ...
+                              'yAvant = y;\nuAvant = double(u);\n'], ...
+                             texteValeur(p.ICPrevOutput), texteValeur(p.ICPrevInput), ...
+                             texteValeur(p.PoleZ), texteValeur(p.Gain), texteValeur(p.ZeroZ));
+        otherwise                      % (z - zéro) / z
+            script = sprintf(['function y = fcn(u)\npersistent uAvant\nif isempty(uAvant)\n' ...
+                              '    uAvant = %s + zeros(size(u));\nend\n' ...
+                              'y = double(u) - %s .* uAvant;\nuAvant = double(u);\n'], ...
+                             texteValeur(p.ICPrevInput), texteValeur(p.ZeroZ));
+    end
+end
+
+% Les blocs de vérification sont des assertions qui portent leur critère :
+% son genre, ses bornes, et le nombre de signaux qu'il lit.
+function q = verification(type, p, chemin)
+    genres = {'checkstaticrange', 'checkstaticlowerbound', 'checkstaticupperbound', ...
+              'checkstaticgap', 'checkdynamicrange', 'checkdynamiclowerbound', ...
+              'checkdynamicupperbound', 'checkdynamicgap'};
+    entrees = [1 1 1 1 3 2 2 3];
+    genre = find(strcmp(type, genres));
+    q = struct('Enabled', p.enabled, 'StopWhenAssertionFail', p.stopWhenAssertionFail, ...
+               'Genre', genre, 'Min', double(champ(p, 'min', 0)), ...
+               'Max', double(champ(p, 'max', 0)), ...
+               'MinInclus', strcmp(champ(p, 'min_included', 'on'), 'on'), ...
+               'MaxInclus', strcmp(champ(p, 'max_included', 'on'), 'on'), ...
+               'NombreEntrees', entrees(genre));
+    if any(genre == [1 4])
+        bas = q.Min;
+        haut = q.Max;
+        if ~(isscalar(bas) || isscalar(haut) || numel(bas) == numel(haut))
+            error('Simulink:blocks:CheckBoundsSize', ...
+                  'Les bornes min et max du bloc ''%s'' n''ont pas le meme nombre d''elements.', ...
+                  chemin);
+        end
+        if any(bas(:) > haut(:))
+            error('Simulink:blocks:CheckBoundsOrder', ...
+                  ['La borne min du bloc ''%s'' depasse sa borne max : l''intervalle ' ...
+                   'est vide.'], chemin);
+        end
+    end
 end
 
 function c = celluleDe(v)
@@ -1538,7 +1998,20 @@ function s = regleTraitement(c, k, dE, complet, forcer)
                 error('Simulink:Engine:DimensionMismatch', ...
                       'L''entree de commande de ''%s'' doit etre scalaire.', c.chemins{k});
             end
-            s = {accorder(dE(2:end), c, k, q(2:end))};
+            if numel(dE) == 2
+                s = {[1 1]};   % une seule entrée de données : l'Index Vector en choisit un élément
+            else
+                s = {accorder(dE(2:end), c, k, q(2:end))};
+            end
+        case 'assertion'
+            % les bornes d'un bloc de vérification dynamique s'accordent au signal
+            if numel(dE) > 1
+                noms = {'max', 'sig', 'min'};
+                if champ(p, 'Genre', 0) == 6
+                    noms = {'min', 'sig'};
+                end
+                accorder(dE, c, k, noms(1:numel(dE)));
+            end
         case 'buscreator'
             s = {[sum(cellfun(@prod, dE)) 1]};
         case 'busselector'
@@ -2108,10 +2581,14 @@ function c = periodes(c, pas)
 
     % Un IC ne se calcule pas une fois pour toutes : il rend sa valeur au
     % premier instant, puis son entrée, fût-elle constante. Un sous-système
-    % itéré non plus : ses états avancent à chaque pas.
-    for k = find(ismember(c.types, {'ic', 'iterateur'}) & isinf(c.cadence))
-        c.cadence(k) = 0;
-        c.majeurSeul(k) = true;
+    % itéré non plus : ses états avancent à chaque pas ; ni une fonction qui
+    % garde un état — une détection de front, une transmittance discrète.
+    for k = find(isinf(c.cadence))
+        if any(strcmp(c.types{k}, {'ic', 'iterateur'})) || ...
+           (strcmp(c.types{k}, 'matlabfunction') && c.fonctions{k}.persistante)
+            c.cadence(k) = 0;
+            c.majeurSeul(k) = true;
+        end
     end
     % Les blocs discrets par nature qui héritent leur période ne peuvent
     % hériter d'un signal continu : Simulink le refuse, et le dit.
@@ -2805,8 +3282,12 @@ function c = abaisser(c, pas, tDebut)
                           ['Le bloc ''%s'' veut ecrire dans ''%s'', qui n''est ' ...
                            'pas un nom de variable.'], ch, char(p.VariableName));
                 end
-            case 'assertion'              % [active; arreter]
-                seg = [strcmp(p.Enabled, 'on'); strcmp(p.StopWhenAssertionFail, 'on')];
+            case 'assertion'   % [active; arreter; genre; min inclus; max inclus; n; min; n; max]
+                bas = double(champ(p, 'Min', 0));
+                haut = double(champ(p, 'Max', 0));
+                seg = [strcmp(p.Enabled, 'on'); strcmp(p.StopWhenAssertionFail, 'on'); ...
+                       champ(p, 'Genre', 0); champ(p, 'MinInclus', 1); champ(p, 'MaxInclus', 1); ...
+                       numel(bas); bas(:); numel(haut); haut(:)];
             % --- sous-systèmes conditionnels ---
             case 'garde'                  % [enable; front; action; remise; largeur du front]
                 % Z : [amorcée; active au pas d'avant; front d'avant]

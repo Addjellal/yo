@@ -1588,6 +1588,12 @@ int main(int argc, char** argv) {
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'constant', 'v', 'Value', [1 2]), "
                         "'v', 'demux');\n");
+                // Un contrôle dynamique aux entrées nulles est hors de ses
+                // bornes, comme dans Simulink : il avertit sans s'arrêter.
+                if (QLatin1String(b->type).startsWith(QLatin1String("checkdynamic")))
+                    essaiTous += QStringLiteral(
+                        "m = set_param(m, '%1', 'stopWhenAssertionFail', 'off');\n")
+                                     .arg(QLatin1String(b->type));
                 essaiTous += QStringLiteral("sim(m, 0.02, 0.01);\n");
             }
             essaiTous += QStringLiteral("disp('TOUS LES BLOCS OK')\n");

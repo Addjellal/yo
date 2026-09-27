@@ -2818,8 +2818,8 @@ casErreurs = {
     @() sim(add_block(new_system('r'), 'modelreference', 'm')), 'Simulink:modelReference:ModelNameEmpty', 'ModelName'
     @() sim(add_block(new_system('r'), 'modelreference', 'm', 'ModelName', 'modeleQuiNExistePas')), ...
         'Simulink:modelReference:ModelNotFound', 'modeleQuiNExistePas'
-    @() sim(add_block(new_system('t'), 'lookup', 'l', 'NumberOfTableDimensions', 3)), ...
-        'Simulink:blocks:LookupNDDimensions', 'une ou deux'
+    @() sim(add_block(new_system('t'), 'lookup', 'l', 'NumberOfTableDimensions', 7)), ...
+        'Simulink:blocks:LookupNDDimensions', 'une a six'
     @() set_param(new_system('c'), 'LoadExternalInput', 'parfois'), 'Simulink:Config:InvalidValue', 'LoadExternalInput'
     };
 for kE = 1:size(casErreurs, 1)
@@ -5239,6 +5239,408 @@ for kE = 1:size(casErreurs, 1)
 end
 rmdir(dossierFichier, 's');
 fprintf('blocs de bibliotheque : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
+%% ------------------------------ 40. Tables à plus de deux dimensions
+% La n-D Lookup Table interpole jusqu'à six dimensions, une entrée par
+% dimension ; la Direct Lookup Table (n-D) lit un élément, ses entrées
+% comptées à partir de 0 et ramenées dans les bornes.
+T3 = reshape(1:24, [2 3 4]);
+tab3 = new_system('tab3');
+tab3 = add_block(tab3, 'constant', 'a', 'Value', 0.5);
+tab3 = add_block(tab3, 'constant', 'b', 'Value', 1.5);
+tab3 = add_block(tab3, 'constant', 'c', 'Value', 2);
+tab3 = add_block(tab3, 'simulink/Lookup Tables/n-D Lookup Table', 'tb', ...
+                 'NumberOfTableDimensions', 3, 'BreakpointsForDimension1', [0 1], ...
+                 'BreakpointsForDimension2', [0 1 2], ...
+                 'BreakpointsForDimension3', [0 1 2 3], 'Table', T3);
+tab3 = add_line(add_block(tab3, 'outport', 'y'), 'tb', 'y');
+tab3 = add_line(add_line(add_line(tab3, 'a', 'tb', 1), 'b', 'tb', 2), 'c', 'tb', 3);
+r = sim(tab3, 1);
+attendu = interpn(0:1, 0:2, 0:3, T3, 0.5, 1.5, 2);
+assert(abs(r.yout(end) - attendu) < 1e-12 && abs(attendu - 16.5) < 1e-12, ...
+       'n-D Lookup Table a trois dimensions : interpolation multilineaire');
+% hors des bornes : tenue (Clip) ou prolongée (Linear)
+tenue = sim(set_param(tab3, 'c', 'Value', 5), 1);
+assert(abs(tenue.yout(end) - interpn(0:1, 0:2, 0:3, T3, 0.5, 1.5, 3)) < 1e-12, ...
+       'Clip tient la table a son bord');
+prolongee = sim(set_param(set_param(tab3, 'c', 'Value', 5), 'tb', 'ExtrapMethod', 'Linear'), 1);
+assert(abs(prolongee.yout(end) - (tenue.yout(end) + 2 * 6)) < 1e-12, ...
+       'Linear prolonge le dernier intervalle (T croit de 6 par page)');
+proche = sim(set_param(tab3, 'tb', 'InterpMethod', 'Nearest', 'ExtrapMethod', 'Clip'), 1);
+assert(proche.yout(end) == T3(2, 3, 3), 'Nearest rend le point le plus proche');
+plat = sim(set_param(tab3, 'tb', 'InterpMethod', 'Flat'), 1);
+assert(plat.yout(end) == T3(1, 2, 3), 'Flat rend le point inferieur');
+% une table à quatre dimensions, parcourue par une horloge
+T4 = reshape(1:16, [2 2 2 2]);
+tab4 = new_system('tab4');
+tab4 = add_block(tab4, 'clock', 't');
+tab4 = add_block(tab4, 'constant', 'z', 'Value', 0);
+tab4 = add_block(tab4, 'lookup', 'tb', 'NumberOfTableDimensions', 4, ...
+                 'BreakpointsData', [0 1], 'BreakpointsForDimension2', [0 1], ...
+                 'BreakpointsForDimension3', [0 1], 'BreakpointsForDimension4', [0 1], ...
+                 'TableData', T4);
+tab4 = add_line(add_block(tab4, 'outport', 'y'), 'tb', 'y');
+tab4 = add_line(add_line(tab4, 't', 'tb', 1), 'z', 'tb', 2);
+tab4 = add_line(add_line(tab4, 'z', 'tb', 3), 't', 'tb', 4);
+r = sim(tab4, 'Solver', 'ode1', 'FixedStep', 0.25, 'StopTime', 1);
+assert(max(abs(r.yout(:)' - (1 + 9 * (0:0.25:1)))) < 1e-12, ...
+       'une table a quatre dimensions suit ses deux entrees variables');
+% la table directe à trois dimensions
+dir3 = new_system('dir3');
+dir3 = add_block(dir3, 'constant', 'a', 'Value', 1);
+dir3 = add_block(dir3, 'constant', 'b', 'Value', 2);
+dir3 = add_block(dir3, 'constant', 'c', 'Value', 9);
+dir3 = add_block(dir3, 'simulink/Lookup Tables/Direct Lookup Table (n-D)', 'dl', ...
+                 'NumberOfTableDimensions', 3, 'Table', T3);
+dir3 = add_line(add_block(dir3, 'outport', 'y'), 'dl', 'y');
+dir3 = add_line(add_line(add_line(dir3, 'a', 'dl', 1), 'b', 'dl', 2), 'c', 'dl', 3);
+r = sim(dir3, 1);
+assert(r.yout(end) == T3(2, 3, 4), 'la table directe ramene l''indice 9 a la derniere page');
+r = sim(set_param(dir3, 'c', 'Value', 1), 1);
+assert(r.yout(end) == T3(2, 3, 2), 'la table directe compte a partir de 0');
+% les erreurs qu'un utilisateur rencontre, chacune nommant le bloc fautif
+casTables = {
+    @() sim(set_param(tab3, 'tb', 'BreakpointsForDimension2', [0 1]), 1), ...
+        'Simulink:blocks:LookupTableSizeMismatch', 'tab3/tb'
+    @() sim(set_param(tab3, 'tb', 'BreakpointsForDimension3', [0 2 1 3]), 1), ...
+        'Simulink:blocks:LookupBreakpointsNotMonotonic', 'tab3/tb'
+    @() sim(set_param(tab3, 'tb', 'NumberOfTableDimensions', 7), 1), ...
+        'Simulink:blocks:LookupNDDimensions', 'tab3/tb'
+    @() sim(set_param(tab4, 'tb', 'NumberOfTableDimensions', 3), 1), ...
+        'Simulink:blocks:LookupTableSizeMismatch', 'tab4/tb'
+    @() sim(set_param(dir3, 'dl', 'NumberOfTableDimensions', 7), 1), ...
+        'Simulink:blocks:LookupNDDimensions', 'dir3/dl'
+    @() sim(set_param(set_param(dir3, 'dl', 'NumberOfTableDimensions', 4), ...
+                      'dl', 'Table', ones(2, 2, 2, 2, 2)), 1), ...
+        'Simulink:blocks:LookupTableSizeMismatch', 'dir3/dl'
+    };
+for kE = 1:size(casTables, 1)
+    vu = '';
+    message = '';
+    try
+        casTables{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casTables{kE, 2}) && ~isempty(strfind(message, casTables{kE, 3})), ...
+           sprintf('tables n-D, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casTables{kE, 2}, vu, message));
+end
+fprintf('tables n-D : %d cas d''erreur verifies\n', size(casTables, 1));
+
+%% ------------------------ 41. Suite de la bibliothèque : logique, tables, vérification
+% Les détections de front, les opérations bit à bit, les tables qui
+% arrivent par les signaux, la pré-recherche, les transmittances
+% discrètes de la bibliothèque, l'Index Vector et les blocs de
+% vérification, avec les erreurs qu'un utilisateur de Simulink rencontre.
+fronts = new_system('fronts');
+fronts = add_block(fronts, 'simulink/Sources/Sine Wave', 's');
+nomsFronts = {'Detect Rise Positive', 'Detect Rise Nonnegative', 'Detect Fall Negative', ...
+              'Detect Fall Nonpositive'};
+for kF = 1:4
+    fronts = add_block(fronts, ['simulink/Logic and Bit Operations/' nomsFronts{kF}], ...
+                       sprintf('f%d', kF));
+    fronts = add_block(fronts, 'outport', sprintf('y%d', kF));
+    fronts = add_line(add_line(fronts, 's', sprintf('f%d', kF)), sprintf('f%d', kF), ...
+                      sprintf('y%d', kF));
+end
+r = sim(fronts, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 10);
+u = sin(r.tout);
+avant = [-Inf; u(1:end - 1)];
+attendus = [(u > 0) & ~([0; u(1:end - 1)] > 0), (u >= 0) & ~([-1; u(1:end - 1)] >= 0), ...
+            (u < 0) & ~([0; u(1:end - 1)] < 0), (u <= 0) & ~([1; u(1:end - 1)] <= 0)];
+assert(isequal(r.yout ~= 0, attendus), 'les quatre detections de front, vinit nul');
+assert(isequal(find(r.yout(:, 1))', find((u > 0) & ~([0; u(1:end - 1)] > 0))'), ...
+       'Detect Rise Positive : les instants ou le sinus devient positif');
+constante = new_system('constante');
+constante = add_block(constante, 'constant', 'c', 'Value', 3);
+constante = add_block(constante, 'simulink/Logic and Bit Operations/Detect Rise Positive', 'rp');
+constante = add_line(add_line(add_block(constante, 'outport', 'y'), 'c', 'rp'), 'rp', 'y');
+r = sim(constante, 'Solver', 'ode1', 'FixedStep', 0.25, 'StopTime', 1);
+assert(isequal(r.yout', [1 0 0 0 0]), 'un front se detecte une fois, meme sur une constante');
+% le test d'intervalle dont les bornes sont des signaux
+itd = new_system('itd');
+itd = add_block(itd, 'constant', 'up', 'Value', 2);
+itd = add_block(itd, 'constant', 'u', 'Value', [1 2 3]);
+itd = add_block(itd, 'constant', 'lo', 'Value', 1);
+itd = add_block(itd, 'simulink/Logic and Bit Operations/Interval Test Dynamic', 'it');
+itd = add_line(add_block(itd, 'outport', 'y'), 'it', 'y');
+itd = add_line(add_line(add_line(itd, 'up', 'it', 1), 'u', 'it', 2), 'lo', 'it', 3);
+r = sim(itd, 1);
+assert(isequal(r.yout(end, :), [1 1 0]), 'Interval Test Dynamic, bornes comprises');
+r = sim(set_param(itd, 'it', 'IntervalClosedLeft', 'off'), 1);
+assert(isequal(r.yout(end, :), [0 1 0]), 'Interval Test Dynamic, borne basse exclue');
+% les bits d'un entier
+bits = new_system('bits');
+bits = add_block(bits, 'constant', 'c', 'Value', 'uint8(12)');
+bits = add_block(bits, 'simulink/Logic and Bit Operations/Bitwise Operator', 'bw', 'BitMask', 10);
+bits = add_block(bits, 'simulink/Logic and Bit Operations/Bit Set', 'bs', 'iBit', 0);
+bits = add_block(bits, 'simulink/Logic and Bit Operations/Bit Clear', 'bc', 'iBit', 2);
+bits = add_block(bits, 'simulink/Logic and Bit Operations/Shift Arithmetic', 'sa', ...
+                 'BitShiftNumber', 2);
+for nomBit = {'bw', 'bs', 'bc', 'sa'}
+    bits = add_block(bits, 'outport', ['o' nomBit{1}]);
+    bits = add_line(add_line(bits, 'c', nomBit{1}), nomBit{1}, ['o' nomBit{1}]);
+end
+r = sim(bits, 1);
+assert(isequal(r.yout(end, :), [8 13 8 3]) && isa(r.yout, 'uint8'), ...
+       'AND avec le masque, Bit Set, Bit Clear, decalage a droite, en uint8');
+r = sim(set_param(set_param(bits, 'bw', 'logicop', 'XOR'), 'sa', 'BitShiftDirection', 'Left'), 1);
+assert(isequal(r.yout(end, :), [6 13 8 48]), 'XOR avec le masque, decalage a gauche');
+signe = new_system('signe');
+signe = add_block(signe, 'constant', 'c', 'Value', 'int8(-7)');
+signe = add_block(signe, 'simulink/Logic and Bit Operations/Shift Arithmetic', 'sa', ...
+                  'BitShiftNumber', 1);
+signe = add_line(add_line(add_block(signe, 'outport', 'y'), 'c', 'sa'), 'sa', 'y');
+r = sim(signe, 1);
+assert(r.yout(end) == -4, 'le decalage arithmetique a droite garde le signe');
+entre = new_system('entre');
+entre = add_block(entre, 'constant', 'a', 'Value', 'uint8(12)');
+entre = add_block(entre, 'constant', 'b', 'Value', 'uint8(10)');
+entre = add_block(entre, 'simulink/Logic and Bit Operations/Bitwise Operator', 'bw', ...
+                  'UseBitMask', 'off', 'NumInputPorts', 2, 'logicop', 'NOR');
+entre = add_line(add_line(add_line(add_block(entre, 'outport', 'y'), 'a', 'bw', 1), ...
+                          'b', 'bw', 2), 'bw', 'y');
+r = sim(entre, 1);
+assert(r.yout(end) == 241, 'NOR entre deux entrees : bitcmp(12 | 10) en uint8');
+% une MATLAB Function reçoit ses entrées dans leur type
+typee = new_system('typee');
+typee = add_block(typee, 'constant', 'c', 'Value', 'int8(100)');
+typee = add_block(typee, 'matlabfunction', 'f', 'Script', ...
+                  sprintf('function y = fcn(u)\ny = u + u;\n'));
+typee = add_line(add_line(add_block(typee, 'outport', 'y'), 'c', 'f'), 'f', 'y');
+r = sim(typee, 1);
+assert(r.yout(end) == 127, 'un int8 calcule en int8 dans la fonction : il sature');
+% Trente simulations d'un modèle à MATLAB Function ne font pas grossir la
+% mémoire : l'arbre des fichiers relus après rehash se libère.
+if exist('/proc/self/status', 'file') == 2
+    memoireSim = @() str2double(regexp(fileread('/proc/self/status'), 'VmRSS:\s*(\d+)', ...
+                                       'tokens', 'once'));
+    sim(typee, 1);
+    avantSim = memoireSim();
+    for kSim = 1:30
+        sim(typee, 1);
+    end
+    assert(memoireSim() - avantSim < 60000, 'la memoire ne croit pas de simulation en simulation');
+end
+% la sinusoïde de l'entrée, les dimensions
+fonction = new_system('fonction');
+fonction = add_block(fonction, 'clock', 't');
+fonction = add_block(fonction, 'simulink/Math Operations/Sine Wave Function', 'sw', ...
+                     'Amplitude', 2, 'Bias', 1, 'Frequency', 3, 'Phase', 0.5);
+fonction = add_line(add_line(add_block(fonction, 'outport', 'y'), 't', 'sw'), 'sw', 'y');
+r = sim(fonction, 'Solver', 'ode1', 'FixedStep', 0.25, 'StopTime', 1);
+assert(max(abs(r.yout - (2 * sin(3 * r.tout + 0.5) + 1))) < 1e-12, 'Sine Wave Function');
+permutee = new_system('permutee');
+permutee = add_block(permutee, 'constant', 'c', 'Value', [1 2; 3 4; 5 6]);
+permutee = add_block(permutee, 'simulink/Math Operations/Permute Dimensions', 'pd');
+permutee = add_block(permutee, 'simulink/Math Operations/Squeeze', 'sq');
+permutee = add_line(add_line(add_block(permutee, 'outport', 'y'), 'c', 'pd'), 'pd', 'sq');
+permutee = add_line(permutee, 'sq', 'y');
+r = sim(permutee, 1);
+assert(isequal(r.yout(end, :), [1 2 3 4 5 6]), ...
+       'Permute Dimensions transpose ; yout range la matrice colonne apres colonne');
+racines = new_system('racines');
+racines = add_block(racines, 'constant', 'c', 'Value', -4);
+racines = add_block(racines, 'simulink/Math Operations/Signed Sqrt', 'ss');
+racines = add_block(racines, 'constant', 'd', 'Value', 4);
+racines = add_block(racines, 'simulink/Math Operations/Reciprocal Sqrt', 'rs');
+racines = add_line(add_line(add_block(racines, 'outport', 'y1'), 'c', 'ss'), 'ss', 'y1');
+racines = add_line(add_line(add_block(racines, 'outport', 'y2'), 'd', 'rs'), 'rs', 'y2');
+r = sim(racines, 1);
+assert(isequal(r.yout(end, :), [-2 0.5]), 'Signed Sqrt et Reciprocal Sqrt');
+% la table qui arrive par les signaux
+dynamique = new_system('dynamique');
+dynamique = add_block(dynamique, 'constant', 'x', 'Value', [0.5 2.5 9]);
+dynamique = add_block(dynamique, 'constant', 'xd', 'Value', [0 1 2 3]);
+dynamique = add_block(dynamique, 'constant', 'yd', 'Value', [0 10 20 40]);
+dynamique = add_block(dynamique, 'simulink/Lookup Tables/Lookup Table Dynamic', 'ltd');
+dynamique = add_line(add_block(dynamique, 'outport', 'y'), 'ltd', 'y');
+dynamique = add_line(add_line(add_line(dynamique, 'x', 'ltd', 1), 'xd', 'ltd', 2), ...
+                     'yd', 'ltd', 3);
+methodesDyn = {'Interpolation-Use End Values', [5 30 40]; ...
+               'Interpolation-Extrapolation', [5 30 160]; 'Use Input Nearest', [10 40 40]; ...
+               'Use Input Below', [0 20 40]; 'Use Input Above', [10 40 40]};
+for kM = 1:size(methodesDyn, 1)
+    r = sim(set_param(dynamique, 'ltd', 'LookUpMeth', methodesDyn{kM, 1}), 1);
+    assert(isequal(r.yout(end, :), methodesDyn{kM, 2}), ['Lookup Table Dynamic : ' ...
+                                                           methodesDyn{kM, 1}]);
+end
+% la pré-recherche et l'interpolation qui la suit
+pre = new_system('pre');
+pre = add_block(pre, 'constant', 'u', 'Value', [5 15 25 110 200]);
+pre = add_block(pre, 'simulink/Lookup Tables/Prelookup', 'pl');
+pre = add_block(pre, 'outport', 'k');
+pre = add_block(pre, 'outport', 'f');
+pre = add_line(add_line(add_line(pre, 'u', 'pl'), 'pl/1', 'k'), 'pl/2', 'f');
+r = sim(pre, 1);
+assert(isequal(r.yout(end, :), [0 0 1 9 9 0 0.5 0.5 1 1]), 'Prelookup, Clip');
+r = sim(set_param(pre, 'pl', 'ExtrapMethod', 'Linear'), 1);
+assert(isequal(r.yout(end, :), [0 0 1 9 9 -0.5 0.5 0.5 1 10]), 'Prelookup, Linear');
+r = sim(set_param(pre, 'pl', 'UseLastBreakpoint', 'on'), 1);
+assert(isequal(r.yout(end, :), [0 0 1 10 10 0 0.5 0.5 0 0]), 'Prelookup, dernier point');
+chaine = new_system('chaine');
+chaine = add_block(chaine, 'constant', 'a', 'Value', 25);
+chaine = add_block(chaine, 'constant', 'b', 'Value', 42);
+chaine = add_block(chaine, 'simulink/Lookup Tables/Prelookup', 'p1');
+chaine = add_block(chaine, 'simulink/Lookup Tables/Prelookup', 'p2');
+chaine = add_block(chaine, 'simulink/Lookup Tables/Interpolation Using Prelookup', 'it');
+chaine = add_line(add_line(chaine, 'a', 'p1'), 'b', 'p2');
+chaine = add_line(add_line(chaine, 'p1/1', 'it/1'), 'p1/2', 'it/2');
+chaine = add_line(add_line(chaine, 'p2/1', 'it/3'), 'p2/2', 'it/4');
+chaine = add_line(add_block(chaine, 'outport', 'y'), 'it', 'y');
+r = sim(chaine, 1);
+tablePre = sqrt((1:11)' * (1:11));
+assert(abs(r.yout(end) - interp2(10:10:110, 10:10:110, tablePre, 42, 25)) < 1e-12, ...
+       'Prelookup puis Interpolation Using Prelookup : l''interpolation bilineaire');
+sinCos = new_system('sinCos');
+sinCos = add_block(sinCos, 'constant', 'u', 'Value', [0 0.1 0.25 0.6 0.9]);
+sinCos = add_block(sinCos, 'simulink/Lookup Tables/Sine, Cosine', 's', ...
+                   'Formula', 'sin(2*pi*u) and cos(2*pi*u)');
+sinCos = add_block(sinCos, 'outport', 'ys');
+sinCos = add_block(sinCos, 'outport', 'yc');
+sinCos = add_line(add_line(add_line(sinCos, 'u', 's'), 's/1', 'ys'), 's/2', 'yc');
+r = sim(sinCos, 1);
+u = [0 0.1 0.25 0.6 0.9];
+assert(max(abs(r.yout(end, :) - [sin(2 * pi * u), cos(2 * pi * u)])) < 1e-3, ...
+       'Sine, Cosine : la table d''un quart d''onde');
+% les transmittances discrètes de la bibliothèque
+discret = new_system('discret');
+discret = add_block(discret, 'simulink/Sources/Step', 'e', 'Time', 0);
+discret = add_block(discret, 'zoh', 'z', 'SampleTime', 1);
+discret = add_block(discret, 'simulink/Discrete/Discrete FIR Filter', 'fir', ...
+                    'Coefficients', [0.5 0.3 0.2], 'SampleTime', 1);
+discret = add_block(discret, 'simulink/Discrete/Transfer Fcn First Order', 'p1');
+discret = add_block(discret, 'simulink/Discrete/Transfer Fcn Lead or Lag', 'll');
+discret = add_block(discret, 'simulink/Discrete/Transfer Fcn Real Zero', 'rz');
+discret = add_line(discret, 'e', 'z');
+for nomD = {'fir', 'p1', 'll', 'rz'}
+    discret = add_block(discret, 'outport', ['o' nomD{1}]);
+    discret = add_line(add_line(discret, 'z', nomD{1}), nomD{1}, ['o' nomD{1}]);
+end
+r = sim(discret, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 4);
+un = ones(5, 1);
+attendu = [filter([0.5 0.3 0.2], 1, un), filter(0.05 * [1 0], [1 -0.95], un), ...
+           filter([1 -0.75], [1 -0.95], un), filter([1 -0.75], 1, un)];
+assert(max(abs(r.yout(:) - attendu(:))) < 1e-12, ...
+       'Discrete FIR Filter, Transfer Fcn First Order, Lead or Lag, Real Zero');
+r = sim(set_param(discret, 'fir', 'InitialStates', [1 2]), 'Solver', 'FixedStepDiscrete', ...
+        'FixedStep', 1, 'StopTime', 4);
+assert(max(abs(r.yout(:, 1)' - [1.2 1 1 1 1])) < 1e-12, 'les etats de depart du FIR');
+% Index Vector, Environment Controller, Integrator Limited
+choix = new_system('choix');
+choix = add_block(choix, 'constant', 'k', 'Value', 2);
+choix = add_block(choix, 'constant', 'v', 'Value', [10 20 30]);
+choix = add_block(choix, 'simulink/Signal Routing/Index Vector', 'ix');
+choix = add_block(choix, 'simulink/Signal Routing/Environment Controller', 'ec');
+choix = add_line(add_line(choix, 'k', 'ix', 1), 'v', 'ix', 2);
+choix = add_line(add_line(choix, 'ix', 'ec', 1), 'v', 'ec', 2);
+choix = add_line(add_block(choix, 'outport', 'y'), 'ec', 'y');
+r = sim(choix, 1);
+assert(r.yout(end) == 30, 'Index Vector compte a partir de zero ; Environment Controller rend Sim');
+borne = new_system('borne');
+borne = add_block(borne, 'constant', 'c', 'Value', 1);
+borne = add_block(borne, 'simulink/Continuous/Integrator Limited', 'i');
+borne = add_line(add_line(add_block(borne, 'outport', 'y'), 'c', 'i'), 'i', 'y');
+r = sim(borne, 3);
+assert(abs(r.yout(end) - 1) < 1e-9 && strcmp(get_param(borne, 'i', 'LimitOutput'), 'on'), ...
+       'Integrator Limited : borne entre 0 et 1 d''avance');
+% les blocs de vérification
+verif = new_system('verif');
+verif = add_block(verif, 'ramp', 'r', 'Slope', 1);
+verif = add_block(verif, 'simulink/Model Verification/Check Static Range', 'cs', ...
+                  'min', 0, 'max', 2.5);
+verif = add_line(verif, 'r', 'cs');
+r = sim(set_param(verif, 'cs', 'max', 10), 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 5);
+assert(numel(r.tout) == 11, 'dans ses bornes, le controle laisse passer');
+etatAvertissement = warning('off', 'Simulink:blocks:AssertionAssert');
+avertir = sim(set_param(verif, 'cs', 'stopWhenAssertionFail', 'off'), 'Solver', 'ode1', ...
+              'FixedStep', 0.5, 'StopTime', 5);
+warning(etatAvertissement);
+assert(numel(avertir.tout) == 11, 'stopWhenAssertionFail off : un avertissement, pas un arret');
+ecart = new_system('ecart');
+ecart = add_block(ecart, 'ramp', 'r', 'Slope', 1);
+ecart = add_block(ecart, 'simulink/Model Verification/Check Static Gap', 'cg', 'min', 1, 'max', 2);
+ecart = add_line(ecart, 'r', 'cg');
+bornes = new_system('bornes');
+bornes = add_block(bornes, 'ramp', 'r', 'Slope', -1);
+bornes = add_block(bornes, 'simulink/Model Verification/Check Static Lower Bound', 'lo', 'min', -2);
+bornes = add_block(bornes, 'simulink/Model Verification/Check Static Upper Bound', 'hi', 'max', 0);
+bornes = add_line(add_line(bornes, 'r', 'lo'), 'r', 'hi');
+dyn = new_system('dyn');
+dyn = add_block(dyn, 'constant', 'haut', 'Value', 3);
+dyn = add_block(dyn, 'ramp', 'sig', 'Slope', 1, 'InitialOutput', 0.5);
+dyn = add_block(dyn, 'constant', 'bas', 'Value', 0);
+dyn = add_block(dyn, 'simulink/Model Verification/Check Dynamic Range', 'cr');
+dyn = add_line(add_line(add_line(dyn, 'haut', 'cr', 1), 'sig', 'cr', 2), 'bas', 'cr', 3);
+dynEcart = set_param(set_param(replace_block(dyn, 'checkdynamicrange', 'checkdynamicgap'), ...
+                               'haut', 'Value', 3), 'bas', 'Value', 2);
+dynBas = new_system('dynBas');
+dynBas = add_block(dynBas, 'constant', 'bas', 'Value', 1);
+dynBas = add_block(dynBas, 'ramp', 'sig', 'Slope', -1, 'InitialOutput', 2);
+dynBas = add_block(dynBas, 'simulink/Model Verification/Check Dynamic Lower Bound', 'cl');
+dynBas = add_line(add_line(dynBas, 'bas', 'cl', 1), 'sig', 'cl', 2);
+dynLarge = add_line(delete_line(add_block(dynBas, 'constant', 'l3', 'Value', [1 2 3]), ...
+                                'bas', 'cl', 1), 'l3', 'cl', 1);
+dynLarge = set_param(dynLarge, 'sig', 'InitialOutput', [4 5]);
+reglage = {'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 5};
+casVerif = {
+    @() sim(verif, reglage{:}), 'Simulink:blocks:AssertionAssert', 'verif/cs'' a t = 3'
+    @() sim(set_param(verif, 'cs', 'max_included', 'off', 'max', 2), reglage{:}), ...
+        'Simulink:blocks:AssertionAssert', 'verif/cs'' a t = 2'
+    @() sim(set_param(verif, 'cs', 'min', 3, 'max', 1), 1), ...
+        'Simulink:blocks:CheckBoundsOrder', 'verif/cs'
+    @() sim(ecart, reglage{:}), 'Simulink:blocks:AssertionAssert', 'ecart/cg'' a t = 1.5'
+    @() sim(bornes, reglage{:}), 'Simulink:blocks:AssertionAssert', 'bornes/lo'' a t = 2.5'
+    @() sim(dyn, reglage{:}), 'Simulink:blocks:AssertionAssert', 'dyn/cr'' a t = 2.5'
+    @() sim(dynEcart, reglage{:}), 'Simulink:blocks:AssertionAssert', 'dyn/cr'' a t = 2'
+    @() sim(dynBas, 'Solver', 'ode1', 'FixedStep', 0.25, 'StopTime', 5), ...
+        'Simulink:blocks:AssertionAssert', 'dynBas/cl'' a t = 1'
+    @() sim(dynLarge, 1), 'Simulink:Engine:DimensionMismatch', 'min est de dimension 3'
+    @() sim(set_param(bits, 'c', 'Value', 12), 1), ...
+        'Simulink:DataType:BitOperationInputType', 'bits/bw'
+    @() sim(set_param(bits, 'bs', 'iBit', 40), 1), 'Simulink:blocks:BitIndex', 'bits/bs'
+    @() sim(set_param(bits, 'bs', 'iBit', 9), 1), 'Simulink:blocks:BitIndex', 'bits/bs'
+    @() sim(set_param(entre, 'bw', 'NumInputPorts', 1), 1), ...
+        'Simulink:blocks:BitwiseOperatorInputs', 'entre/bw'
+    @() sim(set_param(signe, 'sa', 'BinPtShiftNumber', 2), 1), ...
+        'Simulink:blocks:ShiftArithmeticBinaryPoint', 'signe/sa'
+    @() sim(set_param(fonction, 'sw', 'SineType', 'Sample based'), 1), ...
+        'Simulink:blocks:SineWaveFunctionSampleBased', 'fonction/sw'
+    @() sim(set_param(permutee, 'pd', 'Order', [1 1]), 1), ...
+        'Simulink:blocks:PermuteDimensionsOrder', 'permutee/pd'
+    @() sim(set_param(dynamique, 'xd', 'Value', [0 2 1 3]), 1), ...
+        'Simulink:blocks:LookupTableDynamicBreakpoints', 'dynamique/ltd'
+    @() sim(set_param(dynamique, 'xd', 'Value', [0 1 2]), 1), ...
+        'Simulink:blocks:LookupTableDynamicSize', 'dynamique/ltd'
+    @() sim(set_param(pre, 'pl', 'BreakpointsData', [3 1 2]), 1), ...
+        'Simulink:blocks:PrelookupBreakpoints', 'pre/pl'
+    @() sim(set_param(chaine, 'it', 'NumberOfTableDimensions', 7), 1), ...
+        'Simulink:blocks:LookupNDDimensions', 'chaine/it'
+    @() sim(set_param(chaine, 'it', 'Table', ones(11, 11, 2)), 1), ...
+        'Simulink:blocks:LookupTableSizeMismatch', 'chaine/it'
+    @() sim(set_param(sinCos, 's', 'NumDataPoints', 1), 1), ...
+        'Simulink:blocks:SineCosineTableSize', 'sinCos/s'
+    @() sim(set_param(discret, 'fir', 'InitialStates', [1 2 3]), 1), ...
+        'Simulink:blocks:DiscreteFirInitialStates', 'discret/fir'
+    @() sim(set_param(choix, 'k', 'Value', 3), 1), ...
+        'Simulink:blocks:MultiPortSwitchIndexOutOfRange', 'choix/ix'
+    };
+for kE = 1:size(casVerif, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('casVerif{kE, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casVerif{kE, 2}) && ~isempty(strfind(message, casVerif{kE, 3})), ...
+           sprintf('bibliotheque, cas %d : %s attendu, %s rendu (%s)', kE, casVerif{kE, 2}, ...
+                   vu, message));
+end
+fprintf('suite de la bibliotheque : %d cas d''erreur verifies\n', size(casVerif, 1));
 
 disp('simulink : toutes les verifications passent');
 

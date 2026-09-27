@@ -138,8 +138,13 @@ totalité.
    mémoires partagées (Data Store Memory, Read, Write, lues avant d'être
    écrites), IC, Width, Manual Switch, Interval Test, les non-linéarités
    à bornes dynamiques, l'intégrateur du second ordre, Discrete
-   Derivative, Difference, Tapped Delay, Discrete Zero-Pole, XY Graph et
-   To File. Les sous-systèmes
+   Derivative, Difference, Tapped Delay, Discrete Zero-Pole, XY Graph,
+   To File et From File, Assignment, Combinatorial Logic, les détections
+   de front, les opérations bit à bit sur les entiers, Lookup Table
+   Dynamic, Prelookup et Interpolation Using Prelookup, Discrete FIR
+   Filter et les transmittances discrètes de la bibliothèque ; les blocs
+   de vérification (Check Static et Check Dynamic) arrêtent la simulation
+   en nommant le bloc et l'instant. Les sous-systèmes
    conditionnels — Enable, Trigger, If et Switch Case avec leurs
    sous-systèmes d'action, Merge — calculent quand leur garde le
    permet, et tiennent ou remettent à zéro sorties et états comme dans
@@ -163,7 +168,8 @@ totalité.
    Type Conversion convertit en entier, simple ou booléen, avec arrondi
    et saturation. Les sous-systèmes itérés (For Iterator, While
    Iterator) et appelés par fonction y sont aussi, comme les entrées
-   externes de `sim`, les références de modèle, les tables n-D, les
+   externes de `sim`, les références de modèle, les tables n-D jusqu'à
+   six dimensions, les
    rappels du modèle (InitFcn, StopFcn...) et SimulationCommand.
    Les types de données se propagent de bloc en bloc — double, single,
    entiers, booléens —, arrondis, repliés ou saturés comme dans Simulink.

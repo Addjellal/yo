@@ -64,8 +64,20 @@ struct FonctionUtilisateur {
     // l'intérieur d'une méthode, l'indexation d'un objet de cette classe
     // reste l'indexation par défaut, subsref/subsasgn ne sont pas appelés.
     std::string classeProprietaire;
-    // Sous-fonctions du même fichier, visibles seulement depuis lui.
-    std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
+    // Sous-fonctions du même fichier, visibles seulement depuis lui. Les
+    // références sont faibles : les fonctions d'un fichier se voient
+    // toutes entre elles, et des références fortes feraient des cycles que
+    // rien ne libère — l'arbre d'un fichier oublié du cache restait en
+    // mémoire. Ce qui les fait vivre, c'est leur groupe.
+    std::map<std::string, std::weak_ptr<FonctionUtilisateur>> voisines;
+    // Le groupe des fonctions du fichier : un pointeur vers l'une d'elles
+    // rendu hors du fichier en partage le compte, si bien que tant que
+    // l'une vit, toutes vivent.
+    std::weak_ptr<void> groupe;
+    // Les groupes que cette fonction fait vivre : les fonctions locales
+    // d'un script qu'elle enveloppe, ou celles qu'un texte exécuté pendant
+    // qu'elle tourne a définies.
+    std::vector<std::shared_ptr<void>> groupesPossedes;
     // Fonctions imbriquées, écrites dans le corps de celle-ci : elles
     // partagent son espace de travail, comme le veut MATLAB.
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> imbriquees;
@@ -103,6 +115,8 @@ struct DefinitionClasse {
     bool heritageFait = false;
     std::string aide;
     std::string fichier;   // d'où elle vient, pour « help » et le navigateur
+    // Le groupe de ses méthodes et des fonctions locales de son fichier.
+    std::shared_ptr<void> groupe;
     bool aMethode(const std::string& nom) const { return methodes.count(nom) > 0; }
     bool estStatique(const std::string& nom) const {
         for (const auto& s : statiques)

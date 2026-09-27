@@ -1010,6 +1010,45 @@ clear(func2str(poigneeCompteur));
 assert(poigneeCompteur() == 1, 'clear(func2str(h)) aussi');
 rmpath(dossierPersistant);
 
+% Les fonctions d'un fichier vivent ensemble : une poignée vers l'une
+% d'elles garde le fichier entier, même quand le cache du chemin l'a
+% oublié ; et un fichier oublié de tous se libère — rehash ne fait plus
+% grossir la mémoire.
+dossierVie = tempname();
+mkdir(dossierVie);
+fichierVie = fopen(fullfile(dossierVie, 'vieFichierEssai.m'), 'w');
+fprintf(fichierVie, ['function h = vieFichierEssai()\nh = @locale;\nend\n' ...
+                     'function y = locale(x)\ny = aideLocale(x) + 1;\nend\n' ...
+                     'function y = aideLocale(x)\ny = 2 * x;\nend\n']);
+fclose(fichierVie);
+addpath(dossierVie);
+poigneeVie = vieFichierEssai();
+rehash();
+rmpath(dossierVie);
+assert(poigneeVie(3) == 7, 'une poignee vers une fonction locale garde son fichier en vie');
+addpath(dossierVie);
+if exist('/proc/self/status', 'file') == 2
+    memoireVie = @() str2double(regexp(fileread('/proc/self/status'), ...
+                                       'VmRSS:\s*(\d+)', 'tokens', 'once'));
+    for kVie = 1:3
+        rehash();
+        vieFichierEssai();
+        strjoin({'a', 'b'}, '-');
+    end
+    avantVie = memoireVie();
+    for kVie = 1:150
+        rehash();
+        poigneeVie = vieFichierEssai();
+        strjoin({'a', 'b'}, '-');
+    end
+    assert(memoireVie() - avantVie < 20000, ...
+           'les arbres des fichiers que rehash fait relire se liberent');
+    assert(poigneeVie(1) == 3);
+end
+rmpath(dossierVie);
+rmdir(dossierVie, 's');
+disp('vie des fichiers : ok')
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

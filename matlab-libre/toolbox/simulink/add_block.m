@@ -55,7 +55,11 @@ function modele = add_block(modele, type, nom, varargin)
 %     minmax       Function (min, max), Inputs
 %     rounding     Operator : floor, ceil, round, fix
 %     polynomial   coefs                        polyval(coefs, u)
-%     sqrt         Operator : sqrt, signedSqrt, rSqrt
+%     sqrt         Operator : sqrt, signedSqrt, rSqrt ; « Signed Sqrt » et
+%                  « Reciprocal Sqrt » de la bibliothèque en sont réglés
+%     sinewavefunction Amplitude, Bias, Frequency, Phase — A sin(F u + P) + B,
+%                  l'entrée tenant lieu de temps (SineType 'Time based')
+%     permutedimensions Order ; squeeze — comme PERMUTE et SQUEEZE
 %
 %   Non-linéarités :
 %     saturation   UpperLimit, LowerLimit
@@ -67,11 +71,22 @@ function modele = add_block(modele, type, nom, varargin)
 %     backlash     BacklashWidth, InitialOutput
 %     coulombfriction Offset, Gain
 %     lookup       BreakpointsData, TableData, InterpMethod, ExtrapMethod ;
-%                  NumberOfTableDimensions 2 et BreakpointsForDimension2
-%                  en font une table à deux entrées (n-D Lookup Table)
+%                  NumberOfTableDimensions (jusqu'à 6) et
+%                  BreakpointsForDimension2 à 6 en font une table à
+%                  plusieurs entrées (n-D Lookup Table)
 %     lookup2d     BreakpointsForDimension1, BreakpointsForDimension2, Table
-%     directlookup Table, NumberOfTableDimensions (1 ou 2) — l'élément que
+%     directlookup Table, NumberOfTableDimensions (1 à 6) — l'élément que
 %                  désignent ses entrées, à partir de 0
+%     lookuptabledynamic LookUpMeth — trois entrées : x, xdat, ydat, la table
+%                  arrivant par les signaux
+%     prelookup    BreakpointsData, OutputSelection, ExtrapMethod,
+%                  UseLastBreakpoint — deux sorties : l'indice k, à partir
+%                  de 0 (uint32), et la fraction f
+%     interpolationusingprelookup NumberOfTableDimensions, Table,
+%                  InterpMethod, ExtrapMethod, ValidIndexMayReachLast — les
+%                  entrées k1, f1, k2, f2... de Prelookup
+%     sinecosine   Formula, NumDataPoints — sin(2 pi u), cos(2 pi u) ou les
+%                  deux, lus dans une table d'un quart d'onde
 %     saturationdynamic, deadzonedynamic — trois entrées : up, u, lo
 %     wraptozero   Threshold                    zéro au-delà du seuil
 %
@@ -83,11 +98,23 @@ function modele = add_block(modele, type, nom, varargin)
 %     intervaltest uplimit, lowlimit, IntervalClosedRight, IntervalClosedLeft
 %     combinatoriallogic TruthTable        la ligne que désignent les entrées,
 %                                          la première en poids fort
+%     detectrisepositive, detectrisenonnegative, detectfallnegative,
+%                  detectfallnonpositive  vinit — le front du test u > 0,
+%                  u >= 0, u < 0, u <= 0
+%     intervaltestdynamic IntervalClosedRight, IntervalClosedLeft — trois
+%                  entrées : up, u, lo
+%     bitwiseoperator logicop (AND, OR, NAND, NOR, XOR, NOT), UseBitMask,
+%                  BitMask, NumInputPorts — sur des entiers
+%     bitset, bitclear iBit (à partir de 0) ; shiftarithmetic
+%                  BitShiftNumber, BitShiftDirection (Left, Right,
+%                  Bidirectional) — à droite, le signe se conserve
 %
 %   Aiguillage :
 %     switch       Threshold, Criteria : 'u2 >= Threshold', 'u2 > Threshold',
 %                  'u2 ~= 0' — la première entrée passe, ou la troisième
-%     multiportswitch Inputs, DataPortOrder
+%     multiportswitch Inputs, DataPortOrder ; une seule entrée de données
+%                  (« Index Vector ») : l'élément que désigne la commande
+%     environmentcontroller —              deux entrées, Sim et Coder : rend Sim
 %     mux          Inputs (un nombre, ou les largeurs)
 %     demux        Outputs (un nombre, ou les largeurs)
 %     selector     Indices
@@ -125,7 +152,8 @@ function modele = add_block(modele, type, nom, varargin)
 %                  falling, either, level, level hold : une entrée de
 %                  remise), InitialConditionSource (external : une entrée
 %                  de condition initiale), ShowSaturationPort,
-%                  ShowStatePort (le port d'état, 'integ/State')
+%                  ShowStatePort (le port d'état, 'integ/State') ;
+%                  « Integrator Limited » le borne d'avance entre 0 et 1
 %     derivative   —                            vaut zéro au premier pas
 %     transferfcn  Numerator, Denominator
 %     statespace   A, B, C, D, X0
@@ -149,6 +177,10 @@ function modele = add_block(modele, type, nom, varargin)
 %     discretederivative gainval, ICPrevScaledInput   K (u - u d'avant) / Ts
 %     difference   ICPrevInput                  u - u d'avant
 %     tappeddelay  NumDelays, vinit, samptime, DelayOrder, includeCurrent
+%     discretefirfilter Coefficients, InitialStates, SampleTime
+%     transferfcnfirstorder PoleZ, ICPrevOutput   (1 - p) z / (z - p)
+%     transferfcnleadorlag PoleZ, ZeroZ, Gain, ICPrevOutput, ICPrevInput
+%     transferfcnrealzero ZeroZ, ICPrevInput      (z - zéro) / z
 %
 %   Sorties :
 %     outport      Port, InitialOutput, OutputWhenDisabled (held, reset)
@@ -161,6 +193,14 @@ function modele = add_block(modele, type, nom, varargin)
 %     stopsimulation — arrête la simulation dès que l'entrée n'est plus nulle
 %     assertion    Enabled, StopWhenAssertionFail — échoue dès que
 %                  l'entrée s'annule
+%     checkstaticrange, checkstaticgap  min, max, min_included, max_included ;
+%                  checkstaticlowerbound  min, min_included ;
+%                  checkstaticupperbound  max, max_included — échouent quand
+%                  le signal sort de ses bornes (ou tombe dans l'écart)
+%     checkdynamicrange, checkdynamicgap — trois entrées : max, sig, min ;
+%                  checkdynamiclowerbound (min, sig),
+%                  checkdynamicupperbound (max, sig) — les bornes sont des
+%                  signaux ; tous portent enabled et stopWhenAssertionFail
 %
 %   Fonctions de l'utilisateur :
 %     fcn          Expr                         une expression de u, scalaire :
@@ -321,9 +361,11 @@ function modele = add_block(modele, type, nom, varargin)
     end
     % Divide, Subtract, Sum of Elements, Product of Elements : des Product
     % et des Sum que la bibliothèque de Simulink règle d'avance.
-    [nomReglage, valeurReglage, synonymes] = prereglage(type);
-    if ~isempty(nomReglage) && ~any(ismember(lower(reglages(1:2:end)), lower(synonymes)))
-        reglages(end + 1:end + 2) = {nomReglage, valeurReglage};
+    avance = prereglages(type);
+    for j = 1:size(avance, 1)
+        if ~any(ismember(lower(reglages(1:2:end)), lower(avance{j, 3})))
+            reglages(end + 1:end + 2) = avance(j, 1:2);
+        end
     end
     % Un « Variant Subsystem » de la bibliothèque est un sous-système à
     % variantes : Variant vaut 'on'.
@@ -424,10 +466,10 @@ end
 % Le réglage qu'un bloc de la bibliothèque porte d'avance, désigné par
 % son nom : un Divide divise, un Subtract soustrait, un Sum of Elements
 % somme les éléments de sa seule entrée.
-function [nom, valeur, synonymes] = prereglage(designation)
-    nom = '';
-    valeur = '';
-    synonymes = {};
+% Les réglages qu'un bloc de la bibliothèque porte d'avance : {nom, valeur,
+% noms qui le désignent}, un par ligne. Un réglage donné l'emporte.
+function avance = prereglages(designation)
+    avance = cell(0, 3);
     if isstruct(designation)
         return
     end
@@ -436,15 +478,27 @@ function [nom, valeur, synonymes] = prereglage(designation)
     if ~isempty(barre)
         texte = texte(barre + 1:end);
     end
+    signes = {'Signs', 'Inputs', 'ListOfSigns'};
     switch lower(regexprep(texte, '\s', ''))
         case 'divide'
-            nom = 'Inputs'; valeur = '*/'; synonymes = {'Inputs'};
+            avance = {'Inputs', '*/', {'Inputs'}};
         case 'productofelements'
-            nom = 'Inputs'; valeur = '*'; synonymes = {'Inputs'};
+            avance = {'Inputs', '*', {'Inputs'}};
         case 'subtract'
-            nom = 'Signs'; valeur = '+-'; synonymes = {'Signs', 'Inputs', 'ListOfSigns'};
+            avance = {'Signs', '+-', signes};
         case 'sumofelements'
-            nom = 'Signs'; valeur = '+'; synonymes = {'Signs', 'Inputs', 'ListOfSigns'};
+            avance = {'Signs', '+', signes};
+        case 'indexvector'
+            avance = {'Inputs', 1, {'Inputs'}; ...
+                      'DataPortOrder', 'Zero-based contiguous', {'DataPortOrder'}};
+        case 'integratorlimited'
+            avance = {'LimitOutput', 'on', {'LimitOutput'}; ...
+                      'UpperSaturationLimit', 1, {'UpperSaturationLimit'}; ...
+                      'LowerSaturationLimit', 0, {'LowerSaturationLimit'}};
+        case 'signedsqrt'
+            avance = {'Operator', 'signedSqrt', {'Operator'}};
+        case 'reciprocalsqrt'
+            avance = {'Operator', 'rSqrt', {'Operator'}};
     end
 end
 

@@ -630,6 +630,15 @@ function [initiales, sortie, derivee, maj] = ecrireBloc(c, k, v, variables, u)
             end
         case 'multiportswitch'
             sortie = {sprintf('choix_%s = fix(%s(1)) + %s;', v, u{1}, nombre(s(2)))};
+            if s(1) == 1
+                % l'Index Vector : un élément de l'unique entrée de données
+                sortie = [sortie, {sprintf('if choix_%s < 1 || choix_%s > numel(%s)', v, v, u{2}), ...
+                    sprintf(['    error(''Simulink:blocks:MultiPortSwitchIndexOutOfRange'', ' ...
+                             '''L''''entree de commande de %s vaut %%g a t = %%g.'', %s(1), t);'], ...
+                            strrep(c.chemins{k}, '''', ''''''), u{1}), 'end', ...
+                    sprintf('%s = %s(choix_%s);', y, u{2}, v)}];
+                return
+            end
             for j = 1:s(1)
                 if j == 1
                     sortie{end + 1} = sprintf('if choix_%s == 1', v); %#ok<AGROW>

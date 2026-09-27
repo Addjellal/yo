@@ -146,8 +146,37 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
         case 'goto'
             nSorties = 0;
         case {'outport', 'display', 'toworkspace', 'terminator', 'stopsimulation', ...
-              'assertion'}
+              'checkstaticrange', 'checkstaticlowerbound', 'checkstaticupperbound', ...
+              'checkstaticgap'}
             nSorties = 0;
+        case 'assertion'
+            nEntrees = entier(lire(p, 'NombreEntrees', 1));
+            nSorties = 0;
+        case {'checkdynamicrange', 'checkdynamicgap'}
+            nEntrees = 3;   % max, sig, min
+            nSorties = 0;
+        case {'checkdynamiclowerbound', 'checkdynamicupperbound'}
+            nEntrees = 2;   % la borne, puis sig
+            nSorties = 0;
+        case {'intervaltestdynamic', 'lookuptabledynamic'}
+            nEntrees = 3;
+        case 'environmentcontroller'
+            nEntrees = 2;
+        case 'bitwiseoperator'
+            if strcmpi(char(lire(p, 'UseBitMask', 'on')), 'off') && ...
+               ~strcmpi(char(lire(p, 'logicop', 'AND')), 'NOT')
+                nEntrees = entier(lire(p, 'NumInputPorts', 1));
+            end
+        case 'prelookup'
+            if ~strcmpi(char(lire(p, 'OutputSelection', 'Index and fraction')), 'Index only')
+                nSorties = 2;
+            end
+        case 'interpolationusingprelookup'
+            nEntrees = 2 * entier(lire(p, 'NumberOfTableDimensions', 2));
+        case 'sinecosine'
+            if strcmp(char(lire(p, 'Formula', 'sin(2*pi*u)')), 'sin(2*pi*u) and cos(2*pi*u)')
+                nSorties = 2;
+            end
         case 'scope'
             nEntrees = entier(lire(p, 'NumInputPorts', 1));
             nSorties = 0;

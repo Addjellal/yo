@@ -36,14 +36,52 @@ static void propagerVoisines(
     const std::shared_ptr<FonctionUtilisateur>& f,
     const std::map<std::string, std::shared_ptr<FonctionUtilisateur>>& voisines) {
     if (!f) return;
-    f->voisines = voisines;
+    f->voisines.clear();
+    for (const auto& kv : voisines) f->voisines[kv.first] = kv.second;
     for (auto& kv : f->imbriquees) propagerVoisines(kv.second, voisines);
+}
+
+// Les fonctions d'un fichier vivent ensemble : un groupe les possède, et
+// chaque pointeur vers l'une d'elles qui sort du fichier partage le compte
+// du groupe. Ainsi rien ne se tient en cycle, et le fichier entier se
+// libère quand plus personne n'en tient une fonction.
+using GroupeFonctions = std::vector<std::shared_ptr<FonctionUtilisateur>>;
+
+static void marquerGroupe(const std::shared_ptr<FonctionUtilisateur>& f,
+                          const std::shared_ptr<void>& groupe) {
+    f->groupe = groupe;
+    for (auto& kv : f->imbriquees) marquerGroupe(kv.second, groupe);
+}
+
+// Rend le groupe, et range dans VOISINES un pointeur partagé par fonction.
+static std::shared_ptr<void> grouper(
+    const GroupeFonctions& fonctions,
+    std::map<std::string, std::shared_ptr<FonctionUtilisateur>>& voisines) {
+    std::shared_ptr<void> groupe = std::make_shared<GroupeFonctions>(fonctions);
+    for (const auto& f : fonctions) {
+        marquerGroupe(f, groupe);
+        voisines[f->nom] = std::shared_ptr<FonctionUtilisateur>(groupe, f.get());
+    }
+    return groupe;
+}
+
+// Un pointeur vers F qui fait vivre tout son fichier : c'est celui qu'on
+// donne à une portée ou à une poignée.
+static std::shared_ptr<FonctionUtilisateur> partager(
+    const std::shared_ptr<FonctionUtilisateur>& f) {
+    if (!f) return f;
+    if (auto groupe = f->groupe.lock()) return std::shared_ptr<FonctionUtilisateur>(groupe, f.get());
+    return f;
 }
 
 static void relierClasse(const std::shared_ptr<DefinitionClasse>& def,
                          const std::vector<std::shared_ptr<FonctionUtilisateur>>& locales) {
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
-    for (const auto& f : locales) voisines[f->nom] = f;
+    GroupeFonctions membres = locales;
+    for (auto& kv : def->methodes) membres.push_back(kv.second);
+    std::map<std::string, std::shared_ptr<FonctionUtilisateur>> tous;
+    def->groupe = grouper(membres, tous);
+    for (const auto& f : locales) voisines[f->nom] = tous[f->nom];
     for (auto& kv : def->methodes) {
         propagerVoisines(kv.second, voisines);
         kv.second->classeProprietaire = def->nom;
@@ -448,7 +486,7 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
     // propres fonctions locales, qui ne sont visibles que de lui : elles
     // vont dans « voisines », et le corps du script les y trouve.
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
-    for (auto& f : u.fonctions) voisines[f->nom] = f;
+    std::shared_ptr<void> groupe = grouper(u.fonctions, voisines);
     for (auto& f : u.fonctions) {
         f->fichier = chemin;
         propagerVoisines(f, voisines);
@@ -463,15 +501,17 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
         f->entrees.clear();
         f->sorties.clear();
         f->script = true;
-        f->voisines = voisines;
+        for (const auto& kv : voisines) f->voisines[kv.first] = kv.second;
+        f->groupesPossedes.push_back(groupe);
         if (cacheable) cacheFonctions_[nom] = f;
         return f;
     }
     u.fonctions[0]->aide = aideDepuisSource(source);
     // Le nom du fichier prime sur celui écrit dans la première fonction ;
     // les suivantes restent privées au fichier, visibles par « voisines ».
-    if (cacheable) cacheFonctions_[nom] = u.fonctions[0];
-    return u.fonctions[0];
+    auto principale = std::shared_ptr<FonctionUtilisateur>(groupe, u.fonctions[0].get());
+    if (cacheable) cacheFonctions_[nom] = principale;
+    return principale;
 }
 
 // Concaténation d'un crochet : quand une classe définit horzcat ou vertcat,
@@ -738,7 +778,10 @@ bool Interpreteur::fonctionExiste(const std::string& nom) const {
     if (indexM_.count(nom)) return true;
     if (indexClasses_.count(nom)) return true;
     const Portee& p = *piles_.back();
-    if (p.fonction && p.fonction->voisines.count(nom)) return true;
+    if (p.fonction) {
+        auto it = p.fonction->voisines.find(nom);
+        if (it != p.fonction->voisines.end() && !it->second.expired()) return true;
+    }
     return !fichierDossierCourant(nom).empty();
 }
 
@@ -757,7 +800,7 @@ std::shared_ptr<Fonction> Interpreteur::resoudrePoignee(const std::string& nom) 
             Portee* hote = q;
             while (hote->anonyme && hote->englobante) hote = hote->englobante.get();
             f->genre = Fonction::Utilisateur;
-            f->utilisateur = it->second;
+            f->utilisateur = partager(it->second);
             f->porteeEnglobante = hote == portante.get() ? portante : trouverPortee(hote);
             return f;
         }
@@ -765,9 +808,11 @@ std::shared_ptr<Fonction> Interpreteur::resoudrePoignee(const std::string& nom) 
     if (p.fonction) {
         auto it = p.fonction->voisines.find(nom);
         if (it != p.fonction->voisines.end()) {
-            f->genre = Fonction::Utilisateur;
-            f->utilisateur = it->second;
-            return f;
+            if (auto voisine = it->second.lock()) {
+                f->genre = Fonction::Utilisateur;
+                f->utilisateur = voisine;
+                return f;
+            }
         }
     }
     auto uf = fonctionFichier(nom);
@@ -806,14 +851,15 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
                 while (hote->anonyme && hote->englobante) hote = hote->englobante.get();
                 englobanteEnAttente_ =
                     hote == portante.get() ? portante : trouverPortee(hote);
-                return appelerUtilisateur(it->second, args, nargout);
+                return appelerUtilisateur(partager(it->second), args, nargout);
             }
         }
     }
     if (p.fonction) {
         auto it = p.fonction->voisines.find(nom);
         if (it != p.fonction->voisines.end())
-            return appelerUtilisateur(it->second, args, nargout);
+            if (auto voisine = it->second.lock())
+                return appelerUtilisateur(voisine, args, nargout);
     }
     // Méthode d'un objet : dispatch sur la classe de l'argument dominant.
     // MATLAB retient le premier argument qui est un objet et dont la classe
@@ -1037,7 +1083,9 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
                "Too many input arguments to function '" + f->nom + "'.");
     auto portee = std::make_shared<Portee>();
     portee->nomFonction = f->nom;
-    portee->fonction = f;
+    // la portée fait vivre tout le fichier de la fonction, le temps qu'elle
+    // tourne : ses voisines restent joignables même si le cache l'oublie
+    portee->fonction = partager(f);
     if (f->imbriquee) {
         portee->englobante = englobanteEnAttente_;
         englobanteEnAttente_.reset();
@@ -1115,10 +1163,12 @@ void Interpreteur::executerTexte(const std::string& source, const std::string& o
     for (auto& c : u.classes) heriterParents(c);
     if (!u.fonctions.empty()) {
         std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
-        for (auto& f : u.fonctions) voisines[f->nom] = f;
+        std::shared_ptr<void> groupe = grouper(u.fonctions, voisines);
         for (auto& f : u.fonctions) propagerVoisines(f, voisines);
         if (piles_.back()->fonction) {
-            for (auto& kv : voisines) piles_.back()->fonction->voisines[kv.first] = kv.second;
+            auto& courante = piles_.back()->fonction;
+            for (auto& kv : voisines) courante->voisines[kv.first] = kv.second;
+            courante->groupesPossedes.push_back(groupe);
         } else {
             for (auto& kv : voisines) cacheFonctions_[kv.first] = kv.second;
         }
@@ -1154,10 +1204,8 @@ void Interpreteur::executerFichier(const std::string& fichier) {
     for (auto& c : u.classes) relierClasse(c, u.fonctions);
     for (auto& c : u.classes) heriterParents(c);
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
-    for (auto& f : u.fonctions) {
-        f->fichier = fichier;
-        voisines[f->nom] = f;
-    }
+    for (auto& f : u.fonctions) f->fichier = fichier;
+    std::shared_ptr<void> groupe = grouper(u.fonctions, voisines);
     for (auto& f : u.fonctions) propagerVoisines(f, voisines);
     if (u.script) {
         auto portee = piles_.back();
@@ -1165,7 +1213,8 @@ void Interpreteur::executerFichier(const std::string& fichier) {
             auto enveloppe = std::make_shared<FonctionUtilisateur>();
             enveloppe->nom = "<script>";
             enveloppe->fichier = fichier;
-            enveloppe->voisines = voisines;
+            for (const auto& kv : voisines) enveloppe->voisines[kv.first] = kv.second;
+            enveloppe->groupesPossedes.push_back(groupe);
             portee->fonction = enveloppe;
         }
         // Meme raison que dans executerTexte : au plus haut niveau, un

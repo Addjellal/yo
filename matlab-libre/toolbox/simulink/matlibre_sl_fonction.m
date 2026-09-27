@@ -116,16 +116,22 @@ function h = installer(script, chemin)
         addpath(dossier);
     end
     [~, ~] = signature(script);
-    texte = renommer(script, nom);
+    texte = sprintf('%s\n', renommer(script, nom));
     fichier = fullfile(dossier, [nom '.m']);
-    f = fopen(fichier, 'w');
-    if f < 0
-        error('Simulink:blocks:MATLABFunctionWrite', ...
-              'Le texte du bloc ''%s'' ne peut pas s''ecrire dans %s.', chemin, dossier);
+    % Un fichier déjà écrit, au même texte, et que le chemin connaît, se
+    % garde : le réécrire obligerait à refaire l'index du chemin.
+    if ~(exist(nom, 'file') == 2 && exist(fichier, 'file') == 2 && ...
+         strcmp(fileread(fichier), texte))
+        f = fopen(fichier, 'w');
+        if f < 0
+            error('Simulink:blocks:MATLABFunctionWrite', ...
+                  'Le texte du bloc ''%s'' ne peut pas s''ecrire dans %s.', chemin, dossier);
+        end
+        fprintf(f, '%s', texte);
+        fclose(f);
+        rehash();
     end
-    fprintf(f, '%s\n', texte);
-    fclose(f);
-    rehash();
+    % ses variables persistantes repartent de rien
     clear(nom);
     h = str2func(nom);
 end
