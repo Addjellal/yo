@@ -6844,6 +6844,233 @@ for kP = 1:size(refusPhysique, 1)
                    vu, message));
 end
 fprintf('reseaux electriques : %d refus nommes verifies\n', size(refusPhysique, 1));
+%% ------------------------------------ 51. Réseaux mécaniques, électromécaniques et thermiques
+% La même mise en équations vaut en mécanique : une vitesse est une
+% grandeur « à travers », une force ou un couple une grandeur
+% « traversante ». Une masse, une inertie sont des condensateurs vers la
+% référence, un ressort une bobine, un amortisseur une conductance. Le
+% convertisseur électromécanique lie les deux domaines : v = K w,
+% couple = K i. Un capteur de mouvement rend la vitesse et la position.
+msd = new_system('msd');
+msd = add_block(msd, 'step', 'f', 'Time', 0, 'After', 10);
+msd = add_block(msd, 'simulinkpsconverter', 'SP');
+msd = add_block(msd, 'idealforcesource', 'F');
+msd = add_block(msd, 'mass', 'M', 'mass', 1000, 'mass_unit', 'g');
+msd = add_block(msd, 'translationalspring', 'K', 'spr_rate', 10);
+msd = add_block(msd, 'translationaldamper', 'B', 'D', 2);
+msd = add_block(msd, 'mechanicaltranslationalreference', 'G');
+msd = add_block(msd, 'solverconfiguration', 'S');
+msd = add_block(msd, 'idealtranslationalmotionsensor', 'X');
+msd = add_block(add_block(msd, 'outport', 'v'), 'outport', 'x');
+msd = add_line(add_line(msd, 'f', 'SP'), 'SP', 'F');
+msd = add_line(msd, 'F/LConn1', 'M/LConn1');
+msd = add_line(msd, 'F/RConn1', 'G/LConn1');
+msd = add_line(msd, 'K/LConn1', 'M/LConn1');
+msd = add_line(msd, 'K/RConn1', 'G/LConn1');
+msd = add_line(msd, 'B/LConn1', 'M/LConn1');
+msd = add_line(msd, 'B/RConn1', 'G/LConn1');
+msd = add_line(msd, 'S/RConn1', 'G/LConn1');
+msd = add_line(msd, 'X/LConn1', 'M/LConn1');
+msd = add_line(msd, 'X/RConn1', 'G/LConn1');
+msd = add_line(add_line(msd, 'X/1', 'v'), 'X/2', 'x');
+r = sim(msd, 'Solver', 'ode45', 'StopTime', 6, 'RelTol', 1e-9, 'AbsTol', 1e-12);
+t = r.tout;
+% x'' + 2 x' + 10 x = 10 : racines -1 +- 3i
+xExact = 1 - exp(-t) .* (cos(3 * t) + sin(3 * t) / 3);
+vExact = exp(-t) .* (10 / 3) .* sin(3 * t);
+assert(max(abs(r.yout(:, 2) - xExact)) < 1e-6 && max(abs(r.yout(:, 1) - vExact)) < 1e-6, ...
+       'masse, ressort, amortisseur : la force pousse la masse, le capteur rend v et x');
+% une inertie freinée par un amortisseur, sous un couple
+rot = new_system('rot');
+rot = add_block(rot, 'constant', 'c', 'Value', 1);
+rot = add_block(rot, 'idealtorquesource', 'T');
+rot = add_block(rot, 'inertia', 'J', 'inertia', 0.01);
+rot = add_block(rot, 'rotationaldamper', 'D', 'D', 0.1);
+rot = add_block(rot, 'mechanicalrotationalreference', 'G');
+rot = add_block(rot, 'solverconfiguration', 'S');
+rot = add_block(rot, 'idealrotationalmotionsensor', 'W', 'phi0', 90, 'phi0_unit', 'deg');
+rot = add_block(add_block(rot, 'outport', 'w'), 'outport', 'a');
+rot = add_line(rot, 'c', 'T');
+rot = add_line(rot, 'T/LConn1', 'J/LConn1');
+rot = add_line(rot, 'T/RConn1', 'G/LConn1');
+rot = add_line(rot, 'D/LConn1', 'J/LConn1');
+rot = add_line(rot, 'D/RConn1', 'G/LConn1');
+rot = add_line(rot, 'S/RConn1', 'G/LConn1');
+rot = add_line(rot, 'W/LConn1', 'J/LConn1');
+rot = add_line(rot, 'W/RConn1', 'G/LConn1');
+rot = add_line(add_line(rot, 'W/1', 'w'), 'W/2', 'a');
+r = sim(rot, 'Solver', 'ode4', 'FixedStep', 1e-4, 'StopTime', 0.5);
+t = r.tout;
+assert(max(abs(r.yout(:, 1) - 10 * (1 - exp(-10 * t)))) < 1e-8 && ...
+       max(abs(r.yout(:, 2) - (pi / 2 + 10 * t - (1 - exp(-10 * t))))) < 1e-8, ...
+       'inertie et amortisseur : w = 10 (1 - exp(-10 t)), l''angle part de 90 degres');
+% un moteur à courant continu : v = R i + L di/dt + K w, K i = J dw/dt + D w
+moteur = new_system('moteur');
+moteur = add_block(moteur, 'dcvoltagesource', 'V', 'v0', 12);
+moteur = add_block(moteur, 'resistor', 'R', 'R', 1);
+moteur = add_block(moteur, 'inductor', 'L', 'l', 10, 'l_unit', 'mH', 'g', 0);
+moteur = add_block(moteur, 'rotationalelectromechanicalconverter', 'M', 'K', 0.1);
+moteur = add_block(moteur, 'inertia', 'J', 'inertia', 0.001);
+moteur = add_block(moteur, 'rotationaldamper', 'D', 'D', 1e-4);
+moteur = add_block(moteur, 'electricalreference', 'GE');
+moteur = add_block(moteur, 'mechanicalrotationalreference', 'GM');
+moteur = add_block(moteur, 'solverconfiguration', 'S');
+moteur = add_block(moteur, 'idealrotationalmotionsensor', 'W');
+moteur = add_block(moteur, 'currentsensor', 'I');
+moteur = add_block(add_block(moteur, 'outport', 'w'), 'outport', 'i');
+moteur = add_line(moteur, 'V/LConn1', 'I/LConn1');
+moteur = add_line(moteur, 'I/RConn1', 'R/LConn1');
+moteur = add_line(moteur, 'R/RConn1', 'L/LConn1');
+moteur = add_line(moteur, 'L/RConn1', 'M/LConn1');
+moteur = add_line(moteur, 'M/LConn2', 'GE/LConn1');
+moteur = add_line(moteur, 'V/RConn1', 'GE/LConn1');
+moteur = add_line(moteur, 'M/RConn1', 'J/LConn1');
+moteur = add_line(moteur, 'M/RConn2', 'GM/LConn1');
+moteur = add_line(moteur, 'D/LConn1', 'J/LConn1');
+moteur = add_line(moteur, 'D/RConn1', 'GM/LConn1');
+moteur = add_line(moteur, 'W/LConn1', 'J/LConn1');
+moteur = add_line(moteur, 'W/RConn1', 'GM/LConn1');
+moteur = add_line(moteur, 'S/RConn1', 'GE/LConn1');
+moteur = add_line(add_line(moteur, 'W/1', 'w'), 'I', 'i');
+r = sim(moteur, 'Solver', 'ode15s', 'StopTime', 2, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+wFinal = 12 / (0.1 + 1 * 1e-4 / 0.1);
+assert(abs(r.yout(end, 1) - wFinal) < 1e-4 && abs(r.yout(end, 2) - 1e-4 * wFinal / 0.1) < 1e-6, ...
+       'moteur a courant continu : sa vitesse et son courant en regime etabli');
+assert(max(r.yout(:, 2)) > 5, 'au demarrage, le courant monte vers V / R');
+[A, B, C, D] = linmod(moteur);
+assert(isequal(size(A), [3 3]) && isempty(B), ...
+       'LINMOD : courant de la bobine, vitesse de l''inertie, angle du capteur');
+fichierMoteur = [tempname() '.slx'];
+save_system(moteur, fichierMoteur);
+r2 = sim(load_system(fichierMoteur), 'Solver', 'ode15s', 'StopTime', 2, 'RelTol', 1e-8, ...
+         'AbsTol', 1e-10);
+assert(abs(r2.yout(end, 1) - r.yout(end, 1)) < 1e-6, 'le moteur se relit du .slx');
+delete(fichierMoteur);
+% ce que Simscape refuse
+sansRefMeca = add_line(delete_block(msd, 'G'), 'S/RConn1', 'M/LConn1');
+refusMeca = {
+    @() add_line(moteur, 'R/RConn1', 'J/LConn1'), ...
+        'Simulink:Commands:AddLinePhysicalDomain', 'rotation'
+    @() add_line(msd, 'M/LConn1', 'moteur_absent/LConn1'), ...
+        'Simulink:Commands:InvSimulinkObjectName', 'moteur_absent'
+    @() sim(sansRefMeca, 1), 'Simscape:Network:ReferenceMissing', ...
+        'Mechanical Translational Reference'
+    @() sim(set_param(msd, 'M', 'mass_unit', 'Ohm'), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'kg'
+    @() sim(set_param(msd, 'K', 'spr_rate', -1), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'msd/K'
+    };
+for kM = 1:size(refusMeca, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('refusMeca{kM, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, refusMeca{kM, 2}) && ~isempty(strfind(message, refusMeca{kM, 3})), ...
+           sprintf('mecanique, cas %d : %s attendu, %s rendu (%s)', kM, refusMeca{kM, 2}, ...
+                   vu, message));
+end
+fprintf('reseaux mecaniques : %d refus nommes verifies\n', size(refusMeca, 1));
+% Le domaine thermique : une température (absolue, en kelvins) est une
+% grandeur « à travers », un flux de chaleur une grandeur « traversante ».
+% Une masse thermique est un condensateur vers le zéro absolu ; la
+% conduction et la convection sont des conductances. La source de
+% température impose T(B) - T(A), le capteur mesure T(A) - T(B).
+th = new_system('th');
+th = add_block(th, 'constant', 'q', 'Value', 50);
+th = add_block(th, 'idealheatflowsource', 'Q');
+th = add_block(th, 'thermalmass', 'M', 'mass', 2, 'sp_heat', 500, 'T', 20, 'T_unit', 'degC');
+th = add_block(th, 'convectiveheattransfer', 'H', 'area', 0.5, 'heat_tr_coeff', 10);
+th = add_block(th, 'constant', 'ambiant', 'Value', 293.15);
+th = add_block(th, 'idealtemperaturesource', 'Ta');
+th = add_block(th, 'thermalreference', 'G');
+th = add_block(th, 'solverconfiguration', 'S');
+th = add_block(th, 'idealtemperaturesensor', 'T');
+th = add_block(th, 'idealheatflowsensor', 'P');
+th = add_block(add_block(th, 'outport', 'y'), 'outport', 'perte');
+th = add_line(add_line(th, 'q', 'Q'), 'ambiant', 'Ta');
+th = add_line(th, 'Q/LConn1', 'G/LConn1');
+th = add_line(th, 'Q/RConn1', 'M/LConn1');
+th = add_line(th, 'P/LConn1', 'M/LConn1');
+th = add_line(th, 'P/RConn1', 'H/LConn1');
+th = add_line(th, 'H/RConn1', 'Ta/RConn1');
+th = add_line(th, 'Ta/LConn1', 'G/LConn1');
+th = add_line(th, 'S/RConn1', 'G/LConn1');
+th = add_line(th, 'T/LConn1', 'M/LConn1');
+th = add_line(th, 'T/RConn1', 'G/LConn1');
+th = add_line(add_line(th, 'T', 'y'), 'P', 'perte');
+r = sim(th, 'Solver', 'ode4', 'FixedStep', 1, 'StopTime', 2000);
+t = r.tout;
+% m c dT/dt = 50 - h S (T - Ta) : T = Ta + 10 (1 - exp(-t / 200))
+assert(max(abs(r.yout(:, 1) - (293.15 + 10 * (1 - exp(-t / 200))))) < 1e-6, ...
+       'masse chauffee qui perd par convection : T = Ta + 10 (1 - exp(-t/200))');
+assert(max(abs(r.yout(:, 2) - 50 * (1 - exp(-t / 200)))) < 1e-6, ...
+       'le capteur de flux mesure la chaleur perdue, de A vers B');
+% deux masses reliées par une paroi : la chaleur passe de la chaude à la
+% froide, et leur énergie se conserve
+paroi = new_system('paroi');
+paroi = add_block(paroi, 'thermalmass', 'chaud', 'mass', 1, 'sp_heat', 400, ...
+                  'T', 212, 'T_unit', 'degF');
+paroi = add_block(paroi, 'thermalmass', 'froid', 'mass', 3, 'sp_heat', 400, ...
+                  'T', 20, 'T_unit', 'degC');
+paroi = add_block(paroi, 'conductiveheattransfer', 'mur', 'area', 20, 'area_unit', 'cm^2', ...
+                  'thickness', 5, 'thickness_unit', 'mm', 'th_cond', 50, ...
+                  'th_cond_unit', 'W/(K*m)');
+paroi = add_block(paroi, 'thermalreference', 'G');
+paroi = add_block(paroi, 'solverconfiguration', 'S');
+paroi = add_block(paroi, 'idealtemperaturesensor', 'T');
+paroi = add_block(paroi, 'outport', 'y');
+paroi = add_line(paroi, 'mur/LConn1', 'chaud/LConn1');
+paroi = add_line(paroi, 'mur/RConn1', 'froid/LConn1');
+paroi = add_line(paroi, 'T/LConn1', 'chaud/LConn1');
+paroi = add_line(paroi, 'T/RConn1', 'G/LConn1');
+paroi = add_line(paroi, 'S/RConn1', 'G/LConn1');
+paroi = add_line(paroi, 'T', 'y');
+r = sim(paroi, 'Solver', 'ode45', 'StopTime', 200, 'RelTol', 1e-9, 'AbsTol', 1e-9);
+t = r.tout;
+% G = 50 * 20e-4 / 5e-3 = 20 W/K ; C1 = 400, C2 = 1200 J/K ; tau = 1 / (G (1/C1 + 1/C2)) = 15 s
+tFinal = (400 * 373.15 + 1200 * 293.15) / 1600;
+assert(max(abs(r.yout - (tFinal + (373.15 - tFinal) * exp(-t / 15)))) < 1e-5, ...
+       'deux masses et une paroi : 212 degF et 20 degC tendent vers leur moyenne ponderee');
+fichierParoi = [tempname() '.slx'];
+save_system(paroi, fichierParoi);
+r2 = sim(load_system(fichierParoi), 'Solver', 'ode45', 'StopTime', 200, 'RelTol', 1e-9, ...
+         'AbsTol', 1e-9);
+assert(abs(r2.yout(end) - r.yout(end)) < 1e-6, 'le modele thermique se relit du .slx');
+delete(fichierParoi);
+[A, B, C, D] = linmod(paroi);
+assert(isequal(size(A), [2 2]) && abs(max(real(eig(A))) - 0) < 1e-9 && ...
+       abs(min(real(eig(A))) + 1 / 15) < 1e-9, ...
+       'LINMOD : deux temperatures, un mode conserve, un mode de 15 s');
+refusThermique = {
+    @() add_line(add_block(th, 'resistor', 'R'), 'M/LConn1', 'R/LConn1'), ...
+        'Simulink:Commands:AddLinePhysicalDomain', 'thermique'
+    @() sim(set_param(th, 'M', 'T_unit', 'Ohm'), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'degC'
+    @() sim(set_param(th, 'H', 'area', 0), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'th/H'
+    @() sim(add_line(delete_block(paroi, 'G'), 'S/RConn1', 'froid/LConn1'), 1), ...
+        'Simscape:Network:ReferenceMissing', 'Thermal Reference'
+    };
+for kT = 1:size(refusThermique, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('refusThermique{kT, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, refusThermique{kT, 2}) && ...
+           ~isempty(strfind(message, refusThermique{kT, 3})), ...
+           sprintf('thermique, cas %d : %s attendu, %s rendu (%s)', kT, ...
+                   refusThermique{kT, 2}, vu, message));
+end
+fprintf('reseaux thermiques : %d refus nommes verifies\n', size(refusThermique, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

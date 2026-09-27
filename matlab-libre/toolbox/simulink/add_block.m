@@ -277,6 +277,26 @@ function modele = add_block(modele, type, nom, varargin)
 %     controlledvoltagesource, controlledcurrentsource — commandées par
 %                  leur entrée ; voltagesensor, currentsensor — une sortie
 %     simulinkpsconverter, pssimulinkconverter — passe-plats
+%   Simscape, mécanique (R à gauche, C à droite ; une force ou un couple
+%   positif pousse R) :
+%     mass mass, v ; translationalspring spr_rate, x ; translationaldamper D
+%     inertia inertia, w ; rotationalspring spr_rate, phi ; rotationaldamper D
+%     mechanicaltranslationalreference, mechanicalrotationalreference
+%     idealforcesource, idealtorquesource, idealtranslationalvelocitysource,
+%                  idealangularvelocitysource — commandés par leur entrée
+%     idealtranslationalmotionsensor x0, idealrotationalmotionsensor phi0 —
+%                  deux sorties, la vitesse et la position ; idealforcesensor,
+%                  idealtorquesensor — une sortie
+%     rotationalelectromechanicalconverter K — + et - (LConn1, LConn2), R et
+%                  C (RConn1, RConn2) : v = K w, couple = K i
+%   Simscape, thermique (A à gauche, B à droite ; températures absolues,
+%   en K, degC ou degF) :
+%     thermalmass mass, sp_heat, T ; thermalreference — le zéro absolu
+%     conductiveheattransfer area, thickness, th_cond ;
+%                  convectiveheattransfer area, heat_tr_coeff
+%     idealtemperaturesource — T(B) - T(A) = entrée ; idealheatflowsource —
+%                  un flux de A vers B ; idealtemperaturesensor T(A) - T(B),
+%                  idealheatflowsensor — une sortie
 %
 %   Fonctions de l'utilisateur :
 %     fcn          Expr                         une expression de u, scalaire :

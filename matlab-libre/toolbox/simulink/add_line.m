@@ -126,6 +126,16 @@ function modele = lienPhysique(modele, source, destination)
         error('Simulink:Commands:AddLineInvalidPort', ...
               'Le port ''%s'' ne se relie pas a lui-meme.', char(source));
     end
+    % deux ports d'un même domaine : un courant ne pousse pas une masse
+    domaineA = matlibre_sl_physique('domaine', typeCanonique(modele.blocs{a}.type), pa);
+    domaineB = matlibre_sl_physique('domaine', typeCanonique(modele.blocs{b}.type), pb);
+    if ~isempty(domaineA) && ~isempty(domaineB) && ~strcmp(domaineA, domaineB)
+        error('Simulink:Commands:AddLinePhysicalDomain', ...
+              ['Le port ''%s'' est du domaine %s, et ''%s'' du domaine %s : on ne relie ' ...
+               'que des ports d''un meme domaine. Un convertisseur (Rotational ' ...
+               'Electromechanical Converter) passe de l''un a l''autre.'], char(source), ...
+              domaineA, char(destination), domaineB);
+    end
     connexions = zeros(0, 4);
     if isfield(modele, 'connexions') && ~isempty(modele.connexions)
         connexions = modele.connexions;
@@ -139,6 +149,13 @@ function modele = lienPhysique(modele, source, destination)
               char(destination), nomModele);
     end
     modele.connexions = [connexions; a, pa, b, pb];
+end
+
+function type = typeCanonique(type)
+    entree = matlibre_sl_catalogue('type', type);
+    if ~isempty(entree)
+        type = entree.type;
+    end
 end
 
 % Le bloc et le port physique que désigne « bloc/LConn1 » : +1, ou -1 pour

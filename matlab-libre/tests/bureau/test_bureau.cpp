@@ -1603,17 +1603,55 @@ int main(int argc, char** argv) {
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'constant', 'v', 'Value', [1 2]), "
                         "'v', 'demux');\n");
-                // Un bloc de Simscape vit dans un réseau : une référence, un
-                // Solver Configuration, une résistance de charge entre ses
-                // ports ; une source commandée reçoit sa commande.
+                // Un bloc de Simscape vit dans un réseau : la référence et un
+                // élément de charge de son domaine — résistance, amortisseur,
+                // paroi —,
+                // un Solver Configuration ; une source commandée reçoit sa
+                // commande, un convertisseur un réseau de chaque côté.
                 if (QString::fromUtf8(b->famille) == QLatin1String("Simscape") &&
                     QLatin1String(b->type) != QLatin1String("simulinkpsconverter") &&
                     QLatin1String(b->type) != QLatin1String("pssimulinkconverter")) {
                     const QString type = QLatin1String(b->type);
+                    const QStringList translation = {
+                        QStringLiteral("mass"), QStringLiteral("translationalspring"),
+                        QStringLiteral("translationaldamper"),
+                        QStringLiteral("mechanicaltranslationalreference"),
+                        QStringLiteral("idealforcesource"),
+                        QStringLiteral("idealtranslationalvelocitysource"),
+                        QStringLiteral("idealtranslationalmotionsensor"),
+                        QStringLiteral("idealforcesensor")};
+                    const QStringList rotation = {
+                        QStringLiteral("inertia"), QStringLiteral("rotationalspring"),
+                        QStringLiteral("rotationaldamper"),
+                        QStringLiteral("mechanicalrotationalreference"),
+                        QStringLiteral("idealtorquesource"),
+                        QStringLiteral("idealangularvelocitysource"),
+                        QStringLiteral("idealrotationalmotionsensor"),
+                        QStringLiteral("idealtorquesensor")};
+                    const QStringList thermique = {
+                        QStringLiteral("thermalmass"), QStringLiteral("conductiveheattransfer"),
+                        QStringLiteral("convectiveheattransfer"),
+                        QStringLiteral("thermalreference"),
+                        QStringLiteral("idealtemperaturesource"),
+                        QStringLiteral("idealheatflowsource"),
+                        QStringLiteral("idealtemperaturesensor"),
+                        QStringLiteral("idealheatflowsensor")};
+                    QString reference = QStringLiteral("electricalreference");
+                    QString charge = QStringLiteral("resistor");
+                    if (translation.contains(type)) {
+                        reference = QStringLiteral("mechanicaltranslationalreference");
+                        charge = QStringLiteral("translationaldamper");
+                    } else if (rotation.contains(type)) {
+                        reference = QStringLiteral("mechanicalrotationalreference");
+                        charge = QStringLiteral("rotationaldamper");
+                    } else if (thermique.contains(type)) {
+                        reference = QStringLiteral("thermalreference");
+                        charge = QStringLiteral("conductiveheattransfer");
+                    }
                     essaiTous += QStringLiteral(
-                        "m = add_block(add_block(m, 'electricalreference', 'masse'), "
-                        "'resistor', 'charge');\n"
-                        "m = add_line(m, 'charge/RConn1', 'masse/LConn1');\n");
+                        "m = add_block(add_block(m, '%1', 'masse'), '%2', 'charge');\n"
+                        "m = add_line(m, 'charge/RConn1', 'masse/LConn1');\n")
+                                     .arg(reference, charge);
                     if (type == QLatin1String("solverconfiguration"))
                         essaiTous += QStringLiteral(
                             "m = add_line(m, 'solverconfiguration/RConn1', "
@@ -1622,16 +1660,33 @@ int main(int argc, char** argv) {
                         essaiTous += QStringLiteral(
                             "m = add_line(add_block(m, 'solverconfiguration', 'cfg'), "
                             "'cfg/RConn1', 'masse/LConn1');\n");
-                    if (type == QLatin1String("electricalreference"))
+                    const bool unPort = type == reference || type == QLatin1String("mass") ||
+                                        type == QLatin1String("inertia") ||
+                                        type == QLatin1String("thermalmass");
+                    if (type == QLatin1String("rotationalelectromechanicalconverter"))
                         essaiTous += QStringLiteral(
-                            "m = add_line(m, 'electricalreference/LConn1', "
-                            "'charge/LConn1');\n");
+                            "m = add_line(m, '%1/LConn1', 'charge/LConn1');\n"
+                            "m = add_line(m, '%1/LConn2', 'masse/LConn1');\n"
+                            "m = add_block(add_block(m, 'mechanicalrotationalreference', "
+                            "'masseM'), 'rotationaldamper', 'chargeM');\n"
+                            "m = add_line(m, 'chargeM/RConn1', 'masseM/LConn1');\n"
+                            "m = add_line(m, '%1/RConn1', 'chargeM/LConn1');\n"
+                            "m = add_line(m, '%1/RConn2', 'masseM/LConn1');\n"
+                            "m = add_line(add_block(m, 'dcvoltagesource', 'pile'), "
+                            "'pile/LConn1', 'charge/LConn1');\n"
+                            "m = add_line(m, 'pile/RConn1', 'masse/LConn1');\n")
+                                         .arg(type);
+                    else if (unPort && type != QLatin1String("solverconfiguration"))
+                        essaiTous += QStringLiteral(
+                            "m = add_line(m, '%1/LConn1', 'charge/LConn1');\n").arg(type);
                     else if (type != QLatin1String("solverconfiguration"))
                         essaiTous += QStringLiteral(
                             "m = add_line(m, '%1/LConn1', 'charge/LConn1');\n"
                             "m = add_line(m, '%1/RConn1', 'masse/LConn1');\n")
                                          .arg(type);
-                    if (type.startsWith(QLatin1String("controlled")))
+                    if (type.startsWith(QLatin1String("controlled")) ||
+                        (type.startsWith(QLatin1String("ideal")) &&
+                         type.endsWith(QLatin1String("source"))))
                         essaiTous += QStringLiteral(
                             "m = add_line(add_block(m, 'constant', 'commande'), "
                             "'commande', '%1');\n").arg(type);

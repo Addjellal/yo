@@ -202,9 +202,11 @@ totalité.
    Les réseaux électriques de Simscape — résistances, condensateurs,
    bobines, sources, capteurs, référence et Solver Configuration — se
    relient par leurs ports physiques et deviennent une représentation
-   d'état, intégrée par les solveurs de Simulink.
+   d'état, intégrée par les solveurs de Simulink ; de même la mécanique
+   en translation et en rotation, le convertisseur électromécanique et
+   la thermique (masses, conduction, convection).
    Manquent : les signaux de taille variable, et de Simscape tout ce qui
-   n'est pas un réseau électrique linéaire.
+   n'est pas un réseau linéaire électrique, mécanique ou thermique.
    Stateflow a ses états emboîtés, ses régions parallèles, son
    historique, sa logique temporelle — SFAFTER, SFBEFORE, SFAT, SFEVERY,
    en réveils ou en secondes — et ses étiquettes écrites en texte :
