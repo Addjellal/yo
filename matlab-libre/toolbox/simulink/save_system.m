@@ -163,6 +163,15 @@ function [lignes, compteur] = batir(modele, cible, lignes, compteur)
                                     liens(l, 3));   %#ok<AGROW>
         end
     end
+    if isfield(modele, 'connexions')
+        % les connexions physiques, par le nom de leurs ports
+        for l = 1:size(modele.connexions, 1)
+            c = modele.connexions(l, :);
+            lignes{end+1} = sprintf('    %s = add_line(%s, %s, %s);', cible, cible, ...
+                citer([modele.blocs{c(1)}.nom '/' matlibre_sl_physique('nomPort', c(2))]), ...
+                citer([modele.blocs{c(3)}.nom '/' matlibre_sl_physique('nomPort', c(4))])); %#ok<AGROW>
+        end
+    end
 end
 
 function oui = estModele(valeur)

@@ -345,6 +345,26 @@ const BlocBibliotheque blocs[] = {
     {"Sorties", "checkdynamicupperbound", "Échoue quand sig n'est plus au-dessous de max", ""},
     {"Sorties", "checkdynamicgap", "Échoue quand sig tombe entre min et max", ""},
 
+    // Les réseaux électriques de Simscape : les ports physiques se relient
+    // en tirant de l'un à l'autre, sans sens.
+    {"Simscape", "solverconfiguration", "Le réglage d'un réseau physique : un par réseau",
+     ""},
+    {"Simscape", "electricalreference", "La référence des tensions : 0 V", ""},
+    {"Simscape", "resistor", "Résistance : v = R i", "'R', 1"},
+    {"Simscape", "capacitor", "Condensateur : i = C dv/dt", "'c', 1e-3"},
+    {"Simscape", "inductor", "Bobine : v = L di/dt", "'l', 1e-3"},
+    {"Simscape", "dcvoltagesource", "Source de tension constante", "'v0', 1"},
+    {"Simscape", "dccurrentsource", "Source de courant constante", "'i0', 1"},
+    {"Simscape", "acvoltagesource", "Source de tension sinusoïdale",
+     "'amp', 1, 'frequency', 50"},
+    {"Simscape", "accurrentsource", "Source de courant sinusoïdale",
+     "'amp', 1, 'frequency', 50"},
+    {"Simscape", "controlledvoltagesource", "Source de tension que commande un signal", ""},
+    {"Simscape", "controlledcurrentsource", "Source de courant que commande un signal", ""},
+    {"Simscape", "voltagesensor", "Mesure la tension entre ses deux ports", ""},
+    {"Simscape", "currentsensor", "Mesure le courant qui la traverse", ""},
+    {"Simscape", "simulinkpsconverter", "Un signal devenu signal physique", ""},
+    {"Simscape", "pssimulinkconverter", "Un signal physique devenu signal", ""},
     {nullptr, nullptr, nullptr, nullptr},
 };
 
@@ -476,6 +496,10 @@ FenetreSimulink::FenetreSimulink(QWidget* parent) : QMainWindow(parent) {
             &FenetreSimulink::surRetablissement);
     connect(toile_, &ToileSimulink::lienSupprime, this,
             &FenetreSimulink::surLienSupprime);
+    connect(toile_, &ToileSimulink::connexionDemandee, this,
+            &FenetreSimulink::surConnexionDemandee);
+    connect(toile_, &ToileSimulink::connexionSupprimee, this,
+            &FenetreSimulink::surConnexionSupprimee);
     connect(toile_, &ToileSimulink::signalNomme, this, &FenetreSimulink::surSignalNomme);
     connect(toile_, &ToileSimulink::journalisationDemandee, this,
             &FenetreSimulink::surJournalisation);
@@ -603,6 +627,23 @@ void FenetreSimulink::surLienDemande(const QString& source, const QString& cible
                                   .arg(source)
                                   .arg(port)
                                   .arg(cible));
+}
+
+// Deux ports physiques reliés : un même nœud du réseau, sans sens.
+void FenetreSimulink::surConnexionDemandee(const QString& a, const QString& b) {
+    const QString modele = cibleModele();
+    if (modele.isEmpty()) return;
+    envoyerModification(QStringLiteral("%1 = add_line(%1, %2, %3);")
+                            .arg(modele, chaineMatlab(a), chaineMatlab(b)),
+                        QStringLiteral("« %1 » et « %2 » font un même nœud.").arg(a, b));
+}
+
+void FenetreSimulink::surConnexionSupprimee(const QString& a, const QString& b) {
+    const QString modele = cibleModele();
+    if (modele.isEmpty()) return;
+    envoyerModification(QStringLiteral("%1 = delete_line(%1, %2, %3);")
+                            .arg(modele, chaineMatlab(a), chaineMatlab(b)),
+                        QStringLiteral("« %1 » et « %2 » ne sont plus reliés.").arg(a, b));
 }
 
 void FenetreSimulink::surBlocsSupprimes(const QStringList& noms) {
@@ -1003,6 +1044,25 @@ void FenetreSimulink::definirSchema(const SchemaSimulink& schema) {
         (new QTreeWidgetItem(rubriqueLiens))->setText(0, texte);
     }
     rubriqueLiens->setExpanded(true);
+    if (!schema.connexions.isEmpty()) {
+        auto* rubriqueConnexions = new QTreeWidgetItem(explorateur_);
+        rubriqueConnexions->setText(
+            0, QStringLiteral("Connexions (%1)").arg(schema.connexions.size()));
+        rubriqueConnexions->setFont(0, grasse);
+        auto nomPort = [&schema](int bloc, int code) {
+            const QString nom = (bloc >= 1 && bloc <= schema.blocs.size())
+                                    ? schema.blocs[bloc - 1].nom
+                                    : QStringLiteral("?");
+            return QStringLiteral("%1/%2%3")
+                .arg(nom, code > 0 ? QStringLiteral("LConn") : QStringLiteral("RConn"))
+                .arg(qAbs(code));
+        };
+        for (const ConnexionSchema& c : schema.connexions)
+            (new QTreeWidgetItem(rubriqueConnexions))
+                ->setText(0, QStringLiteral("%1 — %2").arg(nomPort(c.a, c.pa),
+                                                           nomPort(c.b, c.pb)));
+        rubriqueConnexions->setExpanded(true);
+    }
     poserEtat(QStringLiteral("Schéma de « %1 » à jour.").arg(schema.nom));
 }
 

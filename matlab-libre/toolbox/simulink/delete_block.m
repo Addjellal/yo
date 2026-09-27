@@ -35,4 +35,13 @@ function modele = delete_block(modele, nom)
         apres = modele.liens(:, 2) > k;
         modele.liens(apres, 2) = modele.liens(apres, 2) - 1;
     end
+    if isfield(modele, 'connexions') && ~isempty(modele.connexions)
+        % ses connexions physiques partent avec lui
+        touche = modele.connexions(:, 1) == k | modele.connexions(:, 3) == k;
+        modele.connexions(touche, :) = [];
+        for colonne = [1 3]
+            apres = modele.connexions(:, colonne) > k;
+            modele.connexions(apres, colonne) = modele.connexions(apres, colonne) - 1;
+        end
+    end
 end

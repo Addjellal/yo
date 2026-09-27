@@ -20,6 +20,22 @@ function modele = delete_line(modele, source, destination, entree, sortie)
 %      isempty(m.liens)                 % vrai
 %
 %   Voir aussi ADD_LINE, DELETE_BLOCK, NEW_SYSTEM.
+    physique = @(t) (ischar(t) || isstring(t)) && ...
+                    ~isempty(regexp(char(t), '/(LConn|RConn)\d+$', 'once', 'ignorecase'));
+    if physique(source) && physique(destination) && isfield(modele, 'connexions')
+        % une connexion physique : dans un sens ou dans l'autre
+        [a, pa] = portPhysique(modele, source);
+        [b, pb] = portPhysique(modele, destination);
+        c = modele.connexions;
+        trouve = (c(:, 1) == a & c(:, 2) == pa & c(:, 3) == b & c(:, 4) == pb) | ...
+                 (c(:, 1) == b & c(:, 2) == pb & c(:, 3) == a & c(:, 4) == pa);
+        if ~any(trouve)
+            error('Simulink:Commands:DeleteLineNoLine', ...
+                  'Aucune connexion ne relie ''%s'' a ''%s''.', char(source), char(destination));
+        end
+        modele.connexions(trouve, :) = [];
+        return
+    end
     [a, portSortie, sortieDite] = designer(modele, source);
     [b, portEntree, entreeDite] = designer(modele, destination);
     if nargin >= 4 && ~isempty(entree)
@@ -44,6 +60,19 @@ function modele = delete_line(modele, source, destination, entree, sortie)
     end
     liens(candidats, :) = [];
     modele.liens = liens;
+end
+
+function [k, port] = portPhysique(modele, texte)
+    jetons = regexp(char(texte), '^(.*)/(LConn|RConn)(\d+)$', 'tokens', 'once', 'ignorecase');
+    k = chercher(modele, jetons{1});
+    if k == 0
+        error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
+              'aucun bloc ne s''appelle ''%s''.'], jetons{1});
+    end
+    port = str2double(jetons{3});
+    if strcmpi(jetons{2}, 'RConn')
+        port = -port;
+    end
 end
 
 % « nom » ou « nom/port », comme dans ADD_LINE. Le troisième résultat dit

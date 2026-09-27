@@ -654,6 +654,10 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
                 b.entrees = (int)blocs.champ("entrees", k).scal();
             if (blocs.aChamp("sorties") && !blocs.champ("sorties", k).estVide())
                 b.sorties = (int)blocs.champ("sorties", k).scal();
+            if (blocs.aChamp("physG") && !blocs.champ("physG", k).estVide())
+                b.physG = (int)blocs.champ("physG", k).scal();
+            if (blocs.aChamp("physD") && !blocs.champ("physD", k).estVide())
+                b.physD = (int)blocs.champ("physD", k).scal();
             if (blocs.aChamp("parametres")) {
                 const Valeur tous = blocs.champ("parametres", k);
                 const Valeur defauts = blocs.champ("defauts", k);
@@ -698,6 +702,17 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
             if (liens.aChamp("journal") && !liens.champ("journal", k).estVide())
                 l.journal = liens.champ("journal", k).scal() != 0.0;
             schema.liens.push_back(l);
+        }
+    }
+    if (geometrie.aChamp("connexions")) {
+        Valeur connexions = geometrie.champ("connexions");
+        for (std::size_t k = 0; k < connexions.nelem(); ++k) {
+            ConnexionSchema c;
+            c.a = (int)connexions.champ("a", k).scal();
+            c.pa = (int)connexions.champ("pa", k).scal();
+            c.b = (int)connexions.champ("b", k).scal();
+            c.pb = (int)connexions.champ("pb", k).scal();
+            schema.connexions.push_back(c);
         }
     }
     emit schemaSimulinkPret(schema);

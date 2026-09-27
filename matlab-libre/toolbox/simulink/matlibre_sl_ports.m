@@ -40,6 +40,12 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 0;
         case {'saturationdynamic', 'deadzonedynamic'}
             nEntrees = 3;   % up, u, lo
+        case {'resistor', 'capacitor', 'inductor', 'electricalreference', ...
+              'solverconfiguration', 'dcvoltagesource', 'dccurrentsource', ...
+              'acvoltagesource', 'accurrentsource', 'controlledvoltagesource', ...
+              'controlledcurrentsource', 'voltagesensor', 'currentsensor'}
+            % Simscape : leurs ports physiques sont à part (MATLIBRE_SL_PHYSIQUE)
+            [~, ~, nEntrees, nSorties] = matlibre_sl_physique('ports', type);
         case 'fromfile'
             nEntrees = 0;
         case 'assignment'

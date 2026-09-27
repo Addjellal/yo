@@ -92,6 +92,9 @@ struct BlocSchema {
     // Demux a autant de sorties que son réglage Outputs. -1 quand le
     // schéma ne le dit pas ; la toile le devine alors par le type.
     int entrees = -1, sorties = 1;
+    // Les ports physiques d'un bloc Simscape : LConn à gauche, RConn à
+    // droite, après les ports de signal du même bord.
+    int physG = 0, physD = 0;
     // Les réglages du bloc, écrits tels qu'un programme les relira. C'est
     // ce que la boîte de dialogue montre au double-clic. POSITION n'y est
     // pas : la place se règle à la souris.
@@ -113,6 +116,12 @@ struct LienSchema {
     bool journal = false;                  // il va dans logsout
 };
 
+// Une connexion physique : deux blocs, rangs à partir de 1, et leurs ports,
+// +i pour LConn i, -i pour RConn i. Elle n'a pas de sens.
+struct ConnexionSchema {
+    int a = 0, pa = 1, b = 0, pb = 1;
+};
+
 // La géométrie d'un schéma, relevée en une fois dans le fil de calcul :
 // l'éditeur la peint, y cherche ce qu'on a cliqué, et en remplit son
 // explorateur. C'est celle de MATLIBRE_SL_GEOMETRIE, la même dont
@@ -121,6 +130,7 @@ struct SchemaSimulink {
     QString nom;
     QVector<BlocSchema> blocs;
     QVector<LienSchema> liens;
+    QVector<ConnexionSchema> connexions;
     // Les réglages de simulation du modèle — ceux de la boîte « Paramètres
     // de configuration » —, en texte, et les solveurs disponibles.
     QMap<QString, QString> configuration;

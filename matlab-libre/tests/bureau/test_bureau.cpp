@@ -1603,6 +1603,39 @@ int main(int argc, char** argv) {
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'constant', 'v', 'Value', [1 2]), "
                         "'v', 'demux');\n");
+                // Un bloc de Simscape vit dans un réseau : une référence, un
+                // Solver Configuration, une résistance de charge entre ses
+                // ports ; une source commandée reçoit sa commande.
+                if (QString::fromUtf8(b->famille) == QLatin1String("Simscape") &&
+                    QLatin1String(b->type) != QLatin1String("simulinkpsconverter") &&
+                    QLatin1String(b->type) != QLatin1String("pssimulinkconverter")) {
+                    const QString type = QLatin1String(b->type);
+                    essaiTous += QStringLiteral(
+                        "m = add_block(add_block(m, 'electricalreference', 'masse'), "
+                        "'resistor', 'charge');\n"
+                        "m = add_line(m, 'charge/RConn1', 'masse/LConn1');\n");
+                    if (type == QLatin1String("solverconfiguration"))
+                        essaiTous += QStringLiteral(
+                            "m = add_line(m, 'solverconfiguration/RConn1', "
+                            "'masse/LConn1');\n");
+                    else
+                        essaiTous += QStringLiteral(
+                            "m = add_line(add_block(m, 'solverconfiguration', 'cfg'), "
+                            "'cfg/RConn1', 'masse/LConn1');\n");
+                    if (type == QLatin1String("electricalreference"))
+                        essaiTous += QStringLiteral(
+                            "m = add_line(m, 'electricalreference/LConn1', "
+                            "'charge/LConn1');\n");
+                    else if (type != QLatin1String("solverconfiguration"))
+                        essaiTous += QStringLiteral(
+                            "m = add_line(m, '%1/LConn1', 'charge/LConn1');\n"
+                            "m = add_line(m, '%1/RConn1', 'masse/LConn1');\n")
+                                         .arg(type);
+                    if (type.startsWith(QLatin1String("controlled")))
+                        essaiTous += QStringLiteral(
+                            "m = add_line(add_block(m, 'constant', 'commande'), "
+                            "'commande', '%1');\n").arg(type);
+                }
                 // Un contrôle dynamique aux entrées nulles est hors de ses
                 // bornes, comme dans Simulink : il avertit sans s'arrêter.
                 if (QLatin1String(b->type).startsWith(QLatin1String("checkdynamic")))
@@ -2004,6 +2037,48 @@ int main(int argc, char** argv) {
                 verifier(QFile::exists(cheminApostrophe),
                          "et le fichier y est bien ecrit, apostrophe comprise");
             }
+
+            // --- les reseaux physiques ------------------------------
+            //
+            // Un bloc de Simscape porte ses ports physiques sur ses bords :
+            // tirer de l'un a l'autre les relie, et la connexion
+            // s'inscrit dans le modele par ADD_LINE, sans sens.
+            envoyer(fenetre, QStringLiteral(
+                "modeleDuBureau = add_block(modeleDuBureau, 'resistor', 'Rb', "
+                "'Position', [2 9 3 10]); "
+                "modeleDuBureau = add_block(modeleDuBureau, 'capacitor', 'Cb', "
+                "'Position', [5 9 6 10]);"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "deux blocs physiques");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return !toile->pointPhysiqueEcran(QStringLiteral("Cb"), 1).isNull();
+                     }, 20000),
+                     "leurs ports physiques sont sur la toile");
+            verifier(toile->pointPhysiqueEcran(QStringLiteral("Rb"), 2).isNull(),
+                     "un port qui n'existe pas n'a pas de place");
+            commandeVue.clear();
+            glisser(toile->pointPhysiqueEcran(QStringLiteral("Rb"), -1),
+                    toile->pointPhysiqueEcran(QStringLiteral("Cb"), 1));
+            verifier(commandeVue.contains(QLatin1String("add_line")) &&
+                         commandeVue.contains(QLatin1String("'Rb/RConn1'")) &&
+                         commandeVue.contains(QLatin1String("'Cb/LConn1'")),
+                     "tirer d'un port physique a l'autre les relie");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "la connexion passe");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return compter(QStringLiteral("Connexions")) == 1;
+                     }, 20000),
+                     "et l'explorateur la compte");
+            envoyer(fenetre, QStringLiteral(
+                "modeleDuBureau = delete_block(delete_block(modeleDuBureau, 'Rb'), 'Cb');"));
+            verifier(attendre([&] { return !fenetre.occupe(); }),
+                     "les blocs physiques s'en vont");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return compter(QStringLiteral("Connexions")) == -1;
+                     }, 20000),
+                     "et leur connexion avec eux");
 
             // --- la boite de reglages -------------------------------
             //

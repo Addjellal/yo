@@ -593,6 +593,16 @@ function [modele, refuses] = construire(S, nom, defauts, refuses)
         if a == 0 || d == 0
             continue
         end
+        if ischar(ps) && ischar(pe) && ~isempty(regexp(ps, '^[lr]conn:\d+$', 'once')) && ...
+           ~isempty(regexp(pe, '^[lr]conn:\d+$', 'once'))
+            % une connexion physique
+            code = @(t) str2double(t(7:end)) * (1 - 2 * (t(1) == 'r'));
+            if ~isfield(modele, 'connexions')
+                modele.connexions = zeros(0, 4);
+            end
+            modele.connexions(end + 1, :) = [a, code(ps), d, code(pe)];
+            continue
+        end
         pe = portDeDestination(modele.blocs{d}, pe);
         if ischar(ps)
             % le port d'état d'un intégrateur : sa dernière sortie
@@ -638,9 +648,18 @@ function [type, refus] = typeDe(b)
         return
     end
     candidats = {b.type};
-    if strcmp(b.type, 'Reference') && isfield(P, 'SourceBlock')
+    if any(strcmp(b.type, {'Reference', 'SimscapeBlock'})) && isfield(P, 'SourceBlock')
         source = regexprep(P.SourceBlock, '\\n|\n', ' ');
         candidats = {source};
+    elseif strcmp(b.type, 'SimscapeBlock')
+        % un bloc Simscape sans chemin : son composant le nomme
+        composant = '';
+        for champ = {'ComponentPath', 'SourceFile'}
+            if isfield(P, champ{1})
+                composant = char(P.(champ{1}));
+            end
+        end
+        candidats = {matlibre_sl_physique('composant', composant)};
     end
     for k = 1:numel(candidats)
         try
@@ -895,8 +914,11 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
         entree = matlibre_sl_catalogue('type', b.type);
         typeSimulink = entree.simulink;
         reference = '';
-        if referenceDeBibliotheque(entree.type) && ~isempty(entree.chemins)
-            typeSimulink = 'Reference';
+        if (referenceDeBibliotheque(entree.type) || strcmp(typeSimulink, 'SimscapeBlock')) && ...
+           ~isempty(entree.chemins)
+            if ~strcmp(typeSimulink, 'SimscapeBlock')
+                typeSimulink = 'Reference';
+            end
             reference = entree.chemins{1};
         end
         lignes{end + 1} = sprintf('%s  <Block BlockType="%s" Name="%s" SID="%d">', marge, ...
@@ -984,6 +1006,20 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
         lignes{end + 1} = sprintf('%s    <P Name="Src">%s</P>', marge, source); %#ok<AGROW>
         lignes{end + 1} = sprintf('%s    <P Name="Dst">%s</P>', marge, destination); %#ok<AGROW>
         lignes{end + 1} = sprintf('%s  </Line>', marge); %#ok<AGROW>
+    end
+    if isfield(modele, 'connexions')
+        % une connexion physique : « 12#lconn:1 » vers « 14#rconn:1 »
+        for l = 1:size(modele.connexions, 1)
+            c = modele.connexions(l, :);
+            lignes{end + 1} = sprintf('%s  <Line>', marge); %#ok<AGROW>
+            lignes{end + 1} = sprintf('%s    <P Name="Src">%d#%s</P>', marge, sids(c(1)), ...
+                                      lower(regexprep(matlibre_sl_physique('nomPort', c(2)), ...
+                                                      '(\d+)$', ':$1'))); %#ok<AGROW>
+            lignes{end + 1} = sprintf('%s    <P Name="Dst">%d#%s</P>', marge, sids(c(3)), ...
+                                      lower(regexprep(matlibre_sl_physique('nomPort', c(4)), ...
+                                                      '(\d+)$', ':$1'))); %#ok<AGROW>
+            lignes{end + 1} = sprintf('%s  </Line>', marge); %#ok<AGROW>
+        end
     end
     lignes{end + 1} = [marge '</System>'];
 end

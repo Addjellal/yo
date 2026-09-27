@@ -268,6 +268,16 @@ function modele = add_block(modele, type, nom, varargin)
 %                  checkdynamicupperbound (max, sig) — les bornes sont des
 %                  signaux ; tous portent enabled et stopWhenAssertionFail
 %
+%   Simscape, réseaux électriques (ports physiques LConn à gauche, RConn à
+%   droite ; un paramètre NOM_unit dit l'unité de NOM : kOhm, uF, mH, kHz...) :
+%     resistor R ; capacitor c, r, g, vc ; inductor l, r, g, iL
+%     electricalreference, solverconfiguration — un de chaque par réseau
+%     dcvoltagesource v0 ; dccurrentsource i0 ; acvoltagesource,
+%                  accurrentsource amp, frequency, shift (degrés)
+%     controlledvoltagesource, controlledcurrentsource — commandées par
+%                  leur entrée ; voltagesensor, currentsensor — une sortie
+%     simulinkpsconverter, pssimulinkconverter — passe-plats
+%
 %   Fonctions de l'utilisateur :
 %     fcn          Expr                         une expression de u, scalaire :
 %                                               'u(1)*sin(u(2))', ou u[2]

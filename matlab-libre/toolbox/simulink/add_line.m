@@ -22,6 +22,12 @@ function modele = add_line(modele, source, destination, entree, sortie)
 %   liens. Une entrée, non : un second lien vers une entrée déjà reliée
 %   est refusé, comme dans Simulink. Un port qui n'existe pas l'est aussi.
 %
+%   Les ports physiques d'un réseau Simscape se désignent par leur nom,
+%   LConn1, LConn2… à gauche et RConn1… à droite : ADD_LINE(MODELE,
+%   'R1/RConn1','C1/LConn1') les relie. Une connexion physique n'a pas de
+%   sens : les deux ports, et tous ceux qu'on relie à eux, font un même
+%   nœud. Un port physique ne se relie qu'à un port physique.
+%
 %   Une boucle peut passer par un bloc à état — intégrateur, retard —, qui
 %   la coupe. Une boucle qui n'en contient pas est algébrique : SIM la
 %   résout à chaque pas, et le signale selon le réglage AlgebraicLoopMsg
@@ -39,6 +45,10 @@ function modele = add_line(modele, source, destination, entree, sortie)
 %      m = add_line(m, 'gain', 'sortie');
 %
 %   Voir aussi ADD_BLOCK, DELETE_LINE, NEW_SYSTEM, SIM.
+    if estPhysique(source) || estPhysique(destination)
+        modele = lienPhysique(modele, source, destination);
+        return
+    end
     [a, portSortie] = designer(modele, source, 'source');
     [b, portEntree] = designer(modele, destination, 'destination');
     if nargin >= 4 && ~isempty(entree)
@@ -99,6 +109,86 @@ function modele = add_line(modele, source, destination, entree, sortie)
               portEntree, chemin(b));
     end
     modele.liens = [liens; a, b, portEntree, portSortie];
+end
+
+% Un port physique : « bloc/LConn1 », « bloc/RConn2 ».
+function oui = estPhysique(texte)
+    oui = (ischar(texte) || isstring(texte)) && ...
+          ~isempty(regexp(char(texte), '/(LConn|RConn)\d+$', 'once', 'ignorecase'));
+end
+
+function modele = lienPhysique(modele, source, destination)
+    [a, pa] = portPhysique(modele, source, destination);
+    [b, pb] = portPhysique(modele, destination, source);
+    nomModele = '';
+    if isfield(modele, 'nom'), nomModele = char(modele.nom); end
+    if a == b && pa == pb
+        error('Simulink:Commands:AddLineInvalidPort', ...
+              'Le port ''%s'' ne se relie pas a lui-meme.', char(source));
+    end
+    connexions = zeros(0, 4);
+    if isfield(modele, 'connexions') && ~isempty(modele.connexions)
+        connexions = modele.connexions;
+    end
+    deja = (connexions(:, 1) == a & connexions(:, 2) == pa & connexions(:, 3) == b & ...
+            connexions(:, 4) == pb) | (connexions(:, 1) == b & connexions(:, 2) == pb & ...
+            connexions(:, 3) == a & connexions(:, 4) == pa);
+    if any(deja)
+        error('Simulink:Commands:AddLineDestConnected', ...
+              'Les ports ''%s'' et ''%s'' de ''%s'' sont deja relies.', char(source), ...
+              char(destination), nomModele);
+    end
+    modele.connexions = [connexions; a, pa, b, pb];
+end
+
+% Le bloc et le port physique que désigne « bloc/LConn1 » : +1, ou -1 pour
+% RConn1. Un port de signal en face d'un port physique est refusé.
+function [k, port] = portPhysique(modele, texte, autre)
+    texte = char(texte);
+    jetons = regexp(texte, '^(.*)/(LConn|RConn)(\d+)$', 'tokens', 'once', 'ignorecase');
+    if isempty(jetons)
+        error('Simulink:Commands:AddLinePhysicalPort', ...
+              ['''%s'' est un port de signal, et ''%s'' un port physique : un port physique ' ...
+               '(LConn, RConn) ne se relie qu''a un port physique. Passez par un ' ...
+               'Simulink-PS Converter ou un PS-Simulink Converter.'], texte, char(autre));
+    end
+    k = chercher(modele, jetons{1});
+    if k == 0
+        error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
+              'aucun bloc ne s''appelle ''%s''.'], jetons{1});
+    end
+    cheminBloc = jetons{1};
+    if isfield(modele, 'nom') && ~isempty(modele.nom)
+        cheminBloc = [char(modele.nom) '/' jetons{1}];
+    end
+    type = modele.blocs{k}.type;
+    entree = matlibre_sl_catalogue('type', type);
+    if ~isempty(entree)
+        type = entree.type;
+    end
+    [g, d] = matlibre_sl_physique('ports', type);
+    numero = str2double(jetons{3});
+    gauche = strcmpi(jetons{2}, 'LConn');
+    disponibles = d;
+    cote = 'a droite (RConn)';
+    if gauche
+        disponibles = g;
+        cote = 'a gauche (LConn)';
+    end
+    if numero < 1 || numero > disponibles
+        if g + d == 0
+            error('Simulink:Commands:AddLineInvalidPort', ...
+                  ['Le bloc ''%s'' n''a pas de port physique : ce n''est pas un bloc ' ...
+                   'Simscape.'], cheminBloc);
+        end
+        error('Simulink:Commands:AddLineInvalidPort', ...
+              'Le bloc ''%s'' a %d port(s) physique(s) %s ; le lien vise le port %d.', ...
+              cheminBloc, disponibles, cote, numero);
+    end
+    port = numero;
+    if ~gauche
+        port = -numero;
+    end
 end
 
 % « nom » ou « nom/port ». Le nom exact d'un bloc l'emporte : un bloc peut

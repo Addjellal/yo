@@ -670,6 +670,11 @@ function [type, p] = normaliser(type, p, chemin)
         case 'bustovector'
             p = struct('Script', sprintf('function y = fcn(u)\ny = u(:);\n'), 'SampleTime', -1);
             type = 'matlabfunction';
+        case {'simulinkpsconverter', 'pssimulinkconverter'}
+            % un signal physique n'est qu'un signal : le convertisseur passe
+            p = struct('ConversionOutput', 'Signal copy', 'NombreDePorts', 1, ...
+                       'OutDataTypeStr', 'Inherit: auto');
+            type = 'signalconversion';
         case {'complextorealimag', 'complextomagnitudeangle'}
             % les deux parties d'un complexe, ou l'une d'elles
             if strcmp(type, 'complextorealimag')

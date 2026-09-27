@@ -27,6 +27,8 @@ const QColor kGrille(0xe8, 0xe8, 0xe8);
 // sortie : au-delà du bord droit du bloc, on tire un fil plutôt que de
 // déplacer le bloc.
 const double kZonePort = 0.22;
+// Le bleu des réseaux électriques de Simscape : fils et ports physiques.
+const QColor kPhysique(0x2a, 0x4b, 0x8d);
 
 }  // namespace
 
@@ -78,9 +80,21 @@ void ToileSimulink::definirSchema(const SchemaSimulink& schema) {
         t.signes = b.signes;
         t.entrees = b.entrees;
         t.sorties = qMax(0, b.sorties);
+        t.physG = qMax(0, b.physG);
+        t.physD = qMax(0, b.physD);
         t.cadre = QRectF(QPointF(b.gauche, b.haut), QPointF(b.droite, b.bas));
         blocs_.push_back(t);
     }
+    connexions_.clear();
+    for (const ConnexionSchema& c : schema.connexions) {
+        ConnexionToile t;
+        t.a = c.a;
+        t.pa = c.pa;
+        t.b = c.b;
+        t.pb = c.pb;
+        connexions_.push_back(t);
+    }
+    connexionChoisie_ = -1;
     for (const LienSchema& l : schema.liens) {
         LienToile t;
         t.source = l.source;
@@ -108,6 +122,9 @@ void ToileSimulink::vider() {
     modele_.clear();
     blocs_.clear();
     liens_.clear();
+    connexions_.clear();
+    connexionChoisie_ = -1;
+    physDepuis_ = -1;
     choisis_.clear();
     lienChoisi_ = -1;
     update();
@@ -353,6 +370,20 @@ void ToileSimulink::dessinerBloc(QPainter& peintre, const BlocToile& bloc,
             peintre.drawText(r, Qt::AlignCenter, bloc.etiquette);
     }
 
+    // Les ports physiques : de petits carrés bleus, à cheval sur le bord.
+    if (bloc.physG + bloc.physD > 0) {
+        const int k = int(&bloc - blocs_.constData());
+        peintre.setPen(QPen(kPhysique, 1.2));
+        peintre.setBrush(Qt::white);
+        const double cote = qMax(5.0, 0.12 * echelle_);
+        for (int i = 1; i <= bloc.physG + bloc.physD; ++i) {
+            const int code = i <= bloc.physG ? i : -(i - bloc.physG);
+            const QPointF p = versEcran(pointPhysique(k, code));
+            peintre.drawRect(QRectF(p.x() - cote / 2, p.y() - cote / 2, cote, cote));
+        }
+        peintre.setBrush(Qt::NoBrush);
+    }
+
     // Le nom va dessous, hors du cadre : c'est là que Simulink le met, et
     // cela laisse l'intérieur à ce que le bloc calcule.
     peintre.setPen(kTrait);
@@ -363,13 +394,97 @@ void ToileSimulink::dessinerBloc(QPainter& peintre, const BlocToile& bloc,
 // Les sorties se répartissent sur le bord droit comme les entrées sur le
 // bord gauche : un Demux montre autant de ports qu'il a de sorties, et un
 // fil part de celui qu'on a pris.
+// Le point de rang RANG parmi TOTAL sur un bord : au milieu s'il est seul,
+// réparti entre les deux tiers du bord sinon.
+static QPointF pointDuBord(const QRectF& r, bool gauche, int rang, int total) {
+    const double x = gauche ? r.left() : r.right();
+    if (total <= 1) return QPointF(x, r.center().y());
+    const double part = double(qBound(1, rang, total) - 1) / (total - 1);
+    return QPointF(x, r.top() + r.height() * (0.22 + 0.56 * part));
+}
+
 QPointF ToileSimulink::pointSortie(int bloc, int sortie) const {
     const BlocToile& b = blocs_[bloc];
-    const QRectF r = b.cadre;
-    if (b.sorties <= 1) return QPointF(r.right(), r.center().y());
-    const int rang = qBound(1, sortie, b.sorties);
-    const double part = double(rang - 1) / (b.sorties - 1);
-    return QPointF(r.right(), r.top() + r.height() * (0.22 + 0.56 * part));
+    // Les ports physiques de droite viennent après les sorties.
+    return pointDuBord(b.cadre, false, qBound(1, sortie, qMax(1, b.sorties)),
+                       b.sorties + b.physD);
+}
+
+// Un port physique : LConn i à gauche, après les entrées ; RConn i à
+// droite, après les sorties.
+QPointF ToileSimulink::pointPhysique(int bloc, int code) const {
+    const BlocToile& b = blocs_[bloc];
+    if (code > 0)
+        return pointDuBord(b.cadre, true, qMax(0, entreesDe(bloc)) + code,
+                           qMax(0, entreesDe(bloc)) + b.physG);
+    return pointDuBord(b.cadre, false, b.sorties + (-code), b.sorties + b.physD);
+}
+
+QPointF ToileSimulink::pointPhysiqueEcran(const QString& nom, int code) const {
+    for (int k = 0; k < blocs_.size(); ++k) {
+        if (blocs_[k].nom != nom) continue;
+        if ((code > 0 && code > blocs_[k].physG) || (code < 0 && -code > blocs_[k].physD) ||
+            code == 0)
+            return QPointF();
+        return versEcran(pointPhysique(k, code));
+    }
+    return QPointF();
+}
+
+QString ToileSimulink::nomPortPhysique(int bloc, int code) const {
+    return QStringLiteral("%1/%2%3")
+        .arg(blocs_[bloc].nom, code > 0 ? QStringLiteral("LConn") : QStringLiteral("RConn"))
+        .arg(qAbs(code));
+}
+
+int ToileSimulink::portPhysiqueSous(const QPointF& ecran, double tolerance,
+                                    int& code) const {
+    int meilleur = -1;
+    double plusPres = tolerance;
+    for (int k = 0; k < blocs_.size(); ++k) {
+        const BlocToile& b = blocs_[k];
+        for (int i = 1; i <= b.physG + b.physD; ++i) {
+            const int c = i <= b.physG ? i : -(i - b.physG);
+            const QPointF p = versEcran(pointPhysique(k, c));
+            const double d = std::hypot(p.x() - ecran.x(), p.y() - ecran.y());
+            if (d <= plusPres) {
+                plusPres = d;
+                meilleur = k;
+                code = c;
+            }
+        }
+    }
+    return meilleur;
+}
+
+// Le tracé d'une connexion physique : à angles droits, par le milieu.
+QVector<QPointF> ToileSimulink::traceConnexion(const ConnexionToile& c) const {
+    if (c.a < 1 || c.a > blocs_.size() || c.b < 1 || c.b > blocs_.size()) return {};
+    const QPointF p = pointPhysique(c.a - 1, c.pa);
+    const QPointF q = pointPhysique(c.b - 1, c.pb);
+    const double milieu = (p.x() + q.x()) / 2;
+    return {p, {milieu, p.y()}, {milieu, q.y()}, q};
+}
+
+int ToileSimulink::connexionSous(const QPointF& ecran) const {
+    const QPointF schema = versSchema(ecran);
+    const double tolerance = 6.0 / echelle_;
+    for (int k = 0; k < connexions_.size(); ++k) {
+        const QVector<QPointF> points = traceConnexion(connexions_[k]);
+        for (int i = 1; i < points.size(); ++i) {
+            const QPointF a = points[i - 1], b = points[i];
+            if (schema.x() < qMin(a.x(), b.x()) - tolerance ||
+                schema.x() > qMax(a.x(), b.x()) + tolerance ||
+                schema.y() < qMin(a.y(), b.y()) - tolerance ||
+                schema.y() > qMax(a.y(), b.y()) + tolerance)
+                continue;
+            const double ecart = std::fabs(a.x() - b.x()) < 1e-9
+                                     ? std::fabs(schema.x() - a.x())
+                                     : std::fabs(schema.y() - a.y());
+            if (ecart <= tolerance) return k;
+        }
+    }
+    return -1;
 }
 
 // Le nombre d'entrées d'un bloc : celui que le schéma a relevé, sinon
@@ -383,14 +498,12 @@ int ToileSimulink::entreesDe(int bloc) const {
 QPointF ToileSimulink::pointEntree(int bloc, int port) const {
     const BlocToile& b = blocs_[bloc];
     const int entrees = entreesDe(bloc);
-    const QRectF r = b.cadre;
-    if (entrees <= 1) return QPointF(r.left(), r.center().y());
-    const int rang = qBound(1, port, entrees);
     // Les entrées se répartissent sur le bord gauche, dans l'ordre :
     // sans cela, deux liaisons arriveraient au même point et l'on ne
-    // saurait plus laquelle est laquelle.
-    const double part = double(rang - 1) / (entrees - 1);
-    return QPointF(r.left(), r.top() + r.height() * (0.22 + 0.56 * part));
+    // saurait plus laquelle est laquelle. Les ports physiques de gauche
+    // viennent après elles.
+    return pointDuBord(b.cadre, true, qBound(1, port, qMax(1, entrees)),
+                       qMax(0, entrees) + b.physG);
 }
 
 void ToileSimulink::dessinerFil(QPainter& peintre, const LienToile& lien,
@@ -563,6 +676,16 @@ void ToileSimulink::paintEvent(QPaintEvent*) {
                             k == lienChoisi_ ? 2.2 : 1.2));
         dessinerFil(peintre, liens_[k], basRetour);
     }
+    // Les connexions physiques : sans flèche, puisqu'elles n'ont pas de sens.
+    for (int k = 0; k < connexions_.size(); ++k) {
+        const QVector<QPointF> points = traceConnexion(connexions_[k]);
+        if (points.isEmpty()) continue;
+        peintre.setPen(QPen(k == connexionChoisie_ ? kChoix : kPhysique,
+                            k == connexionChoisie_ ? 2.4 : 1.6));
+        QPolygonF trace;
+        for (const QPointF& p : points) trace << versEcran(p);
+        peintre.drawPolyline(trace);
+    }
     for (int k = 0; k < blocs_.size(); ++k)
         dessinerBloc(peintre, blocs_[k], choisis_.contains(k));
 
@@ -580,6 +703,10 @@ void ToileSimulink::paintEvent(QPaintEvent*) {
     if (filDepuis_ >= 0) {
         peintre.setPen(QPen(kChoix, 1.6, Qt::DashLine));
         peintre.drawLine(versEcran(pointSortie(filDepuis_, filSortie_)), filVers_);
+    }
+    if (physDepuis_ >= 0) {
+        peintre.setPen(QPen(kPhysique, 1.6, Qt::DashLine));
+        peintre.drawLine(versEcran(pointPhysique(physDepuis_, physCode_)), filVers_);
     }
 }
 
@@ -665,6 +792,20 @@ void ToileSimulink::mousePressEvent(QMouseEvent* evenement) {
     }
     const bool ajoute = evenement->modifiers().testFlag(Qt::ControlModifier) ||
                         evenement->modifiers().testFlag(Qt::ShiftModifier);
+    // Un port physique pris : on tire une connexion. Il est à cheval sur
+    // le bord, si bien qu'on le cherche avant le bloc.
+    int code = 0;
+    const int porteur = ajoute ? -1 : portPhysiqueSous(ecran, qMax(7.0, 0.16 * echelle_), code);
+    if (porteur >= 0) {
+        physDepuis_ = porteur;
+        physCode_ = code;
+        filVers_ = ecran;
+        connexionChoisie_ = -1;
+        lienChoisi_ = -1;
+        emit etatChange(QStringLiteral("Tirez jusqu'à un autre port physique."));
+        update();
+        return;
+    }
     if (sous >= 0) {
         // Ctrl ou Maj ajoute au lot, comme partout ailleurs ; un clic nu
         // sur un bloc déjà du lot le garde, pour qu'on puisse déplacer
@@ -698,7 +839,8 @@ void ToileSimulink::mousePressEvent(QMouseEvent* evenement) {
     }
     if (!ajoute) choisis_.clear();
     lienChoisi_ = lienSous(ecran);
-    if (lienChoisi_ < 0) {
+    connexionChoisie_ = lienChoisi_ < 0 ? connexionSous(ecran) : -1;
+    if (lienChoisi_ < 0 && connexionChoisie_ < 0) {
         // Sur le vide : on trace un rectangle, et ce qu'il touche est pris.
         elastique_ = true;
         elastiqueDe_ = ecran;
@@ -710,6 +852,11 @@ void ToileSimulink::mousePressEvent(QMouseEvent* evenement) {
 
 void ToileSimulink::mouseMoveEvent(QMouseEvent* evenement) {
     const QPointF ecran = evenement->position();
+    if (physDepuis_ >= 0) {
+        filVers_ = ecran;
+        update();
+        return;
+    }
     if (filDepuis_ >= 0) {
         filVers_ = ecran;
         update();
@@ -751,6 +898,22 @@ void ToileSimulink::mouseMoveEvent(QMouseEvent* evenement) {
 
 void ToileSimulink::mouseReleaseEvent(QMouseEvent* evenement) {
     const QPointF ecran = evenement->position();
+    if (physDepuis_ >= 0) {
+        const int depuis = physDepuis_;
+        const int codeDepuis = physCode_;
+        physDepuis_ = -1;
+        update();
+        int code = 0;
+        int cible = portPhysiqueSous(ecran, qMax(10.0, 0.3 * echelle_), code);
+        if (cible == depuis && code == codeDepuis) cible = -1;
+        if (cible < 0) {
+            emit etatChange(QStringLiteral("La connexion n'aboutit à aucun port physique."));
+            return;
+        }
+        emit connexionDemandee(nomPortPhysique(depuis, codeDepuis),
+                               nomPortPhysique(cible, code));
+        return;
+    }
     if (filDepuis_ >= 0) {
         const int cible = blocSous(ecran);
         const int depuis = filDepuis_;
@@ -834,6 +997,13 @@ void ToileSimulink::keyPressEvent(QKeyEvent* evenement) {
             emit blocsSupprimes(blocsChoisis());
             return;
         }
+        if (connexionChoisie_ >= 0 && connexionChoisie_ < connexions_.size()) {
+            const ConnexionToile& c = connexions_[connexionChoisie_];
+            if (c.a >= 1 && c.a <= blocs_.size() && c.b >= 1 && c.b <= blocs_.size())
+                emit connexionSupprimee(nomPortPhysique(c.a - 1, c.pa),
+                                        nomPortPhysique(c.b - 1, c.pb));
+            return;
+        }
         if (lienChoisi_ >= 0 && lienChoisi_ < liens_.size()) {
             const LienToile& l = liens_[lienChoisi_];
             if (l.source >= 1 && l.source <= blocs_.size() && l.cible >= 1 &&
@@ -846,6 +1016,8 @@ void ToileSimulink::keyPressEvent(QKeyEvent* evenement) {
     if (evenement->key() == Qt::Key_Escape) {
         choisis_.clear();
         lienChoisi_ = -1;
+        connexionChoisie_ = -1;
+        physDepuis_ = -1;
         filDepuis_ = -1;
         elastique_ = false;
         update();

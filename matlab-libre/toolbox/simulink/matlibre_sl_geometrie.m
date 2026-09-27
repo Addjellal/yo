@@ -22,6 +22,8 @@ function geometrie = matlibre_sl_geometrie(modele)
 %                                                accepte, avec leur valeur
 %                                                et leurs choix « a|b|c »
 %     G.blocs(k).entrees, .sorties               son nombre de ports
+%     G.blocs(k).physG, .physD                   ses ports physiques (Simscape),
+%                                                à gauche et à droite
 %     G.blocs(k).gauche, .haut, .droite, .bas    le cadre du bloc
 %     G.blocs(k).pose                            vrai si POSITION le fixait
 %     G.blocs(k).masque                          vrai pour un sous-système
@@ -30,6 +32,9 @@ function geometrie = matlibre_sl_geometrie(modele)
 %     G.liens(k).source, .cible, .port, .sortie, .retour
 %     G.liens(k).nom, .journal                  le nom du signal, et s'il
 %                                                est journalisé
+%     G.connexions(k).a, .pa, .b, .pb           une connexion physique : deux
+%                                                blocs et leurs ports, +i pour
+%                                                LConn i, -i pour RConn i
 %     G.largeur, G.hauteur                       la taille d'un bloc par défaut
 %     G.configuration                            les réglages de simulation,
 %                                                en texte
@@ -62,7 +67,7 @@ function geometrie = matlibre_sl_geometrie(modele)
                    'gauche', {}, 'haut', {}, 'droite', {}, 'bas', {}, ...
                    'pose', {}, 'noms', {}, 'valeurs', {}, 'entrees', {}, ...
                    'sorties', {}, 'parametres', {}, 'defauts', {}, 'choix', {}, ...
-                   'masque', {});
+                   'masque', {}, 'physG', {}, 'physD', {});
     for k = 1:n
         bloc = modele.blocs{k};
         pose = false;
@@ -94,6 +99,7 @@ function geometrie = matlibre_sl_geometrie(modele)
         end
         [entrees, sorties] = ports(bloc);
         [tous, defauts, choix] = dialogue(bloc);
+        [physG, physD] = portsPhysiques(bloc);
         blocs(end + 1) = struct('nom', bloc.nom, 'type', bloc.type, ...
                                 'etiquette', matlibre_sl_etiquette(bloc), ...
                                 'signes', matlibre_sl_signes(bloc), ...
@@ -104,7 +110,8 @@ function geometrie = matlibre_sl_geometrie(modele)
                                 'sorties', sorties, 'parametres', {tous}, ...
                                 'defauts', {defauts}, 'choix', {choix}, ...
                                 'masque', ~isempty(matlibre_sl_masque('variables', ...
-                                                                      bloc)));   %#ok<AGROW>
+                                                                      bloc)), ...
+                                'physG', physG, 'physD', physD);   %#ok<AGROW>
     end
     geometrie.blocs = blocs;
 
@@ -125,6 +132,14 @@ function geometrie = matlibre_sl_geometrie(modele)
                                 'journal', strcmp(signal.DataLogging, 'on'));   %#ok<AGROW>
     end
     geometrie.liens = liens;
+    connexions = struct('a', {}, 'pa', {}, 'b', {}, 'pb', {});
+    if isfield(modele, 'connexions')
+        for l = 1:size(modele.connexions, 1)
+            c = modele.connexions(l, :);
+            connexions(end + 1) = struct('a', c(1), 'pa', c(2), 'b', c(3), 'pb', c(4)); %#ok<AGROW>
+        end
+    end
+    geometrie.connexions = connexions;
 
     % Les réglages de simulation, en texte : c'est ce que la boîte
     % « Paramètres de configuration » du bureau montre.
@@ -175,6 +190,17 @@ function [entrees, sorties] = ports(bloc)
     end
     if isfinite(ns)
         sorties = ns;
+    end
+end
+
+% Les ports physiques d'un bloc Simscape, à gauche et à droite.
+function [g, d] = portsPhysiques(bloc)
+    g = 0;
+    d = 0;
+    try
+        entree = matlibre_sl_catalogue('type', bloc.type);
+        [g, d] = matlibre_sl_physique('ports', entree.type);
+    catch
     end
 end
 

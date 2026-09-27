@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **681 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **3039 fonctions de toolbox** réparties en5 modules, écrites dans le
+- **3040 fonctions de toolbox** réparties en5 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -53,7 +53,7 @@ fichier est produit par mesure, non écrit à la main.
   dans le langage — dont une qui contrôle un résultat exact par toolbox,
   une les types de données, une le calcul parallèle, une qui compile puis
   exécute le C produit pour le comparer à l'interpréteur, une qui exécute
-  les 664 exemples de l'aide — et 372 vérifications du bureau natif,
+  les 664 exemples de l'aide — et 380 vérifications du bureau natif,
   pilotées sans ouvrir de fenêtre. `outils/eprouverNatives.sh` appelle en
   plus chacune des 681 fonctions natives avec des arguments qu'elle
   n'attend pas — une cellule, une structure, une poignée, une taille
@@ -199,7 +199,12 @@ totalité.
    transmettent le complexe, Complex to Real-Imag et ses pendants passent
    d'une forme à l'autre, et un bloc qui ne calcule qu'en réel refuse un
    complexe en se nommant.
-   Manquent : les signaux de taille variable et Simscape.
+   Les réseaux électriques de Simscape — résistances, condensateurs,
+   bobines, sources, capteurs, référence et Solver Configuration — se
+   relient par leurs ports physiques et deviennent une représentation
+   d'état, intégrée par les solveurs de Simulink.
+   Manquent : les signaux de taille variable, et de Simscape tout ce qui
+   n'est pas un réseau électrique linéaire.
    Stateflow a ses états emboîtés, ses régions parallèles, son
    historique, sa logique temporelle — SFAFTER, SFBEFORE, SFAT, SFEVERY,
    en réveils ou en secondes — et ses étiquettes écrites en texte :

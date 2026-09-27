@@ -71,6 +71,9 @@ function modele = matlibre_sl_aplatir(modele)
         modele = matlibre_sl_bibliotheque(modele);
         k = premier(modele);
         if k == 0
+            % les réseaux physiques, une fois tout déplié, deviennent des
+            % blocs ordinaires
+            modele = matlibre_sl_physique('reseaux', modele);
             return
         end
         garde = garde + 1;
@@ -267,6 +270,15 @@ function modele = deplier(modele, k)
         modele.liens = [modele.liens; ...
                         [interne.liens(:, 1) + n, interne.liens(:, 2) + n, ...
                          interne.liens(:, 3:4)]];
+    end
+    % les connexions physiques du dedans suivent leurs blocs
+    if isfield(interne, 'connexions') && ~isempty(interne.connexions)
+        if ~isfield(modele, 'connexions')
+            modele.connexions = zeros(0, 4);
+        end
+        modele.connexions = [modele.connexions; ...
+                             [interne.connexions(:, 1) + n, interne.connexions(:, 2), ...
+                              interne.connexions(:, 3) + n, interne.connexions(:, 4)]];
     end
 
     % Les bornes d'un sous-système sont les siennes, non celles du modèle

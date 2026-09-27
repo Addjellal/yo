@@ -39,6 +39,9 @@ public:
     // Le rectangle qu'occupe un bloc à l'écran, pour qu'un test puisse y
     // viser sans deviner.
     QRectF cadreEcranDe(const QString& nom) const;
+    // Où se trouve, à l'écran, le port physique CODE d'un bloc : +i pour
+    // LConn i, -i pour RConn i. Un point nul si le bloc ou le port manque.
+    QPointF pointPhysiqueEcran(const QString& nom, int code) const;
     // Le nombre d'entrées qu'un type de bloc accepte : c'est ce qui
     // décide du port où un fil se raccroche.
     static int nombreEntrees(const QString& type, const QString& signes);
@@ -69,6 +72,9 @@ signals:
     // « Suppr » sur ce qui est choisi.
     void blocsSupprimes(const QStringList& noms);
     void lienSupprime(const QString& source, const QString& cible, int port, int sortie);
+    // Deux ports physiques à relier, ou à délier : « R1/RConn1 », « C1/LConn1 ».
+    void connexionDemandee(const QString& a, const QString& b);
+    void connexionSupprimee(const QString& a, const QString& b);
     // Un double-clic : on veut régler le bloc.
     void blocOuvert(const QString& nom);
     // Quelque chose a été lâché sur la toile depuis la bibliothèque.
@@ -101,7 +107,11 @@ private:
     struct BlocToile {
         QString nom, type, etiquette, signes;
         int entrees = -1, sorties = 1;   // -1 : le type en décide
+        int physG = 0, physD = 0;        // ports physiques, à gauche et à droite
         QRectF cadre;   // en unités du schéma, l'ordonnée vers le bas
+    };
+    struct ConnexionToile {
+        int a = 0, pa = 1, b = 0, pb = 1;
     };
     struct LienToile {
         int source = 0, cible = 0, port = 1, sortie = 1;
@@ -120,6 +130,13 @@ private:
     int entreesDe(int bloc) const;
     QPointF pointEntree(int bloc, int port) const;
     QPointF pointSortie(int bloc, int sortie = 1) const;
+    QPointF pointPhysique(int bloc, int code) const;
+    // Le port physique le plus proche d'un point de l'écran, à moins de
+    // TOLERANCE pixels : le bloc et le code, ou -1.
+    int portPhysiqueSous(const QPointF& ecran, double tolerance, int& code) const;
+    int connexionSous(const QPointF& ecran) const;
+    QVector<QPointF> traceConnexion(const ConnexionToile& c) const;
+    QString nomPortPhysique(int bloc, int code) const;
     void dessinerBloc(QPainter& peintre, const BlocToile& bloc, bool choisi) const;
     void dessinerFil(QPainter& peintre, const LienToile& lien, double basRetour) const;
     void annoncerChoix();
@@ -127,6 +144,7 @@ private:
     QString modele_;
     QVector<BlocToile> blocs_;
     QVector<LienToile> liens_;
+    QVector<ConnexionToile> connexions_;
     double hauteurType_ = 1.0;
 
     double echelle_ = 40.0;
@@ -134,6 +152,9 @@ private:
 
     QVector<int> choisis_;    // les blocs choisis, rangs dans blocs_
     int lienChoisi_ = -1;     // lien choisi
+    int connexionChoisie_ = -1;   // connexion physique choisie
+    int physDepuis_ = -1;     // bloc d'où part la connexion en cours
+    int physCode_ = 0;        // et son port physique
     int saisi_ = -1;          // bloc par lequel on tient le lot
     QPointF saisiDepart_;     // là où la souris a pris le bloc, en schéma
     QVector<QRectF> saisiCadres_;   // les cadres au moment de la prise

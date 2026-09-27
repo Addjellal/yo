@@ -4693,7 +4693,8 @@ for kB = 1:numel(lotBatterie)
     else
         diagnostic = o.SimulationMetadata.ExecutionInfo.ErrorDiagnostic;
         assert(strncmp(diagnostic.identifier, 'Simulink:', 9) || ...
-               strncmp(diagnostic.identifier, 'Stateflow:', 10), ...
+               strncmp(diagnostic.identifier, 'Stateflow:', 10) || ...
+               strncmp(diagnostic.identifier, 'Simscape:', 9), ...
                sprintf('%s : erreur interne %s : %s', contextes{kB}, diagnostic.identifier, ...
                        o.ErrorMessage));
         assert(~isempty(strfind(o.ErrorMessage, 'journalBatterie/')), ...
@@ -6305,7 +6306,8 @@ for n = 1:120
         [r, id, message] = aleaSimuler(m, solveur{1});
         if ~isempty(id)
             statsAlea(2) = statsAlea(2) + 1;
-            assert(strncmp(id, 'Simulink:', 9) || strncmp(id, 'Stateflow:', 10), ...
+            assert(strncmp(id, 'Simulink:', 9) || strncmp(id, 'Stateflow:', 10) || ...
+               strncmp(id, 'Simscape:', 9), ...
                    sprintf('%s (%s) : erreur interne %s : %s', contexte, solveur{1}, id, message));
             assert(~isempty(strfind(message, nomAlea)), ...
                    sprintf('%s (%s) : le message ne nomme pas le modele : %s', contexte, ...
@@ -6671,6 +6673,177 @@ retardFixe = add_line(add_line(add_block(retardFixe, 'outport', 'y'), 'c', 'd'),
 r = sim(retardFixe, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1);
 assert(isequal(double(r.yout), [26 / 256; 1]), 'la condition initiale 0.1 devient 26/256');
 fprintf('virgule fixe : %d refus nommes verifies\n', size(refusFixe, 1));
+%% ----------------------------------------------- 50. Réseaux électriques Simscape
+% Les blocs de Simscape se relient par leurs ports physiques — LConn à
+% gauche, RConn à droite — et chaque réseau, avec son Solver Configuration
+% et sa référence, se met en équations par l'analyse nodale modifiée :
+% il devient une représentation d'état, que tous les solveurs intègrent et
+% que LINMOD linéarise. Un courant va du + au - à travers un bloc.
+rc = new_system('rc');
+rc = add_block(rc, 'dcvoltagesource', 'V', 'v0', 5);
+rc = add_block(rc, 'resistor', 'R', 'R', 1, 'R_unit', 'kOhm');
+rc = add_block(rc, 'capacitor', 'C', 'c', 1, 'c_unit', 'uF', 'r', 0);
+rc = add_block(rc, 'electricalreference', 'G');
+rc = add_block(rc, 'solverconfiguration', 'S');
+rc = add_block(rc, 'voltagesensor', 'VS');
+rc = add_block(rc, 'currentsensor', 'IS');
+rc = add_block(rc, 'pssimulinkconverter', 'PS');
+rc = add_block(rc, 'pssimulinkconverter', 'PI');
+rc = add_block(add_block(rc, 'outport', 'v'), 'outport', 'i');
+rc = add_line(rc, 'V/LConn1', 'IS/LConn1');
+rc = add_line(rc, 'IS/RConn1', 'R/LConn1');
+rc = add_line(rc, 'R/RConn1', 'C/LConn1');
+rc = add_line(rc, 'C/RConn1', 'G/LConn1');
+rc = add_line(rc, 'V/RConn1', 'G/LConn1');
+rc = add_line(rc, 'S/RConn1', 'G/LConn1');
+rc = add_line(rc, 'VS/LConn1', 'C/LConn1');
+rc = add_line(rc, 'VS/RConn1', 'C/RConn1');
+rc = add_line(add_line(rc, 'VS', 'PS'), 'PS', 'v');
+rc = add_line(add_line(rc, 'IS', 'PI'), 'PI', 'i');
+r = sim(rc, 'Solver', 'ode4', 'FixedStep', 1e-5, 'StopTime', 5e-3);
+tau = 1e-3;
+attendu = [5 * (1 - exp(-r.tout / tau)), 5e-3 * exp(-r.tout / tau)];
+assert(max(abs(r.yout(:, 1) - attendu(:, 1))) < 1e-8 && ...
+       max(abs(r.yout(:, 2) - attendu(:, 2))) < 1e-11, ...
+       'RC : la tension monte en 1 - exp(-t/RC), le courant decroit');
+r = sim(rc, 'Solver', 'ode45', 'StopTime', 5e-3, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+assert(abs(r.yout(end, 1) - 5 * (1 - exp(-5))) < 1e-6, 'RC a pas variable');
+[A, B, C, D] = linmod(rc);
+assert(abs(A + 1000) < 1e-3 && isempty(B) && isequal(size(C), [2 1]), ...
+       'LINMOD voit un etat, la tension du condensateur');
+% RLC série commandé : une Controlled Voltage Source, un échelon
+rlc = new_system('rlc');
+rlc = add_block(rlc, 'step', 'u', 'Time', 0, 'After', 1);
+rlc = add_block(rlc, 'simulinkpsconverter', 'SP');
+rlc = add_block(rlc, 'controlledvoltagesource', 'V');
+rlc = add_block(rlc, 'resistor', 'R', 'R', 2);
+rlc = add_block(rlc, 'inductor', 'L', 'l', 1, 'g', 0);
+rlc = add_block(rlc, 'capacitor', 'C', 'c', 0.5, 'r', 0);
+rlc = add_block(rlc, 'electricalreference', 'G');
+rlc = add_block(rlc, 'solverconfiguration', 'S');
+rlc = add_block(rlc, 'voltagesensor', 'VS');
+rlc = add_block(rlc, 'outport', 'y');
+rlc = add_line(add_line(rlc, 'u', 'SP'), 'SP', 'V');
+rlc = add_line(rlc, 'V/LConn1', 'R/LConn1');
+rlc = add_line(rlc, 'R/RConn1', 'L/LConn1');
+rlc = add_line(rlc, 'L/RConn1', 'C/LConn1');
+rlc = add_line(rlc, 'C/RConn1', 'G/LConn1');
+rlc = add_line(rlc, 'V/RConn1', 'G/LConn1');
+rlc = add_line(rlc, 'S/RConn1', 'V/RConn1');
+rlc = add_line(rlc, 'VS/LConn1', 'C/LConn1');
+rlc = add_line(rlc, 'VS/RConn1', 'G/LConn1');
+rlc = add_line(rlc, 'VS', 'y');
+r = sim(rlc, 'Solver', 'ode45', 'StopTime', 5, 'RelTol', 1e-9, 'AbsTol', 1e-12);
+% LC s^2 + RC s + 1 = 0,5 s^2 + s + 1 : racines -1 +- i
+t = r.tout;
+exacte = 1 - exp(-t) .* (cos(t) + sin(t));
+assert(max(abs(r.yout - exacte)) < 1e-6, 'RLC serie : la reponse indicielle exacte');
+% une source de courant sinusoïdale dans une résistance
+ac = new_system('ac');
+ac = add_block(ac, 'accurrentsource', 'I', 'amp', 2, 'amp_unit', 'mA', 'frequency', 50, ...
+               'shift', 90);
+ac = add_block(ac, 'resistor', 'R', 'R', 1, 'R_unit', 'kOhm');
+ac = add_block(ac, 'electricalreference', 'G');
+ac = add_block(ac, 'solverconfiguration', 'S');
+ac = add_block(ac, 'voltagesensor', 'VS');
+ac = add_block(ac, 'outport', 'y');
+ac = add_line(ac, 'I/RConn1', 'R/LConn1');
+ac = add_line(ac, 'R/RConn1', 'G/LConn1');
+ac = add_line(ac, 'I/LConn1', 'G/LConn1');
+ac = add_line(ac, 'S/RConn1', 'G/LConn1');
+ac = add_line(ac, 'VS/LConn1', 'R/LConn1');
+ac = add_line(ac, 'VS/RConn1', 'R/RConn1');
+ac = add_line(ac, 'VS', 'y');
+r = sim(ac, 'Solver', 'ode4', 'FixedStep', 1e-4, 'StopTime', 0.02);
+assert(max(abs(r.yout - 2 * cos(2 * pi * 50 * r.tout))) < 1e-9, ...
+       'le courant sort par le - : 2 mA dans 1 kOhm, dephase de 90 degres');
+% un réseau dans un sous-système : ses connexions suivent ses blocs au dépliage
+interne = new_system('filtre');
+interne = add_block(interne, 'inport', 'u');
+interne = add_block(interne, 'simulinkpsconverter', 'SP');
+interne = add_block(interne, 'controlledvoltagesource', 'V');
+interne = add_block(interne, 'resistor', 'R', 'R', 1, 'R_unit', 'kOhm');
+interne = add_block(interne, 'capacitor', 'C', 'c', 1, 'c_unit', 'uF', 'r', 0);
+interne = add_block(interne, 'electricalreference', 'G');
+interne = add_block(interne, 'solverconfiguration', 'S');
+interne = add_block(interne, 'voltagesensor', 'VS');
+interne = add_block(interne, 'outport', 'y');
+interne = add_line(add_line(interne, 'u', 'SP'), 'SP', 'V');
+interne = add_line(interne, 'V/LConn1', 'R/LConn1');
+interne = add_line(interne, 'R/RConn1', 'C/LConn1');
+interne = add_line(interne, 'C/RConn1', 'G/LConn1');
+interne = add_line(interne, 'V/RConn1', 'G/LConn1');
+interne = add_line(interne, 'S/RConn1', 'G/LConn1');
+interne = add_line(interne, 'VS/LConn1', 'C/LConn1');
+interne = add_line(interne, 'VS/RConn1', 'G/LConn1');
+interne = add_line(interne, 'VS', 'y');
+dehors = new_system('dehors');
+dehors = add_block(dehors, 'step', 'e', 'Time', 0, 'After', 2);
+dehors = add_block(dehors, 'subsystem', 'rc', 'Model', interne);
+dehors = add_block(dehors, 'outport', 'y');
+dehors = add_line(add_line(dehors, 'e', 'rc'), 'rc', 'y');
+r = sim(dehors, 'Solver', 'ode4', 'FixedStep', 1e-5, 'StopTime', 3e-3);
+assert(abs(r.yout(end) - 2 * (1 - exp(-3))) < 1e-8, 'un reseau dans un sous-systeme');
+% un réseau dont tous les nœuds sont à la référence n'a rien à résoudre
+court = new_system('court');
+court = add_block(court, 'resistor', 'R');
+court = add_block(court, 'electricalreference', 'G');
+court = add_block(court, 'solverconfiguration', 'S');
+court = add_block(court, 'voltagesensor', 'VS');
+court = add_line(add_line(court, 'R/LConn1', 'G/LConn1'), 'R/RConn1', 'G/LConn1');
+court = add_line(add_line(court, 'S/RConn1', 'G/LConn1'), 'VS/LConn1', 'R/LConn1');
+court = add_line(court, 'VS/RConn1', 'G/LConn1');
+court = add_line(add_block(court, 'outport', 'y'), 'VS', 'y');
+r = sim(court, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.2);
+assert(isequal(r.yout, zeros(3, 1)), 'une resistance court-circuitee ne porte aucune tension');
+% .slx et .m relisent les connexions physiques
+for ext = {'.slx', '.m'}
+    fichierRLC = [tempname() ext{1}];
+    save_system(rlc, fichierRLC);
+    r2 = sim(load_system(fichierRLC), 'Solver', 'ode45', 'StopTime', 5, 'RelTol', 1e-9, ...
+             'AbsTol', 1e-12);
+    assert(max(abs(r2.yout(end) - exacte(end))) < 1e-6, ['relu par ' ext{1}]);
+    delete(fichierRLC);
+end
+% ce que Simscape refuse
+sansConfig = delete_block(rc, 'S');
+sansRef = delete_block(rc, 'G');
+sansRef = add_line(sansRef, 'S/RConn1', 'C/RConn1');
+% une source de courant qui débite dans une résistance que rien ne ramène
+% à la référence : la tension de cet îlot n'est pas déterminée
+flottant = add_block(add_block(rc, 'dccurrentsource', 'If'), 'resistor', 'Rf');
+flottant = add_line(add_line(flottant, 'If/LConn1', 'C/LConn1'), 'If/RConn1', 'Rf/LConn1');
+doubleConfig = add_line(add_block(rc, 'solverconfiguration', 'S2'), 'S2/RConn1', 'G/LConn1');
+boucle = add_line(add_block(rc, 'dcvoltagesource', 'V2', 'v0', 1), 'V2/LConn1', 'C/LConn1');
+boucle = add_line(boucle, 'V2/RConn1', 'G/LConn1');
+refusPhysique = {
+    @() sim(sansConfig, 1e-3), 'Simscape:Network:SolverConfigurationMissing', 'rc/R'
+    @() sim(sansRef, 1e-3), 'Simscape:Network:ReferenceMissing', 'rc/C'
+    @() sim(flottant, 1e-3), 'Simscape:Network:SingularNetwork', 'rc/Rf'
+    @() sim(doubleConfig, 1e-3), 'Simscape:Network:MultipleSolverConfigurations', 'rc/S2'
+    @() sim(boucle, 1e-3), 'Simscape:Network:SingularNetwork', 'rc/V2'
+    @() add_line(rc, 'VS', 'R/LConn1'), 'Simulink:Commands:AddLinePhysicalPort', 'LConn'
+    @() add_line(rc, 'R/LConn2', 'C/LConn1'), 'Simulink:Commands:AddLineInvalidPort', 'rc'
+    @() add_line(rc, 'G/RConn1', 'C/LConn1'), 'Simulink:Commands:AddLineInvalidPort', 'G'
+    @() add_line(rc, 'R/RConn1', 'C/LConn1'), 'Simulink:Commands:AddLineDestConnected', 'rc'
+    @() sim(set_param(rc, 'R', 'R', 0), 1e-3), 'Simulink:Parameters:InvParamSetting', 'rc/R'
+    @() sim(set_param(rc, 'R', 'R_unit', 'furlong'), 1e-3), ...
+        'Simulink:Parameters:InvParamSetting', 'furlong'
+    };
+for kP = 1:size(refusPhysique, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('refusPhysique{kP, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, refusPhysique{kP, 2}) && ~isempty(strfind(message, refusPhysique{kP, 3})), ...
+           sprintf('Simscape, cas %d : %s attendu, %s rendu (%s)', kP, refusPhysique{kP, 2}, ...
+                   vu, message));
+end
+fprintf('reseaux electriques : %d refus nommes verifies\n', size(refusPhysique, 1));
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -6739,7 +6912,8 @@ function id = batterieSimuler(s, solveur, contexte)
         evalc('sim(s, ''Solver'', solveur, ''FixedStep'', 0.1, ''StopTime'', 0.5);');
     catch err
         id = err.identifier;
-        assert(strncmp(id, 'Simulink:', 9) || strncmp(id, 'Stateflow:', 10), ...
+        assert(strncmp(id, 'Simulink:', 9) || strncmp(id, 'Stateflow:', 10) || ...
+               strncmp(id, 'Simscape:', 9), ...
                sprintf('%s (%s) : erreur interne %s : %s', contexte, solveur, id, err.message));
         assert(~isempty(strfind(err.message, [s.nom '/'])), ...
                sprintf('%s (%s) : le message ne nomme pas de bloc : %s', contexte, ...
