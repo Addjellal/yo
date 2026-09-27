@@ -7071,6 +7071,428 @@ for kT = 1:size(refusThermique, 1)
 end
 fprintf('reseaux thermiques : %d refus nommes verifies\n', size(refusThermique, 1));
 
+%% ------------------------------------ 52. Éléments solidaires, mécanismes, amplificateurs
+% Deux inerties sur un même arbre, deux masses thermiques sur un même nœud,
+% un ressort au bout libre : leurs états ne sont pas indépendants, et le
+% réseau se réduit aux combinaisons d'états qu'il laisse libres. Le
+% transformateur, le réducteur, la roue et l'essieu lient deux grandeurs à
+% travers ; l'amplificateur opérationnel égale ses entrées.
+arbre = new_system('arbre');
+arbre = add_block(arbre, 'constant', 'c', 'Value', 1);
+arbre = add_block(arbre, 'idealtorquesource', 'T');
+arbre = add_block(arbre, 'inertia', 'J1', 'inertia', 0.01);
+arbre = add_block(arbre, 'inertia', 'J2', 'inertia', 0.03);
+arbre = add_block(arbre, 'rotationaldamper', 'D', 'D', 0.1);
+arbre = add_block(arbre, 'mechanicalrotationalreference', 'G');
+arbre = add_block(arbre, 'solverconfiguration', 'S');
+arbre = add_block(arbre, 'idealrotationalmotionsensor', 'W');
+arbre = add_block(arbre, 'outport', 'w');
+arbre = add_line(add_line(arbre, 'c', 'T'), 'T/LConn1', 'J1/LConn1');
+arbre = add_line(arbre, 'T/RConn1', 'G/LConn1');
+arbre = add_line(arbre, 'J2/LConn1', 'J1/LConn1');
+arbre = add_line(arbre, 'D/LConn1', 'J1/LConn1');
+arbre = add_line(arbre, 'D/RConn1', 'G/LConn1');
+arbre = add_line(arbre, 'S/RConn1', 'G/LConn1');
+arbre = add_line(arbre, 'W/LConn1', 'J1/LConn1');
+arbre = add_line(arbre, 'W/RConn1', 'G/LConn1');
+arbre = add_line(arbre, 'W/1', 'w');
+r = sim(arbre, 'Solver', 'ode45', 'StopTime', 1, 'RelTol', 1e-10, 'AbsTol', 1e-12);
+assert(max(abs(r.yout - 10 * (1 - exp(-r.tout / 0.4)))) < 1e-8, ...
+       'deux inerties solidaires : une seule, de 0.04 kg.m^2');
+[A, B, C, D] = linmod(arbre);
+assert(isequal(size(A), [2 2]) && abs(min(eig(A)) + 2.5) < 1e-9, ...
+       'LINMOD : la vitesse commune et l''angle, le mode de 0.4 s');
+% deux masses thermiques sur un même nœud, chauffées ensemble
+chauffe = new_system('chauffe');
+chauffe = add_block(chauffe, 'constant', 'q', 'Value', 10);
+chauffe = add_block(chauffe, 'idealheatflowsource', 'Q');
+chauffe = add_block(chauffe, 'thermalmass', 'M1', 'mass', 1, 'sp_heat', 100, 'T', 300);
+chauffe = add_block(chauffe, 'thermalmass', 'M2', 'mass', 1, 'sp_heat', 300, 'T', 300);
+chauffe = add_block(chauffe, 'thermalreference', 'G');
+chauffe = add_block(chauffe, 'solverconfiguration', 'S');
+chauffe = add_block(chauffe, 'idealtemperaturesensor', 'T');
+chauffe = add_block(chauffe, 'outport', 'y');
+chauffe = add_line(add_line(chauffe, 'q', 'Q'), 'Q/LConn1', 'G/LConn1');
+chauffe = add_line(chauffe, 'Q/RConn1', 'M1/LConn1');
+chauffe = add_line(chauffe, 'M2/LConn1', 'M1/LConn1');
+chauffe = add_line(chauffe, 'T/LConn1', 'M1/LConn1');
+chauffe = add_line(chauffe, 'T/RConn1', 'G/LConn1');
+chauffe = add_line(chauffe, 'S/RConn1', 'G/LConn1');
+chauffe = add_line(chauffe, 'T', 'y');
+r = sim(chauffe, 'Solver', 'ode45', 'StopTime', 10);
+assert(abs(r.yout(end) - 300.25) < 1e-9, 'deux masses sur un noeud : 100 J pour 400 J/K');
+% un ressort au bout libre ne porte aucun effort
+libre = new_system('libre');
+libre = add_block(libre, 'constant', 'f', 'Value', 2);
+libre = add_block(libre, 'idealforcesource', 'F');
+libre = add_block(libre, 'mass', 'M', 'mass', 1);
+libre = add_block(libre, 'translationalspring', 'K', 'spr_rate', 100);
+libre = add_block(libre, 'translationalfreeend', 'L');
+libre = add_block(libre, 'mechanicaltranslationalreference', 'G');
+libre = add_block(libre, 'solverconfiguration', 'S');
+libre = add_block(libre, 'idealtranslationalmotionsensor', 'X');
+libre = add_block(add_block(libre, 'outport', 'v'), 'outport', 'x');
+libre = add_line(add_line(libre, 'f', 'F'), 'F/LConn1', 'M/LConn1');
+libre = add_line(libre, 'F/RConn1', 'G/LConn1');
+libre = add_line(libre, 'K/LConn1', 'M/LConn1');
+libre = add_line(libre, 'K/RConn1', 'L/LConn1');
+libre = add_line(libre, 'S/RConn1', 'G/LConn1');
+libre = add_line(libre, 'X/LConn1', 'M/LConn1');
+libre = add_line(libre, 'X/RConn1', 'G/LConn1');
+libre = add_line(add_line(libre, 'X/1', 'v'), 'X/2', 'x');
+r = sim(libre, 'Solver', 'ode45', 'StopTime', 1, 'RelTol', 1e-10, 'AbsTol', 1e-12);
+assert(max(abs(r.yout(:, 1) - 2 * r.tout)) < 1e-9 && max(abs(r.yout(:, 2) - r.tout .^ 2)) < 1e-9, ...
+       'un ressort au bout libre : la masse accelere seule');
+% deux inerties solidaires lancées à des vitesses différentes : leur
+% vitesse commune conserve le moment cinétique, et un avertissement le dit
+contraires = new_system('contraires');
+contraires = add_block(contraires, 'inertia', 'J1', 'inertia', 1, 'w', 10);
+contraires = add_block(contraires, 'inertia', 'J2', 'inertia', 3, 'w', 0);
+contraires = add_block(contraires, 'mechanicalrotationalreference', 'G');
+contraires = add_block(contraires, 'solverconfiguration', 'S');
+contraires = add_block(contraires, 'idealrotationalmotionsensor', 'W');
+contraires = add_block(contraires, 'outport', 'w');
+contraires = add_line(contraires, 'J2/LConn1', 'J1/LConn1');
+contraires = add_line(contraires, 'W/LConn1', 'J1/LConn1');
+contraires = add_line(contraires, 'W/RConn1', 'G/LConn1');
+contraires = add_line(contraires, 'S/RConn1', 'G/LConn1');
+contraires = add_line(contraires, 'W/1', 'w');
+lastwarn('');
+texte52 = evalc('r = sim(contraires, 1);');
+[~, identifiant] = lastwarn();
+assert(~isempty(strfind(texte52, 'contraires/J2')), 'l''avertissement nomme les inerties');
+assert(abs(r.yout(end) - 2.5) < 1e-12 && ...
+       strcmp(identifiant, 'Simscape:Network:InconsistentInitialConditions'), ...
+       'etats initiaux contradictoires : 2.5 rad/s, et un avertissement');
+% des inductances couplées : un secondaire ouvert, puis chargé
+couple = new_system('couple');
+couple = add_block(couple, 'acvoltagesource', 'V', 'amp', 10, 'frequency', 50);
+couple = add_block(couple, 'resistor', 'R1', 'R', 1);
+couple = add_block(couple, 'mutualinductor', 'T', 'L1', 0.1, 'L2', 0.4, 'k', 0.8);
+couple = add_block(couple, 'electricalreference', 'G');
+couple = add_block(couple, 'electricalreference', 'G2');
+couple = add_block(couple, 'solverconfiguration', 'S');
+couple = add_block(couple, 'voltagesensor', 'V2');
+couple = add_block(couple, 'voltagesensor', 'V1');
+couple = add_block(add_block(couple, 'outport', 'y2'), 'outport', 'y1');
+couple = add_line(couple, 'V/LConn1', 'R1/LConn1');
+couple = add_line(couple, 'R1/RConn1', 'T/LConn1');
+couple = add_line(couple, 'T/LConn2', 'G/LConn1');
+couple = add_line(couple, 'V/RConn1', 'G/LConn1');
+couple = add_line(couple, 'S/RConn1', 'G/LConn1');
+couple = add_line(couple, 'T/RConn2', 'G2/LConn1');
+couple = add_line(couple, 'V2/LConn1', 'T/RConn1');
+couple = add_line(couple, 'V2/RConn1', 'G2/LConn1');
+couple = add_line(couple, 'V1/LConn1', 'T/LConn1');
+couple = add_line(couple, 'V1/RConn1', 'G/LConn1');
+couple = add_line(add_line(couple, 'V2', 'y2'), 'V1', 'y1');
+r = sim(couple, 'Solver', 'ode45', 'StopTime', 0.1, 'RelTol', 1e-10, 'AbsTol', 1e-12);
+assert(max(abs(r.yout(:, 1) - 1.6 * r.yout(:, 2))) < 1e-9, ...
+       'secondaire ouvert : v2 = M / L1 v1');
+charge = add_block(couple, 'resistor', 'R2', 'R', 5);
+charge = add_line(add_line(charge, 'R2/LConn1', 'T/RConn1'), 'R2/RConn1', 'G2/LConn1');
+r = sim(charge, 'Solver', 'ode45', 'StopTime', 0.1, 'RelTol', 1e-10, 'AbsTol', 1e-12);
+% L [i1' ; i2'] = [v - R1 i1 ; -R2 i2], v2 = -R2 i2
+L = [0.1, 0.8 * 0.2; 0.8 * 0.2, 0.4];
+temoin = new_system('temoin');
+temoin = add_block(temoin, 'sine', 'v', 'Amplitude', 10, 'Frequency', 2 * pi * 50);
+temoin = add_block(temoin, 'statespace', 'i', 'A', -L \ diag([1 5]), 'B', L \ [1; 0], ...
+                   'C', [0 -5], 'D', 0);
+temoin = add_block(temoin, 'outport', 'y');
+temoin = add_line(add_line(temoin, 'v', 'i'), 'i', 'y');
+r2 = sim(temoin, 'Solver', 'ode45', 'StopTime', 0.1, 'RelTol', 1e-10, 'AbsTol', 1e-12);
+assert(abs(interp1(r.tout, r.yout(:, 1), 0.0777) - interp1(r2.tout, r2.yout, 0.0777)) < 1e-4, ...
+       'secondaire charge : la tension que donnent les equations des inductances couplees');
+% une source de vitesse sur une masse : il faut dériver sa commande
+vitesse = new_system('vitesse');
+vitesse = add_block(vitesse, 'step', 'u', 'Time', 0.1, 'After', 1);
+vitesse = add_block(vitesse, 'simulinkpsconverter', 'SP');
+vitesse = add_block(vitesse, 'idealtranslationalvelocitysource', 'V');
+vitesse = add_block(vitesse, 'mass', 'M', 'mass', 2);
+vitesse = add_block(vitesse, 'mechanicaltranslationalreference', 'G');
+vitesse = add_block(vitesse, 'solverconfiguration', 'S');
+vitesse = add_block(vitesse, 'idealforcesensor', 'F');
+vitesse = add_block(vitesse, 'outport', 'f');
+vitesse = add_line(add_line(vitesse, 'u', 'SP'), 'SP', 'V');
+vitesse = add_line(vitesse, 'V/RConn1', 'G/LConn1');
+vitesse = add_line(vitesse, 'V/LConn1', 'F/LConn1');
+vitesse = add_line(vitesse, 'F/RConn1', 'M/LConn1');
+vitesse = add_line(vitesse, 'S/RConn1', 'G/LConn1');
+vitesse = add_line(vitesse, 'F', 'f');
+filtre = set_param(vitesse, 'SP', 'FilteringAndDerivatives', ...
+                   'Filter input, derivatives calculated', 'InputFilterTimeConstant', 10, ...
+                   'InputFilterTimeConstant_unit', 'ms');
+r = sim(filtre, 'Solver', 'ode15s', 'StopTime', 0.3, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+t = r.tout;
+apres = t > 0.105;
+assert(max(abs(r.yout(apres) - 200 * exp(-(t(apres) - 0.1) / 0.01))) < 1e-3, ...
+       'une commande filtree : F = m v'', v = 1 - exp(-(t - 0.1) / 0.01)');
+r = sim(set_param(vitesse, 'SP', 'FilteringAndDerivatives', ...
+                  'Zero derivatives (piecewise constant)'), 0.3);
+assert(max(abs(r.yout)) == 0, 'une commande constante par morceaux : sa derivee est nulle');
+% transformateur, amplificateurs, réducteur, roue, inerteur, moteur linéaire
+transfo = new_system('transfo');
+transfo = add_block(transfo, 'dcvoltagesource', 'V', 'v0', 10);
+transfo = add_block(transfo, 'idealtransformer', 'T', 'n', 2);
+transfo = add_block(transfo, 'resistor', 'R', 'R', 10);
+transfo = add_block(transfo, 'electricalreference', 'G');
+transfo = add_block(transfo, 'electricalreference', 'G2');
+transfo = add_block(transfo, 'solverconfiguration', 'S');
+transfo = add_block(transfo, 'currentsensor', 'I1');
+transfo = add_block(transfo, 'voltagesensor', 'V2');
+transfo = add_block(add_block(transfo, 'outport', 'i1'), 'outport', 'v2');
+transfo = add_line(transfo, 'V/LConn1', 'I1/LConn1');
+transfo = add_line(transfo, 'I1/RConn1', 'T/LConn1');
+transfo = add_line(transfo, 'T/LConn2', 'G/LConn1');
+transfo = add_line(transfo, 'V/RConn1', 'G/LConn1');
+transfo = add_line(transfo, 'S/RConn1', 'G/LConn1');
+transfo = add_line(transfo, 'T/RConn1', 'R/LConn1');
+transfo = add_line(transfo, 'R/RConn1', 'G2/LConn1');
+transfo = add_line(transfo, 'T/RConn2', 'G2/LConn1');
+transfo = add_line(transfo, 'V2/LConn1', 'R/LConn1');
+transfo = add_line(transfo, 'V2/RConn1', 'G2/LConn1');
+transfo = add_line(add_line(transfo, 'I1', 'i1'), 'V2', 'v2');
+r = sim(transfo, 1);
+assert(abs(r.yout(end, 1) - 0.25) < 1e-12 && abs(r.yout(end, 2) - 5) < 1e-12, ...
+       'transformateur ideal : v2 = v1 / n, i1 = i2 / n');
+for inverseur = [true false]
+    ao = new_system('ao');
+    ao = add_block(ao, 'dcvoltagesource', 'V', 'v0', 1);
+    ao = add_block(ao, 'resistor', 'R1', 'R', 1, 'R_unit', 'kOhm');
+    ao = add_block(ao, 'resistor', 'Rf', 'R', 10, 'R_unit', 'kOhm');
+    ao = add_block(ao, 'opamp', 'A');
+    ao = add_block(ao, 'electricalreference', 'G');
+    ao = add_block(ao, 'solverconfiguration', 'S');
+    ao = add_block(ao, 'voltagesensor', 'VS');
+    ao = add_block(ao, 'outport', 'y');
+    ao = add_line(ao, 'V/RConn1', 'G/LConn1');
+    ao = add_line(ao, 'S/RConn1', 'G/LConn1');
+    ao = add_line(ao, 'Rf/LConn1', 'A/LConn2');
+    ao = add_line(ao, 'Rf/RConn1', 'A/RConn1');
+    ao = add_line(ao, 'R1/RConn1', 'A/LConn2');
+    if inverseur
+        ao = add_line(ao, 'V/LConn1', 'R1/LConn1');
+        ao = add_line(ao, 'A/LConn1', 'G/LConn1');
+    else
+        ao = add_line(ao, 'R1/LConn1', 'G/LConn1');
+        ao = add_line(ao, 'V/LConn1', 'A/LConn1');
+    end
+    ao = add_line(ao, 'VS/LConn1', 'A/RConn1');
+    ao = add_line(ao, 'VS/RConn1', 'G/LConn1');
+    ao = add_line(ao, 'VS', 'y');
+    r = sim(ao, 1);
+    assert(abs(r.yout(end) - (inverseur * -10 + ~inverseur * 11)) < 1e-9, ...
+           'amplificateur operationnel : -Rf/R1 en inverseur, 1 + Rf/R1 sinon');
+end
+reducteur = new_system('reducteur');
+reducteur = add_block(reducteur, 'constant', 'c', 'Value', 1);
+reducteur = add_block(reducteur, 'idealtorquesource', 'T');
+reducteur = add_block(reducteur, 'gearbox', 'R', 'ratio', 4);
+reducteur = add_block(reducteur, 'inertia', 'J', 'inertia', 0.16);
+reducteur = add_block(reducteur, 'mechanicalrotationalreference', 'G');
+reducteur = add_block(reducteur, 'solverconfiguration', 'S');
+reducteur = add_block(reducteur, 'idealrotationalmotionsensor', 'We');
+reducteur = add_block(reducteur, 'outport', 'we');
+reducteur = add_line(add_line(reducteur, 'c', 'T'), 'T/RConn1', 'G/LConn1');
+reducteur = add_line(reducteur, 'T/LConn1', 'R/LConn1');
+reducteur = add_line(reducteur, 'R/RConn1', 'J/LConn1');
+reducteur = add_line(reducteur, 'S/RConn1', 'G/LConn1');
+reducteur = add_line(reducteur, 'We/LConn1', 'R/LConn1');
+reducteur = add_line(reducteur, 'We/RConn1', 'G/LConn1');
+reducteur = add_line(reducteur, 'We/1', 'we');
+r = sim(reducteur, 'Solver', 'ode45', 'StopTime', 1);
+assert(max(abs(r.yout - 100 * r.tout)) < 1e-9, ...
+       'reducteur de rapport 4 : l''inertie vue de l''entree est divisee par 16');
+roue = new_system('roue');
+roue = add_block(roue, 'constant', 'c', 'Value', 0.5);
+roue = add_block(roue, 'idealtorquesource', 'T');
+roue = add_block(roue, 'wheelandaxle', 'W', 'radius', 10, 'radius_unit', 'cm');
+roue = add_block(roue, 'mass', 'M', 'mass', 5);
+roue = add_block(roue, 'mechanicalrotationalreference', 'GR');
+roue = add_block(roue, 'mechanicaltranslationalreference', 'GT');
+roue = add_block(roue, 'solverconfiguration', 'S');
+roue = add_block(roue, 'idealtranslationalmotionsensor', 'X');
+roue = add_block(roue, 'outport', 'v');
+roue = add_line(add_line(roue, 'c', 'T'), 'T/RConn1', 'GR/LConn1');
+roue = add_line(roue, 'T/LConn1', 'W/LConn1');
+roue = add_line(roue, 'W/RConn1', 'M/LConn1');
+roue = add_line(roue, 'S/RConn1', 'GR/LConn1');
+roue = add_line(roue, 'X/LConn1', 'M/LConn1');
+roue = add_line(roue, 'X/RConn1', 'GT/LConn1');
+roue = add_line(roue, 'X/1', 'v');
+r = sim(roue, 'Solver', 'ode45', 'StopTime', 1);
+r2 = sim(set_param(roue, 'W', 'orientation', 'Drives in negative direction'), ...
+         'Solver', 'ode45', 'StopTime', 1);
+assert(max(abs(r.yout - r.tout)) < 1e-12 && max(abs(r2.yout + r2.tout)) < 1e-12, ...
+       'roue et essieu : F = T / r, dans un sens ou dans l''autre');
+inerteur = new_system('inerteur');
+inerteur = add_block(inerteur, 'constant', 'f', 'Value', 3);
+inerteur = add_block(inerteur, 'idealforcesource', 'F');
+inerteur = add_block(inerteur, 'mass', 'M', 'mass', 1);
+inerteur = add_block(inerteur, 'translationalinerter', 'B', 'B', 2);
+inerteur = add_block(inerteur, 'mechanicaltranslationalreference', 'G');
+inerteur = add_block(inerteur, 'solverconfiguration', 'S');
+inerteur = add_block(inerteur, 'idealtranslationalmotionsensor', 'X');
+inerteur = add_block(inerteur, 'outport', 'v');
+inerteur = add_line(add_line(inerteur, 'f', 'F'), 'F/LConn1', 'M/LConn1');
+inerteur = add_line(inerteur, 'F/RConn1', 'G/LConn1');
+inerteur = add_line(inerteur, 'B/LConn1', 'M/LConn1');
+inerteur = add_line(inerteur, 'B/RConn1', 'G/LConn1');
+inerteur = add_line(inerteur, 'S/RConn1', 'G/LConn1');
+inerteur = add_line(inerteur, 'X/LConn1', 'M/LConn1');
+inerteur = add_line(inerteur, 'X/RConn1', 'G/LConn1');
+inerteur = add_line(inerteur, 'X/1', 'v');
+r = sim(inerteur, 'Solver', 'ode45', 'StopTime', 1);
+assert(max(abs(r.yout - r.tout)) < 1e-12, 'un inerteur de 2 kg s''ajoute a la masse');
+lineaire = new_system('lineaire');
+lineaire = add_block(lineaire, 'dcvoltagesource', 'V', 'v0', 2);
+lineaire = add_block(lineaire, 'resistor', 'R', 'R', 1);
+lineaire = add_block(lineaire, 'translationalelectromechanicalconverter', 'C', 'K', 2);
+lineaire = add_block(lineaire, 'translationaldamper', 'D', 'D', 4);
+lineaire = add_block(lineaire, 'electricalreference', 'GE');
+lineaire = add_block(lineaire, 'mechanicaltranslationalreference', 'GM');
+lineaire = add_block(lineaire, 'solverconfiguration', 'S');
+lineaire = add_block(lineaire, 'idealtranslationalmotionsensor', 'X');
+lineaire = add_block(lineaire, 'outport', 'v');
+lineaire = add_line(lineaire, 'V/LConn1', 'R/LConn1');
+lineaire = add_line(lineaire, 'R/RConn1', 'C/LConn1');
+lineaire = add_line(lineaire, 'C/LConn2', 'GE/LConn1');
+lineaire = add_line(lineaire, 'V/RConn1', 'GE/LConn1');
+lineaire = add_line(lineaire, 'S/RConn1', 'GE/LConn1');
+lineaire = add_line(lineaire, 'C/RConn1', 'D/LConn1');
+lineaire = add_line(lineaire, 'C/RConn2', 'GM/LConn1');
+lineaire = add_line(lineaire, 'D/RConn1', 'GM/LConn1');
+lineaire = add_line(lineaire, 'X/LConn1', 'D/LConn1');
+lineaire = add_line(lineaire, 'X/RConn1', 'GM/LConn1');
+lineaire = add_line(lineaire, 'X/1', 'v');
+r = sim(lineaire, 1);
+assert(abs(r.yout(end) - 0.5) < 1e-12, 'moteur lineaire : 2 = i + 2 v et 2 i = 4 v');
+% les sources commandées, et les unités des convertisseurs
+commandees = new_system('commandees');
+commandees = add_block(commandees, 'dcvoltagesource', 'V', 'v0', 3);
+commandees = add_block(commandees, 'resistor', 'R1', 'R', 2);
+commandees = add_block(commandees, 'voltagecontrolledvoltagesource', 'E', 'K', 5);
+commandees = add_block(commandees, 'currentcontrolledvoltagesource', 'H', 'K', 7);
+commandees = add_block(commandees, 'resistor', 'R2', 'R', 1);
+commandees = add_block(commandees, 'resistor', 'R3', 'R', 1);
+commandees = add_block(commandees, 'electricalreference', 'G');
+commandees = add_block(commandees, 'solverconfiguration', 'S');
+commandees = add_block(commandees, 'voltagesensor', 'VE');
+commandees = add_block(commandees, 'voltagesensor', 'VH');
+commandees = add_block(add_block(commandees, 'outport', 'ye'), 'outport', 'yh');
+commandees = add_line(commandees, 'V/LConn1', 'E/LConn1');
+commandees = add_line(commandees, 'E/LConn2', 'G/LConn1');
+commandees = add_line(commandees, 'V/RConn1', 'G/LConn1');
+commandees = add_line(commandees, 'S/RConn1', 'G/LConn1');
+commandees = add_line(commandees, 'E/RConn1', 'R2/LConn1');
+commandees = add_line(commandees, 'R2/RConn1', 'G/LConn1');
+commandees = add_line(commandees, 'E/RConn2', 'G/LConn1');
+commandees = add_line(commandees, 'VE/LConn1', 'R2/LConn1');
+commandees = add_line(commandees, 'VE/RConn1', 'G/LConn1');
+commandees = add_line(commandees, 'V/LConn1', 'R1/LConn1');
+commandees = add_line(commandees, 'R1/RConn1', 'H/LConn1');
+commandees = add_line(commandees, 'H/LConn2', 'G/LConn1');
+commandees = add_line(commandees, 'H/RConn1', 'R3/LConn1');
+commandees = add_line(commandees, 'R3/RConn1', 'G/LConn1');
+commandees = add_line(commandees, 'H/RConn2', 'G/LConn1');
+commandees = add_line(commandees, 'VH/LConn1', 'R3/LConn1');
+commandees = add_line(commandees, 'VH/RConn1', 'G/LConn1');
+commandees = add_line(add_line(commandees, 'VE', 'ye'), 'VH', 'yh');
+r = sim(commandees, 1);
+assert(abs(r.yout(end, 1) - 15) < 1e-12 && abs(r.yout(end, 2) - 10.5) < 1e-12, ...
+       'sources commandees : 5 x 3 V, et 7 Ohm x 1.5 A');
+unites = new_system('unites');
+unites = add_block(unites, 'constant', 'c', 'Value', 500);
+unites = add_block(unites, 'simulinkpsconverter', 'SP', 'InputSignalUnit', 'mA');
+unites = add_block(unites, 'controlledcurrentsource', 'I');
+unites = add_block(unites, 'resistor', 'R', 'R', 4);
+unites = add_block(unites, 'electricalreference', 'G');
+unites = add_block(unites, 'solverconfiguration', 'S');
+unites = add_block(unites, 'currentsensor', 'A');
+unites = add_block(unites, 'pssimulinkconverter', 'PS', 'OutputSignalUnit', 'mA');
+unites = add_block(unites, 'voltagesensor', 'VS');
+unites = add_block(unites, 'pssimulinkconverter', 'PV', 'Unit', 'kV');
+unites = add_block(add_block(unites, 'outport', 'i'), 'outport', 'v');
+unites = add_line(add_line(unites, 'c', 'SP'), 'SP', 'I');
+unites = add_line(unites, 'I/LConn1', 'G/LConn1');
+unites = add_line(unites, 'I/RConn1', 'A/LConn1');
+unites = add_line(unites, 'A/RConn1', 'R/LConn1');
+unites = add_line(unites, 'R/RConn1', 'G/LConn1');
+unites = add_line(unites, 'S/RConn1', 'G/LConn1');
+unites = add_line(unites, 'VS/LConn1', 'R/LConn1');
+unites = add_line(unites, 'VS/RConn1', 'G/LConn1');
+unites = add_line(add_line(unites, 'A', 'PS'), 'PS', 'i');
+unites = add_line(add_line(unites, 'VS', 'PV'), 'PV', 'v');
+r = sim(unites, 1);
+assert(abs(r.yout(end, 1) - 500) < 1e-9 && abs(r.yout(end, 2) - 0.002) < 1e-15, ...
+       'unites des convertisseurs : 500 mA commandes, mesures en mA et en kV');
+degres = new_system('degres');
+degres = add_block(degres, 'thermalmass', 'M', 'T', 25, 'T_unit', 'degC');
+degres = add_block(degres, 'thermalreference', 'G');
+degres = add_block(degres, 'solverconfiguration', 'S');
+degres = add_block(degres, 'idealtemperaturesensor', 'T');
+degres = add_block(degres, 'perfectinsulator', 'I');
+degres = add_block(degres, 'pssimulinkconverter', 'PC', 'OutputSignalUnit', 'degC', ...
+                   'ApplyAffineConversion', 'on');
+degres = add_block(degres, 'pssimulinkconverter', 'PK');
+degres = add_block(add_block(degres, 'outport', 'c'), 'outport', 'k');
+degres = add_line(degres, 'T/LConn1', 'M/LConn1');
+degres = add_line(degres, 'I/LConn1', 'M/LConn1');
+degres = add_line(degres, 'T/RConn1', 'G/LConn1');
+degres = add_line(degres, 'S/RConn1', 'G/LConn1');
+degres = add_line(add_line(degres, 'T', 'PC'), 'PC', 'c');
+degres = add_line(add_line(degres, 'T', 'PK'), 'PK', 'k');
+r = sim(degres, 1);
+assert(abs(r.yout(end, 1) - 25) < 1e-12 && abs(r.yout(end, 2) - 298.15) < 1e-12, ...
+       'une temperature rendue en degC par la conversion affine, en K sinon');
+% ces blocs passent par un .slx
+fichier52 = [tempname() '.slx'];
+save_system(reducteur, fichier52);
+r = sim(load_system(fichier52), 'Solver', 'ode45', 'StopTime', 1);
+assert(max(abs(r.yout - 100 * r.tout)) < 1e-9, 'le reducteur se relit du .slx');
+save_system(set_param(unites, 'SP', 'FilteringAndDerivatives', ...
+                      'Filter input, derivatives calculated'), fichier52);
+relu = load_system(fichier52);
+r = sim(relu, 'Solver', 'ode15s', 'StopTime', 1);
+assert(abs(r.yout(end, 1) - 500) < 1e-6, 'l''unite et le filtre des convertisseurs aussi');
+delete(fichier52);
+% ce que Simscape refuse
+% un secondaire sans référence : son potentiel n'est pas déterminé
+flottant52 = delete_block(transfo, 'G2');
+flottant52 = add_line(add_line(flottant52, 'R/RConn1', 'T/RConn2'), 'V2/RConn1', 'T/RConn2');
+refus52 = {
+    @() sim(vitesse, 1), 'Simscape:Network:SingularNetwork', 'deriver sa commande'
+    @() sim(set_param(couple, 'T', 'k', 1), 1), 'Simulink:Parameters:InvParamSetting', ...
+        'couple/T'
+    @() sim(set_param(reducteur, 'R', 'ratio', 0), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'reducteur/R'
+    @() sim(set_param(unites, 'SP', 'InputSignalUnit', 'furlong'), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'furlong'
+    @() sim(set_param(unites, 'SP', 'FilteringAndDerivatives', 'filtrer'), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'unites/SP'
+    @() sim(set_param(unites, 'SP', 'ProvidedSignals', 'Input and first derivative'), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'ProvidedSignals'
+    @() sim(flottant52, 1), 'Simscape:Network:SingularNetwork', 'transfo/T'
+    @() add_line(add_block(reducteur, 'mass', 'M'), 'R/RConn1', 'M/LConn1'), ...
+        'Simulink:Commands:AddLinePhysicalDomain', 'translation'
+    @() add_line(add_block(roue, 'inertia', 'J'), 'W/RConn1', 'J/LConn1'), ...
+        'Simulink:Commands:AddLinePhysicalDomain', 'rotation'
+    };
+for k52 = 1:size(refus52, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('refus52{k52, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, refus52{k52, 2}) && ~isempty(strfind(message, refus52{k52, 3})), ...
+           sprintf('lot 36, cas %d : %s attendu, %s rendu (%s)', k52, refus52{k52, 2}, vu, ...
+                   message));
+end
+fprintf('elements solidaires et mecanismes : %d refus nommes verifies\n', size(refus52, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

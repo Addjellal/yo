@@ -1603,94 +1603,15 @@ int main(int argc, char** argv) {
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'constant', 'v', 'Value', [1 2]), "
                         "'v', 'demux');\n");
-                // Un bloc de Simscape vit dans un réseau : la référence et un
-                // élément de charge de son domaine — résistance, amortisseur,
-                // paroi —,
-                // un Solver Configuration ; une source commandée reçoit sa
-                // commande, un convertisseur un réseau de chaque côté.
+                // Un bloc de Simscape vit dans un réseau : essaiReseauPhysique
+                // donne à chacun de ses ports une charge de son domaine,
+                // reliée à la référence de ce domaine, un Solver
+                // Configuration, et une commande à chacune de ses entrées.
                 if (QString::fromUtf8(b->famille) == QLatin1String("Simscape") &&
                     QLatin1String(b->type) != QLatin1String("simulinkpsconverter") &&
-                    QLatin1String(b->type) != QLatin1String("pssimulinkconverter")) {
-                    const QString type = QLatin1String(b->type);
-                    const QStringList translation = {
-                        QStringLiteral("mass"), QStringLiteral("translationalspring"),
-                        QStringLiteral("translationaldamper"),
-                        QStringLiteral("mechanicaltranslationalreference"),
-                        QStringLiteral("idealforcesource"),
-                        QStringLiteral("idealtranslationalvelocitysource"),
-                        QStringLiteral("idealtranslationalmotionsensor"),
-                        QStringLiteral("idealforcesensor")};
-                    const QStringList rotation = {
-                        QStringLiteral("inertia"), QStringLiteral("rotationalspring"),
-                        QStringLiteral("rotationaldamper"),
-                        QStringLiteral("mechanicalrotationalreference"),
-                        QStringLiteral("idealtorquesource"),
-                        QStringLiteral("idealangularvelocitysource"),
-                        QStringLiteral("idealrotationalmotionsensor"),
-                        QStringLiteral("idealtorquesensor")};
-                    const QStringList thermique = {
-                        QStringLiteral("thermalmass"), QStringLiteral("conductiveheattransfer"),
-                        QStringLiteral("convectiveheattransfer"),
-                        QStringLiteral("thermalreference"),
-                        QStringLiteral("idealtemperaturesource"),
-                        QStringLiteral("idealheatflowsource"),
-                        QStringLiteral("idealtemperaturesensor"),
-                        QStringLiteral("idealheatflowsensor")};
-                    QString reference = QStringLiteral("electricalreference");
-                    QString charge = QStringLiteral("resistor");
-                    if (translation.contains(type)) {
-                        reference = QStringLiteral("mechanicaltranslationalreference");
-                        charge = QStringLiteral("translationaldamper");
-                    } else if (rotation.contains(type)) {
-                        reference = QStringLiteral("mechanicalrotationalreference");
-                        charge = QStringLiteral("rotationaldamper");
-                    } else if (thermique.contains(type)) {
-                        reference = QStringLiteral("thermalreference");
-                        charge = QStringLiteral("conductiveheattransfer");
-                    }
-                    essaiTous += QStringLiteral(
-                        "m = add_block(add_block(m, '%1', 'masse'), '%2', 'charge');\n"
-                        "m = add_line(m, 'charge/RConn1', 'masse/LConn1');\n")
-                                     .arg(reference, charge);
-                    if (type == QLatin1String("solverconfiguration"))
-                        essaiTous += QStringLiteral(
-                            "m = add_line(m, 'solverconfiguration/RConn1', "
-                            "'masse/LConn1');\n");
-                    else
-                        essaiTous += QStringLiteral(
-                            "m = add_line(add_block(m, 'solverconfiguration', 'cfg'), "
-                            "'cfg/RConn1', 'masse/LConn1');\n");
-                    const bool unPort = type == reference || type == QLatin1String("mass") ||
-                                        type == QLatin1String("inertia") ||
-                                        type == QLatin1String("thermalmass");
-                    if (type == QLatin1String("rotationalelectromechanicalconverter"))
-                        essaiTous += QStringLiteral(
-                            "m = add_line(m, '%1/LConn1', 'charge/LConn1');\n"
-                            "m = add_line(m, '%1/LConn2', 'masse/LConn1');\n"
-                            "m = add_block(add_block(m, 'mechanicalrotationalreference', "
-                            "'masseM'), 'rotationaldamper', 'chargeM');\n"
-                            "m = add_line(m, 'chargeM/RConn1', 'masseM/LConn1');\n"
-                            "m = add_line(m, '%1/RConn1', 'chargeM/LConn1');\n"
-                            "m = add_line(m, '%1/RConn2', 'masseM/LConn1');\n"
-                            "m = add_line(add_block(m, 'dcvoltagesource', 'pile'), "
-                            "'pile/LConn1', 'charge/LConn1');\n"
-                            "m = add_line(m, 'pile/RConn1', 'masse/LConn1');\n")
-                                         .arg(type);
-                    else if (unPort && type != QLatin1String("solverconfiguration"))
-                        essaiTous += QStringLiteral(
-                            "m = add_line(m, '%1/LConn1', 'charge/LConn1');\n").arg(type);
-                    else if (type != QLatin1String("solverconfiguration"))
-                        essaiTous += QStringLiteral(
-                            "m = add_line(m, '%1/LConn1', 'charge/LConn1');\n"
-                            "m = add_line(m, '%1/RConn1', 'masse/LConn1');\n")
-                                         .arg(type);
-                    if (type.startsWith(QLatin1String("controlled")) ||
-                        (type.startsWith(QLatin1String("ideal")) &&
-                         type.endsWith(QLatin1String("source"))))
-                        essaiTous += QStringLiteral(
-                            "m = add_line(add_block(m, 'constant', 'commande'), "
-                            "'commande', '%1');\n").arg(type);
-                }
+                    QLatin1String(b->type) != QLatin1String("pssimulinkconverter"))
+                    essaiTous += QStringLiteral("m = essaiReseauPhysique(m, '%1');\n")
+                                     .arg(QLatin1String(b->type));
                 // Un contrôle dynamique aux entrées nulles est hors de ses
                 // bornes, comme dans Simulink : il avertit sans s'arrêter.
                 if (QLatin1String(b->type).startsWith(QLatin1String("checkdynamic")))
@@ -1707,6 +1628,57 @@ int main(int argc, char** argv) {
                 if (f.open(QIODevice::WriteOnly | QIODevice::Text))
                     f.write(essaiTous.toUtf8());
             }
+            // Le plus petit réseau qui simule un bloc physique, quel qu'il
+            // soit : ses ports et leurs domaines le décrivent.
+            const QString fichierReseau =
+                QDir::current().absoluteFilePath(QStringLiteral("essaiReseauPhysique.m"));
+            {
+                QFile f(fichierReseau);
+                if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+                    f.write(R"(function m = essaiReseauPhysique(m, type)
+charges = struct('electrique', 'resistor', 'translation', 'translationaldamper', ...
+                 'rotation', 'rotationaldamper', 'thermique', 'conductiveheattransfer');
+references = struct('electrique', 'electricalreference', ...
+                    'translation', 'mechanicaltranslationalreference', ...
+                    'rotation', 'mechanicalrotationalreference', ...
+                    'thermique', 'thermalreference');
+[g, d, e] = matlibre_sl_physique('ports', type);
+if strcmp(type, 'solverconfiguration')
+    m = add_block(add_block(m, 'electricalreference', 'masse'), 'resistor', 'charge');
+    m = add_line(add_line(m, 'charge/LConn1', 'masse/LConn1'), 'charge/RConn1', 'masse/LConn1');
+    m = add_line(m, 'solverconfiguration/RConn1', 'masse/LConn1');
+    return
+end
+m = add_block(m, 'solverconfiguration', 'cfg');
+codes = [1:g, -(1:d)];
+relie = false;
+for k = 1:numel(codes)
+    domaine = matlibre_sl_physique('domaine', type, codes(k));
+    masse = ['masse_' domaine];
+    if ~any(cellfun(@(b) strcmp(b.nom, masse), m.blocs))
+        m = add_block(m, references.(domaine), masse);
+        if ~relie
+            m = add_line(m, 'cfg/RConn1', [masse '/LConn1']);
+            relie = true;
+        end
+    end
+    charge = sprintf('charge%d', k);
+    m = add_block(m, charges.(domaine), charge);
+    m = add_line(m, [charge '/RConn1'], [masse '/LConn1']);
+    m = add_line(m, [type '/' matlibre_sl_physique('nomPort', codes(k))], [charge '/LConn1']);
+end
+if strcmp(type, 'opamp')
+    % sans contre-réaction, la sortie d'un amplificateur idéal n'est pas déterminée
+    m = add_block(m, 'resistor', 'retour');
+    m = add_line(add_line(m, 'retour/LConn1', 'opamp/RConn1'), 'retour/RConn1', 'opamp/LConn2');
+end
+for k = 1:e
+    nom = sprintf('commande%d', k);
+    m = add_line(add_block(m, 'constant', nom), nom, type, k);
+end
+end
+)");
+            }
             avant = console->toPlainText().size();
             envoyer(fenetre, QStringLiteral("run('%1')").arg(fichierTous));
             verifier(attendre([&] { return !fenetre.occupe(); }, 60000),
@@ -1715,6 +1687,7 @@ int main(int argc, char** argv) {
             verifier(sortie.contains(QLatin1String("TOUS LES BLOCS OK")),
                      "et se simulent tous : la bibliotheque ne propose rien qui n'existe");
             QFile::remove(fichierTous);
+            QFile::remove(fichierReseau);
 
             // La toile porte le schema du modele choisi : c'est le fil de
             // calcul qui le trace, et l'editeur qui le peint. C'est la

@@ -386,12 +386,20 @@ FONCTION(fnEvalc) {
     // evalc dans un evalc laissait sinon echapper l'affichage du plus
     // interne vers la console.
     std::ostream* precedente = &it.sortie();
+    // Les avertissements aussi : MATLAB capture tout ce qui s'écrirait dans
+    // la fenêtre de commande, hors les erreurs, qui remontent.
+    std::ostream* erreurPrecedente = it.erreurSortieDefinie();
     it.definirSortie(&tampon);
+    it.definirErreurSortie(&tampon);
     struct Restaurer {
         Interpreteur& moteur;
         std::ostream* valeur;
-        ~Restaurer() { moteur.definirSortie(valeur); }
-    } restaurer{it, precedente};
+        std::ostream* erreur;
+        ~Restaurer() {
+            moteur.definirSortie(valeur);
+            moteur.definirErreurSortie(erreur);
+        }
+    } restaurer{it, precedente, erreurPrecedente};
     it.executerTexte(args[0].versTexte(), "<evalc>");
     return {Valeur::texte(tampon.str())};
 }

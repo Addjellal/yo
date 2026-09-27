@@ -211,6 +211,10 @@ public:
     std::ostream& sortie();
     std::ostream& erreurSortie();
     void definirSortie(std::ostream* s) { sortie_ = s; }
+    // Les avertissements et fprintf(2, ...) : evalc les capture comme le
+    // reste de l'affichage. Nul : la sortie d'erreur du processus.
+    void definirErreurSortie(std::ostream* s) { erreur_ = s; }
+    std::ostream* erreurSortieDefinie() const { return erreur_; }
     void ouvrirJournal(const std::string& fichier);
     void fermerJournal();
 
@@ -326,6 +330,7 @@ private:
     std::string racineToolbox_;
     std::vector<std::tuple<const Valeur*, int, int>> pileFin_;
     std::ostream* sortie_ = nullptr;
+    std::ostream* erreur_ = nullptr;
     std::shared_ptr<std::ostream> journal_;
 
     Valeur evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Valeur>* multi);

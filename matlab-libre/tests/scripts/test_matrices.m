@@ -574,4 +574,23 @@ assert(sum(zeros(1, 0)) == 0 && isequal(size(diff(zeros(0, 3), 1, 2)), [0 2]));
 assert(isempty(find(all(zeros(0, 5) == repmat([1 2 3 4 5], 0, 1), 2), 1)), ...
        'une recherche dans une table vide ne trouve rien');
 
+% SVD d'une matrice de rang incomplet : les vecteurs singuliers des
+% valeurs nulles forment, comme dans MATLAB, une base orthonormale du
+% complément — ils étaient nuls, et U n'était plus orthogonale.
+E = blkdiag(zeros(3), eye(3));
+[U, S, V] = svd(E);
+assert(norm(U' * U - eye(6)) < 1e-14 && norm(V' * V - eye(6)) < 1e-14 && ...
+       norm(U * S * V' - E) < 1e-14, 'svd d''une matrice de rang 3 sur 6');
+A = [1 2; 2 4; 3 6];
+[U, S, V] = svd(A);
+assert(norm(U' * U - eye(3)) < 1e-14 && norm(U * S * V' - A) < 1e-13, 'svd de rang 1, 3 x 2');
+[U, S, V] = svd(A');
+assert(norm(V' * V - eye(3)) < 1e-14 && norm(U * S * V' - A') < 1e-13, 'svd de rang 1, 2 x 3');
+[U, ~, V] = svd(zeros(3));
+assert(norm(U' * U - eye(3)) < 1e-15 && norm(V' * V - eye(3)) < 1e-15, 'svd de la matrice nulle');
+[U, S, V] = svd(A, 'econ');
+assert(norm(U' * U - eye(2)) < 1e-14 && norm(U * S * V' - A) < 1e-13, 'svd economique de rang 1');
+N0 = null([1 1; 1 1]);
+assert(abs(norm(N0) - 1) < 1e-14 && norm([1 1; 1 1] * N0) < 1e-14, 'null d''une matrice singuliere');
+
 disp('matrices : toutes les verifications passent');

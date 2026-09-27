@@ -170,6 +170,21 @@ assert(numel(cc) == 3 && cc{3} == 6);
 % « hold on ». La regle est syntaxique, sauf que le nom ne doit pas etre
 % une variable — « x -1 » soustrait quand x en est une.
 assert(strcmp(evalc('disp bonjour'), sprintf('bonjour\n')));
+% evalc capture aussi les avertissements et fprintf(2, ...) : tout ce qui
+% s'écrirait dans la fenêtre de commande, hors les erreurs. lastwarn les
+% retient comme ailleurs.
+lastwarn('');
+sortieAvert = evalc('warning(''essai:evalc'', ''un avertissement capture'')');
+assert(~isempty(strfind(sortieAvert, 'Warning: un avertissement capture')), ...
+       'evalc capture les avertissements');
+[~, idAvert] = lastwarn();
+assert(strcmp(idAvert, 'essai:evalc'));
+assert(~isempty(strfind(evalc('fprintf(2, ''vers la sortie d''''erreur'')'), ...
+                        'vers la sortie d''erreur')), 'evalc capture fprintf(2, ...)');
+sortieImbriquee = evalc('x = evalc(''warning(''''dedans'''')''); disp(numel(x) > 0)');
+assert(~isempty(strfind(sortieImbriquee, '1')) && ...
+       isempty(strfind(sortieImbriquee, 'dedans')), ...
+       'un evalc dans un evalc garde pour lui ce qu''il capture');
 
 xCmd = 10;
 assert(xCmd -1 == 9);          % xCmd est une variable : soustraction

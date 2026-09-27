@@ -204,7 +204,10 @@ totalité.
    relient par leurs ports physiques et deviennent une représentation
    d'état, intégrée par les solveurs de Simulink ; de même la mécanique
    en translation et en rotation, le convertisseur électromécanique et
-   la thermique (masses, conduction, convection).
+   la thermique (masses, conduction, convection), l'amplificateur
+   opérationnel, les transformateurs, les réducteurs. Des éléments à état
+   solidaires (deux inerties sur un même arbre) réduisent le réseau aux
+   états qu'il laisse libres.
    Manquent : les signaux de taille variable, et de Simscape tout ce qui
    n'est pas un réseau linéaire électrique, mécanique ou thermique.
    Stateflow a ses états emboîtés, ses régions parallèles, son

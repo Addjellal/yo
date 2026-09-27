@@ -162,7 +162,7 @@ Interpreteur::Interpreteur() {
 Interpreteur::~Interpreteur() = default;
 
 std::ostream& Interpreteur::sortie() { return sortie_ ? *sortie_ : std::cout; }
-std::ostream& Interpreteur::erreurSortie() { return std::cerr; }
+std::ostream& Interpreteur::erreurSortie() { return erreur_ ? *erreur_ : std::cerr; }
 
 void Interpreteur::ouvrirJournal(const std::string& fichier) {
     journal_ = std::make_shared<std::ofstream>(fichier, std::ios::app);

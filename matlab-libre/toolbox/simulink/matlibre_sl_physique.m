@@ -25,13 +25,28 @@ function varargout = matlibre_sl_physique(action, varargin)
 %   un ressort une bobine ; un amortisseur, une paroi des conductances ;
 %   une source de force ou de couple une source de courant.
 %   Le convertisseur électromécanique lie les deux domaines : v = K w,
-%   couple = K i. Ses états sont les tensions des condensateurs, les
+%   couple = K i ; le transformateur idéal, le réducteur, la roue et
+%   l'essieu lient de même deux grandeurs à travers et deux efforts.
+%   L'amplificateur opérationnel idéal égale ses deux entrées sans y
+%   laisser passer de courant. Ses états sont les tensions des condensateurs, les
 %   vitesses des masses et des inerties, les températures des masses
 %   thermiques, les courants des bobines, les
 %   efforts des ressorts, et la position que mesure chaque capteur de
 %   mouvement. Le réseau étant linéaire, il devient une représentation
 %   d'état : le bloc Solver Configuration devient un bloc State-Space, que
 %   tous les solveurs intègrent et que LINMOD linéarise.
+%
+%   Des éléments à état solidaires — deux inerties sur un même arbre, deux
+%   masses thermiques sur un même nœud, un ressort au bout libre, un
+%   enroulement ouvert — n'ont pas d'états indépendants : les équations
+%   algébriques du réseau sont alors singulières, et le système
+%   algébro-différentiel se réduit, contrainte après contrainte, aux
+%   combinaisons d'états qu'il laisse libres. Une source qui impose l'état
+%   d'un élément (une source de vitesse sur une masse) demande la dérivée
+%   de sa commande : le Simulink-PS Converter la fournit en filtrant son
+%   entrée (FilteringAndDerivatives), ou la dit nulle (constante par
+%   morceaux). Les convertisseurs lisent l'unité de leur signal (mA, rpm,
+%   degC...) et la ramènent aux unités SI dans lesquelles le réseau calcule.
 %
 %   Conventions de Simscape : une grandeur traversante va du port de gauche
 %   (+, R) au port de droite (-, C) à travers le bloc ; une grandeur à
@@ -109,6 +124,20 @@ function T = table()
         'idealheatflowsource',              'sourceThrough',  1, 1, 1, 0, 'h', 'h'
         'idealtemperaturesensor',           'capteurAcross',  1, 1, 0, 1, 'h', 'h'
         'idealheatflowsensor',              'capteurThrough', 1, 1, 0, 1, 'h', 'h'
+        'opamp',                            'ampliOp',        2, 1, 0, 0, 'e', 'e'
+        'idealtransformer',                 'convertisseur',  2, 2, 0, 0, 'e', 'e'
+        'mutualinductor',                   'mutuelle',       2, 2, 0, 0, 'e', 'e'
+        'voltagecontrolledvoltagesource',   'vcvs',           2, 2, 0, 0, 'e', 'e'
+        'currentcontrolledvoltagesource',   'ccvs',           2, 2, 0, 0, 'e', 'e'
+        'opencircuit',                      'libre',          1, 0, 0, 0, 'e', ''
+        'translationalelectromechanicalconverter', 'convertisseur', 2, 2, 0, 0, 'e', 't'
+        'translationalinerter',             'capacite',       1, 1, 0, 0, 't', 't'
+        'translationalfreeend',             'libre',          1, 0, 0, 0, 't', ''
+        'rotationalinerter',                'capacite',       1, 1, 0, 0, 'r', 'r'
+        'rotationalfreeend',                'libre',          1, 0, 0, 0, 'r', ''
+        'gearbox',                          'reducteur',      1, 1, 0, 0, 'r', 'r'
+        'wheelandaxle',                     'reducteur',      1, 1, 0, 0, 'r', 't'
+        'perfectinsulator',                 'libre',          1, 0, 0, 0, 'h', ''
         };
 end
 
@@ -195,6 +224,17 @@ function type = composant(chemin)
         'foundation.thermal.elements.conduction',             'conductiveheattransfer'
         'foundation.thermal.elements.convection',             'convectiveheattransfer'
         'foundation.thermal.elements.reference',              'thermalreference'
+        'foundation.electrical.elements.op_amp',              'opamp'
+        'foundation.electrical.elements.ideal_transformer',   'idealtransformer'
+        'foundation.electrical.elements.mutual_inductor',     'mutualinductor'
+        'foundation.electrical.elements.open_circuit',        'opencircuit'
+        'foundation.mechanical.translational.inerter',        'translationalinerter'
+        'foundation.mechanical.translational.free_end',       'translationalfreeend'
+        'foundation.mechanical.rotational.inerter',           'rotationalinerter'
+        'foundation.mechanical.rotational.free_end',          'rotationalfreeend'
+        'foundation.mechanical.mechanisms.gear_box',          'gearbox'
+        'foundation.mechanical.mechanisms.wheel_axle',        'wheelandaxle'
+        'foundation.thermal.elements.perfect_insulator',      'perfectinsulator'
         };
     k = find(strcmp(char(chemin), table(:, 1)), 1);
     type = char(chemin);
@@ -208,36 +248,8 @@ end
 % Une valeur écrite dans UNITE, ramenée à l'unité BASE du paramètre : les
 % deux doivent mesurer la même grandeur.
 function v = unite(v, texte, base, chemin, nom)
-    unites = {
-        'Ohm', 'R', 1; 'mOhm', 'R', 1e-3; 'kOhm', 'R', 1e3; 'MOhm', 'R', 1e6
-        'F', 'C', 1; 'mF', 'C', 1e-3; 'uF', 'C', 1e-6; 'nF', 'C', 1e-9; 'pF', 'C', 1e-12
-        'H', 'L', 1; 'mH', 'L', 1e-3; 'uH', 'L', 1e-6; 'nH', 'L', 1e-9
-        'V', 'U', 1; 'mV', 'U', 1e-3; 'kV', 'U', 1e3; 'uV', 'U', 1e-6
-        'A', 'I', 1; 'mA', 'I', 1e-3; 'uA', 'I', 1e-6; 'kA', 'I', 1e3
-        '1/Ohm', 'G', 1; 'S', 'G', 1; 'mS', 'G', 1e-3; 'uS', 'G', 1e-6
-        'Hz', 'f', 1; 'kHz', 'f', 1e3; 'MHz', 'f', 1e6
-        'rad', 'a', 1; 'deg', 'a', pi / 180; 'rev', 'a', 2 * pi
-        'kg', 'm', 1; 'g', 'm', 1e-3; 't', 'm', 1e3
-        'm', 'x', 1; 'cm', 'x', 1e-2; 'mm', 'x', 1e-3; 'km', 'x', 1e3
-        'm/s', 'v', 1; 'mm/s', 'v', 1e-3; 'km/h', 'v', 1 / 3.6
-        'rad/s', 'w', 1; 'deg/s', 'w', pi / 180; 'rpm', 'w', pi / 30
-        'N', 'F', 1; 'kN', 'F', 1e3; 'mN', 'F', 1e-3
-        'N*m', 'T', 1; 'mN*m', 'T', 1e-3; 'kN*m', 'T', 1e3
-        'N/m', 'k', 1; 'N/mm', 'k', 1e3; 'kN/m', 'k', 1e3
-        'N/(m/s)', 'b', 1; 'N*s/m', 'b', 1
-        'kg*m^2', 'J', 1; 'g*cm^2', 'J', 1e-7
-        'N*m/rad', 'K', 1; 'N*m/deg', 'K', 180 / pi
-        'N*m/(rad/s)', 'B', 1; 'N*m*s/rad', 'B', 1
-        'V/(rad/s)', 'E', 1; 'V/rpm', 'E', 30 / pi
-        's', 's', 1; 'ms', 's', 1e-3; 'us', 's', 1e-6
-        'K', 'tK', 1; 'degC', 'tK', 1; 'degF', 'tK', 5 / 9; 'degR', 'tK', 5 / 9
-        'W', 'P', 1; 'kW', 'P', 1e3; 'mW', 'P', 1e-3
-        'm^2', 'S', 1; 'cm^2', 'S', 1e-4; 'mm^2', 'S', 1e-6
-        'W/(m*K)', 'l', 1; 'W/(K*m)', 'l', 1
-        'W/(m^2*K)', 'h', 1; 'W/(K*m^2)', 'h', 1
-        'J/(kg*K)', 'c', 1; 'J/(K*kg)', 'c', 1; 'kJ/(kg*K)', 'c', 1e3; 'kJ/(K*kg)', 'c', 1e3
-        };
-    texte = strtrim(char(texte));
+    unites = tableUnites();
+    texte = strtrim(texteParametre(texte, [nom '_unit'], chemin));
     k = find(strcmp(texte, unites(:, 1)), 1);
     b = find(strcmp(base, unites(:, 1)), 1);
     if isempty(k) || isempty(b) || ~strcmp(unites{k, 2}, unites{b, 2})
@@ -258,6 +270,66 @@ function v = unite(v, texte, base, chemin, nom)
     v = v * unites{k, 3} / unites{b, 3};
 end
 
+% Les unités, chacune avec sa grandeur et son facteur vers l'unité SI.
+function unites = tableUnites()
+    unites = {
+        'Ohm', 'R', 1; 'mOhm', 'R', 1e-3; 'kOhm', 'R', 1e3; 'MOhm', 'R', 1e6
+        'F', 'C', 1; 'mF', 'C', 1e-3; 'uF', 'C', 1e-6; 'nF', 'C', 1e-9; 'pF', 'C', 1e-12
+        'H', 'L', 1; 'mH', 'L', 1e-3; 'uH', 'L', 1e-6; 'nH', 'L', 1e-9
+        'V', 'U', 1; 'mV', 'U', 1e-3; 'kV', 'U', 1e3; 'uV', 'U', 1e-6
+        'A', 'I', 1; 'mA', 'I', 1e-3; 'uA', 'I', 1e-6; 'kA', 'I', 1e3
+        '1/Ohm', 'G', 1; 'S', 'G', 1; 'mS', 'G', 1e-3; 'uS', 'G', 1e-6
+        'Hz', 'f', 1; 'kHz', 'f', 1e3; 'MHz', 'f', 1e6
+        'rad', 'a', 1; 'deg', 'a', pi / 180; 'rev', 'a', 2 * pi
+        'kg', 'm', 1; 'g', 'm', 1e-3; 't', 'm', 1e3
+        'm', 'x', 1; 'cm', 'x', 1e-2; 'mm', 'x', 1e-3; 'km', 'x', 1e3
+        'm/s', 'v', 1; 'mm/s', 'v', 1e-3; 'km/h', 'v', 1 / 3.6
+        'rad/s', 'w', 1; 'deg/s', 'w', pi / 180; 'rpm', 'w', pi / 30
+        'N', 'F', 1; 'kN', 'F', 1e3; 'mN', 'F', 1e-3
+        'N*m', 'T', 1; 'mN*m', 'T', 1e-3; 'kN*m', 'T', 1e3
+        'N/m', 'k', 1; 'N/mm', 'k', 1e3; 'kN/m', 'k', 1e3
+        'N/(m/s)', 'b', 1; 'N*s/m', 'b', 1
+        'kg*m^2', 'J', 1; 'g*cm^2', 'J', 1e-7
+        'N*m/rad', 'K', 1; 'N*m/deg', 'K', 180 / pi
+        'N*m/(rad/s)', 'B', 1; 'N*m*s/rad', 'B', 1
+        'V/(rad/s)', 'E', 1; 'V/rpm', 'E', 30 / pi; 'N*m/A', 'E', 1
+        'V/(m/s)', 'Et', 1; 'N/A', 'Et', 1
+        's', 's', 1; 'ms', 's', 1e-3; 'us', 's', 1e-6
+        'K', 'tK', 1; 'degC', 'tK', 1; 'degF', 'tK', 5 / 9; 'degR', 'tK', 5 / 9
+        'W', 'P', 1; 'kW', 'P', 1e3; 'mW', 'P', 1e-3
+        'm^2', 'S', 1; 'cm^2', 'S', 1e-4; 'mm^2', 'S', 1e-6
+        'W/(m*K)', 'l', 1; 'W/(K*m)', 'l', 1
+        'W/(m^2*K)', 'h', 1; 'W/(K*m^2)', 'h', 1
+        'J/(kg*K)', 'c', 1; 'J/(K*kg)', 'c', 1; 'kJ/(kg*K)', 'c', 1e3; 'kJ/(K*kg)', 'c', 1e3
+        };
+end
+
+% Un nombre écrit dans l'unité TEXTE, ramené aux unités SI : A * nombre + B.
+% Une température absolue (conversion affine) se décale.
+function [a, b] = versSI(texte, affine, chemin)
+    texte = strtrim(texteParametre(texte, 'unite', chemin));
+    a = 1;
+    b = 0;
+    if any(strcmp(texte, {'1', ''}))
+        return
+    end
+    unites = tableUnites();
+    k = find(strcmp(texte, unites(:, 1)), 1);
+    if isempty(k)
+        error('Simulink:Parameters:InvParamSetting', ...
+              'L''unite ''%s'' de ''%s'' n''est pas connue.', texte, chemin);
+    end
+    a = unites{k, 3};
+    if affine
+        switch texte
+            case 'degC'
+                b = 273.15;
+            case 'degF'
+                b = 273.15 - 32 * 5 / 9;
+        end
+    end
+end
+
 % --- les réseaux -------------------------------------------------------------
 
 function modele = reseaux(modele)
@@ -272,6 +344,7 @@ function modele = reseaux(modele)
                   'Le modele ''%s'' porte des connexions physiques sans bloc physique.', ...
                   char(modele.nom));
         end
+        modele = convertisseurs(modele);
         return
     end
     connexions = zeros(0, 4);
@@ -323,6 +396,81 @@ function modele = reseaux(modele)
         modele = remplacer(modele, membres, ports, noeud, chemin);
     end
     modele.connexions = zeros(0, 4);
+    modele = convertisseurs(modele);
+end
+
+% Les convertisseurs : un nombre de Simulink devient un signal physique
+% dans l'unité que dit le convertisseur, ramenée ici aux unités SI ; le
+% Simulink-PS Converter qui filtre sans commander une source filtre lui-même.
+function modele = convertisseurs(modele)
+    nomModele = char(modele.nom);
+    for k = 1:numel(modele.blocs)
+        bloc = modele.blocs{k};
+        entrant = strcmp(bloc.type, 'simulinkpsconverter');
+        if ~entrant && ~strcmp(bloc.type, 'pssimulinkconverter')
+            continue
+        end
+        chemin = [nomModele '/' bloc.nom];
+        affine = strcmp(choix(bloc, 'ApplyAffineConversion', 'off', {'on', 'off'}, chemin), 'on');
+        tau = 0;
+        ordre = 0;
+        if entrant
+            [a, b] = versSI(texteDe(bloc, 'InputSignalUnit', '1', chemin), affine, chemin);
+            if strcmp(reglageFiltre(bloc, chemin), 'Filter input, derivatives calculated')
+                [tau, ordre] = filtreDe(bloc, chemin);
+            end
+        else
+            % le signal physique, en unités SI, rendu dans l'unité de sortie
+            [a, b] = versSI(texteDe(bloc, 'OutputSignalUnit', '1', chemin), affine, chemin);
+            b = -b / a;
+            a = 1 / a;
+        end
+        if tau > 0
+            den = [tau, 1];
+            if ordre == 2
+                den = conv(den, den);
+            end
+            modele.blocs{k} = remplace(bloc, 'transferfcn', struct('Numerator', a, ...
+                                                                  'Denominator', den));
+        elseif a ~= 1
+            modele.blocs{k} = remplace(bloc, 'gain', struct('Gain', a));
+        elseif b ~= 0
+            modele.blocs{k} = remplace(bloc, 'bias', struct('Bias', b));
+            continue
+        else
+            continue
+        end
+        if b ~= 0
+            % le décalage d'une température absolue, après le facteur
+            m = numel(modele.blocs) + 1;
+            modele.blocs{m} = heriter(struct('type', 'bias', 'nom', [bloc.nom '/decalage'], ...
+                                             'parametres', struct('Bias', b)), bloc);
+            liens = matlibre_sl_liens(modele);
+            sortants = liens(:, 1) == k;
+            liens(sortants, 1) = m;
+            modele.liens = [liens; k, m, 1, 1];
+        end
+    end
+end
+
+function v = texteDe(bloc, nom, defaut, chemin)
+    v = defaut;
+    if isfield(bloc.parametres, nom)
+        v = texteParametre(bloc.parametres.(nom), nom, chemin);
+    end
+end
+
+% Un paramètre qui se donne par un texte : une ligne de caractères, ou une
+% chaîne.
+function t = texteParametre(v, nom, chemin)
+    if isstring(v) && isscalar(v)
+        v = char(v);
+    end
+    if ~ischar(v) || (~isempty(v) && size(v, 1) ~= 1)
+        error('Simulink:Parameters:InvParamSetting', ...
+              'Le parametre ''%s'' de ''%s'' doit etre un texte.', nom, chemin);
+    end
+    t = v;
 end
 
 function parent = unir(parent, a, b)
@@ -390,7 +538,8 @@ function modele = remplacer(modele, membres, ports, noeud, chemin)
     % les éléments, dans l'ordre des blocs
     el = struct('bloc', {}, 'type', {}, 'comportement', {}, 'p', {}, 'n', {}, ...
                 'valeur', {}, 'r', {}, 'g', {}, 'initial', {}, 'signe', {}, ...
-                'sorties', {}, 'position', {}, 'mp', {}, 'mn', {});
+                'sorties', {}, 'position', {}, 'mp', {}, 'mn', {}, 'matrice', {}, ...
+                'initial2', {}, 'filtre', {}, 'ordre', {}, 'constant', {}, 'amont', {});
     for k = membres
         type = modele.blocs{k}.type;
         ligne = entreeDe(type);
@@ -399,42 +548,82 @@ function modele = remplacer(modele, membres, ports, noeud, chemin)
         end
         e = struct('bloc', k, 'type', type, 'comportement', ligne{2}, 'p', numero(k, 1), ...
                    'n', 0, 'valeur', 0, 'r', 0, 'g', 0, 'initial', 0, 'signe', 1, ...
-                   'sorties', ligne{6}, 'position', 0, 'mp', 0, 'mn', 0);
-        if ligne{4} >= 1 && ~strcmp(ligne{2}, 'convertisseur')
-            e.n = numero(k, -1);
-        end
-        if strcmp(ligne{2}, 'convertisseur')
-            % + et - à gauche, R et C à droite
-            e.n = numero(k, 2);
-            e.mp = numero(k, -1);
-            e.mn = numero(k, -2);
+                   'sorties', ligne{6}, 'position', 0, 'mp', 0, 'mn', 0, 'matrice', [], ...
+                   'initial2', 0, 'filtre', 0, 'ordre', 0, 'constant', false, 'amont', 0);
+        switch ligne{2}
+            case {'convertisseur', 'mutuelle', 'vcvs', 'ccvs'}
+                % deux couples de ports : +, - à gauche ; +, - (ou R, C) à droite
+                e.n = numero(k, 2);
+                e.mp = numero(k, -1);
+                e.mn = numero(k, -2);
+            case 'ampliOp'
+                % +, - à gauche, la sortie à droite
+                e.n = numero(k, 2);
+                e.mp = numero(k, -1);
+            case 'reducteur'
+                % un arbre de chaque côté, chacun rapporté à la référence
+                e.mp = numero(k, -1);
+            otherwise
+                if ligne{4} >= 1
+                    e.n = numero(k, -1);
+                end
         end
         e = lireElement(modele.blocs{k}, e, chemin(k));
+        if ligne{5} > 0
+            e = lireCommande(modele, k, e, chemin);
+            if e.amont > 0 && (e.filtre > 0 || e.constant)
+                % le filtre vit dans le réseau : le convertisseur ne fait
+                % plus que passer le signal
+                modele.blocs{e.amont}.parametres.FilteringAndDerivatives = 'Provide signals';
+            end
+        end
         el(end + 1) = e; %#ok<AGROW>
     end
     comportements = {el.comportement};
-    % les inconnues de branche : sources « à travers », capacités,
-    % capteurs de grandeur traversante, convertisseurs
-    branches = find(ismember(comportements, {'sourceAcross', 'capacite', 'capteurThrough', ...
-                                             'convertisseur'}));
-    nb = numel(branches);
+    % les inconnues de branche : sources « à travers », capacités, capteurs
+    % de grandeur traversante, convertisseurs, réducteurs, amplificateurs
+    % opérationnels, sources de tension commandées (deux pour celle qu'un
+    % courant commande : le courant mesuré, puis la sortie)
+    nbBranches = double(ismember(comportements, {'sourceAcross', 'capacite', ...
+        'capteurThrough', 'convertisseur', 'reducteur', 'ampliOp', 'vcvs'}));
+    nbBranches(strcmp(comportements, 'ccvs')) = 2;
+    premiere = nn + cumsum([0, nbBranches(1:end - 1)]) + 1;
+    nb = sum(nbBranches);
+    branche = @(i) premiere(i);
     capacites = find(strcmp(comportements, 'capacite'));
     inductances = find(strcmp(comportements, 'inductance'));
+    mutuelles = find(strcmp(comportements, 'mutuelle'));
     sources = find(ismember(comportements, {'sourceAcross', 'sourceThrough'}));
+    filtres = sources([el(sources).ordre] > 0);
     capteurs = find(ismember(comportements, {'capteurAcross', 'capteurThrough'}));
     mouvements = capteurs([el(capteurs).sorties] == 2);   % une position à intégrer
-    nx = numel(capacites) + numel(inductances);
+    % les états : tensions des capacités, courants des inductances, deux
+    % courants par paire d'inductances couplées, sorties des filtres des
+    % commandes et leurs dérivées
+    colonneEtat = zeros(1, numel(el));
+    colonneEtat(capacites) = 1:numel(capacites);
+    colonneEtat(inductances) = numel(capacites) + (1:numel(inductances));
+    suivant = numel(capacites) + numel(inductances);
+    for i = mutuelles
+        colonneEtat(i) = suivant + 1;
+        suivant = suivant + 2;
+    end
+    colonneFiltre = zeros(1, numel(el));
+    for i = filtres
+        colonneFiltre(i) = suivant + 1;
+        suivant = suivant + el(i).ordre;
+    end
+    nx = suivant;
     nu = numel(sources);
     % M z = N w, avec z = [grandeurs des nœuds ; grandeurs des branches] et
     % w = [états ; entrées]
     M = zeros(nn + nb);
     N = zeros(nn + nb, nx + nu);
-    colonneEtat = zeros(1, numel(el));
-    colonneEtat(capacites) = 1:numel(capacites);
-    colonneEtat(inductances) = numel(capacites) + (1:numel(inductances));
     colonneEntree = zeros(1, numel(el));
     colonneEntree(sources) = nx + (1:nu);
-    branche = @(i) nn + find(branches == i, 1);
+    % ce que reçoit une source : son entrée, ou la sortie de son filtre
+    commande = colonneEntree;
+    commande(filtres) = colonneFiltre(filtres);
     for i = 1:numel(el)
         e = el(i);
         p = e.p;
@@ -445,14 +634,20 @@ function modele = remplacer(modele, membres, ports, noeud, chemin)
             case 'sourceThrough'
                 % la grandeur traversante va de p à q à travers la source ;
                 % SIGNE -1 : elle pousse p (force, couple)
-                N = injection(N, p, -e.signe, colonneEntree(i));
-                N = injection(N, q, e.signe, colonneEntree(i));
+                N = injection(N, p, -e.signe, commande(i));
+                N = injection(N, q, e.signe, commande(i));
             case 'inductance'
                 M = conductance(M, p, q, e.g);
                 N = injection(N, p, -1, colonneEtat(i));
                 N = injection(N, q, 1, colonneEtat(i));
-            case 'capteurAcross'
-            case 'convertisseur'
+            case 'mutuelle'
+                % deux courants, chacun du + au - de son enroulement
+                N = injection(N, p, -1, colonneEtat(i));
+                N = injection(N, q, 1, colonneEtat(i));
+                N = injection(N, e.mp, -1, colonneEtat(i) + 1);
+                N = injection(N, e.mn, 1, colonneEtat(i) + 1);
+            case {'capteurAcross', 'libre'}
+            case {'convertisseur', 'reducteur'}
                 % v(+) - v(-) = K (w(R) - w(C)) ; le couple K i pousse R
                 b = branche(i);
                 M = incidence(M, p, q, b);
@@ -460,6 +655,26 @@ function modele = remplacer(modele, membres, ports, noeud, chemin)
                 M = colonne(M, b, e.mn, e.valeur);
                 M = ligneEntree(M, e.mp, b, -e.valeur);
                 M = ligneEntree(M, e.mn, b, e.valeur);
+            case 'ampliOp'
+                % v(+) = v(-), sans courant d'entrée ; le courant de sortie
+                % vient de la référence
+                b = branche(i);
+                M = colonne(M, b, p, 1);
+                M = colonne(M, b, q, -1);
+                M = ligneEntree(M, e.mp, b, -1);
+            case 'vcvs'
+                % v(+2) - v(-2) = K (v(+) - v(-))
+                b = branche(i);
+                M = incidence(M, e.mp, e.mn, b);
+                M = colonne(M, b, p, -e.valeur);
+                M = colonne(M, b, q, e.valeur);
+            case 'ccvs'
+                % le courant mesuré va du + au - sous une tension nulle ;
+                % v(+2) - v(-2) = K i
+                b = branche(i);
+                M = incidence(M, p, q, b);
+                M = incidence(M, e.mp, e.mn, b + 1);
+                M(b + 1, b) = M(b + 1, b) - e.valeur;
             otherwise
                 % une branche « à travers » : x(p) - x(q) - r i = valeur
                 b = branche(i);
@@ -471,15 +686,25 @@ function modele = remplacer(modele, membres, ports, noeud, chemin)
                         M = conductance(M, p, q, e.g);
                     case 'sourceAcross'
                         % SIGNE -1 : x(q) - x(p) = valeur (température)
-                        N(b, colonneEntree(i)) = e.signe;
+                        N(b, commande(i)) = e.signe;
                 end
         end
     end
-    if ~isempty(M) && (rcond(M) < 1e-13 || any(~isfinite(M(:))))
+    if any(~isfinite(M(:)))
         error('Simscape:Network:SingularNetwork', ...
               ['Les equations du reseau de %s n''ont pas de solution unique : un noeud ' ...
                'flotte, sans chemin vers la reference, ou des sources et des elements ' ...
                'a etat forment une boucle.'], noms);
+    end
+    if ~isempty(M) && rcond(M) < 1e-13
+        % des éléments à état solidaires : leurs états ne sont pas tous libres
+        constantes = [el(sources).constant];
+        [A, B, C, D, X0] = reseauSingulier(M, N, el, branche, colonneEtat, capacites, ...
+            inductances, mutuelles, filtres, colonneFiltre, colonneEntree, capteurs, ...
+            constantes, nx, nu, noms);
+        modele = reecrire(modele, config, el, sources, capteurs, A, B, C, D, X0, membres, ...
+                          chemin);
+        return
     end
     Z = zeros(0, nx + nu);
     if ~isempty(M)
@@ -501,6 +726,14 @@ function modele = remplacer(modele, membres, ports, noeud, chemin)
         F(k, :) = v / el(i).valeur;
         X0(k) = el(i).initial;
     end
+    for i = mutuelles
+        % [v1 ; v2] = [L1 M ; M L2] d[i1 ; i2]/dt
+        k = colonneEtat(i);
+        v = [ligne(el(i).p) - ligne(el(i).n); ligne(el(i).mp) - ligne(el(i).mn)];
+        F(k:k + 1, :) = el(i).matrice \ v;
+        X0(k:k + 1) = [el(i).initial; el(i).initial2];
+    end
+    F = filtrage(F, el, filtres, colonneFiltre, colonneEntree);
     % ce que mesurent les capteurs : la grandeur, puis la position
     H = zeros(0, nx + nu);
     estPosition = false(0, 1);
@@ -603,6 +836,272 @@ function v = ligneNoeud(Z, noeudK, largeur)
     end
 end
 
+% La commande d'une source : le Simulink-PS Converter qui la donne peut la
+% filtrer — le réseau reçoit alors la sortie du filtre, et ses dérivées
+% quand il en a besoin — ou la dire constante par morceaux.
+function e = lireCommande(modele, k, e, chemin)
+    liens = matlibre_sl_liens(modele);
+    l = find(liens(:, 2) == k & liens(:, 3) == 1, 1);
+    if isempty(l)
+        return
+    end
+    amont = liens(l, 1);
+    bloc = modele.blocs{amont};
+    if ~strcmp(bloc.type, 'simulinkpsconverter')
+        return
+    end
+    e.amont = amont;
+    switch reglageFiltre(bloc, chemin(amont))
+        case 'Filter input, derivatives calculated'
+            [e.filtre, e.ordre] = filtreDe(bloc, chemin(amont));
+        case 'Zero derivatives (piecewise constant)'
+            e.constant = true;
+    end
+end
+
+function mode = reglageFiltre(bloc, chemin)
+    mode = choix(bloc, 'FilteringAndDerivatives', 'Provide signals', ...
+                 {'Provide signals', 'Filter input, derivatives calculated', ...
+                  'Zero derivatives (piecewise constant)'}, chemin);
+    fournis = choix(bloc, 'ProvidedSignals', 'Input only', {'Input only', ...
+                    'Input and first derivative', 'Input and first two derivatives'}, chemin);
+    if strcmp(mode, 'Provide signals') && ~strcmp(fournis, 'Input only')
+        error('Simulink:Parameters:InvParamSetting', ...
+              ['''%s'' fournit les derivees de son entree par des ports (ProvidedSignals ' ...
+               '= ''%s'') : MatLibre ne les prend pas ; filtrez l''entree ' ...
+               '(FilteringAndDerivatives = ''Filter input, derivatives calculated'').'], ...
+              chemin, fournis);
+    end
+end
+
+function [tau, ordre] = filtreDe(bloc, chemin)
+    tau = positif(bloc, 'InputFilterTimeConstant', 0.001, 's', chemin);
+    ordre = 1 + strcmp(choix(bloc, 'SimscapeFilterOrder', 'First-order filtering', ...
+                             {'First-order filtering', 'Second-order filtering'}, chemin), ...
+                       'Second-order filtering');
+end
+
+% Un réglage à choisir dans une liste, sans égard à la casse.
+function v = choix(bloc, nom, defaut, liste, chemin)
+    v = defaut;
+    if isfield(bloc.parametres, nom)
+        v = texteParametre(bloc.parametres.(nom), nom, chemin);
+    end
+    k = find(strcmpi(v, liste), 1);
+    if isempty(k)
+        error('Simulink:Parameters:InvParamSetting', ...
+              'Le parametre ''%s'' de ''%s'' vaut ''%s'' ; il doit valoir %s.', nom, chemin, ...
+              v, strjoin(cellfun(@(x) ['''' x ''''], liste, 'UniformOutput', false), ', '));
+    end
+    v = liste{k};
+end
+
+% Les filtres des commandes : tau f' + f = u, ou, au second ordre,
+% tau^2 f'' + 2 tau f' + f = u, dont f et f' sont les états.
+function F = filtrage(F, el, filtres, colonneFiltre, colonneEntree)
+    for i = filtres
+        k = colonneFiltre(i);
+        u = colonneEntree(i);
+        tau = el(i).filtre;
+        if el(i).ordre == 1
+            F(k, k) = F(k, k) - 1 / tau;
+            F(k, u) = F(k, u) + 1 / tau;
+        else
+            F(k, k + 1) = F(k, k + 1) + 1;
+            F(k + 1, k) = F(k + 1, k) - 1 / tau^2;
+            F(k + 1, k + 1) = F(k + 1, k + 1) - 2 / tau;
+            F(k + 1, u) = F(k + 1, u) + 1 / tau^2;
+        end
+    end
+end
+
+% --- les éléments à état solidaires ---------------------------------------------
+%
+% Deux inerties sur un même arbre, deux masses thermiques sur un même nœud,
+% un ressort dont un bout est libre, des inductances couplées dont un
+% enroulement est ouvert : les équations algébriques du réseau deviennent
+% singulières, car les états de ces éléments ne sont plus indépendants. Le
+% système algébro-différentiel
+%     M z = Ns s + Nu u,   s' = Gz z + Gs s + Gu u,   y = Hz z + Hs s
+% se ramène alors à une représentation d'état : on élimine, pas à pas, les
+% contraintes que les équations algébriques imposent aux états, en ne
+% gardant que les combinaisons d'états qu'elles laissent libres.
+
+function [A, B, C, D, X0] = reseauSingulier(M, N, el, branche, colonneEtat, capacites, ...
+        inductances, mutuelles, filtres, colonneFiltre, colonneEntree, capteurs, ...
+        constantes, nx, nu, noms)
+    nz = size(M, 1);
+    mouvements = capteurs([el(capteurs).sorties] == 2);
+    np = numel(mouvements);
+    ns = nx + np;
+    unitaire = @(j) double((1:nz) == j);
+    Gz = zeros(ns, nz);
+    Gs = zeros(ns, ns);
+    s0 = zeros(ns, 1);
+    % le poids de chaque état dans le compromis des états initiaux : sa
+    % capacité, son inductance — l'inertie de deux arbres solidaires part
+    % avec leur moment cinétique commun
+    poids = ones(ns, 1);
+    for i = capacites
+        k = colonneEtat(i);
+        Gz(k, branche(i)) = 1 / el(i).valeur;
+        s0(k) = el(i).initial;
+        poids(k) = el(i).valeur;
+    end
+    for i = inductances
+        k = colonneEtat(i);
+        Gz(k, :) = (unitaire(el(i).p) - unitaire(el(i).n)) / el(i).valeur;
+        Gs(k, k) = -el(i).r / el(i).valeur;
+        s0(k) = el(i).initial;
+        poids(k) = el(i).valeur;
+    end
+    for i = mutuelles
+        k = colonneEtat(i);
+        Gz(k:k + 1, :) = el(i).matrice \ [unitaire(el(i).p) - unitaire(el(i).n); ...
+                                          unitaire(el(i).mp) - unitaire(el(i).mn)];
+        s0(k:k + 1) = [el(i).initial; el(i).initial2];
+        poids(k:k + 1) = diag(el(i).matrice);
+    end
+    Gw = filtrage(zeros(nx, nx + nu), el, filtres, colonneFiltre, colonneEntree);
+    Gs(1:nx, 1:nx) = Gs(1:nx, 1:nx) + Gw(:, 1:nx);
+    Gu = [Gw(:, nx + 1:end); zeros(np, nu)];
+    % les capteurs ; une position est un état de plus, l'intégrale d'une vitesse
+    ny = sum([el(capteurs).sorties]);
+    Hz = zeros(ny, nz);
+    Hs = zeros(ny, ns);
+    l = 0;
+    jp = 0;
+    for j = 1:numel(capteurs)
+        i = capteurs(j);
+        l = l + 1;
+        if strcmp(el(i).comportement, 'capteurAcross')
+            Hz(l, :) = unitaire(el(i).p) - unitaire(el(i).n);
+            if el(i).sorties == 2
+                jp = jp + 1;
+                Gz(nx + jp, :) = Hz(l, :);
+                s0(nx + jp) = el(i).position;
+                l = l + 1;
+                Hs(l, nx + jp) = 1;
+            end
+        else
+            Hz(l, :) = unitaire(branche(i));
+        end
+    end
+    [A, B, C, D, X0, ecart] = reduire(M, [N(:, 1:nx), zeros(nz, np)], N(:, nx + 1:end), ...
+                                      Gz, Gs, Gu, Hz, Hs, s0, poids, constantes, noms);
+    if ecart > 1e-6 * max(1, norm(s0))
+        warning('Simscape:Network:InconsistentInitialConditions', ...
+                ['Les etats initiaux des elements de %s se contredisent : des elements ' ...
+                 'solidaires (deux inerties sur un meme arbre, deux masses thermiques sur ' ...
+                 'un meme noeud) n''ont qu''un etat a eux deux. Il prend la moyenne des ' ...
+                 'valeurs donnees, ponderee par leurs inerties, masses ou capacites.'], noms);
+    end
+end
+
+function [A, B, C, D, x0, ecart] = reduire(M, Ns, Nu, Gz, Gs, Gu, Hz, Hs, s0, poids, ...
+                                          constantes, noms)
+    nz = size(M, 1);
+    ns = size(Gs, 1);
+    nu = size(Nu, 2);
+    % E w' = Aw w + Bw u, y = Cw w, avec w = [z ; s]
+    E = blkdiag(zeros(nz), eye(ns));
+    Aw = [-M, Ns; Gz, Gs];
+    Bw = [Nu; Gu];
+    Cw = [Hz, Hs];
+    T = eye(nz + ns);                 % w = T w' + Tu u, w' les inconnues courantes
+    Tu = zeros(nz + ns, nu);
+    echelle = max(1, norm(Aw, 1));
+    echelleU = max(1, norm(Bw, 1));
+    for tour = 1:nz + ns + 1 %#ok<FXUP>
+        n = size(E, 2);
+        % les directions de E : V pour ses lignes, U pour ses colonnes
+        [~, S, V] = svd(E);
+        [~, ~, U] = svd(E');
+        sv = diag(S);
+        r = sum(sv > 1e-9);
+        U1 = U(:, 1:r);
+        U2 = U(:, r + 1:end);
+        V1 = V(:, 1:r);
+        V2 = V(:, r + 1:end);
+        E11 = U1' * E * V1;
+        A11 = U1' * Aw * V1;
+        A12 = U1' * Aw * V2;
+        A21 = U2' * Aw * V1;
+        A22 = U2' * Aw * V2;
+        B1 = U1' * Bw;
+        B2 = U2' * Bw;
+        m2 = n - r;
+        rho = 0;
+        if m2 > 0
+            [~, SA, UA] = svd(A22');   % UA : les directions des colonnes de A22
+            sa = diag(SA);
+            rho = sum(sa > max(1e-12 * max(sa), 1e-14 * echelle));
+        end
+        if rho == m2
+            % les inconnues algébriques s'expriment par les états : c'est fini
+            X = zeros(m2, r);
+            Y = zeros(m2, nu);
+            if m2 > 0
+                X = -(A22 \ A21);
+                Y = -(A22 \ B2);
+            end
+            A = E11 \ (A11 + A12 * X);
+            B = E11 \ (B1 + A12 * Y);
+            Tf = T * (V1 + V2 * X);
+            Tuf = Tu + T * (V2 * Y);
+            C = Cw * Tf;
+            D = Cw * Tuf;
+            Ts = Tf(nz + 1:end, :);
+            x0 = zeros(r, 1);
+            if r > 0
+                % l'état le plus proche des valeurs données, chacune pesant
+                % ce que pèse son élément
+                racines = diag(sqrt(poids));
+                x0 = pinv(racines * Ts) * (racines * s0);
+            end
+            ecart = norm(Ts * x0 - s0);
+            return
+        end
+        % des combinaisons d'équations algébriques qui ne voient pas les
+        % inconnues algébriques : des contraintes sur les états
+        P = UA(:, rho + 1:end)';
+        Q = UA(:, 1:rho)';
+        K = P * A21;
+        Kb = P * B2;
+        sk = svd(K);
+        rk = sum(sk > 1e-9 * max(1, norm(A21, 1)));
+        if rk < size(P, 1)
+            error('Simscape:Network:SingularNetwork', ...
+                  ['Les equations du reseau de %s n''ont pas de solution unique : un noeud ' ...
+                   'flotte, sans chemin vers la reference, ou des sources et des elements ' ...
+                   'a etat forment une boucle.'], noms);
+        end
+        imposees = any(abs(Kb) > 1e-9 * echelleU, 1);
+        if any(imposees & ~constantes)
+            error('Simscape:Network:SingularNetwork', ...
+                  ['Dans le reseau de %s, une source impose l''etat d''un element — une ' ...
+                   'source de tension aux bornes d''un condensateur ideal, une source de ' ...
+                   'vitesse sur une masse — : il faudrait deriver sa commande. Filtrez-la ' ...
+                   'dans son Simulink-PS Converter (FilteringAndDerivatives), ou ajoutez ' ...
+                   'une resistance ou un amortisseur en serie.'], noms);
+        end
+        % les états qui respectent les contraintes : a = Nk c + a0 u, u étant
+        % constante par morceaux quand une contrainte la voit
+        [~, ~, VK] = svd(K);
+        Nk = VK(:, rk + 1:end);
+        a0 = -pinv(K) * Kb;
+        E = [E11 * Nk, zeros(r, m2); zeros(rho, size(Nk, 2) + m2)];
+        Aw = [A11 * Nk, A12; Q * A21 * Nk, Q * A22];
+        Bw = [B1 + A11 * a0; Q * B2 + Q * A21 * a0];
+        Tu = Tu + T * (V1 * a0);
+        T = T * [V1 * Nk, V2];
+    end
+    error('Simscape:Network:SingularNetwork', ...
+          ['Les equations du reseau de %s n''ont pas de solution unique : un noeud ' ...
+           'flotte, sans chemin vers la reference, ou des sources et des elements ' ...
+           'a etat forment une boucle.'], noms);
+end
+
 % --- les paramètres d'un élément ------------------------------------------------
 
 function e = lireElement(bloc, e, chemin)
@@ -658,6 +1157,61 @@ function e = lireElement(bloc, e, chemin)
         case 'convectiveheattransfer'
             e.valeur = positif(bloc, 'heat_tr_coeff', 20, 'W/(m^2*K)', chemin) * ...
                        positif(bloc, 'area', 1e-4, 'm^2', chemin);
+        case 'idealtransformer'
+            % v1 = N v2 ; le courant N i1 sort par le + du secondaire
+            e.valeur = positifSansUnite(bloc, 'n', 1, chemin);
+        case 'mutualinductor'
+            L1 = positif(bloc, 'L1', 10, 'H', chemin);
+            L2 = positif(bloc, 'L2', 0.1, 'H', chemin);
+            k = valeurParametre(bloc, 'k', 0.9, chemin);
+            if ~(k > 0 && k < 1)
+                error('Simulink:Parameters:InvParamSetting', ...
+                      ['Le coefficient de couplage ''k'' de ''%s'' vaut %s : il doit etre ' ...
+                       'strictement entre 0 et 1.'], chemin, mat2str(k, 6));
+            end
+            mutuelle = k * sqrt(L1 * L2);
+            e.matrice = [L1, mutuelle; mutuelle, L2];
+            e.initial = nombre(bloc, 'i1', 0, 'A', chemin);
+            e.initial2 = nombre(bloc, 'i2', 0, 'A', chemin);
+        case 'voltagecontrolledvoltagesource'
+            e.valeur = valeurParametre(bloc, 'K', 1, chemin);
+        case 'currentcontrolledvoltagesource'
+            e.valeur = nombre(bloc, 'K', 1, 'Ohm', chemin);
+        case 'translationalelectromechanicalconverter'
+            e.valeur = nombre(bloc, 'K', 0.1, 'V/(m/s)', chemin);
+        case 'translationalinerter'
+            e.valeur = positif(bloc, 'B', 1, 'kg', chemin);
+            e.initial = nombre(bloc, 'v', 0, 'm/s', chemin);
+        case 'rotationalinerter'
+            e.valeur = positif(bloc, 'B', 1, 'kg*m^2', chemin);
+            e.initial = nombre(bloc, 'w', 0, 'rad/s', chemin);
+        case 'gearbox'
+            % w(S) = N w(O) ; le couple de sortie vaut N fois celui d'entrée
+            e.valeur = valeurParametre(bloc, 'ratio', 5, chemin);
+            if e.valeur == 0
+                error('Simulink:Parameters:InvParamSetting', ...
+                      'Le rapport ''ratio'' de ''%s'' ne peut pas etre nul.', chemin);
+            end
+        case 'wheelandaxle'
+            % v(P) = r w(A) or : w(A) = v(P) / (r or)
+            rayon = positif(bloc, 'radius', 0.05, 'm', chemin);
+            sens = 1;
+            if strcmp(choix(bloc, 'orientation', 'Drives in positive direction', ...
+                            {'Drives in positive direction', ...
+                             'Drives in negative direction'}, chemin), ...
+                      'Drives in negative direction')
+                sens = -1;
+            end
+            e.valeur = 1 / (rayon * sens);
+    end
+end
+
+function v = positifSansUnite(bloc, nom, defaut, chemin)
+    v = valeurParametre(bloc, nom, defaut, chemin);
+    if ~(v > 0)
+        error('Simulink:Parameters:InvParamSetting', ...
+              'Le parametre ''%s'' de ''%s'' vaut %s : il doit etre positif.', nom, chemin, ...
+              mat2str(v, 6));
     end
 end
 
@@ -755,8 +1309,7 @@ function modele = reecrire(modele, config, el, sources, capteurs, A, B, C, D, X0
     for k = membres
         type = modele.blocs{k}.type;
         ligne = entreeDe(type);
-        if ~isempty(ligne) && any(strcmp(ligne{2}, {'conductance', 'capacite', 'inductance', ...
-                                                    'reference', 'convertisseur'}))
+        if ~isempty(ligne) && ligne{5} == 0 && ligne{6} == 0 && ~strcmp(ligne{2}, 'config')
             modele.blocs{k} = remplace(modele.blocs{k}, 'ground', struct());
         end
     end

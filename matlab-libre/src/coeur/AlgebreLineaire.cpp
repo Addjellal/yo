@@ -429,6 +429,38 @@ static void svdJacobi(Mat<double> A, Mat<double>& U, std::vector<double>& s, Mat
         if (norme > 0)
             for (int i = 0; i < m; ++i) U(i, j) = A(i, j) / norme;
     }
+    // Les colonnes de U des valeurs singulières nulles — ou noyées dans les
+    // erreurs d'arrondi — ne se déduisent pas de A : on les prend dans le
+    // complément orthogonal des autres, pour que U soit orthonormale.
+    double plusGrande = 0;
+    for (double x : s) plusGrande = std::max(plusGrande, x);
+    const double seuil = std::max(m, n) * 2.220446049250313e-16 * plusGrande;
+    std::vector<bool> valide((std::size_t)n);
+    for (int j = 0; j < n; ++j) valide[(std::size_t)j] = s[(std::size_t)j] > seuil;
+    for (int j = 0; j < n; ++j) {
+        if (valide[(std::size_t)j]) continue;
+        std::vector<double> e((std::size_t)m);
+        for (int essai = 0; essai < m; ++essai) {
+            std::fill(e.begin(), e.end(), 0.0);
+            e[(std::size_t)essai] = 1.0;
+            for (int passe = 0; passe < 2; ++passe)
+                for (int k = 0; k < n; ++k) {
+                    if (!valide[(std::size_t)k]) continue;
+                    double d = 0;
+                    for (int i = 0; i < m; ++i) d += U(i, k) * e[(std::size_t)i];
+                    for (int i = 0; i < m; ++i) e[(std::size_t)i] -= d * U(i, k);
+                }
+            double nn = 0;
+            for (double x : e) nn += x * x;
+            // l'un des vecteurs de base garde au moins 1/m de sa norme
+            if (nn > 0.5 / m) {
+                nn = std::sqrt(nn);
+                for (int i = 0; i < m; ++i) U(i, j) = e[(std::size_t)i] / nn;
+                valide[(std::size_t)j] = true;
+                break;
+            }
+        }
+    }
     // Tri décroissant.
     std::vector<int> ordre((std::size_t)n);
     for (int i = 0; i < n; ++i) ordre[(std::size_t)i] = i;

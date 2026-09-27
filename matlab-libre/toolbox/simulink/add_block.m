@@ -276,7 +276,17 @@ function modele = add_block(modele, type, nom, varargin)
 %                  accurrentsource amp, frequency, shift (degrés)
 %     controlledvoltagesource, controlledcurrentsource — commandées par
 %                  leur entrée ; voltagesensor, currentsensor — une sortie
-%     simulinkpsconverter, pssimulinkconverter — passe-plats
+%     opamp — +, - (LConn1, LConn2), sortie (RConn1) : v(+) = v(-)
+%     idealtransformer n — primaire (LConn1, LConn2), secondaire (RConn1,
+%                  RConn2) : v1 = n v2, i2 = n i1 ; mutualinductor L1, L2,
+%                  k, i1, i2 ; opencircuit
+%     voltagecontrolledvoltagesource K, currentcontrolledvoltagesource K —
+%                  la commande à gauche, la sortie à droite
+%     simulinkpsconverter InputSignalUnit, ApplyAffineConversion,
+%                  FilteringAndDerivatives ('Provide signals', 'Filter input,
+%                  derivatives calculated', 'Zero derivatives (piecewise
+%                  constant)'), SimscapeFilterOrder, InputFilterTimeConstant ;
+%                  pssimulinkconverter OutputSignalUnit, ApplyAffineConversion
 %   Simscape, mécanique (R à gauche, C à droite ; une force ou un couple
 %   positif pousse R) :
 %     mass mass, v ; translationalspring spr_rate, x ; translationaldamper D
@@ -289,6 +299,12 @@ function modele = add_block(modele, type, nom, varargin)
 %                  idealtorquesensor — une sortie
 %     rotationalelectromechanicalconverter K — + et - (LConn1, LConn2), R et
 %                  C (RConn1, RConn2) : v = K w, couple = K i
+%     translationalelectromechanicalconverter K — de même : v = K u, F = K i
+%     translationalinerter B, v ; rotationalinerter B, w — F = B d(vR-vC)/dt
+%     translationalfreeend, rotationalfreeend — un port libre
+%     gearbox ratio — S (LConn1), O (RConn1) : w(S) = ratio w(O)
+%     wheelandaxle radius, orientation — l'essieu A (LConn1), la périphérie
+%                  P (RConn1) : v(P) = r w(A)
 %   Simscape, thermique (A à gauche, B à droite ; températures absolues,
 %   en K, degC ou degF) :
 %     thermalmass mass, sp_heat, T ; thermalreference — le zéro absolu
@@ -297,6 +313,7 @@ function modele = add_block(modele, type, nom, varargin)
 %     idealtemperaturesource — T(B) - T(A) = entrée ; idealheatflowsource —
 %                  un flux de A vers B ; idealtemperaturesensor T(A) - T(B),
 %                  idealheatflowsensor — une sortie
+%     perfectinsulator — une paroi que la chaleur ne traverse pas
 %
 %   Fonctions de l'utilisateur :
 %     fcn          Expr                         une expression de u, scalaire :
