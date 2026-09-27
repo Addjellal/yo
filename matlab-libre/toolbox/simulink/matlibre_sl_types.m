@@ -173,6 +173,18 @@ function s = regle(c, k, tE)
             if r == 0
                 r = commun(tE(1:min(1, end)));
             end
+            if isfield(p, 'TypeVerifie')
+                % Signal Specification : le type annoncé doit être celui de
+                % l'entrée, qu'il ne convertit pas
+                attendu = typeFixe(struct('OutDataTypeStr', p.TypeVerifie), ch);
+                if attendu > 0 && ~isempty(tE) && tE(1) > 0 && tE(1) ~= attendu
+                    error('Simulink:DataType:SignalSpecificationMismatch', ...
+                          ['Le bloc Signal Specification ''%s'' annonce le type %s, et son ' ...
+                           'entree est de type %s.'], ch, ...
+                          matlibre_sl_types('classe', attendu), ...
+                          matlibre_sl_types('classe', tE(1)));
+                end
+            end
         case {'logic', 'relational', 'comparetoconstant', 'comparetozero', 'detectchange', ...
               'detectincrease', 'detectdecrease', 'intervaltest'}
             % un booléen, ou le type que dit OutDataTypeStr
@@ -227,6 +239,9 @@ function s = classesFonction(c, k, tE)
     try
         [sorties{:}] = h(u{:});
     catch err
+        if strncmp(err.identifier, 'Simulink:', 9) && ~isempty(strfind(err.message, c.chemins{k}))
+            rethrow(err);
+        end
         error('Simulink:blocks:MATLABFunctionError', ...
               'La fonction du bloc ''%s'' echoue sur des entrees nulles typees : %s', ...
               c.chemins{k}, err.message);

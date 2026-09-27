@@ -462,6 +462,232 @@ function [type, p] = normaliser(type, p, chemin)
             p = struct('Numerator', numerateur, 'Denominator', denominateur, ...
                        'SampleTime', p.SampleTime, 'ZeroPole', true);
             type = 'discretetransferfcn';
+        case 'fromfile'
+            % From File lit son fichier et devient un From Workspace qui
+            % porte ses données.
+            [temps, valeurs] = lireFichierSignal(char(p.FileName), chemin);
+            interpolation = 'on';
+            if strcmp(p.InterpolationWithinTimeRange, 'Zero-order hold')
+                interpolation = 'off';
+            end
+            apres = struct('Linear_extrapolation', 'Extrapolation', ...
+                           'Hold_last_value', 'Holding final value', ...
+                           'Ground_value', 'Setting to zero');
+            p = struct('VariableName', char(p.FileName), 'Interpolate', interpolation, ...
+                       'OutputAfterFinalValue', ...
+                       apres.(strrep(p.ExtrapolationAfterLastDataPoint, ' ', '_')), ...
+                       'SampleTime', p.SampleTime, 'ZeroCross', 'on', ...
+                       'Donnees', struct('temps', temps, 'valeurs', valeurs));
+            type = 'fromworkspace';
+        case 'assignment'
+            p = struct('Script', scriptAffectation(p, chemin), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'combinatoriallogic'
+            p = struct('Script', scriptLogiqueCombinatoire(p, chemin), ...
+                       'SampleTime', p.SampleTime);
+            type = 'matlabfunction';
+        case 'signalspecification'
+            % un passage qui vérifie ses dimensions et son type
+            p = struct('ConversionOutput', 'Signal copy', 'NombreDePorts', 1, ...
+                       'OutDataTypeStr', 'Inherit: auto', ...
+                       'DimensionsVerifiees', double(p.Dimensions), ...
+                       'TypeVerifie', char(p.OutDataTypeStr));
+            type = 'signalconversion';
+    end
+end
+
+% Le signal d'un fichier MAT, comme l'écrit To File : une matrice dont la
+% première ligne porte les instants et chaque autre ligne un élément du
+% signal ; ou une timeseries.
+function [temps, valeurs] = lireFichierSignal(fichier, chemin)
+    chemin_fichier = fichier;
+    if exist(chemin_fichier, 'file') ~= 2
+        [~, ~, extension] = fileparts(fichier);
+        if isempty(extension) && exist([fichier '.mat'], 'file') == 2
+            chemin_fichier = [fichier '.mat'];
+        else
+            error('Simulink:blocks:FromFileNotFound', ...
+                  'Le bloc From File ''%s'' lit ''%s'', qui n''existe pas.', chemin, fichier);
+        end
+    end
+    try
+        contenu = load(chemin_fichier);
+    catch err
+        error('Simulink:blocks:FromFileInvalidData', ...
+              'Le bloc From File ''%s'' ne sait pas lire ''%s'' : %s', chemin, fichier, ...
+              err.message);
+    end
+    noms = fieldnames(contenu);
+    if isempty(noms)
+        error('Simulink:blocks:FromFileInvalidData', ...
+              'Le fichier ''%s'' que lit le bloc From File ''%s'' est vide.', fichier, chemin);
+    end
+    donnees = contenu.(noms{1});
+    if isa(donnees, 'timeseries')
+        [temps, valeurs] = matlibre_sl_serie(donnees);
+        return
+    end
+    if ~(isnumeric(donnees) && ismatrix(donnees) && size(donnees, 1) >= 2 && ...
+         size(donnees, 2) >= 1)
+        error('Simulink:blocks:FromFileInvalidData', ...
+              ['La variable ''%s'' du fichier ''%s'' que lit le bloc From File ''%s'' ' ...
+               'doit etre une matrice : les instants sur la premiere ligne, un element du ' ...
+               'signal par ligne suivante — ce qu''ecrit To File —, ou une timeseries.'], ...
+              noms{1}, fichier, chemin);
+    end
+    temps = double(donnees(1, :)).';
+    if any(diff(temps) < 0)
+        error('Simulink:blocks:FromFileInvalidData', ...
+              'Les instants du fichier ''%s'' que lit le bloc From File ''%s'' decroissent.', ...
+              fichier, chemin);
+    end
+    valeurs = double(donnees(2:end, :)).';
+end
+
+% Assignment : y vaut Y0 — ou des zéros de la taille donnée —, puis ses
+% éléments aux indices voulus reçoivent ceux de U. Il s'écrit en une
+% fonction, que le bloc MATLAB Function calcule.
+function script = scriptAffectation(p, chemin)
+    n = double(p.NumberOfDimensions);
+    if ~(isscalar(n) && any(n == [1 2]))
+        error('Simulink:blocks:AssignmentDimensions', ...
+              ['Le bloc Assignment ''%s'' a %s dimension(s) : MatLibre affecte en une ou ' ...
+               'deux dimensions.'], chemin, mat2str(n));
+    end
+    options = celluleDe(p.IndexOptionArray);
+    indices = celluleDe(p.IndexParamArray);
+    if numel(options) < n
+        error('Simulink:blocks:AssignmentIndexOptions', ...
+              ['Le bloc Assignment ''%s'' a %d dimension(s) et %d option(s) d''indice ' ...
+               '(IndexOptionArray) : une par dimension.'], chemin, n, numel(options));
+    end
+    zero = double(strcmp(p.IndexMode, 'Zero-based'));
+    parY0 = strcmp(p.OutputInitialize, 'Initialize using input port <Y0>');
+    arguments_ = {};
+    if parY0
+        arguments_{end + 1} = 'y0';
+    end
+    arguments_{end + 1} = 'u';
+    expressions = cell(1, n);
+    for d = 1:n
+        taille = sprintf('size(u, %d)', d);
+        if n == 1
+            taille = 'numel(u)';
+        end
+        switch options{d}
+            case 'Assign all'
+                expressions{d} = ':';
+            case {'Index vector (dialog)', 'Starting index (dialog)'}
+                if numel(indices) < d
+                    error('Simulink:blocks:AssignmentIndexOptions', ...
+                          'Le bloc Assignment ''%s'' ne donne pas d''indice pour la dimension %d.', ...
+                          chemin, d);
+                end
+                v = indices{d};
+                if ischar(v) || isstring(v)
+                    v = matlibre_sl_expression(char(v), chemin, 'IndexParamArray');
+                end
+                v = double(v(:).') + zero;
+                if any(v < 1) || any(v ~= round(v))
+                    error('Simulink:blocks:AssignmentInvalidIndex', ...
+                          ['Les indices %s de la dimension %d du bloc Assignment ''%s'' ne ' ...
+                           'sont pas des entiers positifs (IndexMode %s).'], mat2str(v - zero), ...
+                          d, chemin, p.IndexMode);
+                end
+                if strcmp(options{d}, 'Index vector (dialog)')
+                    expressions{d} = mat2str(v);
+                else
+                    expressions{d} = sprintf('%d - 1 + (1:%s)', v(1), taille);
+                end
+            case {'Index vector (port)', 'Starting index (port)'}
+                error('Simulink:blocks:AssignmentIndexOptions', ...
+                      ['Le bloc Assignment ''%s'' prend ses indices par un port : MatLibre ' ...
+                       'les veut dans le dialogue (''Index vector (dialog)'', ''Starting ' ...
+                       'index (dialog)'') ou ''Assign all''.'], chemin);
+            otherwise
+                error('Simulink:blocks:AssignmentIndexOptions', ...
+                      ['L''option d''indice ''%s'' du bloc Assignment ''%s'' est inconnue : ' ...
+                       '''Assign all'', ''Index vector (dialog)'', ''Index vector (port)'', ' ...
+                       '''Starting index (dialog)'' ou ''Starting index (port)''.'], ...
+                      options{d}, chemin);
+        end
+    end
+    if parY0
+        depart = 'y = y0;';
+    else
+        tailles = celluleDe(p.OutputSizeArray);
+        dims = zeros(1, max(2, n));
+        dims(:) = 1;
+        for d = 1:min(n, numel(tailles))
+            v = tailles{d};
+            if ischar(v) || isstring(v)
+                v = matlibre_sl_expression(char(v), chemin, 'OutputSizeArray');
+            end
+            dims(d) = double(v);
+        end
+        if n == 1
+            dims = [dims(1) 1];
+        end
+        depart = sprintf('y = zeros(%s);', mat2str(dims));
+    end
+    message = strrep(sprintf(['Le bloc Assignment ''%s'' affecte hors de sa sortie, ou ' ...
+                              'des elements en nombre different de ceux de son entree U'], ...
+                             chemin), '''', '''''');
+    % chaque indice est vérifié : MATLAB agrandirait la sortie, Simulink
+    % refuse un indice qui en sort
+    controles = '';
+    noms = cell(1, n);
+    for d = 1:n
+        if strcmp(expressions{d}, ':')
+            noms{d} = ':';
+            continue
+        end
+        noms{d} = sprintf('I%d', d);
+        borne = sprintf('size(y, %d)', d);
+        if n == 1
+            borne = 'numel(y)';
+        end
+        controles = [controles, sprintf(['I%d = %s;\nif any(I%d < 1) || any(I%d > %s)\n' ...
+            '    error(''Simulink:blocks:AssignmentOutOfRange'', ''%s.'');\nend\n'], ...
+            d, expressions{d}, d, d, borne, message)]; %#ok<AGROW>
+    end
+    script = sprintf(['function y = fcn(%s)\n%s\n%stry\n    y(%s) = u;\ncatch\n' ...
+                      '    error(''Simulink:blocks:AssignmentOutOfRange'', ''%s.'');\nend\n'], ...
+                     strjoin(arguments_, ', '), depart, controles, strjoin(noms, ', '), message);
+end
+
+% Combinatorial Logic : la ligne de la table de vérité que désignent ses
+% entrées booléennes, la première étant le bit de poids fort.
+function script = scriptLogiqueCombinatoire(p, chemin)
+    table = double(p.TruthTable);
+    lignes = size(table, 1);
+    if lignes < 2 || abs(log2(lignes) - round(log2(lignes))) > 0
+        error('Simulink:blocks:CombinatorialLogicRows', ...
+              ['La table de verite du bloc ''%s'' a %d ligne(s) : il en faut une puissance ' ...
+               'de deux, une par combinaison des entrees.'], chemin, lignes);
+    end
+    message = strrep(sprintf(['Le bloc Combinatorial Logic ''%s'' recoit %%d entree(s), et ' ...
+                              'sa table de verite a %d ligne(s) : il en faut 2^%%d.'], ...
+                             chemin, lignes), '''', '''''');
+    script = sprintf(['function y = fcn(u)\nT = %s;\nn = numel(u);\n' ...
+                      'if size(T, 1) ~= 2^n\n' ...
+                      '    error(''Simulink:blocks:CombinatorialLogicRows'', ''%s'', n, n);\n' ...
+                      'end\nk = 1 + sum((u(:).'' ~= 0) .* 2.^(n - 1:-1:0));\ny = T(k, :).'';\n'], ...
+                     mat2str(table), message);
+end
+
+function c = celluleDe(v)
+    if iscell(v)
+        c = v;
+    elseif ischar(v) || isstring(v)
+        texte = strtrim(char(v));
+        if ~isempty(texte) && texte(1) == '{'
+            c = eval(texte);
+        else
+            c = {texte};
+        end
+    else
+        c = {v};
     end
 end
 
@@ -837,6 +1063,28 @@ function oui = appelParGraphe(c, g)
     q = g - c.portDebut(k) + 1 - numel(code.sorties);
     oui = q >= 1 && q <= numel(code.sortiesEvt) && ...
           strcmp(code.sortiesEvt(q).declencheur, 'Function call');
+end
+
+% Signal Specification : les dimensions qu'il annonce doivent être
+% celles de son entrée.
+function verifierSpecification(c, k, dE)
+    p = c.p{k};
+    if ~isfield(p, 'DimensionsVerifiees') || isequal(p.DimensionsVerifiees, -1) || ...
+       isempty(dE) || isempty(dE{1})
+        return
+    end
+    attendu = p.DimensionsVerifiees;
+    d = dE{1};
+    if isscalar(attendu)
+        bon = prod(d) == attendu && any(d == 1);
+    else
+        bon = isequal(d(:).', attendu(:).');
+    end
+    if ~bon
+        error('Simulink:blocks:SignalSpecificationDimensions', ...
+              ['Le bloc Signal Specification ''%s'' annonce des dimensions %s, et son ' ...
+               'entree en a %s.'], c.chemins{k}, mat2str(attendu), mat2str(d));
+    end
 end
 
 function s = parent(nom)
@@ -1228,6 +1476,7 @@ function s = regleTraitement(c, k, dE, complet, forcer)
             if strcmp(t, 'signalconversion')
                 s = dE;
                 if isempty(s), s = {[1 1]}; end
+                verifierSpecification(c, k, dE);
             else
                 s = dE(1);
             end
@@ -3133,6 +3382,10 @@ function s = dimsFonction(c, k, dE)
     try
         [sorties{:}] = h(u{:});
     catch err
+        % une erreur de Simulink qui nomme déjà le bloc passe telle quelle
+        if strncmp(err.identifier, 'Simulink:', 9) && ~isempty(strfind(err.message, c.chemins{k}))
+            rethrow(err);
+        end
         error('Simulink:blocks:MATLABFunctionError', ...
               'La fonction du bloc ''%s'' echoue sur des entrees nulles : %s', ...
               c.chemins{k}, err.message);

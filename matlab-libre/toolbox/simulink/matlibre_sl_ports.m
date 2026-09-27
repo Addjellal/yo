@@ -40,6 +40,21 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 0;
         case {'saturationdynamic', 'deadzonedynamic'}
             nEntrees = 3;   % up, u, lo
+        case 'fromfile'
+            nEntrees = 0;
+        case 'assignment'
+            % U, précédé de Y0 quand il initialise la sortie, suivi d'un
+            % port par indice donné par un port
+            options = lire(p, 'IndexOptionArray', {'Index vector (dialog)'});
+            if ischar(options)
+                options = {options};
+            end
+            parPort = sum(strcmp(options, 'Index vector (port)') | ...
+                          strcmp(options, 'Starting index (port)'));
+            parY0 = strcmpi(char(lire(p, 'OutputInitialize', ...
+                                      'Initialize using input port <Y0>')), ...
+                            'Initialize using input port <Y0>');
+            nEntrees = 1 + parY0 + parPort;   % les ports d'indice sont refusés à la compilation
         case 'variantsource'
             nEntrees = numel(matlibre_sl_variantes('liste', lire(p, 'VariantControls', {1, 2})));
         case 'variantsink'

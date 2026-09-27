@@ -22,6 +22,9 @@ function modele = add_block(modele, type, nom, varargin)
 %     uniformrandomnumber Minimum, Maximum, Seed, SampleTime
 %     inport       Port, Value, PortDimensions  l'entrée du modèle
 %     fromworkspace VariableName, Interpolate, OutputAfterFinalValue
+%     fromfile     FileName, InterpolationWithinTimeRange,
+%                  ExtrapolationAfterLastDataPoint — le fichier MAT
+%                  qu'écrit To File : les instants sur la première ligne
 %     from         GotoTag                      le signal d'un Goto
 %     chirp        f1, T, f2                    la fréquence va de f1 à f2 en T
 %     bandlimitedwhitenoise Cov, Ts, seed       variance Cov / Ts, tenu Ts
@@ -78,6 +81,8 @@ function modele = add_block(modele, type, nom, varargin)
 %     comparetoconstant relop, const ; comparetozero relop
 %     detectchange, detectincrease, detectdecrease  vinit
 %     intervaltest uplimit, lowlimit, IntervalClosedRight, IntervalClosedLeft
+%     combinatoriallogic TruthTable        la ligne que désignent les entrées,
+%                                          la première en poids fort
 %
 %   Aiguillage :
 %     switch       Threshold, Criteria : 'u2 >= Threshold', 'u2 > Threshold',
@@ -86,6 +91,13 @@ function modele = add_block(modele, type, nom, varargin)
 %     mux          Inputs (un nombre, ou les largeurs)
 %     demux        Outputs (un nombre, ou les largeurs)
 %     selector     Indices
+%     assignment   NumberOfDimensions (1 ou 2), IndexMode, IndexOptionArray
+%                  ('Assign all', 'Index vector (dialog)', 'Starting index
+%                  (dialog)'), IndexParamArray, OutputInitialize,
+%                  OutputSizeArray — Y0, dont les éléments aux indices
+%                  reçoivent ceux de U
+%     signalspecification Dimensions, OutDataTypeStr — laisse passer, en
+%                  vérifiant les dimensions et le type
 %     concatenate  NumInputs, Mode, ConcatenateDimension
 %     reshape      OutputDimensionality, OutputDimensions
 %     goto         GotoTag, TagVisibility : local, scoped, global
@@ -307,6 +319,12 @@ function modele = add_block(modele, type, nom, varargin)
             reglages(end + 1:end + 2) = {'Model', gabarit};
         end
     end
+    % Divide, Subtract, Sum of Elements, Product of Elements : des Product
+    % et des Sum que la bibliothèque de Simulink règle d'avance.
+    [nomReglage, valeurReglage, synonymes] = prereglage(type);
+    if ~isempty(nomReglage) && ~any(ismember(lower(reglages(1:2:end)), lower(synonymes)))
+        reglages(end + 1:end + 2) = {nomReglage, valeurReglage};
+    end
     % Un « Variant Subsystem » de la bibliothèque est un sous-système à
     % variantes : Variant vaut 'on'.
     if strcmp(entree.type, 'subsystem') && estVariante(type) && ...
@@ -400,6 +418,33 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
     end
     if strcmp(cle, 'function-callsubsystem')
         gabarit = set_param(gabarit, 'function', 'TriggerType', 'function-call');
+    end
+end
+
+% Le réglage qu'un bloc de la bibliothèque porte d'avance, désigné par
+% son nom : un Divide divise, un Subtract soustrait, un Sum of Elements
+% somme les éléments de sa seule entrée.
+function [nom, valeur, synonymes] = prereglage(designation)
+    nom = '';
+    valeur = '';
+    synonymes = {};
+    if isstruct(designation)
+        return
+    end
+    texte = char(designation);
+    barre = find(texte == '/', 1, 'last');
+    if ~isempty(barre)
+        texte = texte(barre + 1:end);
+    end
+    switch lower(regexprep(texte, '\s', ''))
+        case 'divide'
+            nom = 'Inputs'; valeur = '*/'; synonymes = {'Inputs'};
+        case 'productofelements'
+            nom = 'Inputs'; valeur = '*'; synonymes = {'Inputs'};
+        case 'subtract'
+            nom = 'Signs'; valeur = '+-'; synonymes = {'Signs', 'Inputs', 'ListOfSigns'};
+        case 'sumofelements'
+            nom = 'Signs'; valeur = '+'; synonymes = {'Signs', 'Inputs', 'ListOfSigns'};
     end
 end
 

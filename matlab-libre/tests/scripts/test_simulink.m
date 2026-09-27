@@ -5088,6 +5088,158 @@ for kE = 1:size(casErreurs, 1)
 end
 fprintf('evenements Stateflow : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% ------------------- 39. Blocs de bibliothèque : réglages d'avance et nouveaux blocs
+% Divide, Subtract, Sum of Elements et Product of Elements sont des Product
+% et des Sum que la bibliothèque règle d'avance. From File lit le fichier
+% qu'écrit To File ; Assignment remplace des éléments ; Combinatorial
+% Logic lit une table de vérité ; Signal Specification vérifie ce qui le
+% traverse.
+bib = new_system('bibliotheque');
+bib = add_block(bib, 'constant', 'a', 'Value', 6);
+bib = add_block(bib, 'constant', 'b', 'Value', 3);
+bib = add_block(bib, 'simulink/Math Operations/Divide', 'quotient');
+bib = add_block(bib, 'simulink/Math Operations/Subtract', 'difference');
+bib = add_block(bib, 'outport', 'q');
+bib = add_block(bib, 'outport', 'd');
+bib = add_line(add_line(bib, 'a', 'quotient', 1), 'b', 'quotient', 2);
+bib = add_line(add_line(bib, 'a', 'difference', 1), 'b', 'difference', 2);
+bib = add_line(add_line(bib, 'quotient', 'q'), 'difference', 'd');
+r = sim(bib, 1);
+assert(isequal(r.yout(end, :), [2 3]), 'Divide divise, Subtract soustrait');
+elements = add_block(new_system('elements'), 'simulink/Math Operations/Sum of Elements', 'se');
+assert(strcmp(get_param(elements, 'se', 'Signs'), '+') && ...
+       isequal(get_param(elements, 'se', 'Ports'), [1 1 0 0 0 0 0 0]), ...
+       'Sum of Elements : une seule entree, dont il somme les elements');
+elements = add_block(elements, 'simulink/Math Operations/Product of Elements', 'pe');
+assert(strcmp(get_param(elements, 'pe', 'Inputs'), '*'), 'Product of Elements');
+choisi = add_block(new_system('choisi'), 'simulink/Math Operations/Divide', 'dd', 'Inputs', '/*');
+assert(strcmp(get_param(choisi, 'dd', 'Inputs'), '/*'), 'un reglage donne l''emporte sur l''avance');
+
+% From File relit ce qu'écrit To File.
+dossierFichier = tempname();
+mkdir(dossierFichier);
+ecrit = new_system('ecrit');
+ecrit = add_block(ecrit, 'ramp', 'r', 'Slope', 2);
+ecrit = add_block(ecrit, 'tofile', 'tf', 'Filename', fullfile(dossierFichier, 'rampe.mat'));
+ecrit = add_line(ecrit, 'r', 'tf');
+sim(ecrit, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 2);
+lu = new_system('lu');
+lu = add_block(lu, 'fromfile', 'ff', 'FileName', fullfile(dossierFichier, 'rampe.mat'));
+lu = add_line(add_block(lu, 'outport', 'y'), 'ff', 'y');
+r = sim(lu, 'Solver', 'ode1', 'FixedStep', 0.25, 'StopTime', 2);
+assert(max(abs(r.yout(:)' - 2 * (0:0.25:2))) < 1e-12, 'From File interpole le fichier de To File');
+r = sim(set_param(lu, 'ff', 'InterpolationWithinTimeRange', 'Zero-order hold'), ...
+       'Solver', 'ode1', 'FixedStep', 0.25, 'StopTime', 2);
+assert(abs(r.yout(2) - 0) < 1e-12 && abs(r.yout(4) - 1) < 1e-12, 'Zero-order hold : en paliers');
+r = sim(set_param(lu, 'ff', 'ExtrapolationAfterLastDataPoint', 'Hold last value'), ...
+       'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 3);
+assert(r.yout(end) == 4, 'Hold last value apres la derniere donnee');
+serieFichier = timeseries([1; 3], [0; 1]);
+save(fullfile(dossierFichier, 'serie.mat'), 'serieFichier');
+r = sim(set_param(lu, 'ff', 'FileName', fullfile(dossierFichier, 'serie.mat')), ...
+       'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 1);
+assert(isequal(r.yout(:)', [1 2 3]), 'From File lit aussi une timeseries');
+pasMatrice = 'texte';
+save(fullfile(dossierFichier, 'mauvais.mat'), 'pasMatrice');
+
+% Assignment : aux indices, par un indice de départ, dans une matrice,
+% sur une sortie de taille donnée.
+af = new_system('affectation');
+af = add_block(af, 'constant', 'y0', 'Value', [1 2 3 4 5]);
+af = add_block(af, 'constant', 'u', 'Value', [10 20]);
+af = add_block(af, 'assignment', 'as', 'IndexParamArray', {'[2 4]'});
+af = add_block(af, 'outport', 'y');
+af = add_line(add_line(af, 'y0', 'as', 1), 'u', 'as', 2);
+af = add_line(af, 'as', 'y');
+r = sim(af, 1);
+assert(isequal(r.yout(end, :), [1 10 3 20 5]), 'Assignment aux indices donnes');
+r = sim(set_param(af, 'as', 'IndexOptionArray', {'Starting index (dialog)'}, ...
+                  'IndexParamArray', {'3'}), 1);
+assert(isequal(r.yout(end, :), [1 2 10 20 5]), 'Assignment a partir d''un indice');
+r = sim(set_param(af, 'as', 'IndexMode', 'Zero-based', 'IndexParamArray', {'[0 1]'}), 1);
+assert(isequal(r.yout(end, :), [10 20 3 4 5]), 'Assignment en indices a partir de 0');
+matrice = new_system('affectationMatrice');
+matrice = add_block(matrice, 'constant', 'y0', 'Value', zeros(2, 3));
+matrice = add_block(matrice, 'constant', 'u', 'Value', [7; 8]);
+matrice = add_block(matrice, 'assignment', 'as', 'NumberOfDimensions', 2, ...
+                    'IndexOptionArray', {'Assign all', 'Index vector (dialog)'}, ...
+                    'IndexParamArray', {'', '2'});
+matrice = add_line(add_line(matrice, 'y0', 'as', 1), 'u', 'as', 2);
+matrice = add_line(add_block(matrice, 'toworkspace', 'tw', 'VariableName', 'affecteeMatrice'), ...
+                   'as', 'tw');
+sim(matrice, 1);
+assert(isequal(squeeze(affecteeMatrice(:, :, end)), [0 7 0; 0 8 0]), ...
+       'Assignment d''une colonne entiere');
+clear affecteeMatrice
+taille = new_system('affectationTaille');
+taille = add_block(taille, 'constant', 'u', 'Value', 9);
+taille = add_block(taille, 'assignment', 'as', 'OutputInitialize', ...
+                   'Specify size for each dimension in table', 'OutputSizeArray', {'4'}, ...
+                   'IndexParamArray', {'3'});
+taille = add_line(add_line(add_block(taille, 'outport', 'y'), 'as', 'y'), 'u', 'as');
+assert(isequal(get_param(taille, 'as', 'Ports'), [1 1 0 0 0 0 0 0]), ...
+       'sans Y0, un seul port d''entree');
+r = sim(taille, 1);
+assert(isequal(r.yout(end, :), [0 0 9 0]), 'Assignment sur une sortie de taille donnee');
+
+% Combinatorial Logic : la ligne de la table que désignent les entrées.
+cl = new_system('combinatoire');
+cl = add_block(cl, 'constant', 'u', 'Value', [1 1]);
+cl = add_block(cl, 'combinatoriallogic', 'demi');
+cl = add_line(add_line(add_block(cl, 'outport', 'y'), 'demi', 'y'), 'u', 'demi');
+r = sim(cl, 1);
+assert(isequal(r.yout(end, :), [1 0]), 'le demi-additionneur : 1 + 1 donne retenue 1, somme 0');
+r = sim(set_param(cl, 'u', 'Value', [0 1]), 1);
+assert(isequal(r.yout(end, :), [0 1]), 'et 0 + 1 donne somme 1');
+
+% Signal Specification laisse passer ce qui s'accorde à ce qu'il annonce.
+sp = new_system('specification');
+sp = add_block(sp, 'constant', 'u', 'Value', [1 2 3]);
+sp = add_block(sp, 'signalspecification', 'spec', 'Dimensions', 3, 'OutDataTypeStr', 'double');
+sp = add_line(add_line(add_block(sp, 'outport', 'y'), 'spec', 'y'), 'u', 'spec');
+r = sim(sp, 1);
+assert(isequal(r.yout(end, :), [1 2 3]), 'Signal Specification laisse passer');
+
+casErreurs = {
+    @() sim(set_param(lu, 'ff', 'FileName', 'absent_introuvable.mat'), 1), ...
+        'Simulink:blocks:FromFileNotFound', 'lu/ff'
+    @() sim(set_param(lu, 'ff', 'FileName', fullfile(dossierFichier, 'mauvais.mat')), 1), ...
+        'Simulink:blocks:FromFileInvalidData', 'lu/ff'
+    @() sim(set_param(af, 'as', 'IndexParamArray', {'[5 6]'}), 1), ...
+        'Simulink:blocks:AssignmentOutOfRange', 'affectation/as'
+    @() sim(set_param(af, 'as', 'IndexParamArray', {'[1 2 3]'}), 1), ...
+        'Simulink:blocks:AssignmentOutOfRange', 'affectation/as'
+    @() sim(set_param(af, 'as', 'IndexParamArray', {'[0 1]'}), 1), ...
+        'Simulink:blocks:AssignmentInvalidIndex', 'affectation/as'
+    @() sim(set_param(af, 'as', 'NumberOfDimensions', 3), 1), ...
+        'Simulink:blocks:AssignmentDimensions', 'affectation/as'
+    @() sim(set_param(af, 'as', 'IndexOptionArray', {'Index vector (port)'}), 1), ...
+        'Simulink:blocks:AssignmentIndexOptions', 'affectation/as'
+    @() sim(set_param(cl, 'u', 'Value', [1 0 1]), 1), ...
+        'Simulink:blocks:CombinatorialLogicRows', 'combinatoire/demi'
+    @() sim(set_param(cl, 'demi', 'TruthTable', [0; 1; 1]), 1), ...
+        'Simulink:blocks:CombinatorialLogicRows', 'puissance de deux'
+    @() sim(set_param(sp, 'spec', 'Dimensions', 2), 1), ...
+        'Simulink:blocks:SignalSpecificationDimensions', 'specification/spec'
+    @() sim(set_param(sp, 'spec', 'OutDataTypeStr', 'int8'), 1), ...
+        'Simulink:DataType:SignalSpecificationMismatch', 'specification/spec'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('blocs de bibliotheque, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+rmdir(dossierFichier, 's');
+fprintf('blocs de bibliotheque : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

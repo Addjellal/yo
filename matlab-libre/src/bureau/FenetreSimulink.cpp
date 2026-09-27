@@ -89,6 +89,8 @@ const BlocBibliotheque blocs[] = {
 
     {"Logique", "logic", "ET, OU, NON, OU exclusif", "'Operator', 'AND'"},
     {"Logique", "relational", "Compare deux entrées", "'Operator', '<'"},
+    {"Logique", "combinatoriallogic", "La ligne d'une table de vérité que désignent ses entrées",
+     "'TruthTable', [0; 1]"},
     {"Logique", "switch", "Aiguille selon un seuil sur la deuxième entrée",
      "'Threshold', 0"},
     {"Logique", "comparetoconstant", "Compare l'entrée à une constante",
@@ -155,6 +157,9 @@ const BlocBibliotheque blocs[] = {
      "'OutputSignals', 'a'"},
     {"Aiguillage", "merge", "Rend la sortie du sous-système qui vient de calculer",
      "'Inputs', 2"},
+    {"Aiguillage", "assignment", "Remplace des éléments de Y0 par ceux de U",
+     "'IndexParamArray', {'1'}"},
+    {"Aiguillage", "signalspecification", "Laisse passer en vérifiant dimensions et type", ""},
     {"Aiguillage", "variantsource", "Laisse passer l'entrée dont la condition est vraie",
      "'VariantControls', {'V == 1', 'V == 2'}"},
     {"Aiguillage", "variantsink", "Envoie son entrée à la sortie dont la condition est vraie",
