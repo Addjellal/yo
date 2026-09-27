@@ -123,6 +123,8 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 1 + entier(lire(p, 'Inputs', 3));
         case 'buscreator'
             nEntrees = compterNoms(lire(p, 'Inputs', '2'));
+        case 'busassignment'
+            nEntrees = 1 + compterNoms(lire(p, 'AssignedSignals', 'signal1'));
         case 'busselector'
             if strcmpi(char(lire(p, 'OutputAsBus', 'off')), 'on')
                 nSorties = 1;

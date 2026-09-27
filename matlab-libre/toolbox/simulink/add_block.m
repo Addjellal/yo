@@ -66,6 +66,9 @@ function modele = add_block(modele, type, nom, varargin)
 %     sinewavefunction Amplitude, Bias, Frequency, Phase — A sin(F u + P) + B,
 %                  l'entrée tenant lieu de temps (SineType 'Time based')
 %     permutedimensions Order ; squeeze — comme PERMUTE et SQUEEZE
+%     algebraicconstraint Constraint ('f(z) = 0', 'f(z) = z'), InitialGuess —
+%                  sa sortie z revient à son entrée par une boucle
+%                  algébrique, que la méthode de Newton résout
 %     sampletimemath TsampMathOp (+, -, *, /, Ts Only, 1/Ts Only),
 %                  weightValue — l'entrée et w Ts, Ts la période du bloc
 %     minmaxrunningresettable Function (min, max), vinit — deux entrées :
@@ -127,6 +130,8 @@ function modele = add_block(modele, type, nom, varargin)
 %                  (« Index Vector ») : l'élément que désigne la commande
 %     environmentcontroller —              deux entrées, Sim et Coder : rend Sim
 %     bustovector  —                            un bus de scalaires, en vecteur
+%     busassignment AssignedSignals ('a,b.c') — le bus, puis un signal par
+%                  élément nommé, qui le remplace
 %     mux          Inputs (un nombre, ou les largeurs)
 %     demux        Outputs (un nombre, ou les largeurs)
 %     selector     Indices

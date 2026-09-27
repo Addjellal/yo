@@ -216,6 +216,10 @@ function T = preparer(c)
         elseif strcmp(c.types{k}, 'merge')
             w = c.oB(k) - c.oA(k) + 1;
             T.V0(c.oA(k):c.oB(k)) = c.seg{k}(2:1 + w);
+        elseif strcmp(c.types{k}, 'algebraicconstraint')
+            % la valeur de départ de l'inconnue de la boucle
+            w = c.oB(k) - c.oA(k) + 1;
+            T.V0(c.oA(k):c.oB(k)) = c.seg{k}(2:1 + w);
         end
     end
     T.sousGarde = cell(1, n);
@@ -2438,6 +2442,14 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         else
                             V(a:b) = retardVariable(T, k, p, t, b - a + 1);
                         end
+                    case 79   % algebraic constraint
+                        % La boucle cherche z tel que la sortie refaite égale
+                        % z : rendre z + f(z) fait de f(z) = 0 son point fixe.
+                        if T.P(p) ~= 0
+                            V(a:b) = V(eA(e + 1):eB(e + 1));
+                        else
+                            V(a:b) = V(a:b) + V(eA(e + 1):eB(e + 1));
+                        end
                     case 78   % variable transport delay
                         V(a:b) = sortieRetardVariable(T, k, p, V, Z, e, a, b, t);
                     case 76   % PID : P u + intégrale + N (D u - filtre)
@@ -2548,6 +2560,13 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                 end
             case 12
                 switch code(k)
+                    case 121   % bus assignment : le bus, et les éléments remplacés
+                        V(a:b) = V(eA(e + 1):eB(e + 1));
+                        for q = 1:T.P(p)
+                            debut = a + T.P(p + 2 * q - 1) - 1;
+                            largeur = T.P(p + 2 * q);
+                            V(debut:debut + largeur - 1) = V(eA(e + 1 + q):eB(e + 1 + q));
+                        end
                     case 120   % direct lookup : l'élément désigné, à partir de 0
                         lignes = T.P(p + 1);
                         u = V(eA(e + 1):eB(e + 1));

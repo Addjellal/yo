@@ -322,6 +322,20 @@ function c = compiler(modele, options)
 
     % --- 10. ordre de calcul et boucles algébriques --------------------------
     c = ordonner(c);
+    % Un Algebraic Constraint n'a de sens que dans une boucle : sa sortie z
+    % doit revenir à son entrée f(z).
+    for k = find(strcmp(c.types, 'algebraicconstraint'))
+        dedans = false;
+        for b = 1:numel(c.boucles)
+            dedans = dedans || any(c.boucles{b}.blocs == k);
+        end
+        if ~dedans
+            error('Simulink:blocks:AlgebraicConstraintNotInLoop', ...
+                  ['L''Algebraic Constraint ''%s'' n''est dans aucune boucle algebrique : ' ...
+                   'sa sortie z doit revenir a son entree f(z), sans bloc a memoire ' ...
+                   'entre elles.'], c.chemins{k});
+        end
+    end
 
     % --- 11. passages par zéro ------------------------------------------------
     c.zc = passagesParZero(c);
@@ -1561,6 +1575,7 @@ function x = codeDe(type)
                 'deadzonedynamic', 38; 'manualswitch', 39; ...
                 'ic', 57; 'width', 58; 'datastoreread', 59; 'datastorewrite', 69; ...
                 'secondorderintegrator', 77; 'variabletransportdelay', 78; ...
+                'algebraicconstraint', 79; 'busassignment', 121; ...
                 'discretederivative', 87; 'tappeddelay', 88; 'difference', 89; ...
                 'xygraph', 97; 'tofile', 98; ...
                 'datastorememory', 117; 'ratetransition', 118; ...
@@ -2242,7 +2257,7 @@ function s = regleDims(c, k, dE, complet, forcer)
                     'zeropole', 'discretetransferfcn', 'discretefilter', ...
                     'discretestatespace', 'integrator', 'delay', 'memory', ...
                     'discreteintegrator', 'sfunction', 'msfunction', 'secondorderintegrator', ...
-                    'tappeddelay', 'ratetransition'})
+                    'tappeddelay', 'ratetransition', 'algebraicconstraint'})
                 return
             end
             s = regleTraitement(c, k, dE, complet, forcer);
@@ -2580,6 +2595,12 @@ function s = regleTraitement(c, k, dE, complet, forcer)
             s = {accorder({dE{1}, dimsDe(p.InitialOutput)}, c, k, ...
                           {'l''entree', 'InitialOutput'})};
         case 'pidcontroller'
+            s = dE(1);
+        case 'algebraicconstraint'
+            % dans la boucle, z a d'abord les dimensions de sa valeur de départ
+            s = {accorder({dE{1}, dimsDe(p.InitialGuess)}, c, k, ...
+                          {'l''entree f(z)', 'InitialGuess'})};
+        case 'busassignment'
             s = dE(1);
         case {'garde', 'if', 'switchcase'}
             s = repmat({[1 1]}, 1, c.nOut(k));
@@ -3582,6 +3603,11 @@ function c = abaisser(c, pas, tDebut)
                 seg = [genre; tMax; L; strcmp(p.ZeroDelay, 'on'); ...
                        etendre(p.InitialOutput, w, ch, 'InitialOutput')];
                 z0 = [0; 1; NaN; zeros(L, 1); zeros(w * L, 1)];
+            case 'algebraicconstraint'    % [f(z) = z ; valeur de départ w]
+                seg = [strcmp(p.Constraint, 'f(z) = z'); ...
+                       etendre(p.InitialGuess, w, ch, 'InitialGuess')];
+            case 'busassignment'          % [n; début, largeur par élément]
+                seg = elementsAssignes(c, k);
             case 'pidcontroller'          % [P; I; D; N], w chacun
                 % Les états sont ceux de Simulink : l'intégrale de I u, et
                 % le filtre f de la dérivée, f' = N (D u - f).
@@ -4032,6 +4058,11 @@ function boucle = decouper(c, comp, succ)
         end
         meilleur = cyclique(1);
         score = -1;
+        % un Algebraic Constraint porte l'inconnue de sa boucle
+        contrainte = cyclique(strcmp(c.types(cyclique), 'algebraicconstraint'));
+        if ~isempty(contrainte)
+            cyclique = contrainte;
+        end
         for v = cyclique
             sortants = sum(ismember(sousSucc{v}, cyclique));
             entrants = 0;
@@ -4366,6 +4397,8 @@ function forme = formeBus(c, gp)
                 break
             case {'signalconversion', 'from'}
                 gp = c.entrees{a}(max(1, min(c.rang(gp), c.nIn(a))));
+            case 'busassignment'
+                gp = c.entrees{a}(1);   % le bus passe, éléments remplacés
             otherwise
                 return
         end
@@ -4539,6 +4572,52 @@ function choix = elementsChoisis(c, k)
         end
         choix(end + 1) = struct('nom', demandes{q}, 'dims', element.dims, ...
                                 'largeur', element.largeur, 'debut', decalage + 1); %#ok<AGROW>
+    end
+end
+
+% Les éléments qu'un Bus Assignment remplace : leur place dans le bus, et
+% leur largeur, qui doit être celle du signal qui les remplace.
+function seg = elementsAssignes(c, k)
+    forme = formeBus(c, c.entrees{k}(1));
+    if isempty(forme)
+        error('Simulink:Bus:AssignmentInputNotBus', ...
+              ['La premiere entree du Bus Assignment ''%s'' n''est pas un bus : il lui ' ...
+               'faut le signal d''un Bus Creator.'], c.chemins{k});
+    end
+    demandes = strtrim(strsplit(char(c.p{k}.AssignedSignals), ','));
+    seg = numel(demandes);
+    for q = 1:numel(demandes)
+        parties = strsplit(demandes{q}, '.');
+        niveau = forme;
+        decalage = 0;
+        element = [];
+        for i = 1:numel(parties)
+            rang = find(strcmp({niveau.nom}, parties{i}), 1);
+            if isempty(rang)
+                error('Simulink:Bus:AssignmentElementNotFound', ...
+                      ['Le Bus Assignment ''%s'' remplace ''%s'', que le bus ne porte ' ...
+                       'pas ; ses elements sont : %s.'], c.chemins{k}, demandes{q}, ...
+                      strjoin({niveau.nom}, ', '));
+            end
+            element = niveau(rang);
+            decalage = decalage + element.debut - 1;
+            if i < numel(parties)
+                if isempty(element.sous)
+                    error('Simulink:Bus:AssignmentElementNotFound', ...
+                          ['Le Bus Assignment ''%s'' remplace ''%s'', mais ''%s'' n''est ' ...
+                           'pas un bus.'], c.chemins{k}, demandes{q}, parties{i});
+                end
+                niveau = element.sous;
+            end
+        end
+        largeur = largeurEntree(c, k, q + 1);
+        if largeur ~= element.largeur
+            error('Simulink:Bus:AssignmentDimensions', ...
+                  ['Le Bus Assignment ''%s'' remplace ''%s'', de %d element(s), par un ' ...
+                   'signal de %d element(s).'], c.chemins{k}, demandes{q}, ...
+                  element.largeur, largeur);
+        end
+        seg = [seg; decalage + 1; element.largeur]; %#ok<AGROW>
     end
 end
 

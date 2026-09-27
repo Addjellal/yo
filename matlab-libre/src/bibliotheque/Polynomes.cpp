@@ -474,6 +474,37 @@ FONCTION(fnInterp1) {
         for (std::size_t k = 0; k < y.size(); ++k) x.push_back((double)(k + 1));
         decalage = 1;
     }
+    // Des ordonnees en matrice, une colonne par jeu de valeurs : chaque
+    // colonne s'interpole a part, et le resultat a une ligne par point
+    // demande, une colonne par jeu, comme dans MATLAB.
+    {
+        const Valeur& Y = args[decalage - 1];
+        if (decalage == 2 && Y.dims.size() == 2 && Y.dims[0] > 1 && Y.dims[1] > 1 &&
+            (std::size_t)Y.dims[0] == x.size()) {
+            int lignes = Y.dims[0];
+            int colonnes = Y.dims[1];
+            std::size_t n = args[2].nelem();
+            Valeur r = Valeur::matrice((int)n, colonnes);
+            bool complexe = !Y.im.empty();
+            if (complexe) r.assurerImaginaire();
+            for (int j = 0; j < colonnes; ++j) {
+                std::vector<Valeur> a(args.begin(), args.end());
+                Valeur colonne = Valeur::matrice(lignes, 1);
+                if (complexe) colonne.assurerImaginaire();
+                for (int i = 0; i < lignes; ++i) {
+                    colonne.re[i] = Y.re[i + (std::size_t)j * lignes];
+                    if (complexe) colonne.im[i] = Y.im[i + (std::size_t)j * lignes];
+                }
+                a[1] = colonne;
+                Valeur c = fnInterp1(it, a, 1)[0];
+                for (std::size_t k = 0; k < n && k < c.nelem(); ++k) {
+                    r.re[k + (std::size_t)j * n] = c.re[k];
+                    if (complexe && !c.im.empty()) r.im[k + (std::size_t)j * n] = c.im[k];
+                }
+            }
+            return {r};
+        }
+    }
     // Une ordonnee complexe s'interpole partie par partie : l'operation
     // est lineaire, donc interpoler les deux parties puis les recombiner
     // rend le meme resultat qu'interpoler le complexe. Sans cela, la

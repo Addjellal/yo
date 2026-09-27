@@ -6045,6 +6045,106 @@ end
 rmdir(dossierTab, 's');
 fprintf('retards variables et sources : %d cas d''erreur verifies\n', size(casRetardV, 1));
 
+%% ------------------------------------ 45. Algebraic Constraint et Bus Assignment
+% L'Algebraic Constraint rend z tel que son entrée f(z) s'annule — ou
+% vaille z —, la boucle algébrique qu'il ferme étant résolue par Newton à
+% partir d'InitialGuess ; il donne aux schémas leurs équations
+% algébriques. Le Bus Assignment remplace des éléments d'un bus par leur
+% nom.
+etatAvertissement = warning('off', 'all');
+contrainte = new_system('contrainte');
+contrainte = add_block(contrainte, 'constant', 'c', 'Value', -6);
+contrainte = add_block(contrainte, 'fcn', 'f', 'Expr', 'u^2 + u');
+contrainte = add_block(contrainte, 'sum', 's', 'Signs', '++');
+contrainte = add_block(contrainte, 'simulink/Math Operations/Algebraic Constraint', 'z', ...
+                       'InitialGuess', 1);
+contrainte = add_line(add_line(contrainte, 'z', 'f'), 'f', 's', 1);
+contrainte = add_line(add_line(contrainte, 'c', 's', 2), 's', 'z');
+contrainte = add_line(add_block(contrainte, 'outport', 'y'), 'z', 'y');
+r = sim(contrainte, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 0.3);
+assert(max(abs(r.yout - 2)) < 1e-8, 'z^2 + z - 6 = 0 depuis 1 : z = 2');
+r = sim(set_param(contrainte, 'z', 'InitialGuess', -5), 'Solver', 'ode1', 'FixedStep', 0.1, ...
+        'StopTime', 0.1);
+assert(max(abs(r.yout + 3)) < 1e-8, 'depuis -5, l''autre racine : z = -3');
+r = sim(set_param(contrainte, 'z', 'Constraint', 'f(z) = z', 'InitialGuess', 3), ...
+        'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 0.2);
+assert(max(abs(r.yout - sqrt(6))) < 1e-8, 'f(z) = z : z^2 - 6 = 0');
+dae = new_system('dae');
+dae = add_block(dae, 'integrator', 'x', 'InitialCondition', 1);
+dae = add_block(dae, 'simulink/Math Operations/Algebraic Constraint', 'z');
+dae = add_block(dae, 'clock', 't');
+dae = add_block(dae, 'trigonometry', 'sn', 'Operator', 'sin');
+dae = add_block(dae, 'sum', 'f', 'Signs', '+--');
+dae = add_block(dae, 'gain', 'g', 'Gain', -1);
+dae = add_line(add_line(dae, 't', 'sn'), 'z', 'f', 1);
+dae = add_line(add_line(dae, 'x', 'f', 2), 'sn', 'f', 3);
+dae = add_line(add_line(dae, 'f', 'z'), 'z', 'g');
+dae = add_line(dae, 'g', 'x');
+dae = add_line(add_block(dae, 'outport', 'y'), 'x', 'y');
+r = sim(dae, 'Solver', 'ode45', 'StopTime', 1);
+exact = 0.5 * exp(-r.tout) - 0.5 * sin(r.tout) + 0.5 * cos(r.tout);
+assert(max(abs(r.yout - exact)) < 1e-5, 'x'' = -z, z = x + sin t : l''equation algebrique tenue');
+warning(etatAvertissement);
+% Bus Assignment
+affecte = new_system('affecte');
+affecte = add_block(affecte, 'constant', 'a', 'Value', 1);
+affecte = add_block(affecte, 'constant', 'v', 'Value', [2 3]);
+affecte = add_block(affecte, 'constant', 'n', 'Value', [20 30]);
+affecte = add_block(affecte, 'buscreator', 'bc', 'Inputs', 'x,y');
+affecte = add_block(affecte, 'simulink/Signal Routing/Bus Assignment', 'as', ...
+                    'AssignedSignals', 'y');
+affecte = add_block(affecte, 'busselector', 'sel', 'OutputSignals', 'x,y');
+affecte = add_line(add_line(affecte, 'a', 'bc', 1), 'v', 'bc', 2);
+affecte = add_line(add_line(affecte, 'bc', 'as', 1), 'n', 'as', 2);
+affecte = add_line(affecte, 'as', 'sel');
+affecte = add_block(add_block(affecte, 'outport', 'ox'), 'outport', 'oy');
+affecte = add_line(add_line(affecte, 'sel/1', 'ox'), 'sel/2', 'oy');
+r = sim(affecte, 1);
+assert(isequal(r.yout(end, :), [1 20 30]), 'y remplace, x garde ; le Bus Selector lit la suite');
+emboite = new_system('emboite');
+emboite = add_block(emboite, 'constant', 'a', 'Value', 1);
+emboite = add_block(emboite, 'constant', 'b', 'Value', 2);
+emboite = add_block(emboite, 'constant', 'c', 'Value', 3);
+emboite = add_block(emboite, 'constant', 'n', 'Value', 9);
+emboite = add_block(emboite, 'buscreator', 'interne', 'Inputs', 'p,q');
+emboite = add_block(emboite, 'buscreator', 'externe', 'Inputs', 'r,s');
+emboite = add_block(emboite, 'busassignment', 'as', 'AssignedSignals', 's.q');
+emboite = add_block(emboite, 'busselector', 'sel', 'OutputSignals', 's.q,r');
+emboite = add_line(add_line(emboite, 'a', 'interne', 1), 'b', 'interne', 2);
+emboite = add_line(add_line(emboite, 'c', 'externe', 1), 'interne', 'externe', 2);
+emboite = add_line(add_line(emboite, 'externe', 'as', 1), 'n', 'as', 2);
+emboite = add_line(emboite, 'as', 'sel');
+emboite = add_block(add_block(emboite, 'outport', 'o1'), 'outport', 'o2');
+emboite = add_line(add_line(emboite, 'sel/1', 'o1'), 'sel/2', 'o2');
+r = sim(emboite, 1);
+assert(isequal(r.yout(end, :), [9 3]), 'un element d''un bus emboite, par son chemin s.q');
+horsBoucle = add_line(add_block(add_block(new_system('horsBoucle'), 'constant', 'c'), ...
+                                'algebraicconstraint', 'z'), 'c', 'z');
+casContrainte = {
+    @() sim(horsBoucle, 1), 'Simulink:blocks:AlgebraicConstraintNotInLoop', 'horsBoucle/z'
+    @() sim(set_param(affecte, 'as', 'AssignedSignals', 'z'), 1), ...
+        'Simulink:Bus:AssignmentElementNotFound', 'affecte/as'
+    @() sim(set_param(affecte, 'as', 'AssignedSignals', 'x'), 1), ...
+        'Simulink:Bus:AssignmentDimensions', 'affecte/as'
+    @() sim(add_line(add_line(add_block(add_block(add_block(new_system('pasBus'), ...
+            'constant', 'a'), 'constant', 'b'), 'busassignment', 'as'), 'a', 'as', 1), ...
+            'b', 'as', 2), 1), 'Simulink:Bus:AssignmentInputNotBus', 'pasBus/as'
+    };
+for kE = 1:size(casContrainte, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('casContrainte{kE, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casContrainte{kE, 2}) && ~isempty(strfind(message, casContrainte{kE, 3})), ...
+           sprintf('contrainte et bus, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casContrainte{kE, 2}, vu, message));
+end
+fprintf('contrainte algebrique et bus : %d cas d''erreur verifies\n', size(casContrainte, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

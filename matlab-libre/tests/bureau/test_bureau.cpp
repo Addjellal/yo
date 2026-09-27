@@ -1585,6 +1585,17 @@ int main(int argc, char** argv) {
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'buscreator', 'bus', 'Inputs', 'a,b'), "
                         "'bus', 'busselector');\n");
+                // Un Algebraic Constraint ferme une boucle ; un Bus
+                // Assignment reçoit un bus.
+                if (QLatin1String(b->type) == QLatin1String("algebraicconstraint"))
+                    essaiTous += QStringLiteral(
+                        "m = add_line(add_block(m, 'gain', 'boucle', 'Gain', 2), "
+                        "'algebraicconstraint', 'boucle'); "
+                        "m = add_line(m, 'boucle', 'algebraicconstraint');\n");
+                if (QLatin1String(b->type) == QLatin1String("busassignment"))
+                    essaiTous += QStringLiteral(
+                        "m = add_line(add_block(m, 'buscreator', 'bus', 'Inputs', "
+                        "'signal1,signal2'), 'bus', 'busassignment');\n");
                 if (QLatin1String(b->type) == QLatin1String("demux"))
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'constant', 'v', 'Value', [1 2]), "
