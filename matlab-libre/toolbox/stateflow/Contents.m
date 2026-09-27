@@ -11,6 +11,9 @@
 %   sffunction   - Ajoute une fonction, appelee par les textes
 %   sftruthtable - Ajoute une table de verite
 %   sfdefault    - Choisit le sous-état où l'on entre par défaut
+%   sfevent      - Déclare un événement d'entrée — il arrive par le port
+%                  de déclenchement d'un bloc Chart — ou de sortie, émis
+%                  par send(nom)
 %
 % Logique temporelle, dans les gardes et les actions
 %   sfafter      - Après N réveils, ou N secondes, dans l'état

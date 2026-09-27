@@ -174,6 +174,15 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
                 sorties = cellstr(sorties);
             end
             nSorties = numel(sorties);
+            % les événements de la machine : un port de déclenchement pour
+            % ceux d'entrée, un port par événement de sortie
+            machine = lire(p, 'Chart', []);
+            if isstruct(machine) && isfield(machine, 'evenements') && ...
+               ~isempty(machine.evenements)
+                portees = {machine.evenements.portee};
+                nEntrees = nEntrees + any(strcmp(portees, 'Input'));
+                nSorties = nSorties + sum(strcmp(portees, 'Output'));
+            end
         case 'matlabfunction'
             % Les arguments de la fonction sont les entrées, ses sorties les
             % sorties.

@@ -798,6 +798,9 @@ function verifierAppels(c)
         end
         rang = 1 + (c.p{g}.Enable ~= 0);
         e = c.entrees{g};
+        if rang <= numel(e) && e(rang) ~= 0 && appelParGraphe(c, e(rang))
+            continue
+        end
         if rang > numel(e) || e(rang) == 0 || ...
            ~strcmp(c.types{c.proprio(e(rang))}, 'functioncallgenerator')
             error('Simulink:blocks:FcnCallSubsystemInputNotFcnCall', ...
@@ -820,6 +823,20 @@ function verifierAppels(c)
             end
         end
     end
+end
+
+% Le port global G est-il un événement de sortie 'Function call' d'un
+% bloc Chart ? Il appelle alors, comme un Function-Call Generator.
+function oui = appelParGraphe(c, g)
+    oui = false;
+    k = c.proprio(g);
+    if ~strcmp(c.types{k}, 'chart') || ~isfield(c.fonctions{k}, 'sortiesEvt')
+        return
+    end
+    code = c.fonctions{k};
+    q = g - c.portDebut(k) + 1 - numel(code.sorties);
+    oui = q >= 1 && q <= numel(code.sortiesEvt) && ...
+          strcmp(code.sortiesEvt(q).declencheur, 'Function call');
 end
 
 function s = parent(nom)
@@ -1496,7 +1513,19 @@ function s = regleTraitement(c, k, dE, complet, forcer)
         case 'matlabfunction'
             s = dimsFonction(c, k, dE);
         case 'chart'
-            s = c.fonctions{k}.dims;
+            code = c.fonctions{k};
+            nEvt = numel(code.entreesEvt);
+            if nEvt > 0 && numel(dE) > code.nDonnees && ~isempty(dE{code.nDonnees + 1})
+                largeur = prod(dE{code.nDonnees + 1});
+                if largeur ~= nEvt
+                    error('Simulink:blocks:ChartTriggerWidth', ...
+                          ['Le port de declenchement du bloc Chart ''%s'' recoit %d ' ...
+                           'element(s), et sa machine declare %d evenement(s) d''entree ' ...
+                           '(%s) : un element par evenement.'], c.chemins{k}, largeur, ...
+                          nEvt, strjoin({code.entreesEvt.nom}, ', '));
+                end
+            end
+            s = code.dims;
         case 'msfunction'
             % Ses ports dynamiques prennent les dimensions de ce qu'ils
             % reçoivent : on attend de les connaître, sauf pour les sorties
@@ -3030,6 +3059,17 @@ function code = preparerGraphe(p, chemin)
     code = struct('machine', machine, 'sorties', {sorties}, 'contexte', contexte, ...
                   'initial', p.InitialContext);
     code.noms = cellfun(@(e) e.nom, machine.etats, 'UniformOutput', false);
+    % Les événements : ceux d'entrée arrivent par un port de déclenchement,
+    % après les entrées de données ; ceux de sortie ont chacun leur port,
+    % après les sorties de données.
+    code.nDonnees = double(p.Inputs);
+    code.entreesEvt = struct('nom', {}, 'portee', {}, 'declencheur', {});
+    code.sortiesEvt = code.entreesEvt;
+    if isfield(machine, 'evenements') && ~isempty(machine.evenements)
+        portees = {machine.evenements.portee};
+        code.entreesEvt = machine.evenements(strcmp(portees, 'Input'));
+        code.sortiesEvt = machine.evenements(strcmp(portees, 'Output'));
+    end
     code.dims = cell(1, numel(sorties));
     for q = 1:numel(sorties)
         if strcmp(sorties{q}, 'etat')
@@ -3049,6 +3089,9 @@ function code = preparerGraphe(p, chemin)
                   sorties{q}, chemin);
         end
         code.dims{q} = size(v);
+    end
+    for q = 1:numel(code.sortiesEvt)
+        code.dims{end + 1} = [1 1];
     end
 end
 

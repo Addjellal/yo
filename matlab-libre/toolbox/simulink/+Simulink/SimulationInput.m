@@ -9,7 +9,9 @@ classdef SimulationInput
 %   Chaque méthode rend l'objet modifié, qu'il faut ranger :
 %      IN = IN.SETVARIABLE(NOM,VALEUR)          pose une variable dans
 %                                               l'espace de travail de
-%                                               base, pendant la simulation
+%                                               base, pendant la simulation ;
+%                                               'Workspace', NOMMODELE la
+%                                               pose dans celui du modèle
 %      IN = IN.SETBLOCKPARAMETER(BLOC,PARAM,V)  change un paramètre de bloc
 %                                               (plusieurs triplets admis)
 %      IN = IN.SETMODELPARAMETER(NOM,V)         change un réglage :

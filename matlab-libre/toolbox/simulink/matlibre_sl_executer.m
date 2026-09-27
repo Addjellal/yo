@@ -2758,16 +2758,26 @@ end
 function V = pasGraphe(T, k, V, p, e, t)
     graphes = T.graphes;
     G = T.objets{k};
+    nEvtE = 0;
+    nEvtS = 0;
+    if isfield(G, 'entreesEvt')
+        nEvtE = numel(G.entreesEvt);
+        nEvtS = numel(G.sortiesEvt);
+    end
     if isKey(graphes, k)
         etat = graphes(k);
     else
-        etat = struct('courant', '', 'contexte', G.initial, 't', -Inf);
+        etat = struct('courant', '', 'contexte', G.initial, 't', -Inf, ...
+                      'declencheur', [], 'sortiesEvt', zeros(1, nEvtS));
         if isempty(etat.contexte)
             etat.contexte = struct();
         end
     end
     if t > etat.t
         nIn = T.P(p);
+        if isfield(G, 'nDonnees')
+            nIn = G.nDonnees;
+        end
         if nIn == 0
             u = [];
         elseif nIn == 1
@@ -2781,11 +2791,50 @@ function V = pasGraphe(T, k, V, p, e, t)
         if isstruct(etat.contexte)
             etat.contexte.sf_t = t;   % pour la logique temporelle en secondes
         end
-        [etat.courant, etat.contexte] = sfstep(G.machine, etat.courant, etat.contexte, u);
+        % Les événements d'entrée qui surviennent à cet instant : sans
+        % événement d'entrée, le diagramme calcule à chaque pas.
+        reveils = {''};
+        if nEvtE > 0
+            d = V(T.eA(e + nIn + 1):T.eB(e + nIn + 1));
+            reveils = evenementsSurvenus(G.entreesEvt, etat.declencheur, d);
+            etat.declencheur = d;
+        end
+        emis = {};
+        for r = 1:numel(reveils)
+            if isstruct(etat.contexte)
+                etat.contexte.sf_emis = {};
+                if ~isempty(reveils{r})
+                    etat.contexte.sf_evenement = reveils{r};
+                end
+            end
+            [etat.courant, etat.contexte] = sfstep(G.machine, etat.courant, etat.contexte, u);
+            if isstruct(etat.contexte)
+                if isfield(etat.contexte, 'sf_emis')
+                    emis = [emis, etat.contexte.sf_emis]; %#ok<AGROW>
+                    etat.contexte = rmfield(etat.contexte, 'sf_emis');
+                end
+                if isfield(etat.contexte, 'sf_evenement')
+                    etat.contexte = rmfield(etat.contexte, 'sf_evenement');
+                end
+            end
+        end
+        % Un événement de sortie 'Function call' vaut 1 à l'instant où il
+        % est émis ; un 'Either' bascule à chaque émission.
+        for q = 1:nEvtS
+            n = sum(strcmp(emis, G.sortiesEvt(q).nom));
+            if strcmp(G.sortiesEvt(q).declencheur, 'Function call')
+                etat.sortiesEvt(q) = double(n > 0);
+            elseif mod(n, 2) == 1
+                etat.sortiesEvt(q) = 1 - etat.sortiesEvt(q);
+            end
+        end
         etat.t = t;
         graphes(k) = etat;
     end
     pd = T.pd(k);
+    for q = 1:nEvtS
+        V(T.poA(pd + numel(G.sorties) + q - 1)) = etat.sortiesEvt(q);
+    end
     for q = 1:numel(G.sorties)
         a = T.poA(pd + q - 1);
         b = T.poB(pd + q - 1);
@@ -2804,6 +2853,39 @@ function V = pasGraphe(T, k, V, p, e, t)
                       b - a + 1);
             end
             V(a:b) = y(:);
+        end
+    end
+end
+
+% Les événements d'entrée d'un diagramme qui surviennent : un front de
+% leur élément du port de déclenchement, lu contre sa valeur au réveil
+% précédent — pas de front à la première lecture —, ou un appel.
+function survenus = evenementsSurvenus(evenements, avant, d)
+    survenus = {};
+    for i = 1:numel(evenements)
+        valeur = d(min(i, numel(d)));
+        if strcmp(evenements(i).declencheur, 'Function call')
+            if valeur ~= 0
+                survenus{end + 1} = evenements(i).nom; %#ok<AGROW>
+            end
+            continue
+        end
+        if isempty(avant)
+            continue
+        end
+        precedente = avant(min(i, numel(avant)));
+        monte = (precedente < 0 && valeur >= 0) || (precedente == 0 && valeur > 0);
+        descend = (precedente > 0 && valeur <= 0) || (precedente == 0 && valeur < 0);
+        switch evenements(i).declencheur
+            case 'Rising'
+                oui = monte;
+            case 'Falling'
+                oui = descend;
+            otherwise
+                oui = monte || descend;
+        end
+        if oui
+            survenus{end + 1} = evenements(i).nom; %#ok<AGROW>
         end
     end
 end

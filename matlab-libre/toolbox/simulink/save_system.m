@@ -67,6 +67,7 @@ function fichier = save_system(modele, fichier)
     lignes{end+1} = '%';
     lignes{end+1} = '%   Voir aussi LOAD_SYSTEM, SAVE_SYSTEM, SIM.';
     [lignes, ~] = batir(modele, 'm', lignes, 0);
+    lignes = ecrireEspace(modele, lignes);
     lignes{end+1} = 'end';
 
     identifiantFichier = fopen(fichier, 'w');
@@ -176,7 +177,59 @@ end
 % Une valeur de paramètre se réécrit telle qu'un programme la relira.
 % Ce qui n'a pas de telle écriture est refusé en nommant le bloc, plutôt
 % qu'écrit de travers.
+% L'espace de travail du modèle, s'il porte des variables : elles se
+% reposent après le modèle, qui part d'un espace vide.
+function lignes = ecrireEspace(modele, lignes)
+    if ~matlibre_sl_espace('existe', char(modele.nom))
+        return
+    end
+    hws = matlibre_sl_espace('lire', char(modele.nom));
+    noms = fieldnames(hws.Donnees);
+    source = ~strcmp(hws.DataSource, 'Model File') || ~isempty(hws.MATLABCode);
+    if isempty(noms) && ~source
+        return
+    end
+    ou = sprintf('%s (espace de travail)', char(modele.nom));
+    lignes{end+1} = '    hws = get_param(m, ''ModelWorkspace'');';
+    if source
+        lignes{end+1} = sprintf('    hws.DataSource = %s;', citer(hws.DataSource));
+        lignes{end+1} = sprintf('    hws.MATLABCode = %s;', citer(hws.MATLABCode));
+    end
+    for k = 1:numel(noms)
+        v = hws.Donnees.(noms{k});
+        if isa(v, 'Simulink.Parameter')
+            lignes{end+1} = sprintf('    parametre = Simulink.Parameter(%s);', ...
+                                    ecrireValeur(v.Value, ou, noms{k})); %#ok<AGROW>
+            if ~strcmp(v.DataType, 'auto')
+                lignes{end+1} = sprintf('    parametre.DataType = %s;', citer(v.DataType)); %#ok<AGROW>
+            end
+            for champ = {'Min', 'Max'}
+                if ~isempty(v.(champ{1}))
+                    lignes{end+1} = sprintf('    parametre.%s = %s;', champ{1}, ...
+                                            ecrireValeur(v.(champ{1}), ou, noms{k})); %#ok<AGROW>
+                end
+            end
+            for champ = {'Unit', 'Description'}
+                if ~isempty(v.(champ{1}))
+                    lignes{end+1} = sprintf('    parametre.%s = %s;', champ{1}, ...
+                                            citer(v.(champ{1}))); %#ok<AGROW>
+                end
+            end
+            lignes{end+1} = sprintf('    assignin(hws, %s, parametre);', citer(noms{k})); %#ok<AGROW>
+        else
+            lignes{end+1} = sprintf('    assignin(hws, %s, %s);', citer(noms{k}), ...
+                                    ecrireValeur(v, ou, noms{k})); %#ok<AGROW>
+        end
+    end
+end
+
 function texte = ecrireValeur(valeur, nomBloc, nomParametre)
+    if iscellstr(valeur)
+        % une liste de textes : les conditions d'un Variant Source...
+        morceaux = cellfun(@citer, valeur(:).', 'UniformOutput', false);
+        texte = ['{' strjoin(morceaux, ', ') '}'];
+        return
+    end
     if ischar(valeur) || isstring(valeur)
         texte = citer(valeur);
     elseif islogical(valeur)
@@ -193,7 +246,7 @@ function texte = ecrireValeur(valeur, nomBloc, nomParametre)
     else
         error('Simulink:Commands:SaveUnsupported', ...
               ['Le parametre ''%s'' du bloc ''%s'' est de classe ''%s'' : ' ...
-               'SAVE_SYSTEM ne sait ecrire que des nombres, des booleens et ' ...
-               'du texte.'], nomParametre, nomBloc, class(valeur));
+               'SAVE_SYSTEM ne sait ecrire que des nombres, des booleens, ' ...
+               'du texte et des listes de textes.'], nomParametre, nomBloc, class(valeur));
     end
 end

@@ -15,6 +15,10 @@ function valeur = get_param(modele, nom, parametre)
 %     DialogParameters  la liste de ses paramètres, avec leurs valeurs
 %                   admises quand ce sont des choix
 %
+%   GET_PARAM(MODELE,'ModelWorkspace') rend l'espace de travail du modèle,
+%   un Simulink.ModelWorkspace, dont les variables passent avant celles de
+%   l'espace de base.
+%
 %   GET_PARAM(MODELE,'Reglage') rend un réglage du modèle : Name, Blocks,
 %   et ceux de la boîte « Paramètres de configuration » — StopTime,
 %   Solver, FixedStep... —, avec leur valeur par défaut quand on ne les a
@@ -170,6 +174,10 @@ function [trouve, valeur] = reglageModele(modele, nom)
     end
     if strcmpi(nom, 'Name')
         valeur = modele.nom;
+        return
+    end
+    if strcmpi(nom, 'ModelWorkspace')
+        valeur = matlibre_sl_espace('lire', char(modele.nom));
         return
     end
     if strcmpi(nom, 'Blocks')

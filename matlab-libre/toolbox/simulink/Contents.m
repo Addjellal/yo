@@ -102,6 +102,9 @@
 %                               le simulent
 %   Simulink.Variant          - Une condition nommée, qui active une
 %                               variante
+%   Simulink.ModelWorkspace   - L'espace de travail d'un modèle, que rend
+%                               GET_PARAM(M,'ModelWorkspace') : ses
+%                               variables passent avant celles de base
 %   Simulink.Bus, Simulink.BusElement - Les types de bus
 %   Simulink.SimulationData.Dataset   - Le journal des sorties, en
 %                               SaveFormat 'Dataset', et celui des signaux,

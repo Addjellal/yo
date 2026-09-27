@@ -31,6 +31,8 @@ function modele = new_system(nom, genre)
 %   Voir aussi ADD_BLOCK, ADD_LINE, SET_PARAM, ADD_PARAM, SIM, OPEN_SYSTEM.
     modele = struct();
     modele.nom = nom;
+    % un modèle neuf part d'un espace de travail vide
+    matlibre_sl_espace('oublier', char(nom));
     modele.blocs = {};
     modele.liens = [];
     modele.parametres = struct();

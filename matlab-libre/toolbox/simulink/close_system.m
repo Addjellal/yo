@@ -52,4 +52,5 @@ function close_system(modele, fichier)
         end
     end
     matlibre_sl_ouverts('retirer', nom);
+    matlibre_sl_espace('oublier', nom);
 end

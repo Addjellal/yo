@@ -177,12 +177,22 @@ function matlibre__v = evaluerBrut(matlibre__texte, matlibre__W, matlibre__chemi
         eval([matlibre__noms{matlibre__k} ' = matlibre__W.(matlibre__noms{matlibre__k});']);
     end
     matlibre__ids = unique(regexp(matlibre__texte, '[A-Za-z]\w*', 'match'));
+    % l'espace de travail du modèle passe avant celui de base
+    [matlibre__nomsM, matlibre__valeursM] = matlibre_sl_espace('variables', matlibre__chemin);
     for matlibre__k = 1:numel(matlibre__ids)
         matlibre__id = matlibre__ids{matlibre__k};
         if any(strcmp(matlibre__noms, matlibre__id)) || strncmp(matlibre__id, 'matlibre__', 10)
             continue
         end
-        if evalin('base', sprintf('exist(''%s'', ''var'')', matlibre__id)) == 1
+        matlibre__j = find(strcmp(matlibre__nomsM, matlibre__id), 1);
+        if ~isempty(matlibre__j)
+            matlibre__x = matlibre__valeursM{matlibre__j};
+            if isa(matlibre__x, 'Simulink.Parameter')
+                matlibre__x = matlibre_sl_parametre('valeur', matlibre__x, matlibre__id, ...
+                                                    matlibre__chemin, matlibre__nom);
+            end
+            eval([matlibre__id ' = matlibre__x;']);
+        elseif evalin('base', sprintf('exist(''%s'', ''var'')', matlibre__id)) == 1
             matlibre__x = evalin('base', matlibre__id);
             % un Simulink.Parameter y vaut sa valeur, comme hors masque
             if isa(matlibre__x, 'Simulink.Parameter')

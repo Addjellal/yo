@@ -167,8 +167,10 @@ totalité.
    rappels du modèle (InitFcn, StopFcn...) et SimulationCommand.
    Les types de données se propagent de bloc en bloc — double, single,
    entiers, booléens —, arrondis, repliés ou saturés comme dans Simulink.
-   Stateflow a aussi ses jonctions de connexion, ses fonctions et ses
-   tables de vérité. Le journal prend la forme que dit SaveFormat, jusqu'au
+   Stateflow a aussi ses jonctions de connexion, ses fonctions, ses
+   tables de vérité et ses événements : ceux d'entrée réveillent le
+   diagramme par un port de déclenchement, ceux de sortie appellent un
+   sous-système. Le journal prend la forme que dit SaveFormat, jusqu'au
    `Simulink.SimulationData.Dataset` de `timeseries`. Les blocs lisent les
    `Simulink.Parameter` — type, bornes Min et Max — comme des variables,
    un `Simulink.Signal` définit une mémoire globale, et
@@ -177,7 +179,9 @@ totalité.
    font sans toucher au modèle. Les signaux se nomment et se journalisent
    par les poignées des ports, et `sim` les range dans `logsout`. Les
    sous-systèmes à variantes, Variant Source et Variant Sink ne font
-   calculer que la variante dont la condition est vraie.
+   calculer que la variante dont la condition est vraie. Chaque modèle a
+   son espace de travail, dont les variables passent avant celles de
+   base.
    Manquent : les types à virgule fixe, les signaux de taille variable et
    Simscape.
    Stateflow a ses états emboîtés, ses régions parallèles, son

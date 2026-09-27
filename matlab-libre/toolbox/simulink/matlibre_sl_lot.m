@@ -193,7 +193,7 @@ function sortie = executer(entree, modele, capturer)
         entree = appelerAvant(entree);
         modele = resoudre(entree, modele);
         modele = appliquer(modele, entree);
-        avant = poserVariables(entree.Variables);
+        avant = poserVariables(entree.Variables, char(modele.nom));
         if isempty(entree.ExternalInput)
             resultat = sim(modele);
         else
@@ -320,26 +320,54 @@ function r = appeler(f, argument)
     end
 end
 
-function avant = poserVariables(variables)
-    avant = struct('nom', {}, 'existait', {}, 'valeur', {});
+% Les variables vont dans l'espace de travail de base, ou dans celui du
+% modèle quand leur Workspace le nomme ; on note ce qu'elles remplacent.
+function avant = poserVariables(variables, nomModele)
+    avant = struct('nom', {}, 'existait', {}, 'valeur', {}, 'espace', {});
     for k = 1:numel(variables)
         nom = variables(k).Name;
-        existait = evalin('base', sprintf('exist(''%s'', ''var'')', nom)) == 1;
-        ancienne = [];
-        if existait
-            ancienne = evalin('base', nom);
+        espace = variables(k).Workspace;
+        if strcmp(espace, 'global-workspace')
+            existait = evalin('base', sprintf('exist(''%s'', ''var'')', nom)) == 1;
+            ancienne = [];
+            if existait
+                ancienne = evalin('base', nom);
+            end
+            assignin('base', nom, variables(k).Value);
+            espace = [];
+        elseif strcmp(espace, nomModele)
+            espace = matlibre_sl_espace('lire', nomModele);
+            existait = hasVariable(espace, nom);
+            ancienne = [];
+            if existait
+                ancienne = getVariable(espace, nom);
+            end
+            assignin(espace, nom, variables(k).Value);
+        else
+            restaurer(avant);
+            error('Simulink:Simulation:InvalidWorkspace', ...
+                  ['La variable ''%s'' est posee dans l''espace ''%s'' : une variable de ' ...
+                   'simulation va dans ''global-workspace'' ou dans l''espace du modele ' ...
+                   '''%s''.'], nom, espace, nomModele);
         end
-        avant(end + 1) = struct('nom', nom, 'existait', existait, 'valeur', {ancienne}); %#ok<AGROW>
-        assignin('base', nom, variables(k).Value);
+        avant(end + 1) = struct('nom', nom, 'existait', existait, 'valeur', {ancienne}, ...
+                                'espace', {espace}); %#ok<AGROW>
     end
 end
 
 function restaurer(avant)
     for k = numel(avant):-1:1
-        if avant(k).existait
-            assignin('base', avant(k).nom, avant(k).valeur);
+        espace = avant(k).espace;
+        if isempty(espace)
+            if avant(k).existait
+                assignin('base', avant(k).nom, avant(k).valeur);
+            else
+                evalin('base', sprintf('clear(''%s'')', avant(k).nom));
+            end
+        elseif avant(k).existait
+            assignin(espace, avant(k).nom, avant(k).valeur);
         else
-            evalin('base', sprintf('clear(''%s'')', avant(k).nom));
+            clear(espace, avant(k).nom);
         end
     end
 end

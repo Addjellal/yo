@@ -287,15 +287,37 @@ function [vrai, contexte] = garde(tr, contexte, u, machine)
     [evenement, condition, actionCondition] = etiquette(char(g));
     vrai = true;
     if ~isempty(evenement)
+        % l'événement que l'entrée nomme, ou celui qui réveille le
+        % diagramme d'un bloc Chart
         vrai = (ischar(u) || isstring(u)) && strcmp(char(u), evenement) || ...
-               (iscell(u) && any(strcmp(u, evenement)));
+               (iscell(u) && any(strcmp(u, evenement))) || ...
+               (isstruct(contexte) && isfield(contexte, 'sf_evenement') && ...
+                strcmp(contexte.sf_evenement, evenement));
     end
     if vrai && ~isempty(condition)
         [~, valeur] = matlibre_sf_evaluer(condition, contexte, u, true, fonctionsDe(machine));
         vrai = logical(valeur);
     end
     if vrai && ~isempty(actionCondition)
-        contexte = matlibre_sf_evaluer(actionCondition, contexte, u, false, fonctionsDe(machine));
+        contexte = matlibre_sf_evaluer(emissions(actionCondition, machine), contexte, u, ...
+                                       false, fonctionsDe(machine));
+    end
+end
+
+% Une action émet un événement de sortie par « send(nom) » ou par son nom
+% seul, « nom; » : il va dans la liste sf_emis du contexte, que le bloc
+% Chart lit après le pas.
+function texte = emissions(texte, machine)
+    if ~isfield(machine, 'evenements') || isempty(machine.evenements)
+        return
+    end
+    sorties = {machine.evenements(strcmp({machine.evenements.portee}, 'Output')).nom};
+    for k = 1:numel(sorties)
+        nom = sorties{k};
+        emettre = sprintf(['if ~exist(''sf_emis'', ''var''), sf_emis = {}; end; ' ...
+                           'sf_emis{end + 1} = ''%s'';'], nom);
+        texte = regexprep(texte, ['send\s*\(\s*' nom '\s*\)\s*;?'], emettre);
+        texte = regexprep(texte, ['(^|[;,{}\n]\s*)' nom '\s*(;|,|$)'], ['$1' emettre]);
     end
 end
 
@@ -335,7 +357,8 @@ function contexte = agir(a, contexte, u, avecEntree, machine)
         end
         return
     end
-    contexte = matlibre_sf_evaluer(char(a), contexte, u, false, fonctionsDe(machine));
+    contexte = matlibre_sf_evaluer(emissions(char(a), machine), contexte, u, false, ...
+                                   fonctionsDe(machine));
 end
 
 function contexte = poserTemps(contexte, R, k, t)

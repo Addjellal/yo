@@ -4870,6 +4870,224 @@ end
 clear Mode ModeP Moteur
 fprintf('variantes : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% ----------------------------------- 37. L'espace de travail du modèle
+% Chaque modèle a son espace de travail, un Simulink.ModelWorkspace que
+% rend GET_PARAM(M,'ModelWorkspace') : ses variables passent avant
+% celles de l'espace de base, pour les blocs, les masques et les
+% conditions des variantes. SAVE_SYSTEM l'écrit, un SimulationInput y
+% pose ses variables quand Workspace nomme le modèle.
+ew = new_system('espaceModele');
+ew = add_block(ew, 'constant', 'c', 'Value', 'Kew');
+ew = add_line(add_block(ew, 'outport', 'y'), 'c', 'y');
+hws = get_param(ew, 'ModelWorkspace');
+assert(isa(hws, 'Simulink.ModelWorkspace') && strcmp(hws.DataSource, 'Model File'), ...
+       'l''espace de travail du modele');
+assignin(hws, 'Kew', 42);
+assert(hasVariable(hws, 'Kew') && getVariable(hws, 'Kew') == 42, 'assignin et getVariable');
+r = sim(ew, 1);
+assert(r.yout(end) == 42, 'un bloc lit la variable de l''espace du modele');
+Kew = 5;
+r = sim(ew, 1);
+assert(r.yout(end) == 42, 'elle passe avant celle de l''espace de base');
+clear(hws, 'Kew');
+r = sim(ew, 1);
+assert(r.yout(end) == 5, 'retiree, c''est celle de base qui vaut');
+evalin(hws, 'Kew = 2 * 3; Lew = Kew + 1;');
+assert(getVariable(hws, 'Lew') == 7 && isequal(sort({whos(hws).name}), {'Kew', 'Lew'}), ...
+       'evalin execute du code dans l''espace, whos le decrit');
+hws.DataSource = 'MATLAB Code';
+hws.MATLABCode = 'Kew = 100;';
+reload(hws);
+r = sim(ew, 1);
+assert(r.yout(end) == 100 && ~hasVariable(hws, 'Lew'), 'reload reexecute MATLABCode');
+hws.DataSource = 'Model File';
+hws.MATLABCode = '';
+clear Kew
+
+% Un Simulink.Parameter de l'espace du modèle, un masque, une variante.
+Pew = Simulink.Parameter(2);
+Pew.DataType = 'int16';
+assignin(hws, 'Pew', Pew);
+clear Pew
+r = sim(set_param(ew, 'c', 'Value', 'Kew * Pew'), 1);
+assert(isa(r.yout, 'int16') && r.yout(end) == 200, 'un Simulink.Parameter de l''espace du modele');
+dedansEw = new_system('dedansEw');
+dedansEw = add_block(dedansEw, 'inport', 'e');
+dedansEw = add_block(dedansEw, 'gain', 'k', 'Gain', 'G');
+dedansEw = add_block(dedansEw, 'outport', 's');
+dedansEw = add_line(add_line(dedansEw, 'e', 'k'), 'k', 's');
+masqueEw = add_block(ew, 'subsystem', 'sous', 'Model', dedansEw, 'Mask', 'on', ...
+                     'MaskVariables', 'G=@1;', 'MaskValueString', 'Kew');
+masqueEw = add_line(add_block(masqueEw, 'outport', 'y2'), 'sous', 'y2');
+masqueEw = add_line(masqueEw, 'c', 'sous');
+r = sim(masqueEw, 1);
+assert(isequal(r.yout(end, :), [100 10000]), 'un masque lit l''espace du modele');
+
+% SAVE_SYSTEM écrit l'espace ; NEW_SYSTEM en donne un neuf.
+fichierEw = save_system(ew, fullfile(tempdir(), 'espaceModeleSauve.m'));
+assert(~isempty(strfind(fileread(fichierEw), 'ModelWorkspace')), 'le .m ecrit l''espace');
+neuf = new_system('espaceModele');
+assert(~hasVariable(get_param(neuf, 'ModelWorkspace'), 'Kew'), 'un modele neuf, un espace vide');
+relu = load_system(fichierEw);
+r = sim(relu, 1);
+assert(r.yout(end) == 100 && isa(getVariable(get_param(relu, 'ModelWorkspace'), 'Pew'), ...
+                                 'Simulink.Parameter'), 'le .m relu repose l''espace');
+delete(fichierEw);
+
+% Un SimulationInput pose une variable dans l'espace du modèle, le temps
+% d'une simulation.
+in = Simulink.SimulationInput(relu);
+in = in.setVariable('Kew', 7, 'Workspace', 'espaceModele');
+o = sim(in);
+assert(o.yout(end) == 7 && getVariable(get_param(relu, 'ModelWorkspace'), 'Kew') == 100, ...
+       'setVariable dans l''espace du modele, rendu ensuite');
+bdclose('espaceModele');
+assert(~matlibre_sl_espace('existe', 'espaceModele'), 'BDCLOSE vide l''espace');
+
+hwsErreurs = get_param(new_system('erreursEw'), 'ModelWorkspace');
+casErreurs = {
+    @() getVariable(hwsErreurs, 'absente'), 'Simulink:Data:VariableNotFound', 'absente'
+    @() assignin(hwsErreurs, '1x', 3), 'Simulink:Data:InvalidVariableName', '1x'
+    @() evalin(hwsErreurs, 'x = variableInconnue + 1;'), 'Simulink:Data:WorkspaceEvalError', ...
+        'erreursEw'
+    @() poserPropriete(hwsErreurs, 'DataSource', 'Disquette'), 'Simulink:Data:InvalidValue', ...
+        'DataSource'
+    @() sim(Simulink.SimulationInput(ew).setVariable('Kew', 1, 'Workspace', 'autre')), ...
+        'Simulink:Simulation:InvalidWorkspace', 'autre'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('espace du modele, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+bdclose('erreursEw');
+fprintf('espace du modele : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
+%% ------------------------------ 38. Stateflow : événements d'entrée et de sortie
+% SFEVENT déclare les événements d'un diagramme. Dans un bloc Chart, ceux
+% d'entrée arrivent par un port de déclenchement, un élément par
+% événement, et le diagramme ne calcule que quand l'un d'eux survient ;
+% ceux de sortie ont chacun leur port : un 'Function call' appelle un
+% sous-système appelé par fonction, un 'Either' bascule à chaque émission.
+compteurEvt = sfchart('compteurEvt');
+compteurEvt = sfevent(compteurEvt, 'impulsion', 'Input', 'Rising');
+compteurEvt = sfevent(compteurEvt, 'plein', 'Output', 'Function call');
+compteurEvt = sfstate(compteurEvt, 'compte', 'en: n = 0; du: n = n + 1;');
+compteurEvt = sftransition(compteurEvt, 'compte', 'compte', 'impulsion[n >= 2]{plein;}');
+assert(numel(compteurEvt.evenements) == 2 && ...
+       strcmp(compteurEvt.evenements(2).declencheur, 'Function call'), 'SFEVENT');
+appele = new_system('appele');
+appele = add_block(appele, 'triggerport', 'f', 'TriggerType', 'function-call');
+appele = add_block(appele, 'constant', 'un', 'Value', 1);
+appele = add_block(appele, 'sum', 's', 'Signs', '++');
+appele = add_block(appele, 'memory', 'mem');
+appele = add_block(appele, 'outport', 'o');
+appele = add_line(add_line(appele, 'un', 's', 1), 'mem', 's', 2);
+appele = add_line(add_line(appele, 's', 'mem'), 's', 'o');
+ev = new_system('evenements');
+ev = add_block(ev, 'pulsegenerator', 'p', 'Period', 1, 'PulseWidth', 50, 'Amplitude', 1);
+ev = add_block(ev, 'chart', 'graphe', 'Chart', compteurEvt, 'Inputs', 0, 'Outputs', {'n'}, ...
+               'InitialContext', struct('n', 0));
+ev = add_block(ev, 'subsystem', 'appele', 'Model', appele);
+ev = add_block(ev, 'outport', 'n');
+ev = add_block(ev, 'outport', 'appels');
+ev = add_line(ev, 'p', 'graphe');
+ev = add_line(ev, 'graphe/1', 'n');
+ev = add_line(ev, 'graphe/2', 'appele');
+ev = add_line(ev, 'appele', 'appels');
+assert(isequal(get_param(ev, 'graphe', 'Ports'), [1 2 0 0 0 0 0 0]), ...
+       'un port de declenchement, un port par evenement de sortie');
+r = sim(ev, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.25, 'StopTime', 10);
+instant = @(t) find(abs(r.tout - t) < 1e-9, 1);
+assert(r.yout(instant(1), 1) == 0 && r.yout(instant(2), 1) == 1 && ...
+       r.yout(instant(3), 1) == 2 && r.yout(instant(3.5), 1) == 2, ...
+       'le diagramme ne calcule qu''aux fronts montants, le premier l''initialise');
+assert(r.yout(instant(3.75), 2) == 0 && r.yout(instant(4), 2) == 1 && ...
+       r.yout(instant(7), 2) == 2 && r.yout(end, 2) == 3, ...
+       'l''evenement de sortie appelle le sous-systeme a chaque emission');
+
+% 'Either' en entrée et en sortie ; un événement par élément.
+basculeEvt = sfevent(sfchart('basculeEvt'), 'tic', 'Input', 'Either');
+basculeEvt = sfevent(basculeEvt, 'fin', 'Output', 'Either');
+basculeEvt = sfstate(basculeEvt, 'a', 'en: k = 0; du: k = k + 1;');
+basculeEvt = sftransition(basculeEvt, 'a', 'a', 'tic[k >= 1]{send(fin);}');
+eb = new_system('bascules');
+eb = add_block(eb, 'pulsegenerator', 'p', 'Period', 1, 'PulseWidth', 50, 'Amplitude', 1);
+eb = add_block(eb, 'chart', 'graphe', 'Chart', basculeEvt, 'Inputs', 0, 'Outputs', {'k'}, ...
+               'InitialContext', struct('k', 0));
+eb = add_block(eb, 'outport', 'k');
+eb = add_block(eb, 'outport', 'fin');
+eb = add_line(add_line(eb, 'p', 'graphe'), 'graphe/1', 'k');
+eb = add_line(eb, 'graphe/2', 'fin');
+r = sim(eb, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.25, 'StopTime', 4);
+instant = @(t) find(abs(r.tout - t) < 1e-9, 1);
+assert(isequal(r.yout(instant(1), :), [1 0]) && isequal(r.yout(instant(1.5), :), [0 1]) && ...
+       isequal(r.yout(instant(2.5), :), [0 0]) && isequal(r.yout(instant(3.5), :), [0 1]), ...
+       'Either : chaque front reveille le diagramme, fin bascule a chaque emission');
+deuxEvt = sfevent(sfevent(sfchart('deuxEvt'), 'haut', 'Input', 'Rising'), 'bas', 'Input', ...
+                  'Falling');
+deuxEvt = sfstate(deuxEvt, 'repos', 'en: s = 0;');
+deuxEvt = sfstate(deuxEvt, 'actif', 'en: s = 1;');
+deuxEvt = sftransition(deuxEvt, 'repos', 'actif', 'haut');
+deuxEvt = sftransition(deuxEvt, 'actif', 'repos', 'bas');
+ed = new_system('deuxEvenements');
+ed = add_block(ed, 'step', 'monte', 'Time', 1);
+ed = add_block(ed, 'step', 'descend', 'Time', 2, 'Before', 1, 'After', 0);
+ed = add_block(ed, 'mux', 'mx', 'Inputs', 2);
+ed = add_block(ed, 'chart', 'graphe', 'Chart', deuxEvt, 'Inputs', 0, 'Outputs', {'s'}, ...
+               'InitialContext', struct('s', 0));
+ed = add_block(ed, 'outport', 's');
+ed = add_line(add_line(ed, 'monte', 'mx', 1), 'descend', 'mx', 2);
+ed = add_line(add_line(ed, 'mx', 'graphe'), 'graphe', 's');
+r = sim(ed, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.5, 'StopTime', 4);
+instant = @(t) find(abs(r.tout - t) < 1e-9, 1);
+assert(r.yout(instant(1)) == 0 && r.yout(instant(2)) == 0 && r.yout(end) == 0, ...
+       'deux evenements, un element chacun');
+sansDeclencheur = add_block(new_system('sansDeclencheur'), 'chart', 'graphe', 'Chart', ...
+                            compteurEvt, 'Inputs', 0, 'Outputs', {'n'}, ...
+                            'InitialContext', struct('n', 0));
+sansDeclencheur = add_block(sansDeclencheur, 'constant', 'c', 'Value', [1 1]);
+sansDeclencheur = add_line(sansDeclencheur, 'c', 'graphe');
+appelFaux = add_block(new_system('appelFaux'), 'constant', 'c', 'Value', 1);
+appelFaux = add_block(appelFaux, 'subsystem', 'appele', 'Model', appele);
+appelFaux = add_line(appelFaux, 'c', 'appele');
+casErreurs = {
+    @() sfevent(compteurEvt, 'local1', 'Local'), 'Stateflow:Events:LocalUnsupported', 'local1'
+    @() sfevent(compteurEvt, 'x', 'Input', 'Parfois'), 'Stateflow:Events:InvalidTrigger', ...
+        'Parfois'
+    @() sfevent(compteurEvt, 'y', 'Output', 'Rising'), 'Stateflow:Events:InvalidTrigger', ...
+        'Rising'
+    @() sfevent(compteurEvt, 'impulsion', 'Input'), 'Stateflow:Events:DuplicateName', ...
+        'impulsion'
+    @() sfevent(compteurEvt, 'compte', 'Input'), 'Stateflow:Events:DuplicateName', 'compte'
+    @() sfevent(compteurEvt, '2x', 'Input'), 'Stateflow:Events:InvalidName', '2x'
+    @() sfevent(compteurEvt, 'z', 'Globale'), 'Stateflow:Events:InvalidScope', 'Globale'
+    @() sim(sansDeclencheur, 1), 'Simulink:blocks:ChartTriggerWidth', 'sansDeclencheur/graphe'
+    @() sim(appelFaux, 1), 'Simulink:blocks:FcnCallSubsystemInputNotFcnCall', 'appelFaux/appele'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('evenements, cas %d : %s attendu, %s rendu (%s)', kE, casErreurs{kE, 2}, ...
+                   vu, message));
+end
+fprintf('evenements Stateflow : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

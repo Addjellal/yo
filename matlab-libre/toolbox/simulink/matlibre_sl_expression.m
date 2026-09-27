@@ -10,6 +10,9 @@ function valeur = matlibre_sl_expression(texte, nomBloc, nomParametre, classe)
 %   simule, non ce qu'il valait quand on a posé le bloc. Changer K et
 %   relancer SIM suffit ; le modèle, lui, ne bouge pas.
 %
+%   Les variables de l'espace de travail du modèle — celui du modèle dont
+%   BLOC est un bloc, « modele/bloc » — passent avant celles de base.
+%
 %   Une variable qui porte un SIMULINK.PARAMETER y vaut la valeur de
 %   l'objet, convertie dans son DataType et vérifiée contre ses bornes
 %   Min et Max : '2*K' se calcule avec la valeur de K, comme dans
@@ -56,18 +59,26 @@ function valeur = matlibre_sl_expression(texte, nomBloc, nomParametre, classe)
     end
 end
 
-% Les variables de l'espace de base que nomme le texte : toutes, avec
-% leur valeur, dès que l'une porte un Simulink.Parameter ; aucune sinon.
+% Les variables que nomme le texte : celles de l'espace de travail du
+% modèle d'abord, puis celles de l'espace de base. Toutes, avec leur
+% valeur, dès que l'une porte un Simulink.Parameter ou vient de l'espace
+% du modèle ; aucune sinon.
 function [noms, valeurs] = parametresNommes(texte, nomBloc, nomParametre)
     noms = {};
     valeurs = {};
     objets = false;
+    [nomsModele, valeursModele] = matlibre_sl_espace('variables', nomBloc);
     for id = unique(regexp(texte, '[A-Za-z]\w*', 'match'))
         nom = id{1};
-        if evalin('base', sprintf('exist(''%s'', ''var'')', nom)) ~= 1
+        j = find(strcmp(nomsModele, nom), 1);
+        if ~isempty(j)
+            v = valeursModele{j};
+            objets = true;
+        elseif evalin('base', sprintf('exist(''%s'', ''var'')', nom)) ~= 1
             continue
+        else
+            v = evalin('base', nom);
         end
-        v = evalin('base', nom);
         if isa(v, 'Simulink.Parameter')
             v = matlibre_sl_parametre('valeur', v, nom, nomBloc, nomParametre);
             objets = true;

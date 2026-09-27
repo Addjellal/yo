@@ -165,7 +165,12 @@ function modele = add_block(modele, type, nom, varargin)
 %                  SFTRANSITION, états emboîtés, régions parallèles et
 %                  logique temporelle compris (SFAFTER... en secondes de
 %                  simulation) ; ses sorties sont des champs de son
-%                  contexte, ou « etat », le rang de l'état actif
+%                  contexte, ou « etat », le rang de l'état actif. Les
+%                  événements d'entrée de la machine (SFEVENT) arrivent
+%                  par un port de déclenchement, après les entrées ; ses
+%                  événements de sortie ont chacun un port, après les
+%                  sorties, qui peut appeler un sous-système appelé par
+%                  fonction
 %
 %   Un schéma dans un bloc :
 %     subsystem    Model                un modèle entier, abrégé en un bloc ;

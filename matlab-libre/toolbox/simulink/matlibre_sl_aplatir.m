@@ -100,7 +100,7 @@ function iterateur = sousSystemeItere(bloc, interne, iterateurs, g, chemin)
         espace = bloc.espace;
     end
     if ~isempty(matlibre_sl_masque('variables', bloc))
-        espace = matlibre_sl_masque('espace', bloc, espace, char(bloc.nom));
+        espace = matlibre_sl_masque('espace', bloc, espace, chemin);
     end
     if ~isempty(fieldnames(espace))
         for j = 1:numel(interne.blocs)
@@ -221,7 +221,7 @@ function modele = deplier(modele, k)
     end
     espaceInterieur = espaceParent;
     if ~isempty(matlibre_sl_masque('variables', bloc))
-        espaceInterieur = matlibre_sl_masque('espace', bloc, espaceParent, char(bloc.nom));
+        espaceInterieur = matlibre_sl_masque('espace', bloc, espaceParent, chemin);
     end
 
     % Le bloc du sous-système garde sa place dans la liste — donc son

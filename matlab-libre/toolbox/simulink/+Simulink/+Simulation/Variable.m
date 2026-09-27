@@ -2,8 +2,9 @@ classdef Variable
 %VARIABLE Une variable qu'un SimulationInput pose pour sa simulation.
 %   V = SIMULINK.SIMULATION.VARIABLE(NOM,VALEUR) ; V =
 %   SIMULINK.SIMULATION.VARIABLE(NOM,VALEUR,'Workspace',ESPACE). ESPACE
-%   vaut 'global-workspace', l'espace de travail de base — celui où les
-%   paramètres des blocs lisent leurs variables —, ou le nom du modèle.
+%   vaut 'global-workspace', l'espace de travail de base, ou le nom du
+%   modèle : la variable va alors dans son espace de travail, que les
+%   paramètres de ses blocs lisent avant celui de base.
 %   C'est ce que SETVARIABLE range dans la propriété Variables d'un
 %   SIMULINK.SIMULATIONINPUT.
 %
