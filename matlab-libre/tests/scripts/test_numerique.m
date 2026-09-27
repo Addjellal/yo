@@ -516,6 +516,13 @@ C = num2cell({1, 'a'; 2, 'b'}, 1);
 assert(iscell(C{2}) && isequal(C{2}, {'a'; 'b'}));
 assert(strcmp(identifiantErreur(@() num2cell(A, 0)), 'MATLAB:num2cell:InvalidDimension'));
 
+% interp1 interpole chaque colonne d'une matrice d'ordonnées : une ligne
+% par point demandé, une colonne par jeu de valeurs.
+assert(isequal(interp1([0 2], [1 10; 3 30], 1), [2 20]));
+assert(isequal(interp1([0 2], [1 10; 3 30], [0.5; 1]), [1.5 15; 2 20]));
+assert(isequal(interp1([0; 1; 2], [0 0; 1 10; 4 40], 1.5, 'previous'), [1 10]));
+assert(isequal(size(interp1([0 1], [1 2 3; 4 5 6], [0 0.5 1])), [3 3]));
+
 disp('numerique : toutes les verifications passent');
 
 function [valeur, arret, sens] = evenementSol(t, y)

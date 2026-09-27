@@ -34,6 +34,10 @@ function modele = add_block(modele, type, nom, varargin)
 %     repeatingsequencestair OutValues, tsamp   une valeur par instant
 %     repeatingsequenceinterpolated OutValues, TimeValues, LookUpMeth,
 %                  tsamp — la séquence datée, de période la dernière date
+%     signaleditor FileName, ActiveScenario — une sortie par signal du
+%                  scénario, un Simulink.SimulationData.Dataset de
+%                  timeseries rangé dans le fichier MAT ; interpolé,
+%                  tenu après sa dernière valeur
 %     fromspreadsheet FileName (un fichier texte : CSV, TXT), Range,
 %                  InterpolationWithinTimeRange,
 %                  ExtrapolationAfterLastDataPoint — la première colonne

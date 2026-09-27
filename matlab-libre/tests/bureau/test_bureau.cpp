@@ -1549,7 +1549,10 @@ int main(int argc, char** argv) {
             // V choisit la variante des blocs à variantes de la
             // bibliothèque, garnis de conditions V == 1 et V == 2.
             QString essaiTous = QStringLiteral(
-                "signal = [0 0; 1 1]; V = 1; writematrix(signal, 'signal.csv');\n");
+                "signal = [0 0; 1 1]; V = 1; writematrix(signal, 'signal.csv');\n"
+                "Scenario = Simulink.SimulationData.Dataset; "
+                "Scenario = addElement(Scenario, timeseries([0; 1], [0; 1], 'Name', 's')); "
+                "save('scenario.mat', 'Scenario');\n");
             for (const BlocBibliotheque* b = bibliothequeSimulink(); b->famille; ++b) {
                 essaiTous += QStringLiteral("m = new_system('t');\n");
                 essaiTous += QStringLiteral("m = add_block(m, '%1', '%1'").arg(

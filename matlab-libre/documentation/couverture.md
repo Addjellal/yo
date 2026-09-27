@@ -193,8 +193,9 @@ totalité.
    calculer que la variante dont la condition est vraie. Chaque modèle a
    son espace de travail, dont les variables passent avant celles de
    base.
-   Manquent : les types à virgule fixe, les signaux de taille variable et
-   Simscape.
+   Manquent : les types à virgule fixe, les signaux complexes — un bloc qui
+   en produirait un est refusé en le nommant —, les signaux de taille
+   variable et Simscape.
    Stateflow a ses états emboîtés, ses régions parallèles, son
    historique, sa logique temporelle — SFAFTER, SFBEFORE, SFAT, SFEVERY,
    en réveils ou en secondes — et ses étiquettes écrites en texte :

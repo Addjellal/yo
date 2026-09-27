@@ -107,6 +107,12 @@ function D = lireSlxArchive(fichier, base)
         D.nom = modeleXml.Attributes.Name;
     end
     D.defauts = defautsXml(enfant(modeleXml, 'BlockParameterDefaults'));
+    % Un fichier écrit par MatLibre le dit dans une partie à lui, que
+    % Simulink ignore : un bloc discret sans période y garde le défaut de
+    % MatLibre, le pas, au lieu d'hériter la sienne comme dans Simulink.
+    if exist(fullfile(dossier, 'matlibre', 'auteur.xml'), 'file') == 2
+        D.defauts.MatLibreAuteur = true;
+    end
     D.config = parametresP(modeleXml);
     % La configuration du solveur, dans un configSet à part depuis 2014.
     ensembles = dir(fullfile(dossier, 'simulink', 'configSet*.xml'));
@@ -557,7 +563,9 @@ function [modele, refuses] = construire(S, nom, defauts, refuses)
             parametres = reprendre(parametres, entree, defauts.(b.type));
         end
         parametres = reprendre(parametres, entree, b.parametres);
-        parametres = defautsSimulink(entree.type, parametres);
+        if ~isfield(defauts, 'MatLibreAuteur')
+            parametres = defautsSimulink(entree.type, parametres);
+        end
         if isfield(b.parametres, 'Position')
             cadre = str2num(b.parametres.Position); %#ok<ST2NM>
             if numel(cadre) == 4
@@ -862,10 +870,13 @@ function ecrire(modele, fichier)
     [lignes, ~] = ecrireSysteme(modele, lignes, '    ', compteur);
     lignes = [lignes, {'  </Model>', '</ModelInformation>'}];
     ecrireTexte(fullfile(dossier, 'simulink', 'blockdiagram.xml'), strjoin(lignes, sprintf('\n')));
+    mkdir(fullfile(dossier, 'matlibre'));
+    ecrireTexte(fullfile(dossier, 'matlibre', 'auteur.xml'), ...
+                ['<?xml version="1.0" encoding="utf-8"?>' sprintf('\n') '<MatLibre Version="1"/>']);
     if exist(fichier, 'file') == 2
         delete(fichier);
     end
-    zip(fichier, {'[Content_Types].xml', '_rels', 'simulink'}, dossier);
+    zip(fichier, {'[Content_Types].xml', '_rels', 'simulink', 'matlibre'}, dossier);
     [dossierFichier, base, extension] = fileparts(fichier);
     if ~strcmpi(extension, '.slx')
         % ZIP ajoute « .zip » à un nom sans extension ; .slx en porte une.
@@ -998,7 +1009,8 @@ function oui = referenceDeBibliotheque(type)
                             'checkstaticgap', 'checkdynamicrange', 'checkdynamiclowerbound', ...
                             'checkdynamicupperbound', 'checkdynamicgap', ...
                             'ratelimiterdynamic', 'minmaxrunningresettable', ...
-                            'firstorderhold', 'repeatingsequenceinterpolated'}));
+                            'firstorderhold', 'repeatingsequenceinterpolated', ...
+                            'signaleditor'}));
 end
 
 % La sortie PORT d'un intégrateur est-elle son port d'état ? Simulink

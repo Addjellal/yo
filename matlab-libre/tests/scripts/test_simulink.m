@@ -6145,6 +6145,201 @@ for kE = 1:size(casContrainte, 1)
 end
 fprintf('contrainte algebrique et bus : %d cas d''erreur verifies\n', size(casContrainte, 1));
 
+%% ---------------------------- 46. Signal Editor ; les signaux complexes refusés
+% Le Signal Editor rejoue un scénario, un Dataset de timeseries rangé dans
+% un fichier MAT, une sortie par signal. MatLibre ne simule que des
+% signaux réels : un signal qui deviendrait complexe — la sortie d'une
+% MATLAB Function, une donnée de l'espace de travail — est refusé en
+% nommant le bloc, au lieu de fausser les autres.
+Scenario = Simulink.SimulationData.Dataset;
+Scenario = addElement(Scenario, timeseries([0; 2; 4], [0; 1; 2], 'Name', 'rampe'));
+Scenario = addElement(Scenario, timeseries([1 10; 3 30], [0; 2], 'Name', 'paire'));
+fichierScenario = [tempname() '.mat'];
+save(fichierScenario, 'Scenario');
+editeur = new_system('editeur');
+editeur = add_block(editeur, 'simulink/Sources/Signal Editor', 'ed', 'FileName', fichierScenario);
+[ne, ns] = matlibre_sl_ports(editeur.blocs{1});
+assert(ne == 0 && ns == 2, 'une sortie par signal du scenario');
+editeur = add_block(add_block(editeur, 'outport', 'y1'), 'outport', 'y2');
+editeur = add_line(add_line(editeur, 'ed/1', 'y1'), 'ed/2', 'y2');
+r = sim(editeur, 'Solver', 'ode4', 'FixedStep', 0.5, 'StopTime', 3);
+assert(isequal(r.yout', [0 1 2 3 4 4 4; 1 1.5 2 2.5 3 3 3; 10 15 20 25 30 30 30]), ...
+       'interpole, puis tient la derniere valeur ; un signal vecteur garde ses elements');
+Autre = Scenario;
+save(fichierScenario, 'Scenario', 'Autre');
+r = sim(set_param(editeur, 'ed', 'ActiveScenario', 'Autre'), 'Solver', 'ode4', ...
+        'FixedStep', 0.5, 'StopTime', 1);
+assert(isequal(r.yout(:, 1)', [0 1 2]), 'ActiveScenario choisit le scenario');
+nombre = 12; %#ok<NASGU>
+save(fichierScenario, 'Scenario', 'nombre');
+% les complexes
+assignin('base', 'signalComplexe', [0 1+1i; 1 2]);
+espace = new_system('espace');
+espace = add_block(espace, 'fromworkspace', 'f', 'VariableName', 'signalComplexe');
+espace = add_line(add_block(espace, 'outport', 'y'), 'f', 'y');
+fonction = new_system('fonction');
+fonction = add_block(fonction, 'constant', 'c', 'Value', -4);
+fonction = add_block(fonction, 'matlabfunction', 'm', 'Script', ...
+                     sprintf('function y = fcn(u)\ny = sqrt(u);\n'));
+fonction = add_line(add_line(add_block(fonction, 'outport', 'y'), 'c', 'm'), 'm', 'y');
+casComplexe = {
+    @() sim(espace, 1), 'Simulink:DataType:ComplexSignalNotSupported', 'espace/f'
+    @() sim(fonction, 1), 'Simulink:DataType:ComplexSignalNotSupported', 'fonction/m'
+    @() sim(set_param(fonction, 'm', 'Script', sprintf('function y = fcn(u)\ny = u + 1i;\n')), 1), ...
+        'Simulink:DataType:ComplexSignalNotSupported', 'fonction/m'
+    @() sim(set_param(fonction, 'c', 'Value', 1 + 2i), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'fonction/c'
+    @() sim(set_param(editeur, 'ed', 'ActiveScenario', 'Absent'), 1), ...
+        'Simulink:SignalEditor:ScenarioNotFound', 'editeur/ed'
+    @() sim(set_param(editeur, 'ed', 'ActiveScenario', 'nombre'), 1), ...
+        'Simulink:SignalEditor:InvalidScenario', 'editeur/ed'
+    @() sim(set_param(editeur, 'ed', 'FileName', 'scenarioIntrouvable.mat'), 1), ...
+        'Simulink:SignalEditor:FileNotFound', 'editeur/ed'
+    };
+for kE = 1:size(casComplexe, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('casComplexe{kE, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casComplexe{kE, 2}) && ~isempty(strfind(message, casComplexe{kE, 3})), ...
+           sprintf('scenario et complexes, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casComplexe{kE, 2}, vu, message));
+end
+delete(fichierScenario);
+fprintf('scenarios et signaux complexes : %d cas d''erreur verifies\n', size(casComplexe, 1));
+
+%% ------------------------------------------- 47. Batterie de modèles tirés au hasard
+% Des modèles tirés au hasard, reproductibles : une source, puis une chaîne
+% de deux à cinq blocs du catalogue, réglages tirés dans leurs listes de
+% choix, valeurs gênantes (nulles, négatives, vecteurs) et entrées
+% vecteurs de temps en temps. Chaque simulation, à pas fixe et à pas
+% variable, ne doit lever qu'une erreur Simulink qui nomme le modèle ; un
+% modèle qui simule doit se relire à l'identique par le .slx et par le .m.
+% Les défauts que la batterie a trouvés, gardés ici en cas fixes : un
+% Signal Generator de fréquence négative ou nulle faisait piétiner le
+% solveur à pas variable sur ses fronts, un nombre de ports qui n'en est
+% pas un (« 2.5 », « -1 ») donnait un message trompeur, et un bloc discret
+% relu d'un .slx écrit par MatLibre prenait la période par défaut de
+% Simulink au lieu de la sienne.
+for forme = {'square', 'sawtooth'}
+    generateur = new_system('generateur');
+    generateur = add_block(generateur, 'signalgenerator', 's', 'WaveForm', forme{1}, ...
+                           'Frequency', -1, 'Units', 'Hertz');
+    generateur = add_line(add_block(generateur, 'outport', 'y'), 's', 'y');
+    r = sim(generateur, 'Solver', 'ode45', 'StopTime', 1.2);
+    assert(numel(r.tout) < 500 && abs(r.tout(end) - 1.2) < 1e-9, ...
+           sprintf('%s de frequence negative : le solveur avance', forme{1}));
+    r0 = sim(set_param(generateur, 's', 'Frequency', 0), 'Solver', 'ode45', 'StopTime', 1.2);
+    assert(numel(r0.tout) < 500 && abs(r0.tout(end) - 1.2) < 1e-9, ...
+           sprintf('%s de frequence nulle : le solveur avance', forme{1}));
+end
+r = sim(set_param(generateur, 's', 'WaveForm', 'square', 'Frequency', -1), ...
+        'Solver', 'ode45', 'StopTime', 1.2);
+assert(r.yout(end) == -1, 'un carre de frequence -1 Hz vaut -1 a t = 1,2 s');
+casPorts = {'sum', 'Inputs', '2.5', 'Simulink:Parameters:InvParamSetting'
+            'sum', 'Inputs', '+x', 'Simulink:Parameters:InvParamSetting'
+            'mux', 'Inputs', '-1', 'Simulink:Parameters:InvalidPortCount'
+            'product', 'Inputs', '1.5', 'Simulink:Parameters:InvParamSetting'
+            'buscreator', 'Inputs', '-2', 'Simulink:Parameters:InvalidPortCount'
+            'demux', 'Outputs', '0.5', 'Simulink:Parameters:InvalidPortCount'};
+for kP = 1:size(casPorts, 1)
+    ports = new_system('ports');
+    ports = add_block(add_block(ports, 'constant', 'c'), casPorts{kP, 1}, 'b', ...
+                      casPorts{kP, 2}, casPorts{kP, 3});
+    vu = '';
+    message = '';
+    try
+        ports = add_line(add_line(add_block(ports, 'outport', 'y'), 'c', 'b'), 'b', 'y');
+        evalc('sim(ports, 1);');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casPorts{kP, 4}) && ~isempty(strfind(message, 'ports/b')), ...
+           sprintf('%s %s = %s : %s attendu, %s rendu (%s)', casPorts{kP, :}, vu, message));
+end
+discret = new_system('discret');
+discret = add_block(discret, 'zoh', 'z');
+discret = add_block(discret, 'unitdelay', 'd');
+fichierDiscret = [tempname() '.slx'];
+save_system(discret, fichierDiscret);
+relu = load_system(fichierDiscret);
+assert(isequal(get_param(relu, 'z', 'SampleTime'), get_param(discret, 'z', 'SampleTime')) && ...
+       isequal(get_param(relu, 'd', 'SampleTime'), get_param(discret, 'd', 'SampleTime')), ...
+       'un .slx ecrit par MatLibre garde ses periodes par defaut');
+delete(fichierDiscret);
+disp('cas fixes de la batterie : ok');
+rng(47);
+catalogueAlea = matlibre_sl_catalogue();
+exclusAlea = {'subsystem', 'modelreference', 'iterateur', 'enableport', 'triggerport', ...
+              'actionport', 'if', 'switchcase', 'goto', 'from', 'datastorememory', ...
+              'datastoreread', 'datastorewrite', 'chart', 'sfunction', 'msfunction', ...
+              'fromfile', 'fromspreadsheet', 'signaleditor', 'fromworkspace', 'variantsource', ...
+              'variantsink', 'busselector', 'busassignment', 'inport', 'foriterator', ...
+              'whileiterator', 'merge', 'functioncallgenerator', 'tofile', ...
+              'algebraicconstraint', 'garde'};
+sourcesAlea = {};
+blocsAlea = {};
+for kT = 1:numel(catalogueAlea)
+    entree = catalogueAlea(kT);
+    if strcmp(entree.famille, 'Interne') || any(strcmp(entree.type, exclusAlea))
+        continue
+    end
+    [ne, ns] = matlibre_sl_ports(struct('type', entree.type, 'nom', 'b', ...
+                                        'parametres', struct()), entree.type);
+    if isnan(ne) || isnan(ns) || ns == 0
+        continue
+    end
+    if ne == 0
+        sourcesAlea{end + 1} = entree.type; %#ok<SAGROW>
+    else
+        blocsAlea{end + 1} = entree.type; %#ok<SAGROW>
+    end
+end
+dossierAlea = tempname();
+mkdir(dossierAlea);
+statsAlea = [0 0 0];   % simulés, refusés, relus
+for n = 1:120
+    typesAlea = [sourcesAlea(randi(numel(sourcesAlea))), ...
+                 blocsAlea(randi(numel(blocsAlea), 1, randi([2 5])))];
+    nomAlea = sprintf('alea%d', n);
+    [m, reglagesAlea] = aleaBatir(nomAlea, typesAlea, catalogueAlea);
+    contexte = sprintf('%s : %s%s', nomAlea, strjoin(typesAlea, ' -> '), reglagesAlea);
+    for solveur = {'ode1', 'ode45'}
+        [r, id, message] = aleaSimuler(m, solveur{1});
+        if ~isempty(id)
+            statsAlea(2) = statsAlea(2) + 1;
+            assert(strncmp(id, 'Simulink:', 9) || strncmp(id, 'Stateflow:', 10), ...
+                   sprintf('%s (%s) : erreur interne %s : %s', contexte, solveur{1}, id, message));
+            assert(~isempty(strfind(message, nomAlea)), ...
+                   sprintf('%s (%s) : le message ne nomme pas le modele : %s', contexte, ...
+                           solveur{1}, message));
+            continue
+        end
+        statsAlea(1) = statsAlea(1) + 1;
+        if ~strcmp(solveur{1}, 'ode1')
+            continue
+        end
+        for ext = {'.slx', '.m'}
+            fichier = fullfile(dossierAlea, [nomAlea ext{1}]);
+            save_system(m, fichier);
+            [r2, id2, message2] = aleaSimuler(load_system(fichier), 'ode1');
+            assert(isempty(id2), sprintf('%s : relu par %s, il echoue : %s %s', contexte, ...
+                                         ext{1}, id2, message2));
+            assert(aleaMemesValeurs(r.yout, r2.yout), ...
+                   sprintf('%s : relu par %s, il ne rend pas la meme chose', contexte, ext{1}));
+            statsAlea(3) = statsAlea(3) + 1;
+        end
+    end
+end
+rmdir(dossierAlea, 's');
+fprintf(['batterie de modeles tires au hasard : %d simulations, %d refus nommes, ' ...
+         '%d relectures identiques\n'], statsAlea);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -6330,4 +6525,82 @@ end
 % anonyme ne peut pas écrire.
 function objet = poserPropriete(objet, nom, valeur)
     objet.(nom) = valeur;
+end
+
+
+% Un modèle de la batterie au hasard : les blocs en chaîne, leurs entrées
+% de plus nourries de constantes, leurs sorties de plus relevées.
+function [m, texte] = aleaBatir(nom, types, cat)
+    m = new_system(nom);
+    texte = '';
+    valeurEntree = 1.5;
+    if rand() < 0.3
+        valeurEntree = [0.5; 1.5; 2.5];
+        texte = ' entrees=vecteur';
+    end
+    for q = 1:numel(types)
+        e = cat(strcmp({cat.type}, types{q}));
+        reglages = {};
+        for i = 1:size(e.params, 1)
+            nature = e.params{i, 3};
+            if iscell(nature) && rand() < 0.4
+                valeur = nature{randi(numel(nature))};
+                reglages(end + 1:end + 2) = {e.params{i, 1}, valeur}; %#ok<AGROW>
+                texte = sprintf('%s %s.%s=%s', texte, types{q}, e.params{i, 1}, valeur);
+            elseif strcmp(nature, 'nombre') && isnumeric(e.params{i, 2}) && ...
+                   isscalar(e.params{i, 2}) && rand() < 0.15
+                genantes = {0, -1, 2, 0.5, [1 2]};
+                valeur = genantes{randi(numel(genantes))};
+                reglages(end + 1:end + 2) = {e.params{i, 1}, valeur}; %#ok<AGROW>
+                texte = sprintf('%s %s.%s=%s', texte, types{q}, e.params{i, 1}, mat2str(valeur));
+            end
+        end
+        m = add_block(m, types{q}, sprintf('b%d', q), reglages{:});
+    end
+    for q = 1:numel(types)
+        [ne, ns] = matlibre_sl_ports(m.blocs{q});
+        if isnan(ne), ne = 1; end
+        if isnan(ns), ns = 1; end
+        for i = 1 + (q > 1):ne
+            source = sprintf('c%d_%d', q, i);
+            m = add_block(m, 'constant', source, 'Value', valeurEntree);
+            m = add_line(m, [source '/1'], sprintf('b%d/%d', q, i));
+        end
+        for j = 1 + (q < numel(types)):ns
+            puits = sprintf('o%d_%d', q, j);
+            m = add_block(m, 'outport', puits);
+            m = add_line(m, sprintf('b%d/%d', q, j), [puits '/1']);
+        end
+        if q < numel(types)
+            [ne2, ~] = matlibre_sl_ports(m.blocs{q + 1});
+            [~, nsq] = matlibre_sl_ports(m.blocs{q});
+            if (isnan(ne2) || ne2 >= 1) && (isnan(nsq) || nsq >= 1)
+                m = add_line(m, sprintf('b%d/1', q), sprintf('b%d/1', q + 1));
+            end
+        end
+    end
+end
+
+function [r, id, message] = aleaSimuler(m, solveur)
+    r = [];
+    id = '';
+    message = '';
+    try
+        evalc('r = sim(m, ''Solver'', solveur, ''FixedStep'', 0.1, ''StopTime'', 1);');
+    catch err
+        id = err.identifier;
+        message = err.message;
+    end
+end
+
+% Deux relevés égaux : mêmes tailles, mêmes infinis et mêmes NaN, le reste
+% au milliardième près.
+function oui = aleaMemesValeurs(a, b)
+    oui = isequal(size(a), size(b));
+    if ~oui
+        return
+    end
+    a = double(a(:));
+    b = double(b(:));
+    oui = all(a == b | (isnan(a) & isnan(b)) | abs(a - b) <= 1e-9 * max(1, abs(a)));
 end

@@ -1627,7 +1627,12 @@ function tc = prochaineCassure(T, t)
             % carré : un front chaque demi-période ; dent de scie : une
             % chute chaque période, décalée d'une demi
             for i = 1:w
-                periode = 2 * pi / T.P(p + w + i - 1);
+                % une fréquence négative a les mêmes fronts ; nulle, aucun
+                pulsation = abs(T.P(p + w + i - 1));
+                if pulsation == 0 || ~isfinite(pulsation)
+                    continue
+                end
+                periode = 2 * pi / pulsation;
                 if T.sub(k) == 2
                     pas = periode / 2;
                     tc = min(tc, (floor(t / pas + 1e-9) + 1) * pas);
@@ -1654,6 +1659,10 @@ function tc = prochaineCassure(T, t)
                 end
             end
         end
+    end
+    % une cassure qui ne serait pas devant ferait piétiner le solveur
+    if tc <= t + tol
+        tc = Inf;
     end
 end
 
@@ -2831,6 +2840,13 @@ function V = appelerFonction(T, k, V, p, e)
         a = T.poA(pd + q - 1);
         b = T.poB(pd + q - 1);
         y = double(sorties{q});
+        if ~isreal(y)
+            % un signal complexe gâterait tout le vecteur des valeurs
+            error('Simulink:DataType:ComplexSignalNotSupported', ...
+                  ['La sortie %d du bloc ''%s'' devient complexe : MatLibre ne simule que ' ...
+                   'des signaux reels. Separez-la en parties reelle et imaginaire ' ...
+                   '(real, imag).'], q, T.chemins{k});
+        end
         if numel(y) ~= b - a + 1
             error('Simulink:blocks:MATLABFunctionOutputSize', ...
                   ['La sortie %d du bloc ''%s'' change de taille : %d valeur(s) au lieu ' ...

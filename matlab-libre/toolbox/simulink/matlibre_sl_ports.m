@@ -166,6 +166,17 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 2;
         case {'repeatingsequenceinterpolated', 'fromspreadsheet'}
             nEntrees = 0;
+        case 'signaleditor'
+            % une sortie par signal du scénario ; un fichier qu'on ne lit
+            % pas encore en donne une
+            nEntrees = 0;
+            try
+                signaux = matlibre_sl_scenario(char(lire(p, 'FileName', 'untitled.mat')), ...
+                                               char(lire(p, 'ActiveScenario', 'Scenario')), '');
+                nSorties = numel(signaux);
+            catch
+                nSorties = 1;
+            end
         case 'environmentcontroller'
             nEntrees = 2;
         case 'bitwiseoperator'
@@ -362,8 +373,8 @@ function n = entier(v)
         v = valeur;
     end
     n = double(v);
-    if ~isscalar(n)
-        n = NaN;
+    if ~isscalar(n) || ~(n >= 0 && n == round(n))
+        n = NaN;   % un nombre de ports qui n'en est pas un : la compilation le refusera
     end
 end
 
@@ -373,13 +384,17 @@ end
 function n = compterSignes(v, admis)
     if isnumeric(v)
         n = double(v);
-        if ~isscalar(n), n = NaN; end
+        if ~isscalar(n) || ~(n >= 0 && n == round(n)), n = NaN; end
         return
     end
     texte = char(v);
     valeur = str2double(texte);
     if ~isnan(valeur) && all(ismember(texte, '0123456789 '))
         n = valeur;
+        return
+    end
+    if ~all(ismember(texte, [admis '| ']))
+        n = NaN;   % « 2.5 », « +x » : ni un nombre, ni des signes
         return
     end
     n = sum(ismember(texte, admis));
@@ -394,7 +409,7 @@ function n = compterNoms(v)
     texte = strtrim(char(v));
     valeur = str2double(texte);
     if ~isnan(valeur)
-        n = valeur;
+        n = entier(valeur);
         return
     end
     n = numel(strsplit(texte, ','));
@@ -414,6 +429,9 @@ function n = compterParties(v)
     v = double(v);
     if isscalar(v)
         n = v;
+        if ~(n >= 0 && n == round(n))
+            n = NaN;
+        end
     else
         n = numel(v);
     end

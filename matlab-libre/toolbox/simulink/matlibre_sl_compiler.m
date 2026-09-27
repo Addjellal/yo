@@ -633,6 +633,9 @@ function [type, p] = normaliser(type, p, chemin)
         case 'repeatingsequenceinterpolated'
             p = struct('Script', scriptSequenceInterpolee(p, chemin), 'SampleTime', p.tsamp);
             type = 'matlabfunction';
+        case 'signaleditor'
+            p = struct('Script', scriptScenario(p, chemin), 'SampleTime', p.SampleTime);
+            type = 'matlabfunction';
         case 'fromspreadsheet'
             [temps, valeurs] = lireTableur(char(p.FileName), char(p.Range), chemin);
             apres = struct('Linear_extrapolation', 'Extrapolation', ...
@@ -672,6 +675,14 @@ function [type, p] = normaliser(type, p, chemin)
                        'TypeVerifie', char(p.OutDataTypeStr));
             type = 'signalconversion';
     end
+end
+
+% Une donnée complexe qu'un bloc voudrait lire.
+function erreurComplexe(nomVariable, nomBloc)
+    error('Simulink:DataType:ComplexSignalNotSupported', ...
+          ['Les valeurs de ''%s'' que lit ''%s'' sont complexes : MatLibre ne simule que ' ...
+           'des signaux reels. Separez-les en parties reelle et imaginaire (real, imag).'], ...
+          nomVariable, nomBloc);
 end
 
 % Le signal d'un fichier MAT, comme l'écrit To File : une matrice dont la
@@ -909,6 +920,29 @@ function script = scriptTableDirecte(p, n, chemin)
                       'y = T(sub2ind(%s, %s));\n'], strjoin(arguments_, ', '), ...
                      mat2str(T(:).', 17), mat2str(tailles(1:n)), mat2str(tailles(1:n)), ...
                      strjoin(indices, ', '));
+end
+
+% Signal Editor : chaque signal du scénario, interpolé à l'instant — ou
+% tenu, pour une timeseries en tenue d'ordre zéro —, et tenu hors de ses
+% dates.
+function script = scriptScenario(p, chemin)
+    signaux = matlibre_sl_scenario(char(p.FileName), char(p.ActiveScenario), chemin);
+    n = numel(signaux);
+    sorties = arrayfun(@(q) sprintf('y%d', q), 1:n, 'UniformOutput', false);
+    L = {sprintf('function [%s] = fcn()', strjoin(sorties, ', ')), ...
+         '[t, ~] = matlibre_sl_instant();'};
+    for q = 1:n
+        tk = signaux(q).temps;
+        vk = signaux(q).valeurs;
+        if numel(tk) == 1
+            L{end + 1} = sprintf('y%d = %s;', q, mat2str(vk(:), 17)); %#ok<AGROW>
+        else
+            L{end + 1} = sprintf(['y%d = interp1(%s, %s, min(max(t, %s), %s), ''%s'').'';'], ...
+                                 q, mat2str(tk, 17), mat2str(vk, 17), mat2str(tk(1), 17), ...
+                                 mat2str(tk(end), 17), signaux(q).methode); %#ok<AGROW>
+        end
+    end
+    script = [strjoin(L, sprintf('\n')), sprintf('\n')];
 end
 
 function v = ifelse(condition, oui, non)
@@ -2242,6 +2276,9 @@ function s = regleDims(c, k, dE, complet, forcer)
             end
         case 'fromworkspace'
             [~, valeurs] = lireSignalEspace(p, c.chemins{k});
+            if ~isreal(valeurs)
+                erreurComplexe(char(p.VariableName), c.chemins{k});
+            end
             s = {dimsDe(zeros(size(valeurs, 2), 1))};
         case 'from'
             if isempty(c.entrees{k}) || c.entrees{k}(1) == 0
@@ -4339,6 +4376,14 @@ function s = dimsFonction(c, k, dE)
     sorties = cell(1, c.nOut(k));
     try
         [sorties{:}] = h(u{:});
+        for q = 1:numel(sorties)
+            if (isnumeric(sorties{q}) || islogical(sorties{q})) && ~isreal(sorties{q})
+                error('Simulink:DataType:ComplexSignalNotSupported', ...
+                      ['La sortie %d du bloc ''%s'' est complexe : MatLibre ne simule que ' ...
+                       'des signaux reels. Separez-la en parties reelle et imaginaire ' ...
+                       '(real, imag).'], q, c.chemins{k});
+            end
+        end
     catch err
         % une erreur de Simulink qui nomme déjà le bloc passe telle quelle
         if strncmp(err.identifier, 'Simulink:', 9) && ~isempty(strfind(err.message, c.chemins{k}))
@@ -4843,6 +4888,9 @@ function [temps, valeurs] = lireSignalEspace(p, nomBloc)
         % une entrée externe du modèle : ses données sont déjà là
         temps = double(p.Donnees.temps(:));
         valeurs = double(p.Donnees.valeurs);
+        if ~isreal(valeurs)
+            erreurComplexe(nomVariable, nomBloc);
+        end
         return
     end
     if isempty(nomVariable)
@@ -4858,6 +4906,9 @@ function [temps, valeurs] = lireSignalEspace(p, nomBloc)
                'l''espace de travail de base.'], nomBloc, nomVariable);
     else
         donnees = evalin('base', nomVariable);
+    end
+    if isnumeric(donnees) && ~isreal(donnees)
+        erreurComplexe(nomVariable, nomBloc);
     end
     if isa(donnees, 'timeseries')
         [temps, valeurs] = matlibre_sl_serie(donnees);

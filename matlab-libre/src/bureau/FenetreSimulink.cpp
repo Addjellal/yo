@@ -48,6 +48,8 @@ const BlocBibliotheque blocs[] = {
      "'FileName', 'signal.csv'"},
     {"Sources", "repeatingsequenceinterpolated", "Une séquence datée, répétée",
      "'tsamp', 0.01"},
+    {"Sources", "signaleditor", "Rejoue un scénario : un Dataset d'un fichier MAT",
+     "'FileName', 'scenario.mat'"},
     {"Sources", "clock", "Le temps de la simulation", ""},
     {"Sources", "digitalclock", "Le temps, échantillonné", "'SampleTime', 0.1"},
     {"Sources", "pulsegenerator", "Un train d'impulsions",
