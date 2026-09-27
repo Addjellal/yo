@@ -56,6 +56,13 @@ function modele = add_block(modele, type, nom, varargin)
 %                  de ses éléments
 %     product      Inputs ('**', '*/'), Multiplication : 'Element-wise(.*)'
 %                  ou 'Matrix(*)'
+%                  gain, sum et product ont aussi OutDataTypeStr ('Inherit:
+%                  Inherit via internal rule', 'Inherit: Same as first
+%                  input', ou un type) ; gain, ParamDataTypeStr
+%     datatypeconversion OutDataTypeStr (double, single, int8 … uint32,
+%                  boolean, fixdt(1,16,8), sfix16_En8), RndMeth,
+%                  SaturateOnIntegerOverflow, ConvertRealWorld (Real World
+%                  Value (RWV), Stored Integer (SI) : garde l'entier stocké)
 %     abs, sign, unaryminus, bias (Bias), dotproduct
 %     math         Operator : exp, log, 10^u, log10, magnitude^2, square,
 %                  sqrt, pow, conj, reciprocal, hypot, rem, mod,

@@ -12,8 +12,9 @@ classdef Parameter < handle
 %                 valeur est convertie dans ce type avant d'être lue — une
 %                 constante réglée sur K sort alors un signal de ce type.
 %                 'Bus: X' et 'Enum: X' laissent la valeur telle quelle ;
-%                 les types à virgule fixe (fixdt) sont refusés, MatLibre
-%                 ne les ayant pas.
+%                 un type à virgule fixe — 'fixdt(1,16,8)', 'sfix16_En8' —
+%                 range la valeur sur sa grille, et le bloc la lit dans ce
+%                 type.
 %      Min, Max   les bornes de la valeur, vides par défaut : une valeur
 %                 qui en sort arrête la compilation par une erreur
 %                 Simulink:Data:ParameterOutOfRange qui nomme le bloc.

@@ -3,7 +3,9 @@ function varargout = matlibre_sl_types(action, varargin)
 %   T = MATLIBRE_SL_TYPES('propager',C) rend le type de chaque port de
 %   sortie du modèle compilé C, comme Simulink le propage : un code par
 %   port — 2 double, 3 single, 4 int8, 5 uint8, 6 int16, 7 uint16,
-%   8 int32, 9 uint32, 10 boolean. Une constante a le type de sa valeur ou
+%   8 int32, 9 uint32, 10 boolean, et à partir de 101 les types à
+%   virgule fixe (fixdt(1,16,8), 'sfix16_En8'), numérotés à mesure
+%   qu'on les rencontre. Une constante a le type de sa valeur ou
 %   celui de son OutDataTypeStr ; une entrée, celui de son OutDataTypeStr,
 %   double sinon ; un opérateur relationnel ou logique rend un booléen ;
 %   un bloc de calcul ou d'aiguillage hérite du type de ses entrées —
@@ -22,6 +24,20 @@ function varargout = matlibre_sl_types(action, varargin)
 %   le transmet, Abs ou Complex to Real-Imag le rendent réel. Un bloc qui
 %   ne calcule qu'en réel — une saturation, un intégrateur, une table... —
 %   refuse une entrée complexe : Simulink:DataType:InputPortComplexityMismatch.
+%
+%   Un calcul à virgule fixe dont le type n'est pas dit (Inherit via
+%   internal rule) prend le type qui ne perd rien : une somme garde la
+%   plus fine des échelles et gagne les bits de ses retenues, un produit
+%   additionne tailles et bits après la virgule, un gain y range d'abord
+%   son paramètre en meilleure précision sur la taille de l'entrée ; le
+%   tout borné à 32 bits, en rognant les bits après la virgule.
+%
+%   V = MATLIBRE_SL_TYPES('convertir',CODE,V) range V dans le type CODE :
+%   un FI pour un type à virgule fixe. T = MATLIBRE_SL_TYPES('numerictype',
+%   CODE) rend le NUMERICTYPE d'un type à virgule fixe, et L =
+%   MATLIBRE_SL_TYPES('fixes') la table de ceux qu'on a rencontrés : une
+%   ligne [signe, taille, bits après la virgule, ajustement, biais] par
+%   code, à partir de 101.
 %
 %   C = MATLIBRE_SL_TYPES('code',NOM) rend le code d'un nom de type
 %   ('int8', 'boolean'...), 0 pour un type hérité ; N =
@@ -46,21 +62,131 @@ function varargout = matlibre_sl_types(action, varargin)
             varargout{1} = nomDe(varargin{1});
         case 'classe'
             varargout{1} = classeDe(varargin{1});
+        case 'convertir'
+            varargout{1} = convertir(varargin{1}, varargin{2});
+        case 'numerictype'
+            varargout{1} = typeNumerique(varargin{1});
+        case 'fixes'
+            varargout{1} = registre('tout');
+        case 'codeValeur'
+            varargout{1} = codeDeValeur(varargin{1});
+        case 'parametreGain'
+            varargout{1} = codeParametreGain(varargin{:});
         otherwise
             error('Simulink:DataType:Action', 'Action inconnue : %s.', char(action));
     end
 end
 
 function n = nomDe(code)
+    if code > 100
+        n = nomFixe(registre('ligne', code));
+        return
+    end
     noms = {'', 'double', 'single', 'int8', 'uint8', 'int16', 'uint16', 'int32', ...
             'uint32', 'boolean'};
     n = noms{code};
 end
 
+% Le nom que Simulink donne à un type à virgule fixe : sfix16_En8, ufix8,
+% sfix16_E2, sfix16_S0p5_B2.
+function n = nomFixe(l)
+    lettres = 'us';
+    n = sprintf('%cfix%d', lettres(l(1) + 1), l(2));
+    if l(4) ~= 1 || l(5) ~= 0
+        ecrire = @(x) strrep(strrep(num2str(x, 10), '.', 'p'), '-', 'n');
+        n = sprintf('%s_S%s_B%s', n, ecrire(l(4) * 2 ^ -l(3)), ecrire(l(5)));
+    elseif l(3) > 0
+        n = sprintf('%s_En%d', n, l(3));
+    elseif l(3) < 0
+        n = sprintf('%s_E%d', n, -l(3));
+    end
+end
+
+% La classe MATLAB d'un signal : un type à virgule fixe se calcule en
+% double, ses valeurs ramenées à la grille de son type après chaque bloc.
 function k = classeDe(code)
+    if code > 100
+        k = 'double';
+        return
+    end
     k = nomDe(code);
     if strcmp(k, 'boolean')
         k = 'logical';
+    end
+end
+
+function v = convertir(code, v)
+    if code > 100
+        v = fi(v, typeNumerique(code));
+    elseif code > 2
+        v = cast(v, classeDe(code));
+    end
+end
+
+function T = typeNumerique(code)
+    l = registre('ligne', code);
+    if l(4) == 1 && l(5) == 0
+        T = numerictype(l(1), l(2), l(3));
+    else
+        T = numerictype(l(1), l(2), l(4) * 2 ^ -l(3), l(5));
+    end
+end
+
+% Les types à virgule fixe rencontrés, une ligne [signe, taille, bits après
+% la virgule, ajustement de la pente, biais] chacun, numérotés à partir de
+% 101 dans l'ordre où on les rencontre.
+function varargout = registre(action, x)
+    persistent tableFixes
+    if isempty(tableFixes)
+        tableFixes = zeros(0, 5);
+    end
+    switch action
+        case 'code'
+            k = find(all(tableFixes == repmat(x, size(tableFixes, 1), 1), 2), 1);
+            if isempty(k)
+                tableFixes(end + 1, :) = x;
+                k = size(tableFixes, 1);
+            end
+            varargout{1} = 100 + k;
+        case 'ligne'
+            varargout{1} = tableFixes(x - 100, :);
+        otherwise
+            varargout{1} = tableFixes;
+    end
+end
+
+% Le code d'un type décrit par un NUMERICTYPE : un entier de MATLAB quand
+% il en est un (fixdt(1,16,0) est int16), sinon un type à virgule fixe.
+function code = codeDuType(T)
+    switch T.Mode
+        case 'double'
+            code = 2;
+        case 'single'
+            code = 3;
+        case 'boolean'
+            code = 10;
+        otherwise
+            if strcmp(T.Scaling, 'Unspecified')
+                code = -2;
+                return
+            end
+            l = [T.Signed, T.WordLength, T.FractionLength, T.SlopeAdjustmentFactor, T.Bias];
+            entiers = [8 4 5; 16 6 7; 32 8 9];
+            k = find(entiers(:, 1) == l(2), 1);
+            if l(3) == 0 && l(4) == 1 && l(5) == 0 && ~isempty(k)
+                code = entiers(k, 3 - l(1));
+            else
+                code = registre('code', double(l));
+            end
+    end
+end
+
+% Le code du type d'une valeur : un FI a celui de son NUMERICTYPE.
+function code = codeDeValeur(v)
+    if isa(v, 'embedded.fi')
+        code = codeDuType(numerictype(v));
+    else
+        code = codeDe(class(v));
     end
 end
 
@@ -79,7 +205,30 @@ function code = codeDe(nom)
         code = 10;
     end
     if isempty(code)
-        code = -1;
+        code = codeFixeDe(nom);
+    end
+end
+
+% Un type à virgule fixe écrit : 'fixdt(1,16,8)', 'sfix16_En8', ou le nom
+% d'une variable de l'espace de travail qui porte un Simulink.NumericType ;
+% -1 pour ce qui n'en est pas un, -2 pour une échelle qui n'est pas dite.
+function code = codeFixeDe(nom)
+    code = -1;
+    T = [];
+    if strncmp(nom, 'fixdt(', 6) || ~isempty(regexp(nom, '^[su]fix\d', 'once'))
+        try
+            T = matlibre_fixe_versType(nom);
+        catch
+            return
+        end
+    elseif isvarname(nom) && evalin('base', sprintf('exist(''%s'', ''var'')', nom)) == 1
+        v = evalin('base', nom);
+        if isa(v, 'embedded.numerictype')
+            T = v;
+        end
+    end
+    if ~isempty(T)
+        code = codeDuType(T);
     end
 end
 
@@ -92,10 +241,22 @@ function t = typeFixe(p, chemin)
         return   % un type de bus : ses éléments sont des doubles
     end
     t = codeDe(p.OutDataTypeStr);
+    if t == -2 && isfield(p, 'Value')
+        % une constante de type fixdt(1,16) : la meilleure précision pour
+        % sa valeur
+        T = matlibre_fixe_versType(char(p.OutDataTypeStr));
+        T.FractionLength = matlibre_fixe_precision(p.Value, T.Signed, T.WordLength);
+        t = codeDuType(T);
+    elseif t == -2
+        error('Simulink:DataType:UnspecifiedScaling', ...
+              ['Le type ''%s'' du bloc ''%s'' ne dit pas son echelle : donnez-lui ses bits ' ...
+               'apres la virgule, fixdt(S,W,F).'], char(p.OutDataTypeStr), chemin);
+    end
     if t < 0
         error('Simulink:DataType:UnknownDataType', ...
               ['Le type ''%s'' du bloc ''%s'' est inconnu : les types sont double, single, ' ...
-               'int8, uint8, int16, uint16, int32, uint32 et boolean, ou ''Inherit: ...''.'], ...
+               'int8, uint8, int16, uint16, int32, uint32, boolean, les types a virgule ' ...
+               'fixe (fixdt(1,16,8), sfix16_En8), ou ''Inherit: ...''.'], ...
               char(p.OutDataTypeStr), chemin);
     end
 end
@@ -201,13 +362,27 @@ function s = regle(c, k, tE)
             if r == 0
                 r = 10;
             end
-        case {'gain', 'abs', 'unaryminus', 'sign', 'rounding', 'saturation', 'deadzone', ...
+        case {'sum', 'product', 'gain'}
+            r = typeFixe(p, ch);
+            if r == 0 && any(strcmpi(strtrim(char(p.OutDataTypeStr)), ...
+                                     {'Inherit: Same as first input', 'Inherit: Same as input'}))
+                r = tE(1);
+            elseif r == 0
+                if any(tE > 100) && all(tE > 0)
+                    r = regleInterne(c.types{k}, p, tE, ch);
+                elseif strcmp(c.types{k}, 'gain')
+                    r = commun(tE(1:min(1, end)));
+                else
+                    r = commun(tE);
+                end
+            end
+        case {'abs', 'unaryminus', 'sign', 'rounding', 'saturation', 'deadzone', ...
               'quantizer', 'bias', 'zoh', 'memory', 'delay', 'ratetransition', 'from', ...
               'selector', 'reshape', 'demux', 'ic', 'manualswitch', 'wraptozero', 'backlash', ...
               'ratelimiter', 'tappeddelay', 'difference', 'busselector', 'busassignment', ...
               'algebraicconstraint'}
             r = commun(tE(1:min(1, end)));
-        case {'sum', 'product', 'minmax', 'mux', 'concatenate', 'merge', 'dotproduct'}
+        case {'minmax', 'mux', 'concatenate', 'merge', 'dotproduct'}
             r = commun(tE);
         case 'switch'
             r = commun(tE([1 min(3, end)]));
@@ -243,7 +418,7 @@ function s = classesFonction(c, k, tE)
         if c.entrees{k}(j) > 0
             d = c.dims{c.entrees{k}(j)};
         end
-        u{j} = cast(zeros(d), classeDe(tE(j)));
+        u{j} = convertir(tE(j), zeros(d));
     end
     sorties = cell(1, c.nOut(k));
     try
@@ -259,7 +434,7 @@ function s = classesFonction(c, k, tE)
     clear(func2str(h));
     s = 2 * ones(1, c.nOut(k));
     for q = 1:c.nOut(k)
-        r = codeDe(class(sorties{q}));
+        r = codeDeValeur(sorties{q});
         if r > 0
             s(q) = r;
         end
@@ -331,6 +506,17 @@ function verifier(c, k, tE, t)
             end
         case 'constant'
             attendu = typeFixe(p, ch);
+            if attendu > 100
+                T = typeNumerique(attendu);
+                [bas, haut] = matlibre_fixe_bornes(T);
+                v = (double(p.Value(:)) - T.Bias) / T.Slope;
+                if any(v < bas - 0.5 | v >= haut + 0.5)
+                    error('Simulink:Parameters:ParamOverflow', ...
+                          ['La valeur %s de ''%s'' deborde le type %s, qui va de %g a %g.'], ...
+                          mat2str(p.Value, 6), ch, nomDe(attendu), bas * T.Slope + T.Bias, ...
+                          haut * T.Slope + T.Bias);
+                end
+            end
             if attendu >= 4 && attendu <= 9
                 bornes = [-128 127; 0 255; -32768 32767; 0 65535; -2147483648 2147483647; ...
                           0 4294967295];
@@ -477,18 +663,17 @@ function [s, sonde] = complexiteFonction(c, k, xE, sonde)
             u = cell(1, c.nIn(k));
             for j = 1:c.nIn(k)
                 d = [1 1];
-                classe = 'double';
                 if c.entrees{k}(j) > 0
                     d = c.dims{c.entrees{k}(j)};
-                    if isfield(c, 'typePort')
-                        classe = classeDe(c.typePort(c.entrees{k}(j)));
-                    end
                 end
                 valeur = (essai - 1) * complex(0.7, 0.3 * xE(j));
                 if ~xE(j)
                     valeur = real(valeur);
                 end
-                u{j} = cast(valeur * ones(d), classe);
+                u{j} = valeur * ones(d);
+                if isfield(c, 'typePort') && c.entrees{k}(j) > 0
+                    u{j} = convertir(c.typePort(c.entrees{k}(j)), u{j});
+                end
                 if xE(j)
                     u{j} = complex(u{j});
                 end
@@ -550,4 +735,97 @@ function verifierComplexe(c, k, xE)
                'que des signaux reels : separez parties reelle et imaginaire (Complex to ' ...
                'Real-Imag), ou prenez le module (Abs).'], j, ch);
     end
+end
+
+% --- la règle interne des calculs à virgule fixe -------------------------
+
+% [signe, taille, bits après la virgule] d'un type ; vide pour une échelle
+% qui n'est pas une puissance de deux.
+function d = decrire(code)
+    entiers = [4 1 8; 5 0 8; 6 1 16; 7 0 16; 8 1 32; 9 0 32; 10 0 1];
+    k = find(entiers(:, 1) == code, 1);
+    if ~isempty(k)
+        d = [entiers(k, 2:3), 0];
+    elseif code > 100
+        l = registre('ligne', code);
+        d = l(1:3);
+        if l(4) ~= 1 || l(5) ~= 0
+            d = [];
+        end
+    else
+        d = [];
+    end
+end
+
+function r = regleInterne(type, p, tE, chemin)
+    if any(tE == 2 | tE == 3)
+        r = 2 + all(tE(tE == 2 | tE == 3) == 3);   % un flottant : le calcul se fait en flottant
+        return
+    end
+    d = zeros(numel(tE), 3);
+    for j = 1:numel(tE)
+        dj = decrire(tE(j));
+        if isempty(dj)
+            r = tE(1);   % une pente quelconque : le type de la première entrée
+            return
+        end
+        d(j, :) = dj;
+    end
+    switch type
+        case 'sum'
+            signes = char(p.Signs);
+            n = max(numel(tE), 2);
+            moins = any(signes == '-');
+            S = any(d(:, 1)) || moins;
+            F = max(d(:, 3));
+            I = max(d(:, 2) - d(:, 3) - d(:, 1)) + ceil(log2(n));
+            W = S + I + F;
+        case 'product'
+            if any(char(p.Inputs) == '/')
+                r = tE(1);
+                return
+            end
+            S = any(d(:, 1));
+            W = sum(d(:, 2));
+            F = sum(d(:, 3));
+        otherwise   % gain : entrée fois paramètre, dans le type de ce dernier
+            dK = decrire(codeParametreGain(p, tE(1), chemin));
+            if isempty(dK)
+                r = tE(1);
+                return
+            end
+            S = d(1, 1) || dK(1);
+            W = d(1, 2) + dK(2);
+            F = d(1, 3) + dK(3);
+    end
+    if W > 32
+        F = F - (W - 32);   % au plus 32 bits : les bits après la virgule cèdent
+        W = 32;
+    end
+    r = codeDuType(numerictype(S, W, F));
+    if r < 0
+        error('Simulink:DataType:InternalRule', ...
+              'Le type de sortie de ''%s'' ne se deduit pas de ses entrees.', chemin);
+    end
+end
+
+% Le type du paramètre d'un gain dont l'entrée est à virgule fixe : celui
+% que dit ParamDataTypeStr, ou la meilleure précision pour sa valeur, sur
+% la taille et le signe de l'entrée — signé si le gain est négatif.
+function r = codeParametreGain(p, typeEntree, chemin)
+    r = 0;
+    if isfield(p, 'ParamDataTypeStr')
+        r = typeFixe(struct('OutDataTypeStr', p.ParamDataTypeStr, 'Value', p.Gain), chemin);
+    end
+    if r ~= 0
+        return
+    end
+    d = decrire(typeEntree);
+    if isempty(d)
+        r = typeEntree;
+        return
+    end
+    K = double(p.Gain);
+    sK = any(K(:) < 0) || d(1);
+    r = codeDuType(numerictype(sK, d(2), matlibre_fixe_precision(K, sK, d(2))));
 end

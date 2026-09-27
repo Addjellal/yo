@@ -39,7 +39,7 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 458 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 459 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 129 |
@@ -53,13 +53,14 @@ existant appellera.
 | `robuste` | Robust Control Toolbox — analyse de robustesse. | 93 |
 | `signal` | Signal Processing Toolbox — traitement du signal. | 208 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
-| `simulink` | Simulink — simulation de schémas-blocs. | 52 |
-| `stateflow` | Stateflow — machines à états finis. | 4 |
+| `simulink` | Simulink — simulation de schémas-blocs. | 79 |
+| `stateflow` | Stateflow — machines à états finis. | 19 |
 | `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 293 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 70 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
+| `virgule-fixe` | Fixed-Point Designer — nombres à virgule fixe. | 17 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 112 |
-Les fonctions natives — 679, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 681, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

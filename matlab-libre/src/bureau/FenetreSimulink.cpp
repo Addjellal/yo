@@ -107,8 +107,8 @@ const BlocBibliotheque blocs[] = {
     {"Opérations", "algebraicconstraint", "Rend z tel que son entrée f(z) s'annule",
      "'InitialGuess', 0"},
     {"Opérations", "dotproduct", "Le produit scalaire de ses deux entrées", ""},
-    {"Opérations", "datatypeconversion", "Convertit le signal : entier, simple, booléen",
-     "'OutDataTypeStr', 'int8'"},
+    {"Opérations", "datatypeconversion",
+     "Convertit le signal : entier, simple, booléen, virgule fixe", "'OutDataTypeStr', 'int8'"},
 
     {"Logique", "logic", "ET, OU, NON, OU exclusif", "'Operator', 'AND'"},
     {"Logique", "relational", "Compare deux entrées", "'Operator', '<'"},

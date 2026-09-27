@@ -412,11 +412,15 @@ function p = lireParametres(entree, bloc, chemin)
             end
             if ~isa(v, 'double')
                 % la classe d'origine, que la propagation des types lit :
-                % une constante int8(5) donne un signal int8
+                % une constante int8(5) donne un signal int8, fi(pi) un
+                % signal sfix16_En13
                 if ~isfield(p, 'Classes')
                     p.Classes = struct();
                 end
                 p.Classes.(nom) = class(v);
+                if isa(v, 'embedded.fi')
+                    p.Classes.(nom) = matlibre_sl_types('nom', matlibre_sl_types('codeValeur', v));
+                end
             end
             if any(strcmp(nom, {'SampleTime', 'tsamp', 'samptime', 'sample_time', 'Ts', ...
                                 'OutPortSampleTime'}))
@@ -3172,6 +3176,10 @@ function c = abaisser(c, pas, tDebut)
             % --- sources ---
             case 'constant'
                 seg = double(p.Value(:));
+                type = c.typePort(c.portDebut(k));
+                if type > 100
+                    seg = double(matlibre_sl_types('convertir', type, seg));
+                end
             case 'step'                   % [Time; Before; After], w chacun
                 seg = [etendre(p.Time, w, ch, 'Time'); etendre(p.Before, w, ch, 'Before'); ...
                        etendre(p.After, w, ch, 'After')];
@@ -3242,6 +3250,13 @@ function c = abaisser(c, pas, tDebut)
             % --- opérations ---
             case 'gain'                   % [lignes; colonnes; K(:)]
                 K = double(p.Gain);
+                if c.entrees{k}(1) > 0 && c.typePort(c.entrees{k}(1)) > 100
+                    % une entrée à virgule fixe : le gain sur la grille de
+                    % son propre type, comme Simulink le range
+                    typeK = matlibre_sl_types('parametreGain', p, ...
+                                              c.typePort(c.entrees{k}(1)), ch);
+                    K = double(matlibre_sl_types('convertir', typeK, K));
+                end
                 sub = find(strcmp(p.Multiplication, {'Element-wise(K.*u)', 'Matrix(K*u)', ...
                                                      'Matrix(u*K)', 'Matrix(K*u) (u vector)'}));
                 seg = [size(K, 1); size(K, 2); K(:)];
@@ -3434,14 +3449,17 @@ function c = abaisser(c, pas, tDebut)
                     end
                     seg = bornes;
                 end
-            case 'datatypeconversion'     % [type; arrondi; saturation]
-                types = {'Inherit: Inherit via back propagation', 'double', 'single', ...
-                         'int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'boolean'};
+            case 'datatypeconversion'     % [type; arrondi; saturation; SI; type d'entrée]
                 arrondis = {'Zero', 'Nearest', 'Round', 'Floor', 'Ceiling', 'Convergent', ...
                             'Simplest'};
-                seg = [find(strcmp(types, p.OutDataTypeStr)); ...
+                typeEntree = 2;
+                if c.entrees{k}(1) > 0
+                    typeEntree = c.typePort(c.entrees{k}(1));
+                end
+                seg = [max(1, c.typePort(c.portDebut(k))); ...
                        find(strcmp(arrondis, p.RndMeth)); ...
-                       strcmp(p.SaturateOnIntegerOverflow, 'on')];
+                       strcmp(p.SaturateOnIntegerOverflow, 'on'); ...
+                       strcmp(p.ConvertRealWorld, 'Stored Integer (SI)'); typeEntree];
             case 'selector'               % [n; indices]
                 indices = double(p.Indices(:));
                 seg = [numel(indices); indices];
@@ -3469,7 +3487,7 @@ function c = abaisser(c, pas, tDebut)
             case 'wraptozero'
                 seg = etendre(p.Threshold, w, ch, 'Threshold');
             case 'ic'                     % [valeur]  Z : [passé]
-                seg = etendre(p.Value, w, ch, 'Value');
+                seg = surGrille(c, k, etendre(p.Value, w, ch, 'Value'));
                 z0 = 0;
             case 'width'
                 seg = largeurEntree(c, k, 1);
@@ -3754,7 +3772,7 @@ function c = abaisser(c, pas, tDebut)
                     seg = [L; L; variable; active; remise; externe; wr];
                 end
                 if L > 0
-                    ci = double(p.InitialCondition);
+                    ci = surGrille(c, k, double(p.InitialCondition));
                     if numel(ci) == w * L && L > 1 && ~variable
                         tampon = reshape(ci, w, L);
                     else
@@ -3766,7 +3784,7 @@ function c = abaisser(c, pas, tDebut)
                     end
                 end
             case 'memory'
-                z0 = etendre(p.InitialCondition, w, ch, 'InitialCondition');
+                z0 = surGrille(c, k, etendre(p.InitialCondition, w, ch, 'InitialCondition'));
             case 'discreteintegrator'
                 % [K T; méthode; bornée; haut w; bas w; remise; externe; wr;
                 %  port de saturation; port d'état]
@@ -5114,5 +5132,16 @@ function verifierSignes(v, admis, chemin, nom, attendu)
         error('Simulink:Parameters:InvParamSetting', ...
               ['Le parametre ''%s'' de ''%s'' vaut %s : il faut un nombre d''entrees, ou ' ...
                '%s.'], nom, chemin, apercu(v), attendu);
+    end
+end
+
+% Une condition initiale sur la grille du type à virgule fixe de la sortie
+% du bloc, comme Simulink la range ; telle quelle pour un autre type.
+function v = surGrille(c, k, v)
+    if isfield(c, 'typePort') && c.nOut(k) > 0
+        type = c.typePort(c.portDebut(k));
+        if type > 100
+            v = double(matlibre_sl_types('convertir', type, v));
+        end
     end
 end

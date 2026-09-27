@@ -35,6 +35,9 @@ assert(max(abs(fftfilt([1 1], [1 2 3 4]) - filter([1 1], 1, [1 2 3 4]))) < 1e-10
 [coefficients, erreur] = lpc([1 2 3 2 1 2 3 2], 2);
 assert(coefficients(1) == 1);
 
+% Fixed-Point Designer
+assert(double(fi(pi, 1, 16, 8)) == 804 / 256 && fi(pi).FractionLength == 13);
+
 % Control System
 G = tf(1, [1 2 1]);
 assert(abs(dcgain(G) - 1) < 1e-12);

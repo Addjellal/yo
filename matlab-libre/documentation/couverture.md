@@ -15,10 +15,10 @@ fichier est produit par mesure, non écrit à la main.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **679 fonctions natives** couvrant le MATLAB de base, **toutes**
+- **681 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **2978 fonctions de toolbox** réparties en4 modules, écrites dans le
+- **3039 fonctions de toolbox** réparties en5 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -39,7 +39,7 @@ fichier est produit par mesure, non écrit à la main.
   MATLAB (tranches, réductions, diffusées, temporaires).
 - **Un générateur de code C** qui traduit l'arbre syntaxique, propage les
   types et les dimensions, et produit du C sans allocation.
-- **Une documentation qui ne ment pas** : 661 fonctions ont leur fiche —
+- **Une documentation qui ne ment pas** : 664 fonctions ont leur fiche —
   syntaxe, description, exemples, voisines —, le bureau les montre dans un
   navigateur d'aide, et chaque exemple est exécuté à chaque passage des
   tests.
@@ -53,9 +53,9 @@ fichier est produit par mesure, non écrit à la main.
   dans le langage — dont une qui contrôle un résultat exact par toolbox,
   une les types de données, une le calcul parallèle, une qui compile puis
   exécute le C produit pour le comparer à l'interpréteur, une qui exécute
-  les 661 exemples de l'aide — et 324 vérifications du bureau natif,
+  les 664 exemples de l'aide — et 372 vérifications du bureau natif,
   pilotées sans ouvrir de fenêtre. `outils/eprouverNatives.sh` appelle en
-  plus chacune des 679 fonctions natives avec des arguments qu'elle
+  plus chacune des 681 fonctions natives avec des arguments qu'elle
   n'attend pas — une cellule, une structure, une poignée, une taille
   absurde, une dimension négative — et vérifie qu'elle rend une erreur au
   lieu de tomber.
@@ -177,7 +177,10 @@ totalité.
    six dimensions, les
    rappels du modèle (InitFcn, StopFcn...) et SimulationCommand.
    Les types de données se propagent de bloc en bloc — double, single,
-   entiers, booléens —, arrondis, repliés ou saturés comme dans Simulink.
+   entiers, booléens, virgule fixe (fixdt) —, arrondis, repliés ou
+   saturés comme dans Simulink ; un calcul à virgule fixe dont le type
+   n'est pas dit prend celui qui ne perd rien, et To Workspace rend des
+   `fi`.
    Stateflow a aussi ses jonctions de connexion, ses fonctions, ses
    tables de vérité et ses événements : ceux d'entrée réveillent le
    diagramme par un port de déclenchement, ceux de sortie appellent un
@@ -196,8 +199,7 @@ totalité.
    transmettent le complexe, Complex to Real-Imag et ses pendants passent
    d'une forme à l'autre, et un bloc qui ne calcule qu'en réel refuse un
    complexe en se nommant.
-   Manquent : les types à virgule fixe, les signaux de taille variable et
-   Simscape.
+   Manquent : les signaux de taille variable et Simscape.
    Stateflow a ses états emboîtés, ses régions parallèles, son
    historique, sa logique temporelle — SFAFTER, SFBEFORE, SFAT, SFEVERY,
    en réveils ou en secondes — et ses étiquettes écrites en texte :

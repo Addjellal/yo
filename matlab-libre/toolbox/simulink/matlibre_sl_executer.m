@@ -96,6 +96,9 @@ function T = preparer(c)
     % Les types des sorties : une sortie qui n'est pas double se ramène à
     % son type après chaque calcul du bloc (voir MATLIBRE_SL_TYPES).
     T.typePort = c.typePort;
+    % les types à virgule fixe, une ligne [signe, taille, virgule,
+    % ajustement, biais] par code à partir de 101
+    T.fixes = matlibre_sl_types('fixes');
     % La complexité des sorties, et pour chaque bloc s'il reçoit un
     % complexe : il calcule alors en complexe — la racine d'un négatif est
     % imaginaire, et non NaN —, même quand la valeur du moment est réelle.
@@ -206,7 +209,9 @@ function T = preparer(c)
         for j = 1:c.nIn(k)
             T.formes{k}{j} = c.inDims{k}{j};
             source = c.entrees{k}(j);
-            if source > 0 && isfield(c, 'typePort') && c.typePort(source) > 2
+            if source > 0 && isfield(c, 'typePort') && c.typePort(source) > 100
+                T.classesEntree{k}{j} = c.typePort(source);   % à virgule fixe : un FI
+            elseif source > 0 && isfield(c, 'typePort') && c.typePort(source) > 2
                 T.classesEntree{k}{j} = matlibre_sl_types('classe', c.typePort(source));
             end
         end
@@ -2175,7 +2180,11 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                         V(a:b) = y;
                     case 34   % data type conversion
-                        V(a:b) = convertirType(T.P(p), T.P(p + 1), T.P(p + 2), u);
+                        if T.P(p + 3) ~= 0
+                            u = entierStocke(T.P(p + 4), u, T.fixes);   % Stored Integer (SI)
+                        end
+                        V(a:b) = convertirType(T.P(p), T.P(p + 1), T.P(p + 2), u, T.fixes, ...
+                                               T.P(p + 3) ~= 0);
                     case 35   % wrap to zero
                         V(a:b) = u .* (u <= T.P(p:p + b - a));
                     case 36   % interval test
@@ -2716,7 +2725,7 @@ function V = convertirSorties(T, k, V)
         if type > 2
             a = T.poA(pd + q - 1);
             b = T.poB(pd + q - 1);
-            V(a:b) = convertirType(type, T.arrondiK(k), T.saturerK(k), V(a:b));
+            V(a:b) = convertirType(type, T.arrondiK(k), T.saturerK(k), V(a:b), T.fixes);
         end
     end
 end
@@ -2844,7 +2853,9 @@ function V = appelerFonction(T, k, V, p, e)
     u = cell(1, nIn);
     for j = 1:nIn
         u{j} = reshape(V(T.eA(e + j):T.eB(e + j)), T.formes{k}{j});
-        if ~isempty(T.classesEntree{k}{j})
+        if isnumeric(T.classesEntree{k}{j}) && ~isempty(T.classesEntree{k}{j})
+            u{j} = matlibre_sl_types('convertir', T.classesEntree{k}{j}, u{j});
+        elseif ~isempty(T.classesEntree{k}{j})
             u{j} = cast(u{j}, T.classesEntree{k}{j});
         end
     end
@@ -3546,7 +3557,7 @@ end
 % Une conversion de type : le signal reste un double, mais prend les valeurs
 % que le type admet — arrondi selon le mode demandé, puis saturé ou
 % replié modulo 2^n à la façon des entiers de Simulink.
-function y = convertirType(type, arrondi, saturer, u)
+function y = convertirType(type, arrondi, saturer, u, fixes, stocke)
     switch type
         case {1, 2}   % hérité, double : rien ne change
             y = u;
@@ -3557,6 +3568,19 @@ function y = convertirType(type, arrondi, saturer, u)
         case 10
             y = double(u ~= 0);
             return
+    end
+    pente = 1;
+    biais = 0;
+    if type > 100
+        % à virgule fixe : l'entier stocké (u - biais) / pente, arrondi et
+        % ramené dans les bornes, puis la valeur qu'il représente ; en
+        % Stored Integer, u est déjà l'entier
+        l = fixes(type - 100, :);
+        pente = l(4) * 2 ^ -l(3);
+        biais = l(5);
+        if nargin < 6 || ~stocke
+            u = (u - biais) / pente;
+        end
     end
     switch arrondi
         case 1
@@ -3576,8 +3600,17 @@ function y = convertirType(type, arrondi, saturer, u)
         otherwise
             v = fix(u);
     end
-    bornes = [-128 127; 0 255; -32768 32767; 0 65535; -2147483648 2147483647; 0 4294967295];
-    b = bornes(type - 3, :);
+    if type > 100
+        if l(1)
+            b = [-2 ^ (l(2) - 1), 2 ^ (l(2) - 1) - 1];
+        else
+            b = [0, 2 ^ l(2) - 1];
+        end
+    else
+        bornes = [-128 127; 0 255; -32768 32767; 0 65535; -2147483648 2147483647; ...
+                  0 4294967295];
+        b = bornes(type - 3, :);
+    end
     if saturer
         y = min(max(v, b(1)), b(2));
     else
@@ -3585,6 +3618,17 @@ function y = convertirType(type, arrondi, saturer, u)
         y = mod(v - b(1), etendue) + b(1);
     end
     y(isnan(u)) = 0;
+    y = y * pente + biais;
+end
+
+% L'entier que stocke un signal de type TYPE : pour la conversion Stored
+% Integer, qui garde l'entier et change ce qu'il vaut.
+function q = entierStocke(type, u, fixes)
+    q = u;
+    if type > 100
+        l = fixes(type - 100, :);
+        q = round((u - l(5)) / (l(4) * 2 ^ -l(3)));
+    end
 end
 
 % --- les modes figés du pas variable

@@ -4375,8 +4375,11 @@ Hors = Simulink.Parameter(7);
 Hors.Max = 5;
 Debord = Simulink.Parameter(300);
 Debord.DataType = 'int8';
-Fixe = Simulink.Parameter(1);
+Fixe = Simulink.Parameter(1.03);
 Fixe.DataType = 'fixdt(1,16,4)';
+r = sim(set_param(t, 'c', 'Value', 'Fixe'), 1);
+assert(isfi(r.yout) && r.yout.FractionLength == 4 && double(r.yout(end)) == 1, ...
+       'un Simulink.Parameter fixdt range sa valeur sur la grille de son type');
 Alias = Simulink.Parameter(1);
 Alias.DataType = 'MonAlias';
 BusFaux = Simulink.Parameter(1);
@@ -4401,8 +4404,6 @@ casErreurs = {
         'typeParametre/c'
     @() sim(set_param(t, 'c', 'Value', 'Debord'), 1), 'Simulink:Data:ParameterOverflow', ...
         '-128 a 127'
-    @() sim(set_param(t, 'c', 'Value', 'Fixe'), 1), ...
-        'Simulink:DataType:FixedPointUnsupported', 'virgule fixe'
     @() sim(set_param(t, 'c', 'Value', 'Alias'), 1), 'Simulink:DataType:UnknownDataType', ...
         'MonAlias'
     @() sim(set_param(t, 'c', 'Value', 'BusFaux'), 1), ...
@@ -6533,6 +6534,143 @@ assert(isreal(r.yout) && max(abs(r.yout(:, 1) - abs(sin(r.tout)))) < 1e-12, ...
        'Abs d''un complexe sous ode45, sans passage par zero');
 fprintf('signaux complexes : %d refus nommes verifies\n', size(casCx, 1) + 3);
 
+%% ----------------------------------------------------- 49. Types à virgule fixe
+% Un signal peut être à virgule fixe — fixdt(1,16,8), 'sfix16_En8', ou le
+% nom d'un Simulink.NumericType de l'espace de travail : ses valeurs sont
+% sur la grille de son type, arrondies et saturées ou repliées comme le
+% disent RndMeth et SaturateOnIntegerOverflow. Un calcul dont le type
+% n'est pas dit ne perd rien : une somme garde la plus fine des échelles
+% et gagne un bit par retenue possible, un produit additionne tailles et
+% bits après la virgule, un gain range son paramètre en meilleure
+% précision ; au plus 32 bits. To Workspace rend des FI.
+fixe = new_system('fixe');
+fixe = add_block(fixe, 'constant', 'c', 'Value', pi, 'OutDataTypeStr', 'fixdt(1,16,8)');
+fixe = add_block(fixe, 'constant', 'd', 'Value', 0.1, 'OutDataTypeStr', 'sfix8_En6');
+fixe = add_block(fixe, 'sum', 's');
+fixe = add_block(fixe, 'product', 'p');
+fixe = add_block(fixe, 'gain', 'g', 'Gain', 3);
+fixe = add_block(fixe, 'datatypeconversion', 'dtc', 'OutDataTypeStr', 'int8', 'RndMeth', 'Nearest');
+fixe = add_block(fixe, 'datatypeconversion', 'si', 'OutDataTypeStr', 'int16', ...
+                 'ConvertRealWorld', 'Stored Integer (SI)');
+fixe = add_block(fixe, 'toworkspace', 'tw', 'VariableName', 'sommeFixe', 'SaveFormat', 'Array');
+for nomSortie = {'ys', 'yp', 'yg', 'yd', 'yi'}
+    fixe = add_block(fixe, 'outport', nomSortie{1});
+end
+fixe = add_line(add_line(fixe, 'c', 's/1'), 'd', 's/2');
+fixe = add_line(add_line(fixe, 'c', 'p/1'), 'd', 'p/2');
+fixe = add_line(add_line(add_line(fixe, 'c', 'g'), 's', 'dtc'), 'c', 'si');
+fixe = add_line(add_line(add_line(fixe, 's', 'ys'), 'p', 'yp'), 'g', 'yg');
+fixe = add_line(add_line(add_line(fixe, 'dtc', 'yd'), 'si', 'yi'), 's', 'tw');
+c = matlibre_sl_compiler(fixe);
+noms = {};
+for k = 1:c.n
+    if c.nOut(k) > 0
+        noms(end + 1, :) = {c.noms{k}, matlibre_sl_types('nom', c.typePort(c.portDebut(k)))}; %#ok<SAGROW>
+    end
+end
+attendus = {'c', 'sfix16_En8'; 'd', 'sfix8_En6'; 's', 'sfix17_En8'; 'p', 'sfix24_En14'; ...
+            'g', 'sfix32_En21'; 'dtc', 'int8'; 'si', 'int16'};
+for i = 1:size(attendus, 1)
+    assert(strcmp(noms{strcmp(noms(:, 1), attendus{i, 1}), 2}, attendus{i, 2}), ...
+           sprintf('le type de %s est %s', attendus{i, :}));
+end
+r = sim(fixe, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1);
+cq = 804 / 256;   % pi sur la grille 2^-8
+dq = 6 / 64;      % 0.1 sur la grille 2^-6
+assert(isequal(r.yout(1, :), [cq + dq, cq * dq, 3 * cq, 3, 804]), ...
+       'somme, produit et gain exacts ; int8 arrondi au plus proche ; entier stocke garde');
+assert(isfi(sommeFixe) && sommeFixe.WordLength == 17 && sommeFixe.FractionLength == 8 && ...
+       double(sommeFixe(1)) == cq + dq, 'To Workspace rend des FI de son type');
+% arrondis et débordements d'un gain de type imposé
+arrondi = new_system('arrondi');
+arrondi = add_block(arrondi, 'constant', 'c', 'Value', [3; -3], 'OutDataTypeStr', 'fixdt(1,16,0)');
+arrondi = add_block(arrondi, 'gain', 'g', 'Gain', 0.5, 'OutDataTypeStr', 'fixdt(1,16,0)');
+arrondi = add_line(add_line(add_block(arrondi, 'outport', 'y'), 'c', 'g'), 'g', 'y');
+methodes = {'Floor', [1 -2]; 'Ceiling', [2 -1]; 'Zero', [1 -1]; 'Nearest', [2 -1]; ...
+            'Round', [2 -2]; 'Convergent', [2 -2]};
+for i = 1:size(methodes, 1)
+    r = sim(set_param(arrondi, 'g', 'RndMeth', methodes{i, 1}), 'Solver', ...
+            'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 0);
+    assert(isequal(double(r.yout(1, :)), methodes{i, 2}), ...
+           sprintf('RndMeth %s : 1.5 et -1.5 donnent %s', methodes{i, 1}, mat2str(methodes{i, 2})));
+end
+deborde = set_param(set_param(arrondi, 'c', 'Value', 3.14, 'OutDataTypeStr', 'fixdt(1,16,8)'), ...
+                    'g', 'Gain', 100, 'OutDataTypeStr', 'fixdt(1,16,8)');
+r = sim(deborde, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 0);
+assert(double(r.yout(1)) == mod(round(3.140625 * 100 * 256) + 32768, 65536) / 256 - 128, ...
+       'sans saturation, un debordement se replie');
+r = sim(set_param(deborde, 'g', 'SaturateOnIntegerOverflow', 'on'), 'Solver', ...
+        'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 0);
+assert(double(r.yout(1)) == 32767 / 256, 'avec saturation, il sature');
+% un Simulink.NumericType de l'espace de travail ; une MATLAB Function recoit des FI
+assignin('base', 'TypeCapteur', fixdt(0, 12, 4));
+capteur = new_system('capteur');
+capteur = add_block(capteur, 'constant', 'c', 'Value', 7.3, 'OutDataTypeStr', 'TypeCapteur');
+capteur = add_block(capteur, 'matlabfunction', 'm', 'Script', ...
+                    sprintf('function [y, estFi] = fcn(u)\ny = u * 2;\nestFi = double(isfi(u));\n'));
+capteur = add_block(add_block(capteur, 'outport', 'y'), 'outport', 'f');
+capteur = add_line(add_line(add_line(capteur, 'c', 'm'), 'm/1', 'y'), 'm/2', 'f');
+c = matlibre_sl_compiler(capteur);
+assert(strcmp(matlibre_sl_types('nom', c.typePort(c.portDebut(1))), 'ufix12_En4'), ...
+       'le type nomme dans l''espace de travail');
+r = sim(capteur, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 0);
+assert(isequal(r.yout(1, :), [2 * 117 / 16, 1]), 'la MATLAB Function calcule en virgule fixe');
+fichierFixe = [tempname() '.slx'];
+save_system(fixe, fichierFixe);
+r2 = sim(load_system(fichierFixe), 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1);
+r = sim(fixe, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1);
+assert(isequal(r2.yout, r.yout), 'un modele a virgule fixe se relit du .slx');
+delete(fichierFixe);
+% ce que Simulink refuse
+refusFixe = {
+    @() sim(set_param(fixe, 'c', 'Value', 200), 1), 'Simulink:Parameters:ParamOverflow', 'fixe/c'
+    @() sim(set_param(fixe, 'c', 'OutDataTypeStr', 'fixdt(1,16'), 1), ...
+        'Simulink:DataType:UnknownDataType', 'fixe/c'
+    @() sim(set_param(fixe, 'c', 'OutDataTypeStr', 'sfix16_Ex'), 1), ...
+        'Simulink:DataType:UnknownDataType', 'fixe/c'
+    @() sim(set_param(fixe, 'g', 'OutDataTypeStr', 'fixdt(1,16)'), 1), ...
+        'Simulink:DataType:UnspecifiedScaling', 'fixe/g'
+    @() sim(add_line(add_block(fixe, 'integrator', 'int'), 'c', 'int'), 1), ...
+        'Simulink:DataType:InputPortDataTypeMismatch', 'sfix16_En8'
+    };
+for kF = 1:size(refusFixe, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('refusFixe{kF, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, refusFixe{kF, 2}) && ~isempty(strfind(message, refusFixe{kF, 3})), ...
+           sprintf('virgule fixe, cas %d : %s attendu, %s rendu (%s)', kF, refusFixe{kF, 2}, ...
+                   vu, message));
+end
+% le paramètre d'un gain à entrée à virgule fixe est lui-même quantifié
+quantifie = new_system('quantifie');
+quantifie = add_block(quantifie, 'constant', 'c', 'Value', 1, 'OutDataTypeStr', 'fixdt(1,16,8)');
+quantifie = add_block(quantifie, 'gain', 'g', 'Gain', 0.1);
+quantifie = add_block(quantifie, 'gain', 'h', 'Gain', 0.1, 'ParamDataTypeStr', 'fixdt(1,8,4)');
+quantifie = add_block(quantifie, 'sum', 's', 'OutDataTypeStr', 'Inherit: Same as first input');
+quantifie = add_block(add_block(add_block(quantifie, 'outport', 'yg'), 'outport', 'yh'), 'outport', 'ys');
+quantifie = add_line(add_line(add_line(quantifie, 'c', 'g'), 'c', 'h'), 'g', 'yg');
+quantifie = add_line(add_line(add_line(quantifie, 'h', 'yh'), 'g', 's/1'), 'c', 's/2');
+quantifie = add_line(quantifie, 's', 'ys');
+c = matlibre_sl_compiler(quantifie);
+typeDe = @(nom) matlibre_sl_types('nom', c.typePort(c.portDebut(find(strcmp(c.noms, nom), 1))));
+assert(strcmp(typeDe('g'), 'sfix32_En26') && strcmp(typeDe('h'), 'sfix24_En12') && ...
+       strcmp(typeDe('s'), 'sfix32_En26'), 'gain : entree fois parametre ; Same as first input');
+r = sim(quantifie, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 0);
+assert(isequal(double(r.yout(1, 1:2)), [round(0.1 * 2 ^ 18) / 2 ^ 18, 2 / 16]), ...
+       'le gain 0.1 est range sur 16 bits, meilleure precision, ou dans ParamDataTypeStr');
+% la condition initiale d'un retard se range sur la grille de son type
+retardFixe = new_system('retardFixe');
+retardFixe = add_block(retardFixe, 'constant', 'c', 'Value', 1, 'OutDataTypeStr', 'fixdt(1,16,8)');
+retardFixe = add_block(retardFixe, 'unitdelay', 'd', 'InitialCondition', 0.1, 'SampleTime', 1);
+retardFixe = add_line(add_line(add_block(retardFixe, 'outport', 'y'), 'c', 'd'), 'd', 'y');
+r = sim(retardFixe, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1);
+assert(isequal(double(r.yout), [26 / 256; 1]), 'la condition initiale 0.1 devient 26/256');
+fprintf('virgule fixe : %d refus nommes verifies\n', size(refusFixe, 1));
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -6727,6 +6865,7 @@ function [m, texte] = aleaBatir(nom, types, cat)
     m = new_system(nom);
     texte = '';
     valeurEntree = 1.5;
+    typeEntree = {};
     tirage = rand();
     if tirage < 0.3
         valeurEntree = [0.5; 1.5; 2.5];
@@ -6734,6 +6873,9 @@ function [m, texte] = aleaBatir(nom, types, cat)
     elseif tirage < 0.45
         valeurEntree = 1.5 - 0.5i;   % un complexe, que bien des blocs refusent
         texte = ' entrees=complexe';
+    elseif tirage < 0.6
+        typeEntree = {'OutDataTypeStr', 'fixdt(1,16,8)'};   % à virgule fixe
+        texte = ' entrees=sfix16_En8';
     end
     for q = 1:numel(types)
         e = cat(strcmp({cat.type}, types{q}));
@@ -6760,7 +6902,7 @@ function [m, texte] = aleaBatir(nom, types, cat)
         if isnan(ns), ns = 1; end
         for i = 1 + (q > 1):ne
             source = sprintf('c%d_%d', q, i);
-            m = add_block(m, 'constant', source, 'Value', valeurEntree);
+            m = add_block(m, 'constant', source, 'Value', valeurEntree, typeEntree{:});
             m = add_line(m, [source '/1'], sprintf('b%d/%d', q, i));
         end
         for j = 1 + (q < numel(types)):ns

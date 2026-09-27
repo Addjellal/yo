@@ -611,7 +611,7 @@ function resultat = assembler(c, T, J, instants)
     end
     % des sorties toutes d'un même type rendent yout de ce type
     if ~isempty(typesSorties) && all(typesSorties == typesSorties(1)) && typesSorties(1) > 2
-        yout = cast(yout, matlibre_sl_types('classe', typesSorties(1)));
+        yout = matlibre_sl_types('convertir', typesSorties(1), yout);
     end
     resultat.yout = yout;
     % La forme de yout que demande SaveFormat : la matrice, une structure
@@ -637,7 +637,7 @@ function y = youtForme(c, parBloc, dimsBloc, sorties, typesSorties, instants, fo
                 valeurs = zeros(N, 1);
             end
             if typesSorties(i) > 2
-                valeurs = cast(valeurs, matlibre_sl_types('classe', typesSorties(i)));
+                valeurs = matlibre_sl_types('convertir', typesSorties(i), valeurs);
             end
             s = Simulink.SimulationData.Signal;
             s.Name = c.noms{k};
@@ -711,7 +711,7 @@ function resultat = deposer(c, T, J, instants, resultat)
         % la variable a la classe du signal : int8, single, logical...
         source = c.entrees{R.bloc}(1);
         if source > 0 && c.typePort(source) > 2
-            donnees = cast(donnees, matlibre_sl_types('classe', c.typePort(source)));
+            donnees = matlibre_sl_types('convertir', c.typePort(source), donnees);
         end
         switch p.SaveFormat
             case 'Array'
