@@ -1795,8 +1795,19 @@ void Interpreteur::executerInstruction(const NoeudPtr& n) {
             return;
         }
         case TypeN::Persistant: {
+            // La case d'une variable persistante porte le nom de sa fonction
+            // et, pour une sous-fonction, celui de son fichier : deux
+            // fichiers peuvent avoir chacun leur sous-fonction « registre »,
+            // qui ne partagent rien, et « clear f » vide aussi les
+            // sous-fonctions de f.m.
+            std::string proprietaire = portee().nomFonction;
+            if (portee().fonction && !portee().fonction->fichier.empty()) {
+                std::string fichier = fs::path(portee().fonction->fichier).stem().string();
+                if (!fichier.empty() && fichier != proprietaire)
+                    proprietaire = fichier + ">" + proprietaire;
+            }
             for (std::size_t k = 0; k < n->noms.size(); ++k) {
-                std::string cle = portee().nomFonction + "::" + n->noms[k];
+                std::string cle = proprietaire + "::" + n->noms[k];
                 portee().liensPersistants[n->noms[k]] = cle;
                 if (!persistantes.count(cle))
                     persistantes[cle] = n->enfants[k] ? evaluer(n->enfants[k]) : Valeur::vide();

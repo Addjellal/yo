@@ -1063,6 +1063,26 @@ C = {complex(2, 0)};
 S.a = complex(2, 0);
 assert(~isreal(C{1}) && ~isreal(S.a), 'une cellule, un champ gardent leur complexe');
 
+% Deux fichiers qui ont chacun une sous-fonction « compteur » à variable
+% persistante : chacune garde la sienne, et « clear f » vide aussi celles
+% des sous-fonctions de f.m.
+dossierPersistant = tempname();
+mkdir(dossierPersistant);
+for nomPersistant = {'persoUn', 'persoDeux'}
+    fid = fopen(fullfile(dossierPersistant, [nomPersistant{1} '.m']), 'w');
+    fprintf(fid, ['function n = %s()\nn = compteur();\nend\nfunction n = compteur()\n' ...
+                  'persistent k\nif isempty(k), k = 0; end\nk = k + 1;\nn = k;\nend\n'], ...
+            nomPersistant{1});
+    fclose(fid);
+end
+addpath(dossierPersistant);
+assert(isequal([persoUn() persoUn() persoDeux()], [1 2 1]), ...
+       'chaque fichier garde les persistantes de ses sous-fonctions');
+clear persoUn
+assert(persoUn() == 1 && persoDeux() == 2, 'clear f vide les sous-fonctions de f.m');
+rmpath(dossierPersistant);
+rmdir(dossierPersistant, 's');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

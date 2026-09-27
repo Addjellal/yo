@@ -51,6 +51,31 @@ bool omettreNaN(const std::vector<Valeur>& args) {
     return false;
 }
 
+// Une réduction le long d'une dimension de longueur nulle rend l'élément
+// neutre à chaque place : prod(zeros(0, 3)) vaut ones(1, 3), all(zeros(0,
+// 3)) true(1, 3). Le parcours des tranches n'en visite aucune : on remplit.
+static Valeur remplirSiVide(Valeur r, const Valeur& v, int dim, double neutre) {
+    Dims d = v.dims;
+    while ((int)d.size() <= dim) d.push_back(1);
+    if (d[(std::size_t)dim] == 0)
+        for (auto& x : r.re) x = neutre;
+    return r;
+}
+
+// Un tableau vide ne se réduit à un scalaire que s'il est 0 x 0 et qu'on
+// ne dit pas selon quelle dimension, ou qu'on les prend toutes : sum([])
+// vaut 0, mais sum(zeros(0, 3)) vaut zeros(1, 3) et sum(zeros(0, 5), 2)
+// zeros(0, 1), comme dans MATLAB.
+static bool videScalaire(std::vector<Valeur>& args) {
+    const Valeur& v = args[0];
+    if (!v.estVide()) return false;
+    bool dimDonnee = args.size() > 1 && !args[1].estVide() &&
+                     !(args[1].estTexte() || args[1].estChaine());
+    if (dimDonnee) return false;
+    if (optionToutesDimensions(args)) return true;
+    return v.dims.size() == 2 && v.dims[0] == 0 && v.dims[1] == 0;
+}
+
 Valeur reductionSomme(const Valeur& brut, int dim, bool produit, bool sansNaN) {
     Valeur v = enDouble(brut);
     if (v.estComplexe()) {
@@ -79,7 +104,7 @@ Valeur reductionSomme(const Valeur& brut, int dim, bool produit, bool sansNaN) {
         std::size_t interne = 1;
         for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
         std::size_t taille = (std::size_t)d[(std::size_t)dim];
-        std::size_t externe = taille ? v.nelem() / (interne * taille) : 0;
+        std::size_t externe = (taille && interne) ? v.nelem() / (interne * taille) : 0;
         for (std::size_t a = 0; a < externe; ++a)
             for (std::size_t b = 0; b < interne; ++b) {
                 std::complex<double> acc(1.0, 0.0);
@@ -96,7 +121,7 @@ Valeur reductionSomme(const Valeur& brut, int dim, bool produit, bool sansNaN) {
         r.compacter();
         return r;
     }
-    return reduire(v, dim, false, [produit, sansNaN](const std::vector<double>& t) {
+    return remplirSiVide(reduire(v, dim, false, [produit, sansNaN](const std::vector<double>& t) {
         double acc = produit ? 1.0 : 0.0;
         for (double x : t) {
             if (sansNaN && std::isnan(x)) continue;
@@ -104,13 +129,13 @@ Valeur reductionSomme(const Valeur& brut, int dim, bool produit, bool sansNaN) {
             else acc += x;
         }
         return acc;
-    });
+    }), v, dim, produit ? 1.0 : 0.0);
 }
 
 FONCTION(fnSum) {
     INUTILISE
     exigerArguments(args, 1, 4, "sum");
-    if (args[0].estVide()) return {Valeur::scalaire(0)};
+    if (videScalaire(args)) return {Valeur::scalaire(0)};
     if (optionToutesDimensions(args))
         return {reductionSomme(aplatirColonne(args[0]), 0, false, omettreNaN(args))};
     int dim = dimensionArgument(args, 1, args[0]);
@@ -119,7 +144,7 @@ FONCTION(fnSum) {
 FONCTION(fnProd) {
     INUTILISE
     exigerArguments(args, 1, 4, "prod");
-    if (args[0].estVide()) return {Valeur::scalaire(1)};
+    if (videScalaire(args)) return {Valeur::scalaire(1)};
     if (optionToutesDimensions(args))
         return {reductionSomme(aplatirColonne(args[0]), 0, true, omettreNaN(args))};
     int dim = dimensionArgument(args, 1, args[0]);
@@ -135,7 +160,7 @@ Valeur cumulatif(const Valeur& brut, int dim, bool produit, bool omettre = false
     std::size_t interne = 1;
     for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
     std::size_t taille = (std::size_t)d[(std::size_t)dim];
-    std::size_t externe = taille ? v.nelem() / (interne * taille) : 0;
+    std::size_t externe = (taille && interne) ? v.nelem() / (interne * taille) : 0;
     if (v.estComplexe()) {
         // Le cumul porte sur les complexes entiers : pour un produit, les
         // parties reelle et imaginaire ne peuvent pas etre cumulees
@@ -231,7 +256,7 @@ std::vector<Valeur> extremum(Interpreteur& it, std::vector<Valeur>& args, int na
     std::size_t interne = 1;
     for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
     std::size_t taille = (std::size_t)d[(std::size_t)dim];
-    std::size_t externe = taille ? v.nelem() / (interne * taille) : 0;
+    std::size_t externe = (taille && interne) ? v.nelem() / (interne * taille) : 0;
     for (std::size_t a = 0; a < externe; ++a)
         for (std::size_t b = 0; b < interne; ++b) {
             std::size_t meilleur = 0;
@@ -275,7 +300,7 @@ static Valeur cumulExtremum(const Valeur& brut, int dim, bool maximum) {
     std::size_t interne = 1;
     for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
     std::size_t taille = (std::size_t)d[(std::size_t)dim];
-    std::size_t externe = taille ? v.nelem() / (interne * taille) : 0;
+    std::size_t externe = (taille && interne) ? v.nelem() / (interne * taille) : 0;
     for (std::size_t a = 0; a < externe; ++a)
         for (std::size_t b = 0; b < interne; ++b) {
             double acc = maximum ? -INFINITY : INFINITY;
@@ -352,7 +377,7 @@ std::vector<Valeur> trier(std::vector<Valeur>& args, int nargout) {
     std::size_t interne = 1;
     for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
     std::size_t taille = (std::size_t)d[(std::size_t)dim];
-    std::size_t externe = taille ? v.nelem() / (interne * taille) : 0;
+    std::size_t externe = (taille && interne) ? v.nelem() / (interne * taille) : 0;
     bool complexe = v.estComplexe();
     for (std::size_t a = 0; a < externe; ++a)
         for (std::size_t b = 0; b < interne; ++b) {
@@ -462,7 +487,7 @@ FONCTION(fnAny) {
     INUTILISE
     exigerArguments(args, 1, 2, "any");
     Valeur v = enDouble(args[0]);
-    if (v.estVide()) return {Valeur::booleen(false)};
+    if (videScalaire(args)) return {Valeur::booleen(false)};
     if (optionToutesDimensions(args)) v = aplatirColonne(v);
     if (v.estVecteur() && (args.size() < 2 || optionToutesDimensions(args))) {
         for (std::size_t k = 0; k < v.re.size(); ++k)
@@ -484,7 +509,7 @@ FONCTION(fnAll) {
     INUTILISE
     exigerArguments(args, 1, 2, "all");
     Valeur v = enDouble(args[0]);
-    if (v.estVide()) return {Valeur::booleen(true)};
+    if (videScalaire(args)) return {Valeur::booleen(true)};
     if (optionToutesDimensions(args)) v = aplatirColonne(v);
     if (v.estVecteur() && (args.size() < 2 || optionToutesDimensions(args))) {
         for (std::size_t k = 0; k < v.re.size(); ++k)
@@ -493,11 +518,11 @@ FONCTION(fnAll) {
         return {Valeur::booleen(true)};
     }
     int dim = dimensionArgument(args, 1, v);
-    Valeur r = reduire(v, dim, false, [](const std::vector<double>& t) {
+    Valeur r = remplirSiVide(reduire(v, dim, false, [](const std::vector<double>& t) {
         for (double x : t)
             if (x == 0) return 0.0;
         return 1.0;
-    });
+    }), v, dim, 1.0);
     r.classe = Classe::Logique;
     return {r};
 }
@@ -531,7 +556,7 @@ FONCTION(fnDiff) {
         std::size_t interne = 1;
         for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
         std::size_t taille = (std::size_t)d[(std::size_t)dim];
-        std::size_t externe = v.nelem() / (interne * taille);
+        std::size_t externe = interne ? v.nelem() / (interne * taille) : 0;
         for (std::size_t a = 0; a < externe; ++a)
             for (std::size_t b = 0; b < interne; ++b)
                 for (std::size_t i = 0; i + 1 < taille; ++i) {
@@ -1058,7 +1083,7 @@ FONCTION(fnCumtrapz) {
         std::size_t interne = 1;
         for (int k = 0; k < dimDemelee; ++k) interne *= (std::size_t)d[(std::size_t)k];
         std::size_t taille = (std::size_t)d[(std::size_t)dimDemelee];
-        std::size_t externe = taille ? y.nelem() / (interne * taille) : 0;
+        std::size_t externe = (taille && interne) ? y.nelem() / (interne * taille) : 0;
         Valeur r = y;
         r.classe = Classe::Double;
         bool complexe = y.estComplexe();
@@ -1113,7 +1138,7 @@ FONCTION(fnTrapz) {
     std::size_t interne = 1;
     for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
     std::size_t taille = (std::size_t)d[(std::size_t)dim];
-    std::size_t externe = taille ? y.nelem() / (interne * taille) : 0;
+    std::size_t externe = (taille && interne) ? y.nelem() / (interne * taille) : 0;
     Valeur r = Valeur::matriceDims(rd);
     bool complexe = y.estComplexe();
     if (complexe) r.assurerImaginaire();

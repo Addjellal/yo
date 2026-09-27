@@ -122,7 +122,7 @@ Valeur fftColonnes(const Valeur& v, std::size_t n, bool inverse, int dim) {
     r.assurerImaginaire();
     std::size_t interne = 1;
     for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
-    std::size_t externe = taille ? source.nelem() / (interne * taille) : 0;
+    std::size_t externe = (taille && interne) ? source.nelem() / (interne * taille) : 0;
     for (std::size_t a2 = 0; a2 < externe; ++a2)
         for (std::size_t b = 0; b < interne; ++b) {
             std::vector<cplx> colonne(n, cplx(0));
@@ -340,7 +340,7 @@ FONCTION(fnFilter) {
     for (int k = 0; k < dimension; ++k) interne *= (std::size_t)d[(std::size_t)k];
     std::size_t taille = (std::size_t)d[(std::size_t)dimension];
     std::size_t total = x.nelem();
-    std::size_t externe = taille ? total / (interne * taille) : 0;
+    std::size_t externe = (taille && interne) ? total / (interne * taille) : 0;
 
     std::vector<cplx> vx = versVecteurComplexe(x);
     std::vector<cplx> y(total, cplx(0.0, 0.0));

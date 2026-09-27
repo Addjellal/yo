@@ -483,8 +483,10 @@ FONCTION(fnClear) {
             // « clear f » décharge la fonction f : ses variables persistantes
             // repartent de zéro au prochain appel.
             const std::string prefixe = n + "::";
+            const std::string sousFonctions = n + ">";
             for (auto p = it.persistantes.begin(); p != it.persistantes.end();) {
-                if (p->first.compare(0, prefixe.size(), prefixe) == 0)
+                if (p->first.compare(0, prefixe.size(), prefixe) == 0 ||
+                    p->first.compare(0, sousFonctions.size(), sousFonctions) == 0)
                     p = it.persistantes.erase(p);
                 else
                     ++p;

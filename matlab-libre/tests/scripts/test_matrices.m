@@ -561,4 +561,17 @@ assert(abs(unPas - exp(-0.1)) < 1e-14);
 assert(numel(tf) == 3 && abs(tf(2) - 0.5) < 1e-15);
 assert(abs(yf(2) - exp(-0.5)) < 1e-8);
 
+% Une réduction le long d'une dimension garde les autres, même vides :
+% sum([]) vaut 0, mais sum(zeros(0, 5), 2) est 0 x 1 et prod(zeros(0, 3))
+% vaut ones(1, 3), l'élément neutre à chaque place.
+assert(isequal(size(sum(zeros(0, 5), 2)), [0 1]) && isequal(size(all(zeros(0, 5), 2)), [0 1]));
+assert(isequal(size(any(zeros(0, 5), 2)), [0 1]) && isequal(size(prod(zeros(0, 5), 2)), [0 1]));
+assert(isequal(prod(zeros(0, 3)), [1 1 1]) && isequal(all(zeros(0, 3)), true(1, 3)));
+assert(isequal(any(zeros(0, 3)), false(1, 3)) && isequal(sum(zeros(0, 3)), [0 0 0]));
+assert(isequal(size(sum(zeros(3, 0))), [1 0]) && isequal(size(all(zeros(3, 0), 2)), [3 1]));
+assert(all(all(zeros(3, 0), 2)) && sum([]) == 0 && all([]) && ~any([]) && prod([]) == 1);
+assert(sum(zeros(1, 0)) == 0 && isequal(size(diff(zeros(0, 3), 1, 2)), [0 2]));
+assert(isempty(find(all(zeros(0, 5) == repmat([1 2 3 4 5], 0, 1), 2), 1)), ...
+       'une recherche dans une table vide ne trouve rien');
+
 disp('matrices : toutes les verifications passent');

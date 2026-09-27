@@ -483,7 +483,7 @@ void parcourirTranches(const Valeur& v, int dimension,
     for (int k = 0; k < dimension; ++k) interne *= (std::size_t)d[(std::size_t)k];
     std::size_t taille = (std::size_t)d[(std::size_t)dimension];
     std::size_t total = v.nelem();
-    std::size_t externe = taille ? total / (interne * taille) : 0;
+    std::size_t externe = (taille && interne) ? total / (interne * taille) : 0;
     std::vector<double> tranche(taille);
     for (std::size_t a = 0; a < externe; ++a) {
         for (std::size_t b = 0; b < interne; ++b) {
