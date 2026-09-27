@@ -1065,6 +1065,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
             hPropose = min(hPropose, pasMax);
             h = min(hPropose, borne);
             plancher = max(pasMin, 16 * eps(max(abs(t), 1)));
+            refus = 0;
             while true
                 [xNouveau, err, V, Z, aux] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, ...
                                                    touche);
@@ -1102,6 +1103,21 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                 end
                 h = max(h * max(0.1, 0.9 * err ^ (-1 / M.ordre)), plancher);
                 parErreur = true;
+                if strcmp(M.methode, 'adams') && M.H.valide
+                    % Adams, comme ode113 : un pas refusé baisse l'ordre, car
+                    % l'erreur des ordres élevés, faite de différences que les
+                    % changements de pas brouillent, ne décroît plus avec le
+                    % pas ; après trois refus de suite, la méthode repart de
+                    % l'ordre un
+                    refus = refus + 1;
+                    if refus >= 3
+                        M.H.valide = false;
+                        M.ordre = 2;
+                    elseif M.H.k > 1
+                        M.H.k = M.H.k - 1;
+                        M.ordre = M.H.k + 1;
+                    end
+                end
             end
         end
         if isfinite(cible) && abs(t + h - cible) <= toleranceTemps(cible)

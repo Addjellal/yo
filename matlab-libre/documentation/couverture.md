@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **681 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **3040 fonctions de toolbox** réparties en5 modules, écrites dans le
+- **3041 fonctions de toolbox** réparties en5 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,

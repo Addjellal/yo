@@ -36,6 +36,11 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
         [~, ~, nEntrees, nSorties] = matlibre_sl_physique('ports', type);
         return
     end
+    if matlibre_sl_physique('estSignal', type)
+        % les blocs de signaux physiques : PS Add, PS Switch, PS Integrator...
+        [nEntrees, nSorties] = matlibre_sl_physique('portsSignal', type, p);
+        return
+    end
     switch type
         case {'constant', 'step', 'ramp', 'sine', 'clock', 'digitalclock', ...
               'pulsegenerator', 'ground', 'repeatingsequence', 'randomnumber', ...

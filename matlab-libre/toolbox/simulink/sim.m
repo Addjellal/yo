@@ -263,7 +263,8 @@ function varargout = sim(modele, varargin)
         end
     catch err
         matlibre_sl_rappel(modele, 'StopFcn');
-        if strncmp(err.identifier, 'Simulink:', 9) || strncmp(err.identifier, 'Stateflow:', 10)
+        if strncmp(err.identifier, 'Simulink:', 9) || strncmp(err.identifier, 'Stateflow:', 10) || ...
+           strncmp(err.identifier, 'Simscape:', 9)
             rethrow(err);
         end
         throw(localiser(err, deroulement));

@@ -7493,6 +7493,292 @@ for k52 = 1:size(refus52, 1)
 end
 fprintf('elements solidaires et mecanismes : %d refus nommes verifies\n', size(refus52, 1));
 
+%% ------------------------------------------------ 53. Signaux physiques de Simscape
+% Les blocs de la bibliothèque Physical Signals calculent sur des signaux
+% physiques, en unités SI : un PS Gain, un PS Add, un PS Integrator
+% deviennent le Gain, le Sum, l'Integrator de Simulink.
+ps = new_system('ps');
+ps = add_block(ps, 'step', 'u', 'Time', 0, 'After', 1);
+ps = add_block(ps, 'simulinkpsconverter', 'SP');
+ps = add_block(ps, 'psgain', 'K', 'Gain', 2);
+ps = add_block(ps, 'psconstant', 'C', 'Constant', 500, 'Constant_unit', 'mN');
+ps = add_block(ps, 'psadd', 'somme');
+ps = add_block(ps, 'idealforcesource', 'F');
+ps = add_block(ps, 'mass', 'M', 'mass', 1);
+ps = add_block(ps, 'translationaldamper', 'D', 'D', 1);
+ps = add_block(ps, 'mechanicaltranslationalreference', 'G');
+ps = add_block(ps, 'solverconfiguration', 'S');
+ps = add_block(ps, 'idealtranslationalmotionsensor', 'X');
+ps = add_block(ps, 'psintegrator', 'I', 'InitialCondition', 10, ...
+               'InitialCondition_unit', 'cm');
+ps = add_block(ps, 'pssubtract', 'ecart');
+ps = add_block(ps, 'psterminator', 'fin');
+ps = add_block(ps, 'pssimulinkconverter', 'PX');
+ps = add_block(ps, 'pssimulinkconverter', 'PE');
+ps = add_block(add_block(ps, 'outport', 'x'), 'outport', 'e');
+ps = add_line(add_line(ps, 'u', 'SP'), 'SP', 'K');
+ps = add_line(add_line(ps, 'K', 'somme', 1), 'C', 'somme', 2);
+ps = add_line(ps, 'somme', 'F');
+ps = add_line(ps, 'F/LConn1', 'M/LConn1');
+ps = add_line(ps, 'F/RConn1', 'G/LConn1');
+ps = add_line(ps, 'D/LConn1', 'M/LConn1');
+ps = add_line(ps, 'D/RConn1', 'G/LConn1');
+ps = add_line(ps, 'S/RConn1', 'G/LConn1');
+ps = add_line(ps, 'X/LConn1', 'M/LConn1');
+ps = add_line(ps, 'X/RConn1', 'G/LConn1');
+% la vitesse intégrée par le PS Integrator, et la position du capteur
+ps = add_line(add_line(ps, 'X/1', 'I'), 'I', 'ecart', 1);
+ps = add_line(ps, 'X/2', 'ecart', 2);
+ps = add_line(add_line(ps, 'ecart', 'PE'), 'PE', 'e');
+ps = add_line(add_line(ps, 'X/2', 'PX'), 'PX', 'x');
+ps = add_line(ps, 'somme', 'fin');
+r = sim(ps, 'Solver', 'ode45', 'StopTime', 3, 'RelTol', 1e-10, 'AbsTol', 1e-12);
+t = r.tout;
+% F = 2 + 0.5 = 2.5 N ; v' = 2.5 - v : x = 2.5 (t - 1 + exp(-t))
+assert(max(abs(r.yout(:, 1) - 2.5 * (t - 1 + exp(-t)))) < 1e-8, ...
+       'PS Gain, PS Constant en mN et PS Add commandent la force');
+assert(max(abs(r.yout(:, 2) - 0.1)) < 1e-8, ...
+       'le PS Integrator part de 10 cm et suit la position');
+% les fonctions, les non-linéarités, l'aiguillage, le retard
+fonctions = {
+    'psabs', {}, @(u) abs(u)
+    'pssign', {}, @(u) sign(u)
+    'psceil', {}, @(u) ceil(u)
+    'psfloor', {}, @(u) floor(u)
+    'psround', {}, @(u) round(u)
+    'psfix', {}, @(u) fix(u)
+    'psmathfunction', {'Function', 'exp(u)'}, @(u) exp(u)
+    'psmathfunction', {'Function', 'cos(u)'}, @(u) cos(u)
+    'psmathfunction', {'Function', 'u.^2'}, @(u) u .^ 2
+    'psmathfunction', {'Function', '1./u'}, @(u) 1 ./ u
+    'psmathfunction', {'Function', 'u.^v', 'v', 3}, @(u) u .^ 3
+    'pssaturation', {'UpperLimit', 1, 'LowerLimit', -0.5}, @(u) min(max(u, -0.5), 1)
+    'psdeadzone', {'UpperLimit', 1, 'LowerLimit', -0.5}, ...
+        @(u) (u >= 1) .* (u - 1) + (u <= -0.5) .* (u + 0.5)
+    'psgain', {'Gain', 3, 'Gain_unit', 'mm'}, @(u) 0.003 * u
+    };
+for k53 = 1:size(fonctions, 1)
+    f = new_system('f');
+    f = add_block(f, 'ramp', 'rampe', 'Slope', 1, 'InitialOutput', -2.3);
+    f = add_block(f, fonctions{k53, 1}, 'bloc', fonctions{k53, 2}{:});
+    f = add_block(f, 'outport', 'y');
+    f = add_line(add_line(f, 'rampe', 'bloc'), 'bloc', 'y');
+    r = sim(f, 'Solver', 'ode45', 'StopTime', 4.2, 'MaxStep', 0.1);
+    u = r.tout - 2.3;
+    attendu = fonctions{k53, 3}(u);
+    garde = abs(u) > 1e-6 & abs(u - round(u)) > 1e-6 & abs(u - round(u) - 0.5) > 1e-6 & ...
+            abs(u - 1) > 1e-6 & abs(u + 0.5) > 1e-6;
+    assert(max(abs(r.yout(garde) - attendu(garde))) < 1e-9, ...
+           sprintf('%s %s : la fonction de son signal', fonctions{k53, 1}, ...
+                   strjoin(cellfun(@num2str, fonctions{k53, 2}, 'UniformOutput', false), ' ')));
+end
+choix53 = new_system('choix53');
+choix53 = add_block(choix53, 'constant', 'a', 'Value', 7);
+choix53 = add_block(choix53, 'clock', 'horloge');
+choix53 = add_block(choix53, 'constant', 'b', 'Value', -7);
+choix53 = add_block(choix53, 'psswitch', 'aiguille', 'Threshold', 1);
+choix53 = add_block(choix53, 'psmax', 'haut');
+choix53 = add_block(choix53, 'psmin', 'bas');
+choix53 = add_block(choix53, 'psconstantdelay', 'retard', 'DelayTime', 500, ...
+                    'DelayTime_unit', 'ms', 'InputHistory', -1);
+choix53 = add_block(choix53, 'psdivide', 'quotient');
+choix53 = add_block(choix53, 'psproduct', 'produit');
+choix53 = add_block(choix53, 'mux', 'tout', 'Inputs', 5);
+choix53 = add_block(choix53, 'outport', 'y');
+choix53 = add_line(choix53, 'a', 'aiguille', 1);
+choix53 = add_line(choix53, 'horloge', 'aiguille', 2);
+choix53 = add_line(choix53, 'b', 'aiguille', 3);
+choix53 = add_line(add_line(choix53, 'horloge', 'haut', 1), 'b', 'haut', 2);
+choix53 = add_line(add_line(choix53, 'horloge', 'bas', 1), 'a', 'bas', 2);
+choix53 = add_line(choix53, 'horloge', 'retard');
+choix53 = add_line(add_line(choix53, 'a', 'quotient', 1), 'b', 'quotient', 2);
+choix53 = add_line(add_line(choix53, 'a', 'produit', 1), 'horloge', 'produit', 2);
+for k = 1:5
+    noms53 = {'aiguille', 'haut', 'bas', 'retard', 'quotient'};
+    choix53 = add_line(choix53, noms53{k}, 'tout', k);
+end
+choix53 = add_line(choix53, 'tout', 'y');
+r = sim(choix53, 'Solver', 'ode45', 'StopTime', 2, 'MaxStep', 0.01);
+t = r.tout;
+apres = t > 1.01;
+avant = t < 0.99;
+assert(all(r.yout(apres, 1) == 7) && all(r.yout(avant, 1) == -7), ...
+       'PS Switch : I1 quand la commande atteint le seuil, I3 sinon');
+assert(max(abs(r.yout(:, 2) - t)) < 1e-12 && max(abs(r.yout(:, 3) - t)) < 1e-12, ...
+       'PS Max et PS Min');
+tard = t > 0.51;
+assert(max(abs(r.yout(tard, 4) - (t(tard) - 0.5))) < 1e-6 && all(r.yout(t < 0.49, 4) == -1), ...
+       'PS Constant Delay : 500 ms, et l''historique d''entree avant');
+assert(all(abs(r.yout(:, 5) + 1) < 1e-15), 'PS Divide : I1 / I2');
+% un intégrateur borné, remis à zéro par un front
+borne = new_system('borne');
+borne = add_block(borne, 'constant', 'un', 'Value', 1);
+borne = add_block(borne, 'pulsegenerator', 'remise', 'Period', 1, 'PulseWidth', 50, ...
+                  'PhaseDelay', 0.5);
+borne = add_block(borne, 'psintegrator', 'I', 'ExternalReset', 'Rising', ...
+                  'LimitOutput', 'Upper', 'UpperLimit', 0.3);
+borne = add_block(borne, 'outport', 'y');
+borne = add_line(add_line(borne, 'un', 'I', 1), 'remise', 'I', 2);
+borne = add_line(borne, 'I', 'y');
+r = sim(borne, 'Solver', 'ode45', 'StopTime', 1, 'MaxStep', 0.01);
+t = r.tout;
+assert(max(r.yout) <= 0.3 + 1e-12 && abs(interp1(t, r.yout, 0.2) - 0.2) < 1e-9 && ...
+       abs(interp1(t, r.yout, 0.6) - 0.1) < 1e-6, ...
+       'PS Integrator : borne haute, remise au front montant');
+% les tables : linéaires ou lisses (Akima modifié), prolongées, bornées
+table53 = new_system('table53');
+table53 = add_block(table53, 'ramp', 'r', 'Slope', 1, 'InitialOutput', -1);
+table53 = add_block(table53, 'pslookuptable1d', 'T', 'x', [0 1 2 3], 'f', [0 1 4 9]);
+table53 = add_block(table53, 'outport', 'y');
+table53 = add_line(add_line(table53, 'r', 'T'), 'T', 'y');
+r = sim(table53, 'Solver', 'ode45', 'StopTime', 5, 'MaxStep', 0.1);
+u = r.tout - 1;
+lineaire = interp1([0 1 2 3], [0 1 4 9], min(max(u, 0), 3));
+lineaire(u < 0) = u(u < 0);
+lineaire(u > 3) = 9 + 5 * (u(u > 3) - 3);
+assert(max(abs(r.yout - lineaire)) < 1e-12, ...
+       'PS Lookup Table (1D) : lineaire, prolongee par ses deux points extremes');
+r = sim(set_param(table53, 'T', 'InterpolationMethod', 'Smooth', ...
+                  'ExtrapolationMethod', 'Nearest'), 'Solver', 'ode45', 'StopTime', 5, ...
+        'MaxStep', 0.1);
+assert(max(abs(r.yout - interp1([0 1 2 3], [0 1 4 9], min(max(u, 0), 3), 'makima'))) < 1e-12, ...
+       'PS Lookup Table (1D) : lisse, bornee aux valeurs du bord');
+table2 = new_system('table2');
+table2 = add_block(table2, 'constant', 'a', 'Value', 1.5);
+table2 = add_block(table2, 'constant', 'b', 'Value', 2.5);
+table2 = add_block(table2, 'pslookuptable2d', 'T', 'x1', [1 2 3], 'x2', [1 2 3 4], ...
+                   'f', [1 2 3 4; 5 6 7 8; 9 10 11 12]);
+table2 = add_block(table2, 'outport', 'y');
+table2 = add_line(add_line(add_line(table2, 'a', 'T', 1), 'b', 'T', 2), 'T', 'y');
+r = sim(table2, 1);
+assert(abs(r.yout(end) - 4.5) < 1e-12, 'PS Lookup Table (2D) : f(x1, x2), x1 le long des lignes');
+fichier53 = [tempname() '.slx'];
+save_system(ps, fichier53);
+r = sim(load_system(fichier53), 'Solver', 'ode45', 'StopTime', 3, 'RelTol', 1e-10, ...
+        'AbsTol', 1e-12);
+assert(max(abs(r.yout(:, 1) - 2.5 * (r.tout - 1 + exp(-r.tout)))) < 1e-8, ...
+       'les signaux physiques se relisent du .slx');
+delete(fichier53);
+refus53 = {
+    @() sim(set_param(ps, 'I', 'LimitOutput', 'Both', 'LimitOutputSource', 'External'), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'ps/I'
+    @() sim(set_param(ps, 'K', 'Gain_unit', 'furlong'), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'furlong'
+    @() set_param(ps, 'K', 'Gian', 3), 'Simulink:Commands:ParamUnknown', 'Gian'
+    @() add_line(ps, 'C', 'somme', 3), 'Simulink:Commands:AddLineInvalidPort', 'somme'
+    @() sim(set_param(table53, 'T', 'ExtrapolationMethod', 'Error'), 'Solver', 'ode45', ...
+            'StopTime', 5), 'Simscape:Lookup:OutOfRange', 'table53/T'
+    @() sim(set_param(table53, 'T', 'x', [0 2 1 3]), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'croissant'
+    @() sim(set_param(table2, 'T', 'f', [1 2 3; 4 5 6]), 1), ...
+        'Simulink:Parameters:InvParamSetting', 'table2/T'
+    };
+for k53 = 1:size(refus53, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('refus53{k53, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, refus53{k53, 2}) && ~isempty(strfind(message, refus53{k53, 3})), ...
+           sprintf('signaux physiques, cas %d : %s attendu, %s rendu (%s)', k53, ...
+                   refus53{k53, 2}, vu, message));
+end
+fprintf('signaux physiques : %d refus nommes verifies\n', size(refus53, 1));
+
+%% ------------------------------------ 54. Batterie de réseaux physiques tirés au hasard
+% Des réseaux en échelle tirés au hasard — électriques, mécaniques,
+% thermiques, électromécaniques (une échelle électrique qui entraîne une
+% échelle en rotation), d'éléments idéaux — dont la
+% transmittance se calcule par les impédances complexes, sans passer par
+% la mise en équations : LINMOD doit la retrouver. Leur réponse
+% indicielle, exacte par EXPM, doit sortir de SIM avec un solveur tiré au
+% hasard. Puis chacun reçoit une faute d'utilisateur tirée au hasard, que
+% Simulink doit refuser en nommant ce qui ne va pas.
+solveurs54 = {'ode45', 'ode23', 'ode113', 'ode15s', 'ode23s', 'ode23t', 'ode23tb', ...
+              'daessc', 'ode4', 'ode5', 'ode8', 'ode3'};
+simulations54 = 0;
+refus54 = 0;
+for graine54 = 1:30
+    [echelle, transmittance, description] = matlibre_essai_echelle(graine54);
+    [A, B, C, D] = linmod(echelle);
+    for w = [0.05 0.3 1 3 20]
+        hModele = C * ((1i * w * eye(size(A, 1)) - A) \ B) + D;
+        hImpedances = transmittance(1i * w);
+        assert(abs(hModele - hImpedances) <= 1e-8 * max(abs(hImpedances), 1e-6), ...
+               sprintf('reseau %d (%s) : la transmittance a %g rad/s', graine54, ...
+                       description, w));
+    end
+    rng(1000 + graine54);
+    solveur = solveurs54{randi(numel(solveurs54))};
+    indiciel = add_line(add_block(delete_block(echelle, 'u'), 'constant', 'u', 'Value', 1), ...
+                        'u', 'SP');
+    nx = size(A, 1);
+    if any(strcmp(solveur, {'ode4', 'ode5', 'ode8', 'ode3'}))
+        pas54 = min(0.2 / max([abs(eig(A)); 0.1]), 0.01);
+        r = sim(indiciel, 'Solver', solveur, 'FixedStep', pas54, 'StopTime', 3);
+    else
+        r = sim(indiciel, 'Solver', solveur, 'StopTime', 3, 'RelTol', 1e-9, 'AbsTol', 1e-11);
+    end
+    exact = zeros(size(r.tout));
+    for k = 1:numel(r.tout)
+        E = expm([A, B; zeros(1, nx + 1)] * r.tout(k));
+        exact(k) = C * E(1:nx, nx + 1) + D;
+    end
+    assert(max(abs(r.yout - exact)) <= 1e-3 * max(1, max(abs(exact))), ...
+           sprintf('reseau %d (%s) : la reponse indicielle par %s', graine54, description, ...
+                   solveur));
+    simulations54 = simulations54 + 1;
+    % une faute d'utilisateur, et l'erreur qui la nomme
+    nomModele = sprintf('echelle%d', graine54);
+    physiques = cellfun(@(b) b.nom, echelle.blocs, 'UniformOutput', false);
+    premier = physiques{find(strncmp(physiques, 'd', 1), 1)};
+    typePremier = echelle.blocs{strcmp(physiques, premier)}.type;
+    parametre = struct('resistor', 'R', 'inductor', 'l', 'capacitor', 'c', ...
+                       'translationaldamper', 'D', 'translationalspring', 'spr_rate', ...
+                       'mass', 'mass', 'conductiveheattransfer', 'th_cond', ...
+                       'thermalmass', 'mass', 'rotationaldamper', 'D', ...
+                       'rotationalspring', 'spr_rate', 'inertia', 'inertia');
+    etranger = 'inertia';
+    if ~isempty(strfind(description, 'rotation'))
+        etranger = 'resistor';
+    end
+    fautes = {
+        @() sim(add_line(delete_block(echelle, 'G'), 'S/RConn1', [premier '/LConn1']), 1), ...
+            'Simscape:Network:ReferenceMissing', [nomModele '/source']
+        @() sim(delete_block(echelle, 'S'), 1), ...
+            'Simscape:Network:SolverConfigurationMissing', nomModele
+        @() sim(delete_line(echelle, 'S/RConn1', 'G/LConn1'), 1), ...
+            'Simscape:Network:SolverConfigurationMissing', [nomModele '/source']
+        @() sim(add_line(add_block(echelle, 'solverconfiguration', 'S2'), 'S2/RConn1', ...
+                         'G/LConn1'), 1), ...
+            'Simscape:Network:MultipleSolverConfigurations', [nomModele '/S2']
+        @() add_line(add_block(echelle, etranger, 'intrus'), 'intrus/LConn1', ...
+                     [premier '/LConn1']), 'Simulink:Commands:AddLinePhysicalDomain', 'intrus'
+        @() sim(set_param(echelle, premier, parametre.(typePremier), -1), 1), ...
+            'Simulink:Parameters:InvParamSetting', [nomModele '/' premier]
+        @() sim(set_param(echelle, premier, [parametre.(typePremier) '_unit'], 'furlong'), 1), ...
+            'Simulink:Parameters:InvParamSetting', 'furlong'
+        };
+    faute = fautes(randi(size(fautes, 1)), :);
+    vu = '';
+    message = '';
+    try
+        evalc('faute{1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, faute{2}) && ~isempty(strfind(message, faute{3})), ...
+           sprintf('reseau %d (%s) : %s attendu, %s rendu (%s)', graine54, description, ...
+                   faute{2}, vu, message));
+    refus54 = refus54 + 1;
+end
+fprintf('reseaux physiques tires au hasard : %d simulations, %d refus nommes\n', ...
+        simulations54, refus54);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

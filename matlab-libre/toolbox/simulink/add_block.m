@@ -314,6 +314,23 @@ function modele = add_block(modele, type, nom, varargin)
 %                  un flux de A vers B ; idealtemperaturesensor T(A) - T(B),
 %                  idealheatflowsensor — une sortie
 %     perfectinsulator — une paroi que la chaleur ne traverse pas
+%   Simscape, signaux physiques (des signaux en unités SI ; un paramètre
+%   NOM_unit dit l'unité de NOM) :
+%     psgain Gain ; psconstant Constant ; psadd, pssubtract (I1 - I2),
+%                  psproduct, psdivide (I1 / I2), psmax, psmin — deux entrées
+%     psabs, pssign, psceil, psfloor, psround, psfix
+%     psmathfunction Function ('sin(u)', 'cos(u)', 'exp(u)', 'log(u)',
+%                  '10.^u', 'log10(u)', 'u.^2', 'sqrt(u)', '1./u', 'tanh(u)',
+%                  'u.^v'), v
+%     psintegrator InitialCondition, ExternalReset, InitialConditionSource,
+%                  LimitOutput ('None', 'Upper', 'Lower', 'Both'), UpperLimit,
+%                  LowerLimit
+%     pssaturation, psdeadzone UpperLimit, LowerLimit ; psswitch Threshold —
+%                  I1 si la commande I2 atteint le seuil, I3 sinon
+%     psconstantdelay DelayTime, InputHistory ; psterminator
+%     pslookuptable1d x, f ; pslookuptable2d x1, x2, f (numel(x1) lignes,
+%                  numel(x2) colonnes) — InterpolationMethod ('Linear',
+%                  'Smooth'), ExtrapolationMethod ('Linear', 'Nearest', 'Error')
 %
 %   Fonctions de l'utilisateur :
 %     fcn          Expr                         une expression de u, scalaire :

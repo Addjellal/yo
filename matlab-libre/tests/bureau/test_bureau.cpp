@@ -1636,6 +1636,9 @@ int main(int argc, char** argv) {
                 QFile f(fichierReseau);
                 if (f.open(QIODevice::WriteOnly | QIODevice::Text))
                     f.write(R"(function m = essaiReseauPhysique(m, type)
+if ~matlibre_sl_physique('est', type)
+    return   % un bloc de signaux physiques n'est qu'un bloc de calcul
+end
 charges = struct('electrique', 'resistor', 'translation', 'translationaldamper', ...
                  'rotation', 'rotationaldamper', 'thermique', 'conductiveheattransfer');
 references = struct('electrique', 'electricalreference', ...

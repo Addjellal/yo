@@ -48,7 +48,7 @@ function c = matlibre_sl_compiler(modele, options)
         [k, bloc, chemin] = enCours('lire');
         enCours('restaurer', avant);
         if k == 0 || strncmp(err.identifier, 'Simulink:', 9) || ...
-           strncmp(err.identifier, 'Stateflow:', 10)
+           strncmp(err.identifier, 'Stateflow:', 10) || strncmp(err.identifier, 'Simscape:', 9)
             rethrow(err);
         end
         throw(matlibre_sl_fautif(err, bloc.type, bloc.parametres, chemin));

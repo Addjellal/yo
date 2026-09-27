@@ -55,6 +55,16 @@ function varargout = matlibre_sl_physique(action, varargin)
 %   source de température impose T(B) - T(A), ses ports A et B étant à
 %   gauche et à droite ; les températures sont absolues.
 %
+%   Les blocs de signaux physiques — PS Gain, PS Add, PS Subtract, PS
+%   Product, PS Divide, PS Abs, PS Sign, PS Ceil, PS Floor, PS Round, PS
+%   Fix, PS Max, PS Min, PS Constant, PS Math Function, PS Integrator, PS
+%   Saturation, PS Dead Zone, PS Switch, PS Constant Delay, PS Terminator,
+%   PS Lookup Table (1D) et (2D) —
+%   calculent sur des signaux, en unités SI : chacun devient le bloc de
+%   Simulink qui calcule la même chose. OUI = MATLIBRE_SL_PHYSIQUE(
+%   'estSignal',TYPE) les reconnaît, [NE,NS] = MATLIBRE_SL_PHYSIQUE(
+%   'portsSignal',TYPE,PARAMETRES) rend leurs entrées et leurs sorties.
+%
 %   V = MATLIBRE_SL_PHYSIQUE('unite',V,UNITE,BASE,CHEMIN,NOM) ramène une
 %   valeur écrite dans une unité (kOhm, uF, mH, kHz, deg, rpm, g, mm...) à
 %   l'unité BASE du paramètre.
@@ -69,6 +79,11 @@ function varargout = matlibre_sl_physique(action, varargin)
             varargout{1} = domaineDe(varargin{1}, varargin{2});
         case 'est'
             varargout{1} = any(strcmp(varargin{1}, tableTypes()));
+        case 'estSignal'
+            T = tableSignaux();
+            varargout{1} = any(strcmp(varargin{1}, T(:, 1)));
+        case 'portsSignal'
+            [varargout{1:2}] = portsSignal(varargin{:});
         case 'reseaux'
             varargout{1} = reseaux(varargin{1});
         case 'unite'
@@ -144,6 +159,37 @@ end
 function t = tableTypes()
     T = table();
     t = T(:, 1);
+end
+
+% Les blocs de signaux physiques : type, entrées, sorties.
+function T = tableSignaux()
+    T = {
+        'psgain', 1, 1; 'psadd', 2, 1; 'pssubtract', 2, 1; 'psproduct', 2, 1
+        'psdivide', 2, 1; 'psabs', 1, 1; 'pssign', 1, 1; 'psceil', 1, 1
+        'psfloor', 1, 1; 'psround', 1, 1; 'psfix', 1, 1; 'psmax', 2, 1
+        'psmin', 2, 1; 'psconstant', 0, 1; 'psmathfunction', 1, 1
+        'psintegrator', 1, 1; 'pssaturation', 1, 1; 'psdeadzone', 1, 1
+        'psswitch', 3, 1; 'psconstantdelay', 1, 1; 'psterminator', 1, 0
+        'pslookuptable1d', 1, 1; 'pslookuptable2d', 2, 1
+        };
+end
+
+% Les ports d'un bloc de signaux physiques ; l'intégrateur gagne une entrée
+% de remise et une de condition initiale quand on les lui demande.
+function [ne, ns] = portsSignal(type, p)
+    T = tableSignaux();
+    k = find(strcmp(type, T(:, 1)), 1);
+    ne = T{k, 2};
+    ns = T{k, 3};
+    if strcmp(type, 'psintegrator') && nargin > 1
+        if isfield(p, 'ExternalReset') && ~strcmpi(char(p.ExternalReset), 'None')
+            ne = ne + 1;
+        end
+        if isfield(p, 'InitialConditionSource') && ...
+           strcmpi(char(p.InitialConditionSource), 'External')
+            ne = ne + 1;
+        end
+    end
 end
 
 function ligne = entreeDe(type)
@@ -333,6 +379,7 @@ end
 % --- les réseaux -------------------------------------------------------------
 
 function modele = reseaux(modele)
+    modele = signauxPhysiques(modele);
     n = numel(modele.blocs);
     physique = false(1, n);
     for k = 1:n
@@ -391,12 +438,233 @@ function modele = reseaux(modele)
     for i = 1:numel(blocsPhysiques)
         racines(i) = racine(groupe, i);
     end
-    for r = unique(racines)
+    % les plus grands réseaux d'abord : c'est leur erreur qui parle le mieux
+    % du modèle, avant celle d'un bloc resté seul
+    groupes = unique(racines);
+    tailles = arrayfun(@(r) sum(racines == r), groupes);
+    [~, ordre] = sort(tailles, 'descend');
+    for r = groupes(ordre)
         membres = blocsPhysiques(racines == r);
         modele = remplacer(modele, membres, ports, noeud, chemin);
     end
     modele.connexions = zeros(0, 4);
     modele = convertisseurs(modele);
+end
+
+% Les blocs de signaux physiques : un signal physique n'est qu'un signal,
+% en unités SI ; chacun devient le bloc de Simulink qui calcule la même
+% chose, ses paramètres ramenés aux unités SI.
+function modele = signauxPhysiques(modele)
+    T = tableSignaux();
+    nomModele = char(modele.nom);
+    for k = 1:numel(modele.blocs)
+        bloc = modele.blocs{k};
+        if ~any(strcmp(bloc.type, T(:, 1)))
+            continue
+        end
+        chemin = [nomModele '/' bloc.nom];
+        p = struct();
+        switch bloc.type
+            case 'psgain'
+                type = 'gain';
+                p.Gain = valeurSI(bloc, 'Gain', 1, chemin);
+            case {'psadd', 'pssubtract'}
+                type = 'sum';
+                p.Signs = '++';
+                if strcmp(bloc.type, 'pssubtract')
+                    p.Signs = '+-';
+                end
+            case {'psproduct', 'psdivide'}
+                type = 'product';
+                p.Inputs = '**';
+                if strcmp(bloc.type, 'psdivide')
+                    p.Inputs = '*/';
+                end
+            case 'psabs'
+                type = 'abs';
+            case 'pssign'
+                type = 'sign';
+            case {'psceil', 'psfloor', 'psround', 'psfix'}
+                type = 'rounding';
+                p.Operator = bloc.type(3:end);
+            case {'psmax', 'psmin'}
+                type = 'minmax';
+                p.Function = bloc.type(3:end);
+                p.Inputs = 2;
+            case 'psconstant'
+                type = 'constant';
+                p.Value = valeurSI(bloc, 'Constant', 1, chemin);
+            case 'psmathfunction'
+                fonction = choix(bloc, 'Function', 'sin(u)', {'sin(u)', 'cos(u)', 'exp(u)', ...
+                                 'log(u)', '10.^u', 'log10(u)', 'u.^2', 'sqrt(u)', '1./u', ...
+                                 'tanh(u)', 'u.^v'}, chemin);
+                switch fonction
+                    case {'sin(u)', 'cos(u)', 'tanh(u)'}
+                        type = 'trigonometry';
+                        p.Operator = fonction(1:end - 3);
+                    case 'sqrt(u)'
+                        type = 'sqrt';
+                        p.Operator = 'sqrt';
+                    case 'u.^v'
+                        type = 'matlabfunction';
+                        p.Script = sprintf('function y = fcn(u)\ny = u .^ %s;\n', ...
+                                           mat2str(valeurParametre(bloc, 'v', 1, chemin), 17));
+                    otherwise
+                        type = 'math';
+                        operateurs = struct('exp', 'exp', 'log', 'log', 'dix', '10^u', ...
+                                            'log10', 'log10', 'carre', 'square', ...
+                                            'inverse', 'reciprocal');
+                        cles = {'exp(u)', 'exp'; 'log(u)', 'log'; '10.^u', 'dix'; ...
+                                'log10(u)', 'log10'; 'u.^2', 'carre'; '1./u', 'inverse'};
+                        p.Operator = operateurs.(cles{strcmp(fonction, cles(:, 1)), 2});
+                end
+            case 'psintegrator'
+                type = 'integrator';
+                p.InitialCondition = valeurSI(bloc, 'InitialCondition', 0, chemin);
+                p.ExternalReset = lower(choix(bloc, 'ExternalReset', 'None', ...
+                                              {'None', 'Rising', 'Falling', 'Either'}, chemin));
+                p.InitialConditionSource = lower(choix(bloc, 'InitialConditionSource', ...
+                                                       'Internal', {'Internal', 'External'}, ...
+                                                       chemin));
+                borne = choix(bloc, 'LimitOutput', 'None', {'None', 'Upper', 'Lower', 'Both'}, ...
+                              chemin);
+                if strcmp(choix(bloc, 'LimitOutputSource', 'Internal', ...
+                                {'Internal', 'External'}, chemin), 'External') && ...
+                   ~strcmp(borne, 'None')
+                    error('Simulink:Parameters:InvParamSetting', ...
+                          ['Les bornes de ''%s'' viennent de ports (LimitOutputSource = ' ...
+                           '''External'') : MatLibre ne les prend que du dialogue.'], chemin);
+                end
+                if ~strcmp(borne, 'None')
+                    p.LimitOutput = 'on';
+                    p.UpperSaturationLimit = Inf;
+                    p.LowerSaturationLimit = -Inf;
+                    if any(strcmp(borne, {'Upper', 'Both'}))
+                        p.UpperSaturationLimit = valeurSI(bloc, 'UpperLimit', Inf, chemin);
+                    end
+                    if any(strcmp(borne, {'Lower', 'Both'}))
+                        p.LowerSaturationLimit = valeurSI(bloc, 'LowerLimit', -Inf, chemin);
+                    end
+                end
+            case {'pssaturation', 'psdeadzone'}
+                haut = valeurSI(bloc, 'UpperLimit', 0.5, chemin);
+                bas = valeurSI(bloc, 'LowerLimit', -0.5, chemin);
+                if strcmp(bloc.type, 'pssaturation')
+                    type = 'saturation';
+                    p.UpperLimit = haut;
+                    p.LowerLimit = bas;
+                else
+                    type = 'deadzone';
+                    p.UpperValue = haut;
+                    p.LowerValue = bas;
+                end
+                p.ZeroCross = choix(bloc, 'ZeroCross', 'on', {'on', 'off'}, chemin);
+            case 'psswitch'
+                % la première entrée passe quand la commande atteint le seuil
+                type = 'switch';
+                p.Threshold = valeurSI(bloc, 'Threshold', 0.5, chemin);
+                p.Criteria = 'u2 >= Threshold';
+                p.ZeroCross = choix(bloc, 'ZeroCross', 'on', {'on', 'off'}, chemin);
+            case 'psconstantdelay'
+                type = 'transportdelay';
+                p.DelayTime = valeurSI(bloc, 'DelayTime', 1, chemin);
+                p.InitialOutput = valeurSI(bloc, 'InputHistory', 0, chemin);
+            case 'psterminator'
+                type = 'terminator';
+            case {'pslookuptable1d', 'pslookuptable2d'}
+                type = 'matlabfunction';
+                p.Script = scriptTable(bloc, chemin);
+                p.SampleTime = -1;
+        end
+        modele.blocs{k} = remplace(bloc, type, p);
+    end
+end
+
+% La table d'un PS Lookup Table (1D) ou (2D), vérifiée, et la fonction qui
+% la lit.
+function script = scriptTable(bloc, chemin)
+    deux = strcmp(bloc.type, 'pslookuptable2d');
+    if deux
+        grilles = {tableau(bloc, 'x1', 1:3, chemin), tableau(bloc, 'x2', 1:4, chemin)};
+        valeurs = tableau(bloc, 'f', reshape(1:12, 3, 4), chemin);
+        attendue = [numel(grilles{1}), numel(grilles{2})];
+    else
+        grilles = {tableau(bloc, 'x', 1:5, chemin)};
+        valeurs = tableau(bloc, 'f', 0:4, chemin);
+        attendue = [1, numel(grilles{1})];
+    end
+    for i = 1:numel(grilles)
+        g = grilles{i};
+        if numel(g) < 2 || any(diff(g) <= 0)
+            error('Simulink:Parameters:InvParamSetting', ...
+                  ['La grille %d de ''%s'' doit compter au moins deux points, rangés en ' ...
+                   'ordre strictement croissant.'], i, chemin);
+        end
+        grilles{i} = g(:).';
+    end
+    if ~deux
+        valeurs = valeurs(:).';
+    end
+    if ~isequal(size(valeurs), attendue)
+        error('Simulink:Parameters:InvParamSetting', ...
+              'Les valeurs de ''%s'' sont de taille %s ; ses grilles demandent %s.', chemin, ...
+              mat2str(size(valeurs)), mat2str(attendue));
+    end
+    lisse = strcmp(choix(bloc, 'InterpolationMethod', 'Linear', {'Linear', 'Smooth'}, ...
+                         chemin), 'Smooth');
+    extrapolation = choix(bloc, 'ExtrapolationMethod', 'Linear', ...
+                          {'Linear', 'Nearest', 'Error'}, chemin);
+    textes = cellfun(@(g) mat2str(g, 17), grilles, 'UniformOutput', false);
+    if deux
+        script = sprintf(['function y = fcn(u1, u2)\ny = matlibre_sl_tableps({%s, %s}, ' ...
+                          '%s, {u1, u2}, %d, ''%s'', ''%s'');\n'], textes{:}, ...
+                         mat2str(valeurs, 17), lisse, extrapolation, strrep(chemin, '''', ''''''));
+    else
+        script = sprintf(['function y = fcn(u)\ny = matlibre_sl_tableps({%s}, %s, {u}, ' ...
+                          '%d, ''%s'', ''%s'');\n'], textes{1}, mat2str(valeurs, 17), lisse, ...
+                         extrapolation, strrep(chemin, '''', ''''''));
+    end
+end
+
+% Un tableau de nombres, dans ses unités.
+function v = tableau(bloc, nom, defaut, chemin)
+    v = defaut;
+    if isfield(bloc.parametres, nom)
+        v = bloc.parametres.(nom);
+        if ischar(v) || isstring(v)
+            if isfield(bloc, 'espace')
+                v = matlibre_sl_masque('evaluer', char(v), bloc.espace, chemin, nom);
+            else
+                v = matlibre_sl_expression(char(v), chemin, nom);
+            end
+        end
+    end
+    if ~(isnumeric(v) || islogical(v)) || ~isreal(v) || any(~isfinite(double(v(:))))
+        error('Simulink:Parameters:InvParamSetting', ...
+              'Le parametre ''%s'' de ''%s'' doit etre un tableau de reels finis.', nom, chemin);
+    end
+    v = double(v);
+    champ = [nom '_unit'];
+    if isfield(bloc.parametres, champ)
+        v = v * versSI(bloc.parametres.(champ), false, chemin);
+    end
+end
+
+% Un paramètre d'un bloc de signaux physiques : tel quel s'il n'a pas
+% d'unité — une expression s'évaluera avec le bloc qu'il devient —, sinon
+% évalué et ramené aux unités SI.
+function v = valeurSI(bloc, nom, defaut, chemin)
+    v = defaut;
+    if isfield(bloc.parametres, nom)
+        v = bloc.parametres.(nom);
+    end
+    champ = [nom '_unit'];
+    if isfield(bloc.parametres, champ)
+        a = versSI(bloc.parametres.(champ), false, chemin);
+        if a ~= 1
+            v = a * valeurParametre(bloc, nom, defaut, chemin);
+        end
+    end
 end
 
 % Les convertisseurs : un nombre de Simulink devient un signal physique
@@ -494,6 +762,11 @@ function modele = remplacer(modele, membres, ports, noeud, chemin)
     noms = strjoin(cellfun(@(k) ['''' chemin(k) ''''], num2cell(membres), ...
                            'UniformOutput', false), ', ');
     config = membres(strcmp(types, 'solverconfiguration'));
+    if numel(config) == numel(membres)
+        error('Simscape:Network:SolverConfigurationNotConnected', ...
+              ['Le bloc Solver Configuration %s n''est relie a aucun element physique : ' ...
+               'reliez son port a un noeud du reseau qu''il regle.'], noms);
+    end
     if isempty(config)
         error('Simscape:Network:SolverConfigurationMissing', ...
               ['Le reseau physique de %s n''est relie a aucun bloc Solver Configuration : ' ...
