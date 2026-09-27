@@ -5642,6 +5642,167 @@ for kE = 1:size(casVerif, 1)
 end
 fprintf('suite de la bibliotheque : %d cas d''erreur verifies\n', size(casVerif, 1));
 
+%% --------------------------------------- 42. Le PID de Simulink en entier
+% Controller et Form choisissent les parties et leur forme ; les
+% conditions initiales portent sur les états de Simulink ; le PID discret
+% intègre et filtre par la méthode qu'on lui choisit ; bornée, la sortie
+% se protège de l'emballement par recalcul ou par blocage ; une entrée
+% remet les états, d'autres donnent leurs conditions initiales.
+pid = new_system('pid');
+pid = add_block(pid, 'constant', 'e', 'Value', 1);
+pid = add_block(pid, 'pidcontroller', 'k', 'P', 2, 'I', 3, 'D', 0, ...
+                'InitialConditionForIntegrator', 5);
+pid = add_line(add_line(add_block(pid, 'outport', 'y'), 'e', 'k'), 'k', 'y');
+r = sim(pid, 1, 1e-3);
+assert(abs(r.yout(end) - (2 + 5 + 3)) < 1e-9, 'la condition initiale est celle de l''integrale');
+r = sim(set_param(pid, 'k', 'Form', 'Ideal'), 1, 1e-3);
+assert(abs(r.yout(end) - (2 + 5 + 2 * 3)) < 1e-9, 'la forme ideale : P (1 + I/s + ...)');
+r = sim(set_param(pid, 'k', 'Controller', 'P'), 1, 1e-3);
+assert(abs(r.yout(end) - 2) < 1e-12, 'Controller P : ni integrale ni derivee');
+r = sim(set_param(set_param(pid, 'k', 'D', 0.1), 'k', 'Controller', 'PD'), 0.5, 1e-3);
+assert(abs(r.yout(1) - (2 + 0.1 * 100)) < 1e-9 && abs(r.yout(end) - 2) < 1e-3, ...
+       'Controller PD : la derivee filtree d''une constante s''eteint');
+pidDefaut = add_block(new_system('pidDefaut'), 'simulink/Continuous/PID Controller', 'k');
+assert(get_param(pidDefaut, 'k', 'I') == 1, 'I vaut 1 par defaut, comme dans Simulink');
+% le PID discret, par les trois méthodes
+pidD = new_system('pidD');
+pidD = add_block(pidD, 'constant', 'e', 'Value', 1);
+pidD = add_block(pidD, 'simulink/Discrete/Discrete PID Controller', 'k', 'P', 2, 'I', 3, ...
+                 'D', 0, 'SampleTime', 0.1);
+pidD = add_line(add_line(add_block(pidD, 'outport', 'y'), 'e', 'k'), 'k', 'y');
+reglageD = {'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 0.5};
+attendus = {'Forward Euler', 2 + 0.3 * (0:5); 'Backward Euler', 2 + 0.3 * (1:6); ...
+            'Trapezoidal', 2.15 + 0.3 * (0:5)};
+for kM = 1:3
+    r = sim(set_param(pidD, 'k', 'IntegratorMethod', attendus{kM, 1}), reglageD{:});
+    assert(max(abs(r.yout' - attendus{kM, 2})) < 1e-12, ['PID discret : ' attendus{kM, 1}]);
+end
+assert(strcmp(get_param(pidD, 'k', 'TimeDomain'), 'Discrete-time'), ...
+       'Discrete PID Controller est regle en Discrete-time');
+r = sim(set_param(pidD, 'k', 'P', 0, 'I', 0, 'D', 1, 'N', 5), reglageD{:});
+assert(max(abs(r.yout' - 5 * 0.5 .^ (0:5))) < 1e-12, 'la derivee filtree discrete, Forward Euler');
+r = sim(set_param(pidD, 'k', 'P', 0, 'I', 0, 'D', 1, 'UseFilter', 'off'), reglageD{:});
+assert(all(r.yout == 0), 'sans filtre, la difference d''une constante est nulle');
+r = sim(set_param(pidD, 'k', 'LimitOutput', 'on', 'UpperSaturationLimit', 3), ...
+        'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 1);
+assert(max(r.yout) == 3 && r.yout(end) == 3, 'la sortie bornee');
+% l'emballement : l'erreur s'inverse à t = 1
+emb = new_system('emb');
+emb = add_block(emb, 'step', 'e', 'Time', 1, 'Before', 1, 'After', -1);
+emb = add_block(emb, 'pidcontroller', 'k', 'P', 1, 'I', 2, 'D', 0, 'LimitOutput', 'on', ...
+                'UpperSaturationLimit', 2);
+emb = add_line(add_line(add_block(emb, 'outport', 'y'), 'e', 'k'), 'k', 'y');
+reglageE = {'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 3};
+r = sim(emb, reglageE{:});
+assert(abs(r.yout(end) - (-3)) < 0.02, 'sans protection, l''integrale emballee retarde la sortie');
+r = sim(set_param(emb, 'k', 'AntiWindupMode', 'clamping'), reglageE{:});
+assert(abs(r.yout(end) - (-4)) < 0.02, 'le blocage arrete l''integrale a la borne');
+r = sim(set_param(emb, 'k', 'AntiWindupMode', 'back-calculation', 'Kb', 1), reglageE{:});
+assert(r.yout(end) < -3.1 && r.yout(end) > -4, 'le recalcul ramene l''integrale vers la borne');
+rD = sim(set_param(set_param(emb, 'k', 'TimeDomain', 'Discrete-time', 'SampleTime', 0.01), ...
+                   'k', 'AntiWindupMode', 'clamping'), reglageE{:});
+assert(abs(rD.yout(end) - (-4)) < 0.05, 'le blocage du PID discret');
+% la remise et les conditions initiales par des entrées
+remise = new_system('remise');
+remise = add_block(remise, 'constant', 'e', 'Value', 1);
+remise = add_block(remise, 'step', 'r', 'Time', 0.5);
+remise = add_block(remise, 'constant', 'ci', 'Value', 10);
+remise = add_block(remise, 'pidcontroller', 'k', 'P', 0, 'I', 1, 'Controller', 'PI', ...
+                   'ExternalReset', 'rising', 'InitialConditionSource', 'external');
+remise = add_line(add_line(add_line(remise, 'e', 'k', 1), 'r', 'k', 2), 'ci', 'k', 3);
+remise = add_line(add_block(remise, 'outport', 'y'), 'k', 'y');
+[ne, ~] = matlibre_sl_ports(remise.blocs{4});
+assert(ne == 3, 'u, Reset et I0 : un PI n''a pas d''entree D0');
+for domaine = {'Continuous-time', 'Discrete-time'}
+    r = sim(set_param(remise, 'k', 'TimeDomain', domaine{1}, 'SampleTime', 0.01), ...
+            'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 1);
+    auPoint = @(t) r.yout(find(r.tout >= t - 1e-9, 1));
+    assert(abs(auPoint(0) - 10) < 1e-9 && abs(auPoint(0.4) - 10.4) < 0.02 && ...
+           abs(auPoint(0.6) - 10.1) < 0.02 && abs(r.yout(end) - 10.5) < 0.02, ...
+           ['la remise sur front montant, ' domaine{1}]);
+end
+brute = new_system('brute');
+brute = add_block(brute, 'ramp', 'e', 'Slope', 3);
+brute = add_block(brute, 'pidcontroller', 'k', 'P', 0, 'I', 0, 'D', 2, 'UseFilter', 'off');
+brute = add_line(add_line(add_block(brute, 'outport', 'y'), 'e', 'k'), 'k', 'y');
+r = sim(brute, 'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 1);
+assert(abs(r.yout(end) - 6) < 1e-9, 'la derivee non filtree d''une rampe');
+% le PID avancé se relit comme il s'écrit
+dossierPid = tempname();
+mkdir(dossierPid);
+save_system(remise, fullfile(dossierPid, 'remise.slx'));
+relu = sim(load_system(fullfile(dossierPid, 'remise.slx')), 'Solver', 'ode4', ...
+           'FixedStep', 0.01, 'StopTime', 1);
+assert(abs(relu.yout(end) - 10.5) < 0.02, 'le PID a remise externe passe par le .slx');
+rmdir(dossierPid, 's');
+% Rate Limiter Dynamic, Weighted Sample Time Math, MinMax Running Resettable
+pente = new_system('pente');
+pente = add_block(pente, 'constant', 'up', 'Value', 2);
+pente = add_block(pente, 'step', 'u', 'Time', 0.5, 'After', 10);
+pente = add_block(pente, 'constant', 'lo', 'Value', -1);
+pente = add_block(pente, 'zoh', 'z', 'SampleTime', 0.1);
+pente = add_block(pente, 'simulink/Discontinuities/Rate Limiter Dynamic', 'rl');
+pente = add_line(add_line(pente, 'u', 'z'), 'z', 'rl', 2);
+pente = add_line(add_line(pente, 'up', 'rl', 1), 'lo', 'rl', 3);
+pente = add_line(add_block(pente, 'outport', 'y'), 'rl', 'y');
+r = sim(pente, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 1);
+assert(max(abs(r.yout' - [0 0 0 0 0 0.2 0.4 0.6 0.8 1 1.2])) < 1e-12, ...
+       'Rate Limiter Dynamic : au plus up Ts par pas');
+poids = new_system('poids');
+poids = add_block(poids, 'constant', 'c', 'Value', 3);
+poids = add_block(poids, 'zoh', 'z', 'SampleTime', 0.5);
+poids = add_block(poids, 'simulink/Math Operations/Weighted Sample Time Math', 'ws', ...
+                  'TsampMathOp', '*', 'weightValue', 2);
+poids = add_line(add_line(poids, 'c', 'z'), 'z', 'ws');
+poids = add_line(add_block(poids, 'outport', 'y'), 'ws', 'y');
+r = sim(poids, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.5, 'StopTime', 1);
+assert(all(r.yout == 3), 'Weighted Sample Time Math : u (w Ts), Ts la periode heritee');
+r = sim(set_param(poids, 'ws', 'TsampMathOp', '1/Ts Only'), 'Solver', ...
+        'FixedStepDiscrete', 'FixedStep', 0.5, 'StopTime', 1);
+assert(all(r.yout == 4), 'Weighted Sample Time Math : w / Ts');
+courant = new_system('courant');
+courant = add_block(courant, 'simulink/Sources/Sine Wave', 's');
+courant = add_block(courant, 'pulsegenerator', 'R', 'Period', 4, 'PulseWidth', 10, ...
+                    'PhaseDelay', 3);
+courant = add_block(courant, 'simulink/Math Operations/MinMax Running Resettable', 'm', ...
+                    'Function', 'max');
+courant = add_line(add_line(courant, 's', 'm', 1), 'R', 'm', 2);
+courant = add_line(add_block(courant, 'outport', 'y'), 'm', 'y');
+r = sim(courant, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 5);
+attendu = zeros(size(r.tout));
+m = 0;
+for kT = 1:numel(r.tout)
+    if r.tout(kT) >= 3 && r.tout(kT) < 3.4
+        m = 0;
+    end
+    m = max(sin(r.tout(kT)), m);
+    attendu(kT) = m;
+end
+assert(max(abs(r.yout - attendu)) < 1e-12, 'MinMax Running Resettable : le maximum couru, remis par R');
+casPid = {
+    @() sim(set_param(pid, 'k', 'N', 0), 1), 'Simulink:blocks:PIDFilterCoefficientNotPositive', 'pid/k'
+    @() sim(set_param(pidD, 'k', 'N', -1, 'D', 1), 1), ...
+        'Simulink:blocks:PIDFilterCoefficientNotPositive', 'pidD/k'
+    @() sim(set_param(pidD, 'k', 'LimitOutput', 'on', 'UpperSaturationLimit', -1, ...
+                      'LowerSaturationLimit', 1), 1), 'Simulink:blocks:PIDSaturationLimits', 'pidD/k'
+    @() sim(set_param(pidD, 'k', 'SampleTime', 0), 1), ...
+        'Simulink:SampleTime:DiscreteBlockContinuous', 'pidD/k'
+    @() sim(set_param(pid, 'k', 'Controller', 'PIDF'), 1), 'Simulink:Parameters:InvalidValue', 'PID, PI, PD, P, I'
+    };
+for kE = 1:size(casPid, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('casPid{kE, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casPid{kE, 2}) && ~isempty(strfind(message, casPid{kE, 3})), ...
+           sprintf('PID, cas %d : %s attendu, %s rendu (%s)', kE, casPid{kE, 2}, vu, message));
+end
+fprintf('PID et blocs de periode : %d cas d''erreur verifies\n', size(casPid, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

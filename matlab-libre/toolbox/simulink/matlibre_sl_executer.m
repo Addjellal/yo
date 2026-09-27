@@ -181,7 +181,11 @@ function T = preparer(c)
     end
     T.formes = cell(1, n);
     T.classesEntree = cell(1, n);
+    % les fonctions qui lisent l'instant et leur période : MATLIBRE_SL_INSTANT
+    T.instant = false(1, n);
+    T.periodes = c.cadence;
     for k = find(strcmp(c.types, 'matlabfunction'))
+        T.instant(k) = isfield(c.fonctions{k}, 'instant') && c.fonctions{k}.instant;
         T.formes{k} = cell(1, c.nIn(k));
         % une entrée typée arrive à la fonction dans sa classe, comme dans
         % Simulink : un int8 y calcule en int8
@@ -2412,18 +2416,18 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         else
                             V(a:b) = retardVariable(T, k, p, t, b - a + 1);
                         end
-                    case 76   % PID controller
+                    case 76   % PID : P u + intégrale + N (D u - filtre)
                         u = V(eA(e + 1):eB(e + 1));
                         xa = T.xA(k);
                         if a == b
-                            V(a) = T.P(p) * u + T.P(p + 1) * x(xa) + ...
-                                   T.P(p + 2) * T.P(p + 3) * (u - T.P(p + 3) * x(xa + 1));
+                            V(a) = T.P(p) * u + x(xa) + ...
+                                   T.P(p + 3) * (T.P(p + 2) * u - x(xa + 1));
                         else
                             w = b - a + 1;
-                            N = T.P(p + 3 * w:p + 4 * w - 1);
-                            V(a:b) = T.P(p:p + w - 1) .* u + T.P(p + w:p + 2 * w - 1) .* ...
-                                     x(xa:xa + w - 1) + T.P(p + 2 * w:p + 3 * w - 1) .* N .* ...
-                                     (u - N .* x(xa + w:xa + 2 * w - 1));
+                            V(a:b) = T.P(p:p + w - 1) .* u + x(xa:xa + w - 1) + ...
+                                     T.P(p + 3 * w:p + 4 * w - 1) .* ...
+                                     (T.P(p + 2 * w:p + 3 * w - 1) .* u - ...
+                                      x(xa + w:xa + 2 * w - 1));
                         end
                 end
             case 8
@@ -2484,6 +2488,9 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         y = T.objets{k}(V(eA(e + 1):eB(e + 1)));
                         V(a:b) = double(y(:));
                     case 101   % MATLAB function : ses arguments, ses sorties
+                        if T.instant(k)
+                            matlibre_sl_instant(t, T.periodes(k));
+                        end
                         V = appelerFonction(T, k, V, p, e);
                     case 103   % S-function : les sorties, drapeau 3
                         if T.P(p + 2) > 0
@@ -3920,10 +3927,11 @@ function dx = derivees(T, V, x, t)
                 w = (b - a + 1) / 2;
                 dx(a:a + w - 1) = x(a + w:b);
                 dx(a + w:b) = u + zeros(w, 1);
-            case 76   % PID : l'intégrale, et le filtre de la dérivée
+            case 76   % PID : l'intégrale de I u, et le filtre de la dérivée
                 w = (b - a + 1) / 2;
-                dx(a:a + w - 1) = u;
-                dx(a + w:b) = u - T.P(p + 3 * w:p + 4 * w - 1) .* x(a + w:b);
+                dx(a:a + w - 1) = T.P(p + w:p + 2 * w - 1) .* u;
+                dx(a + w:b) = T.P(p + 3 * w:p + 4 * w - 1) .* ...
+                              (T.P(p + 2 * w:p + 3 * w - 1) .* u - x(a + w:b));
         end
     end
 end

@@ -571,6 +571,35 @@ function [type, p] = normaliser(type, p, chemin)
         case {'transferfcnfirstorder', 'transferfcnleadorlag', 'transferfcnrealzero'}
             p = struct('Script', scriptPremierOrdre(type, p), 'SampleTime', -1);
             type = 'matlabfunction';
+        case 'ratelimiterdynamic'
+            % la pente de la sortie reste entre lo et up : sur un pas Ts,
+            % la sortie bouge d'au plus up Ts et d'au moins lo Ts
+            p = struct('Script', sprintf(['function y = fcn(up, u, lo)\n' ...
+                'persistent yAvant tAvant\n[t, Ts] = matlibre_sl_instant();\n' ...
+                'if isempty(yAvant)\n    y = double(u);\n    yAvant = y;\n    tAvant = t;\n' ...
+                '    return\nend\nif ~(Ts > 0 && isfinite(Ts))\n    Ts = t - tAvant;\nend\n' ...
+                'tAvant = t;\nd = min(max(double(u) - yAvant, double(lo) .* Ts), ' ...
+                'double(up) .* Ts);\ny = yAvant + d;\nyAvant = y;\n']), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'sampletimemath'
+            w = texteValeur(p.weightValue);
+            formules = struct('plus', ['u + ' w ' .* Ts'], 'moins', ['u - ' w ' .* Ts'], ...
+                              'fois', ['u .* (' w ' .* Ts)'], ...
+                              'divise', ['u ./ (' w ' .* Ts)'], 'ts', [w ' .* Ts'], ...
+                              'inverse', [w ' ./ Ts']);
+            cles = {'plus', 'moins', 'fois', 'divise', 'ts', 'inverse'};
+            cle = cles{strcmp(p.TsampMathOp, {'+', '-', '*', '/', 'Ts Only', '1/Ts Only'})};
+            % l'entrée ne donne que sa période à Ts Only et 1/Ts Only
+            p = struct('Script', sprintf(['function y = fcn(u)\n' ...
+                '[~, Ts] = matlibre_sl_instant();\nif ~isfinite(Ts)\n    Ts = 0;\nend\n' ...
+                'y = %s;\n'], formules.(cle)), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'minmaxrunningresettable'
+            p = struct('Script', sprintf(['function y = fcn(u, R)\npersistent m\n' ...
+                'if isempty(m) || any(R(:) ~= 0)\n    m = zeros(size(u)) + %s;\nend\n' ...
+                'y = %s(double(u), m);\nm = y;\n'], texteValeur(p.vinit), char(p.Function)), ...
+                'SampleTime', -1);
+            type = 'matlabfunction';
         case 'environmentcontroller'
             % en simulation, l'entrée Sim ; Coder ne sert qu'au code produit
             p = struct('Script', sprintf('function y = fcn(Sim, Coder)\ny = Sim;\n'), ...
@@ -581,6 +610,11 @@ function [type, p] = normaliser(type, p, chemin)
               'checkdynamicupperbound', 'checkdynamicgap'}
             p = verification(type, p, chemin);
             type = 'assertion';
+        case 'pidcontroller'
+            if strcmp(p.TimeDomain, 'Discrete-time')
+                p = struct('Script', scriptPIDDiscret(p, chemin), 'SampleTime', p.SampleTime);
+                type = 'matlabfunction';
+            end
         case 'signalspecification'
             % un passage qui vérifie ses dimensions et son type
             p = struct('ConversionOutput', 'Signal copy', 'NombreDePorts', 1, ...
@@ -826,6 +860,202 @@ function script = scriptTableDirecte(p, n, chemin)
                       'y = T(sub2ind(%s, %s));\n'], strjoin(arguments_, ', '), ...
                      mat2str(T(:).', 17), mat2str(tailles(1:n)), mat2str(tailles(1:n)), ...
                      strjoin(indices, ', '));
+end
+
+% Les gains du PID continu tel que le calcul les lit, un par élément : les
+% parties que Controller écarte valent zéro ; la forme idéale multiplie
+% I et D par P. Sans dérivée, N vaut zéro et le filtre ne bouge pas.
+function [P, I, D, N] = gainsPID(p, w, ch)
+    type = upper(char(p.Controller));
+    P = etendre(p.P, w, ch, 'P');
+    I = etendre(p.I, w, ch, 'I');
+    D = etendre(p.D, w, ch, 'D');
+    N = etendre(p.N, w, ch, 'N');
+    if strcmp(p.Form, 'Ideal') && any(type == 'P')
+        I = P .* I;
+        D = P .* D;
+    end
+    if ~any(type == 'P')
+        P = zeros(w, 1);
+    end
+    if ~any(type == 'I')
+        I = zeros(w, 1);
+    end
+    if ~any(type == 'D')
+        D = zeros(w, 1);
+        N = zeros(w, 1);
+    elseif any(N <= 0)
+        error('Simulink:blocks:PIDFilterCoefficientNotPositive', ...
+              ['Le bloc ''%s'' demande un coefficient de filtre N ' ...
+               'strictement positif : une derivee non filtree ne ' ...
+               's''integre pas.'], ch);
+    end
+end
+
+% Le PID discret : l'intégrale et le filtre de la dérivée par la méthode
+% qu'on leur choisit (Forward Euler, Backward Euler, Trapezoidal), la
+% sortie bornée, l'anti-emballement par recalcul (Kb) ou par blocage, la
+% remise par l'entrée Reset, les conditions initiales internes ou
+% externes (I0, D0). Le pas est la période du bloc, que donne
+% MATLIBRE_SL_INSTANT.
+function script = scriptPIDDiscret(p, chemin)
+    type = upper(char(p.Controller));
+    aP = any(type == 'P');
+    aI = any(type == 'I');
+    aD = any(type == 'D');
+    P = double(p.P);
+    I = double(p.I);
+    D = double(p.D);
+    N = double(p.N);
+    if strcmp(p.Form, 'Ideal') && aP
+        I = P .* I;
+        D = P .* D;
+    end
+    filtre = strcmp(p.UseFilter, 'on');
+    if aD && filtre && any(N(:) <= 0)
+        error('Simulink:blocks:PIDFilterCoefficientNotPositive', ...
+              ['Le bloc ''%s'' demande un coefficient de filtre N strictement ' ...
+               'positif.'], chemin);
+    end
+    Ts = double(p.SampleTime);
+    if ~(Ts(1) == -1 || Ts(1) > 0)
+        error('Simulink:SampleTime:DiscreteBlockContinuous', ...
+              ['Le PID discret ''%s'' a une periode nulle : donnez-lui une periode ' ...
+               'positive, ou -1 pour l''heriter.'], chemin);
+    end
+    methodes = {'Forward Euler', 'Backward Euler', 'Trapezoidal'};
+    mI = find(strcmp(p.IntegratorMethod, methodes));
+    mD = find(strcmp(p.FilterMethod, methodes));
+    remise = find(strcmp(p.ExternalReset, {'rising', 'falling', 'either', 'level'}));
+    externe = strcmp(p.InitialConditionSource, 'external');
+    entrees = {'u'};
+    if ~isempty(remise)
+        entrees{end + 1} = 'r';
+    end
+    ciI = texteValeur(p.InitialConditionForIntegrator);
+    ciD = texteValeur(p.InitialConditionForFilter);
+    if externe && aI
+        entrees{end + 1} = 'I0';
+        ciI = 'double(I0)';
+    end
+    if externe && aD && filtre
+        entrees{end + 1} = 'D0';
+        ciD = 'double(D0)';
+    end
+    borne = strcmp(p.LimitOutput, 'on');
+    haut = double(p.UpperSaturationLimit);
+    bas = double(p.LowerSaturationLimit);
+    if borne && any(bas(:) > haut(:))
+        error('Simulink:blocks:PIDSaturationLimits', ...
+              'La borne basse de la sortie de ''%s'' depasse sa borne haute.', chemin);
+    end
+    anti = 0;
+    if borne
+        anti = find(strcmp(p.AntiWindupMode, {'none', 'back-calculation', 'clamping'})) - 1;
+    end
+    L = {sprintf('function y = fcn(%s)', strjoin(entrees, ', ')), ...
+         'persistent s f dAvant xAvant eAvant rAvant tAvant', ...
+         '[t, Ts] = matlibre_sl_instant();', 'e = double(u);', ...
+         'if isempty(s)', ...
+         sprintf('    s = zeros(size(e)) + %s;', ciI), ...
+         sprintf('    f = zeros(size(e)) + %s;', ciD), ...
+         '    dAvant = zeros(size(e));', '    xAvant = zeros(size(e));', ...
+         '    eAvant = e;', '    rAvant = [];', '    tAvant = t;', 'end', ...
+         'if ~(Ts > 0 && isfinite(Ts))', '    Ts = t - tAvant;', 'end', 'tAvant = t;'};
+    if ~isempty(remise)
+        conditions = {'(ra < 0 & rr >= 0) | (ra == 0 & rr > 0)', ...
+                      '(ra > 0 & rr <= 0) | (ra == 0 & rr < 0)', ...
+                      ['(ra < 0 & rr >= 0) | (ra == 0 & rr ~= 0) | ' ...
+                       '(ra > 0 & rr <= 0)'], ...
+                      'rr ~= 0 | (ra ~= 0 & rr == 0)'};
+        L = [L, {'rr = double(r) + zeros(size(e));', 'ra = rAvant;', ...
+                 'if isempty(ra)', '    ra = rr;   % pas de front au premier instant', ...
+                 'end', sprintf('remis = %s;', conditions{remise}), 'rAvant = rr;', ...
+                 'if any(remis(:))', sprintf('    base = zeros(size(e)) + %s;', ciI), ...
+                 '    s(remis) = base(remis);', ...
+                 sprintf('    base = zeros(size(e)) + %s;', ciD), ...
+                 '    f(remis) = base(remis);', '    dAvant(remis) = 0;', ...
+                 '    xAvant(remis) = 0;', 'end'}];
+    end
+    % les trois parties
+    if aP
+        L{end + 1} = sprintf('yP = %s .* e;', texteValeur(P));
+    else
+        L{end + 1} = 'yP = zeros(size(e));';
+    end
+    if aI
+        L{end + 1} = sprintf('iE = %s .* e;', texteValeur(I));
+        switch mI
+            case 1
+                L = [L, {'h = 0;', 'base = s;'}];
+            case 2
+                L = [L, {'h = Ts;', 'base = s;'}];
+            otherwise
+                L = [L, {'h = Ts / 2;', 'base = s + Ts / 2 .* xAvant;'}];
+        end
+    else
+        L = [L, {'iE = zeros(size(e));', 'h = 0;', 'base = zeros(size(e));'}];
+    end
+    if aD && filtre
+        DN = {texteValeur(D), texteValeur(N)};
+        switch mD
+            case 1
+                L{end + 1} = sprintf('yD = %s .* (%s .* e - f);', DN{2}, DN{1});
+            case 2
+                L{end + 1} = sprintf('yD = %s .* (%s .* e - f) ./ (1 + %s .* Ts);', ...
+                                     DN{2}, DN{1}, DN{2});
+            otherwise
+                L{end + 1} = sprintf(['yD = %s .* (%s .* e - f - Ts / 2 .* dAvant) ./ ' ...
+                                      '(1 + %s .* Ts / 2);'], DN{2}, DN{1}, DN{2});
+        end
+    elseif aD
+        L = [L, {'if Ts > 0', sprintf('    yD = %s .* (e - eAvant) ./ Ts;', texteValeur(D)), ...
+                 'else', '    yD = zeros(size(e));', 'end'}];
+    else
+        L{end + 1} = 'yD = zeros(size(e));';
+    end
+    L{end + 1} = 'y = yP + base + h .* iE + yD;';
+    L{end + 1} = 'x = iE;';
+    if borne
+        L = [L, {sprintf('haut = zeros(size(e)) + %s;', texteValeur(haut)), ...
+                 sprintf('bas = zeros(size(e)) + %s;', texteValeur(bas))}];
+        switch anti
+            case 1   % recalcul : l'intégrale reçoit Kb (sortie bornée - sortie)
+                L = [L, {sprintf('kb = zeros(size(e)) + %s;', texteValeur(p.Kb)), ...
+                         'dessus = y > haut;', 'dessous = y < bas;', ...
+                         'y(dessus) = (y(dessus) + h .* kb(dessus) .* haut(dessus)) ./ (1 + h .* kb(dessus));', ...
+                         'y(dessous) = (y(dessous) + h .* kb(dessous) .* bas(dessous)) ./ (1 + h .* kb(dessous));', ...
+                         'yb = min(max(y, bas), haut);', 'x = iE + kb .* (yb - y);'}];
+            case 2   % blocage : l'intégrale s'arrête quand elle pousse la sortie hors des bornes
+                L = [L, {'yb = min(max(y, bas), haut);', ...
+                         'bloque = (y ~= yb) & (sign(iE) == sign(y - yb));', ...
+                         'x(bloque) = 0;', 'y = y - h .* (iE - x);', ...
+                         'yb = min(max(y, bas), haut);'}];
+            otherwise
+                L{end + 1} = 'yb = min(max(y, bas), haut);';
+        end
+    else
+        L{end + 1} = 'yb = y;';
+    end
+    % les mises à jour
+    if aI
+        switch mI
+            case 3
+                L = [L, {'s = s + Ts / 2 .* (x + xAvant);', 'xAvant = x;'}];
+            otherwise
+                L{end + 1} = 's = s + Ts .* x;';
+        end
+    end
+    if aD && filtre
+        switch mD
+            case 3
+                L = [L, {'f = f + Ts / 2 .* (yD + dAvant);', 'dAvant = yD;'}];
+            otherwise
+                L{end + 1} = 'f = f + Ts .* yD;';
+        end
+    end
+    L = [L, {'eAvant = e;', 'y = yb;'}];
+    script = [strjoin(L, sprintf('\n')), sprintf('\n')];
 end
 
 % Un texte écrit dans le code d'une fonction, entre apostrophes.
@@ -3207,19 +3437,21 @@ function c = abaisser(c, pas, tDebut)
                     z0 = [0; zeros(w * longueur, 1)];
                 end
             case 'pidcontroller'          % [P; I; D; N], w chacun
-                N = etendre(p.N, w, ch, 'N');
-                if any(N <= 0)
-                    error('Simulink:blocks:PIDFilterCoefficientNotPositive', ...
-                          ['Le bloc ''%s'' demande un coefficient de filtre N ' ...
-                           'strictement positif : une derivee non filtree ne ' ...
-                           's''integre pas.'], ch);
+                % Les états sont ceux de Simulink : l'intégrale de I u, et
+                % le filtre f de la dérivée, f' = N (D u - f).
+                [P, I, D, N] = gainsPID(p, w, ch);
+                xi = zeros(w, 1);
+                xd = zeros(w, 1);
+                if any(I ~= 0)
+                    xi = etendre(p.InitialConditionForIntegrator, w, ch, ...
+                                 'InitialConditionForIntegrator');
                 end
-                xi = etendre(p.InitialConditionForIntegrator, w, ch, ...
-                             'InitialConditionForIntegrator');
-                xd = etendre(p.InitialConditionForFilter, w, ch, 'InitialConditionForFilter');
+                if any(N ~= 0)
+                    xd = etendre(p.InitialConditionForFilter, w, ch, ...
+                                 'InitialConditionForFilter');
+                end
                 c = ajouterEtat(c, k, [xi; xd]);
-                seg = [etendre(p.P, w, ch, 'P'); etendre(p.I, w, ch, 'I'); ...
-                       etendre(p.D, w, ch, 'D'); N];
+                seg = [P; I; D; N];
             % --- discret ---
             case 'delay'                  % [L]  Z : [tete; tampon w x L]
                 L = double(p.DelayLength);
@@ -3712,6 +3944,7 @@ function code = preparerCode(c, k)
         case 'matlabfunction'
             code.h = matlibre_sl_fonction('installer', p.Script, ch);
             code.persistante = ~isempty(regexp(char(p.Script), '(^|\n)\s*persistent\s', 'once'));
+            code.instant = ~isempty(strfind(char(p.Script), 'matlibre_sl_instant'));
         case 'msfunction'
             code = matlibre_sl_msfonction('preparer', p.FunctionName, ...
                                           parametresSFonction(p, ch), ch);

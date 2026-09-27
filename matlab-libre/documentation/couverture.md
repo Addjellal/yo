@@ -142,7 +142,9 @@ totalité.
    To File et From File, Assignment, Combinatorial Logic, les détections
    de front, les opérations bit à bit sur les entiers, Lookup Table
    Dynamic, Prelookup et Interpolation Using Prelookup, Discrete FIR
-   Filter et les transmittances discrètes de la bibliothèque ; les blocs
+   Filter et les transmittances discrètes de la bibliothèque, le PID
+   continu ou discret avec ses bornes, son anti-emballement, sa remise et
+   ses conditions initiales externes ; les blocs
    de vérification (Check Static et Check Dynamic) arrêtent la simulation
    en nommant le bloc et l'instant. Les sous-systèmes
    conditionnels — Enable, Trigger, If et Switch Case avec leurs

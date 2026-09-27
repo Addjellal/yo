@@ -158,8 +158,10 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
         case {'checkdynamiclowerbound', 'checkdynamicupperbound'}
             nEntrees = 2;   % la borne, puis sig
             nSorties = 0;
-        case {'intervaltestdynamic', 'lookuptabledynamic'}
+        case {'intervaltestdynamic', 'lookuptabledynamic', 'ratelimiterdynamic'}
             nEntrees = 3;
+        case 'minmaxrunningresettable'
+            nEntrees = 2;
         case 'environmentcontroller'
             nEntrees = 2;
         case 'bitwiseoperator'
@@ -167,6 +169,10 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
                ~strcmpi(char(lire(p, 'logicop', 'AND')), 'NOT')
                 nEntrees = entier(lire(p, 'NumInputPorts', 1));
             end
+        case 'pidcontroller'
+            % u, puis l'entrée de remise, puis les conditions initiales I0
+            % et D0 des parties qui en ont
+            nEntrees = pidEntrees(p);
         case 'prelookup'
             if ~strcmpi(char(lire(p, 'OutputSelection', 'Index and fraction')), 'Index only')
                 nSorties = 2;
@@ -294,6 +300,15 @@ function liste = expressionsSinonSi(texte)
         end
     end
     liste{end + 1} = strtrim(texte(debut:end));
+end
+
+function n = pidEntrees(p)
+    type = upper(char(lire(p, 'Controller', 'PID')));
+    n = 1 + ~strcmpi(char(lire(p, 'ExternalReset', 'none')), 'none');
+    if strcmpi(char(lire(p, 'InitialConditionSource', 'internal')), 'external')
+        n = n + any(type == 'I') + (any(type == 'D') && ...
+                                   strcmpi(char(lire(p, 'UseFilter', 'on')), 'on'));
+    end
 end
 
 function v = lire(p, nom, defaut)

@@ -60,6 +60,10 @@ function modele = add_block(modele, type, nom, varargin)
 %     sinewavefunction Amplitude, Bias, Frequency, Phase — A sin(F u + P) + B,
 %                  l'entrée tenant lieu de temps (SineType 'Time based')
 %     permutedimensions Order ; squeeze — comme PERMUTE et SQUEEZE
+%     sampletimemath TsampMathOp (+, -, *, /, Ts Only, 1/Ts Only),
+%                  weightValue — l'entrée et w Ts, Ts la période du bloc
+%     minmaxrunningresettable Function (min, max), vinit — deux entrées :
+%                  u, et R qui remet à vinit
 %
 %   Non-linéarités :
 %     saturation   UpperLimit, LowerLimit
@@ -87,7 +91,8 @@ function modele = add_block(modele, type, nom, varargin)
 %                  entrées k1, f1, k2, f2... de Prelookup
 %     sinecosine   Formula, NumDataPoints — sin(2 pi u), cos(2 pi u) ou les
 %                  deux, lus dans une table d'un quart d'onde
-%     saturationdynamic, deadzonedynamic — trois entrées : up, u, lo
+%     saturationdynamic, deadzonedynamic, ratelimiterdynamic — trois
+%                  entrées : up, u, lo
 %     wraptozero   Threshold                    zéro au-delà du seuil
 %
 %   Logique :
@@ -159,7 +164,17 @@ function modele = add_block(modele, type, nom, varargin)
 %     statespace   A, B, C, D, X0
 %     zeropole     Zeros, Poles, Gain
 %     transportdelay DelayTime, InitialOutput, BufferSize
-%     pidcontroller P, I, D, N                  dérivée filtrée par N/(1+N/s)
+%     pidcontroller P, I, D, N (dérivée filtrée par N/(1+N/s)), Controller
+%                  (PID, PI, PD, P, I), Form (Parallel, Ideal), TimeDomain
+%                  (Continuous-time, Discrete-time : SampleTime,
+%                  IntegratorMethod, FilterMethod), UseFilter,
+%                  InitialConditionForIntegrator, InitialConditionForFilter,
+%                  InitialConditionSource (external : entrées I0 et D0),
+%                  ExternalReset (entrée Reset), LimitOutput,
+%                  UpperSaturationLimit, LowerSaturationLimit,
+%                  AntiWindupMode (back-calculation : Kb ; clamping) ; les
+%                  entrées : u, Reset, I0, D0 ; « Discrete PID Controller »
+%                  est réglé en Discrete-time
 %     secondorderintegrator ICX, ICDXDT         deux sorties : x et dx/dt
 %
 %   Discret — ils ne calculent qu'aux instants de leur période :
@@ -499,6 +514,8 @@ function avance = prereglages(designation)
             avance = {'Operator', 'signedSqrt', {'Operator'}};
         case 'reciprocalsqrt'
             avance = {'Operator', 'rSqrt', {'Operator'}};
+        case 'discretepidcontroller'
+            avance = {'TimeDomain', 'Discrete-time', {'TimeDomain'}};
     end
 end
 

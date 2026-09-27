@@ -67,6 +67,8 @@ function modele = matlibre_sl_aplatir(modele)
     % parcours qui constate qu'il n'y a rien à déplier.
     garde = 0;
     while true
+        % les blocs de la bibliothèque que Simulink bâtit en sous-systèmes
+        modele = matlibre_sl_bibliotheque(modele);
         k = premier(modele);
         if k == 0
             return
