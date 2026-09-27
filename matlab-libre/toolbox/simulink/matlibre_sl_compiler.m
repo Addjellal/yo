@@ -600,6 +600,41 @@ function [type, p] = normaliser(type, p, chemin)
                 'y = %s(double(u), m);\nm = y;\n'], texteValeur(p.vinit), char(p.Function)), ...
                 'SampleTime', -1);
             type = 'matlabfunction';
+        case 'firstorderhold'
+            Ts = double(p.Ts);
+            if ~(isscalar(Ts) && Ts > 0)
+                error('Simulink:blocks:FirstOrderHoldSampleTime', ...
+                      'La periode Ts de ''%s'' doit etre positive.', chemin);
+            end
+            % continu : il se calcule à chaque pas majeur, entre les
+            % échantillons qu'il prend toutes les Ts
+            p = struct('Script', sprintf(['function y = fcn(u)\n' ...
+                'persistent uk up tk\n[t, ~] = matlibre_sl_instant();\nTs = %s;\n' ...
+                'instant = floor(t / Ts + 1e-9) * Ts;\nif isempty(uk)\n' ...
+                '    uk = double(u);\n    up = uk;\n    tk = instant;\n' ...
+                'elseif instant > tk + 1e-9 * Ts\n    up = uk;\n    uk = double(u);\n' ...
+                '    tk = instant;\nend\ny = uk + (uk - up) / Ts * (t - tk);\n'], ...
+                mat2str(Ts, 17)), 'SampleTime', 0);
+            type = 'matlabfunction';
+        case 'repeatingsequenceinterpolated'
+            p = struct('Script', scriptSequenceInterpolee(p, chemin), 'SampleTime', p.tsamp);
+            type = 'matlabfunction';
+        case 'fromspreadsheet'
+            [temps, valeurs] = lireTableur(char(p.FileName), char(p.Range), chemin);
+            apres = struct('Linear_extrapolation', 'Extrapolation', ...
+                           'Hold_last_value', 'Holding final value', ...
+                           'Ground_value', 'Setting to zero');
+            p = struct('VariableName', char(p.FileName), ...
+                       'Interpolate', char(ifelse(strcmp(p.InterpolationWithinTimeRange, ...
+                                                        'Zero order hold'), 'off', 'on')), ...
+                       'OutputAfterFinalValue', ...
+                       apres.(strrep(p.ExtrapolationAfterLastDataPoint, ' ', '_')), ...
+                       'SampleTime', p.SampleTime, 'ZeroCross', 'on', ...
+                       'Donnees', struct('temps', temps, 'valeurs', valeurs));
+            type = 'fromworkspace';
+        case 'bustovector'
+            p = struct('Script', sprintf('function y = fcn(u)\ny = u(:);\n'), 'SampleTime', -1);
+            type = 'matlabfunction';
         case 'environmentcontroller'
             % en simulation, l'entrée Sim ; Coder ne sert qu'au code produit
             p = struct('Script', sprintf('function y = fcn(Sim, Coder)\ny = Sim;\n'), ...
@@ -862,6 +897,74 @@ function script = scriptTableDirecte(p, n, chemin)
                      strjoin(indices, ', '));
 end
 
+function v = ifelse(condition, oui, non)
+    if condition
+        v = oui;
+    else
+        v = non;
+    end
+end
+
+% Repeating Sequence Interpolated : la table (TimeValues, OutValues) lue au
+% temps pris modulo la dernière date, par la méthode LookUpMeth.
+function script = scriptSequenceInterpolee(p, chemin)
+    t = double(p.TimeValues(:));
+    v = double(p.OutValues(:));
+    if numel(t) ~= numel(v) || numel(t) < 2
+        error('Simulink:blocks:RepeatingSequenceSize', ...
+              ['''%s'' porte %d date(s) et %d valeur(s) : il en faut autant, au moins ' ...
+               'deux.'], chemin, numel(t), numel(v));
+    end
+    if any(diff(t) < 0) || t(end) <= 0
+        error('Simulink:blocks:RepeatingSequenceTimes', ...
+              ['Les dates de ''%s'' doivent croitre, et la derniere, qui fait la ' ...
+               'periode, etre positive.'], chemin);
+    end
+    methodes = struct('Interpolation_Extrapolation', 'linear', ...
+                      'Interpolation_Use_End_Values', 'linear', ...
+                      'Use_Input_Nearest', 'nearest', 'Use_Input_Below', 'previous', ...
+                      'Use_Input_Above', 'next');
+    cle = strrep(strrep(char(p.LookUpMeth), '-', '_'), ' ', '_');
+    % des dates répétées marquent un saut : on garde la dernière valeur
+    [tu, derniers] = unique(t, 'last');
+    script = sprintf(['function y = fcn()\n[t, ~] = matlibre_sl_instant();\n' ...
+                      'td = %s;\nvd = %s;\nq = min(max(mod(t, %s), td(1)), td(end));\n' ...
+                      'y = interp1(td, vd, q, ''%s'');\n'], mat2str(tu, 17), ...
+                     mat2str(v(derniers), 17), mat2str(t(end), 17), methodes.(cle));
+end
+
+% Un signal dans un fichier texte de tableur : la première colonne donne
+% les instants, les suivantes les éléments du signal.
+function [temps, valeurs] = lireTableur(fichier, plage, chemin)
+    if exist(fichier, 'file') ~= 2
+        error('Simulink:blocks:FromSpreadsheetNotFound', ...
+              'Le fichier ''%s'' que lit ''%s'' est introuvable.', fichier, chemin);
+    end
+    try
+        if isempty(plage)
+            M = readmatrix(fichier);
+        else
+            M = readmatrix(fichier, 'Range', plage);
+        end
+    catch err
+        error('Simulink:blocks:FromSpreadsheetFormat', ...
+              ['''%s'' ne sait pas lire ''%s'' : MatLibre lit les tableurs en texte ' ...
+               '(CSV, TXT). %s'], chemin, fichier, err.message);
+    end
+    M = M(~all(isnan(M), 2), :);
+    if size(M, 2) < 2 || size(M, 1) < 1 || any(isnan(M(:)))
+        error('Simulink:blocks:FromSpreadsheetInvalidData', ...
+              ['''%s'' attend dans ''%s'' une colonne d''instants suivie d''au moins ' ...
+               'une colonne de valeurs, toutes numeriques.'], chemin, fichier);
+    end
+    temps = M(:, 1);
+    if any(diff(temps) < 0)
+        error('Simulink:blocks:FromSpreadsheetInvalidData', ...
+              'Les instants lus par ''%s'' dans ''%s'' doivent croitre.', chemin, fichier);
+    end
+    valeurs = M(:, 2:end);
+end
+
 % Les gains du PID continu tel que le calcul les lit, un par élément : les
 % parties que Controller écarte valent zéro ; la forme idéale multiplie
 % I et D par P. Sans dérivée, N vaut zéro et le filtre ne bouge pas.
@@ -1056,6 +1159,21 @@ function script = scriptPIDDiscret(p, chemin)
     end
     L = [L, {'eAvant = e;', 'y = yb;'}];
     script = [strjoin(L, sprintf('\n')), sprintf('\n')];
+end
+
+% La méthode du Discrete-Time Integrator : 1 Forward Euler, 2 Backward
+% Euler, 3 trapèzes ; CUMUL vaut vrai pour « Accumulation », qui ne
+% multiplie pas par la période.
+function [methode, cumul] = methodeDTI(texte)
+    texte = char(texte);
+    cumul = strncmp(texte, 'Accumulation', 12);
+    if ~isempty(strfind(texte, 'Backward'))
+        methode = 2;
+    elseif ~isempty(strfind(texte, 'Trapezoidal'))
+        methode = 3;
+    else
+        methode = 1;
+    end
 end
 
 % Un texte écrit dans le code d'une fonction, entre apostrophes.
@@ -1442,7 +1560,7 @@ function x = codeDe(type)
                 'wraptozero', 35; 'intervaltest', 36; 'saturationdynamic', 37; ...
                 'deadzonedynamic', 38; 'manualswitch', 39; ...
                 'ic', 57; 'width', 58; 'datastoreread', 59; 'datastorewrite', 69; ...
-                'secondorderintegrator', 77; ...
+                'secondorderintegrator', 77; 'variabletransportdelay', 78; ...
                 'discretederivative', 87; 'tappeddelay', 88; 'difference', 89; ...
                 'xygraph', 97; 'tofile', 98; ...
                 'datastorememory', 117; 'ratetransition', 118; ...
@@ -1796,7 +1914,9 @@ function d = transmissionDirecte(c, k)
     p = c.p{k};
     switch c.types{k}
         case {'integrator', 'delay', 'memory'}
-            d = strcmp(c.types{k}, 'delay') && p.DelayLength == 0;
+            % une longueur donnée par une entrée peut valoir zéro
+            d = strcmp(c.types{k}, 'delay') && ...
+                (p.DelayLength == 0 || strcmp(p.DelayLengthSource, 'Input port'));
         case {'secondorderintegrator', 'width', 'foriterator', 'whileiterator'}
             d = false;
         case 'tappeddelay'
@@ -1810,8 +1930,11 @@ function d = transmissionDirecte(c, k)
             d = numel(p.Zeros) == numel(p.Poles) && p.Gain ~= 0;
         case 'transportdelay'
             d = p.DelayTime == 0;
+        case 'variabletransportdelay'
+            % le retard se lit aussi à la passe refaite, après son entrée
+            d = strcmp(p.ZeroDelay, 'on');
         case 'discreteintegrator'
-            d = ~strcmp(p.IntegratorMethod, 'ForwardEuler');
+            d = methodeDTI(p.IntegratorMethod) ~= 1;
         case 'sfunction'
             d = c.fonctions{k}.tailles(6) ~= 0;
         case 'msfunction'
@@ -2412,7 +2535,7 @@ function s = regleTraitement(c, k, dE, complet, forcer)
         case {'saturationdynamic', 'deadzonedynamic', 'manualswitch', 'directlookup'}
             s = {accorder(dE, c, k, q)};
         case 'discreteintegrator'
-            s = {dimsAvecEtat(dE, p.InitialCondition, complet, forcer)};
+            s = repmat({dimsAvecEtat(dE, p.InitialCondition, complet, forcer)}, 1, c.nOut(k));
         case {'discretetransferfcn', 'discretefilter'}
             % Comme dans Simulink, chaque élément d'un vecteur ou d'une
             % matrice est une voie, filtrée à part — sauf pour le
@@ -2446,6 +2569,14 @@ function s = regleTraitement(c, k, dE, complet, forcer)
             end
             s = {[size(C, 1) 1]};
         case 'transportdelay'
+            s = {accorder({dE{1}, dimsDe(p.InitialOutput)}, c, k, ...
+                          {'l''entree', 'InitialOutput'})};
+        case 'variabletransportdelay'
+            if numel(dE) > 1 && ~isempty(dE{2}) && prod(dE{2}) ~= 1
+                error('Simulink:blocks:VariableTransportDelayInput', ...
+                      ['Le retard que recoit ''%s'' par sa seconde entree est de dimension ' ...
+                       '%s : c''est un scalaire.'], c.chemins{k}, texteDims(dE{2}));
+            end
             s = {accorder({dE{1}, dimsDe(p.InitialOutput)}, c, k, ...
                           {'l''entree', 'InitialOutput'})};
         case 'pidcontroller'
@@ -2724,6 +2855,8 @@ function c = periodes(c, pas)
                 if c.fonctions{k}.persistante
                     c.majeurSeul(k) = true;
                 end
+            case 'variabletransportdelay'
+                c.cadence(k) = 0;   % lu à chaque passe, poussé aux pas majeurs
             case {'derivative', 'transportdelay', 'memory', 'ratelimiter', 'relay', ...
                   'backlash', 'hitcrossing', 'detectchange', 'detectincrease', ...
                   'detectdecrease'}
@@ -3436,6 +3569,19 @@ function c = abaisser(c, pas, tDebut)
                            etendre(p.InitialOutput, w, ch, 'InitialOutput')];
                     z0 = [0; zeros(w * longueur, 1)];
                 end
+            case 'variabletransportdelay'
+                % [genre; retard maximal; taille; zéro direct; sortie initiale w]
+                % Z : [nombre; tête; retard vu; instants L; valeurs w x L]
+                tMax = double(p.MaximumDelay);
+                if ~(isscalar(tMax) && tMax > 0)
+                    error('Simulink:blocks:VariableTransportDelayMaximum', ...
+                          'Le retard maximal de ''%s'' doit etre positif.', ch);
+                end
+                L = max(16, round(double(p.MaximumPoints)));
+                genre = 1 + strcmp(p.VariableDelayType, 'Variable time delay');
+                seg = [genre; tMax; L; strcmp(p.ZeroDelay, 'on'); ...
+                       etendre(p.InitialOutput, w, ch, 'InitialOutput')];
+                z0 = [0; 1; NaN; zeros(L, 1); zeros(w * L, 1)];
             case 'pidcontroller'          % [P; I; D; N], w chacun
                 % Les états sont ceux de Simulink : l'intégrale de I u, et
                 % le filtre f de la dérivée, f' = N (D u - f).
@@ -3453,29 +3599,96 @@ function c = abaisser(c, pas, tDebut)
                 c = ajouterEtat(c, k, [xi; xd]);
                 seg = [P; I; D; N];
             % --- discret ---
-            case 'delay'                  % [L]  Z : [tete; tampon w x L]
+            case 'delay'   % [L; taille; entrée d; activation; remise; externe; wr]
+                % Z : [tete; tampon w x taille], puis, pour un retard qui
+                % s'active, se remet ou lit sa condition initiale :
+                % [sortie tenue w; premier; remise d'avant wr; désactivé]
+                variable = strcmp(p.DelayLengthSource, 'Input port');
                 L = double(p.DelayLength);
-                if ~(isscalar(L) && L >= 0 && L == round(L))
+                if variable
+                    L = double(p.DelayLengthUpperLimit);
+                    if ~(isscalar(L) && L >= 1 && L == round(L))
+                        error('Simulink:blocks:DelayLengthUpperLimit', ...
+                              ['La longueur maximale du retard ''%s'' est un entier ' ...
+                               'positif.'], ch);
+                    end
+                elseif ~(isscalar(L) && L >= 0 && L == round(L))
                     error('Simulink:Parameters:InvalidValue', ...
                           'La longueur de retard de ''%s'' est un entier positif ou nul.', ch);
                 end
+                active = strcmp(p.ShowEnablePort, 'on');
+                remise = find(strcmp(p.ExternalReset, {'Rising', 'Falling', 'Either', ...
+                                                       'Level', 'Level hold'}));
+                if isempty(remise)
+                    remise = 0;
+                end
+                externe = strcmp(p.InitialConditionSource, 'Input port');
+                wr = 0;
+                if remise > 0
+                    wr = largeurEntree(c, k, 2 + variable + active);
+                end
+                avance = variable || active || remise > 0 || externe;
                 seg = L;
+                if avance
+                    seg = [L; L; variable; active; remise; externe; wr];
+                end
                 if L > 0
                     ci = double(p.InitialCondition);
-                    if numel(ci) == w * L && L > 1
+                    if numel(ci) == w * L && L > 1 && ~variable
                         tampon = reshape(ci, w, L);
                     else
                         tampon = repmat(etendre(ci, w, ch, 'InitialCondition'), 1, L);
                     end
                     z0 = [1; tampon(:)];
+                    if avance
+                        z0 = [z0; tampon(:, end); 0; zeros(wr, 1); 0];
+                    end
                 end
             case 'memory'
                 z0 = etendre(p.InitialCondition, w, ch, 'InitialCondition');
-            case 'discreteintegrator'     % [K T; methode]
-                methode = find(strcmp(p.IntegratorMethod, ...
-                                      {'ForwardEuler', 'BackwardEuler', 'Trapezoidal'}));
-                seg = [double(p.Gain) * c.cadence(k); methode];
-                z0 = etendre(p.InitialCondition, w, ch, 'InitialCondition');
+            case 'discreteintegrator'
+                % [K T; méthode; bornée; haut w; bas w; remise; externe; wr;
+                %  port de saturation; port d'état]
+                % Z : état, puis, pour une remise ou une condition initiale
+                % externe : [premier; remise d'avant wr; état d'avant la
+                % remise w; instant de la remise]
+                [methode, cumul] = methodeDTI(p.IntegratorMethod);
+                K = double(p.Gain);
+                if ~isscalar(K)
+                    error('Simulink:blocks:DiscreteIntegratorGain', ...
+                          'Le gain de l''integrateur ''%s'' est un scalaire.', ch);
+                end
+                if ~cumul
+                    K = K * c.cadence(k);
+                end
+                borne = strcmp(p.LimitOutput, 'on');
+                haut = etendre(p.UpperSaturationLimit, w, ch, 'UpperSaturationLimit');
+                bas = etendre(p.LowerSaturationLimit, w, ch, 'LowerSaturationLimit');
+                if borne && any(bas > haut)
+                    error('Simulink:blocks:DiscreteIntegratorLimits', ...
+                          ['La borne basse de l''integrateur ''%s'' depasse sa borne ' ...
+                           'haute.'], ch);
+                end
+                remise = find(strcmp(p.ExternalReset, {'rising', 'falling', 'either', ...
+                                                       'level', 'sampled level'}));
+                if isempty(remise)
+                    remise = 0;
+                end
+                externe = strcmp(p.InitialConditionSource, 'external');
+                wr = 0;
+                if remise > 0
+                    wr = largeurEntree(c, k, 2);
+                end
+                seg = [K; methode; borne; haut; bas; remise; externe; wr; ...
+                       strcmp(p.ShowSaturationPort, 'on'); strcmp(p.ShowStatePort, 'on')];
+                ci = etendre(p.InitialCondition, w, ch, 'InitialCondition');
+                if borne
+                    ci = min(max(ci, bas), haut);
+                end
+                z0 = ci;
+                if remise > 0 || externe
+                    z0 = [ci; 0; zeros(wr, 1); ci; -Inf];
+                end
             case {'discretetransferfcn', 'discretefilter'}   % [m; b; a]
                 [b, a] = filtreDiscret(p.Numerator, p.Denominator, ...
                                        strcmp(c.types{k}, 'discretetransferfcn'), ch);

@@ -1548,7 +1548,8 @@ int main(int argc, char** argv) {
             // clic pourrait ne pas etre reconnu par SIM.
             // V choisit la variante des blocs à variantes de la
             // bibliothèque, garnis de conditions V == 1 et V == 2.
-            QString essaiTous = QStringLiteral("signal = [0 0; 1 1]; V = 1;\n");
+            QString essaiTous = QStringLiteral(
+                "signal = [0 0; 1 1]; V = 1; writematrix(signal, 'signal.csv');\n");
             for (const BlocBibliotheque* b = bibliothequeSimulink(); b->famille; ++b) {
                 essaiTous += QStringLiteral("m = new_system('t');\n");
                 essaiTous += QStringLiteral("m = add_block(m, '%1', '%1'").arg(

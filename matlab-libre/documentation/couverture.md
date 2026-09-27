@@ -144,7 +144,9 @@ totalité.
    Dynamic, Prelookup et Interpolation Using Prelookup, Discrete FIR
    Filter et les transmittances discrètes de la bibliothèque, le PID
    continu ou discret avec ses bornes, son anti-emballement, sa remise et
-   ses conditions initiales externes ; les blocs
+   ses conditions initiales externes, l'intégrateur discret borné à
+   remise, le Delay à longueur variable, activé ou remis, les retards
+   variables, la tenue du premier ordre, les tableurs ; les blocs
    de vérification (Check Static et Check Dynamic) arrêtent la simulation
    en nommant le bloc et l'instant. Les sous-systèmes
    conditionnels — Enable, Trigger, If et Switch Case avec leurs

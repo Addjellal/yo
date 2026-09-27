@@ -40,6 +40,9 @@ function [ordre, directe, memoire] = matlibre_sl_ordre(modele)
             case 'transportdelay'
                 directe(k) = lireNombre(bloc, 'DelayTime', 1) == 0;
                 memoire(k) = true;
+            case 'variabletransportdelay'
+                directe(k) = strcmpi(lireTexte(bloc, 'ZeroDelay', 'off'), 'on');
+                memoire(k) = true;
             case {'statespace', 'discretestatespace'}
                 directe(k) = any(any(lireNombre(bloc, 'D', 0) ~= 0));
                 memoire(k) = true;
@@ -50,7 +53,8 @@ function [ordre, directe, memoire] = matlibre_sl_ordre(modele)
                 memoire(k) = true;
             case 'discreteintegrator'
                 methode = lireTexte(bloc, 'IntegratorMethod', 'ForwardEuler');
-                directe(k) = ~strcmpi(methode, 'ForwardEuler');
+                directe(k) = isempty(strfind(methode, 'Forward')) && ...
+                             ~strcmpi(methode, 'ForwardEuler');
                 memoire(k) = true;
             case 'discretetransferfcn'
                 num = lireNombre(bloc, 'Numerator', 1);

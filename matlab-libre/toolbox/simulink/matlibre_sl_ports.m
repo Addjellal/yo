@@ -160,8 +160,10 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nSorties = 0;
         case {'intervaltestdynamic', 'lookuptabledynamic', 'ratelimiterdynamic'}
             nEntrees = 3;
-        case 'minmaxrunningresettable'
+        case {'minmaxrunningresettable', 'variabletransportdelay'}
             nEntrees = 2;
+        case {'repeatingsequenceinterpolated', 'fromspreadsheet'}
+            nEntrees = 0;
         case 'environmentcontroller'
             nEntrees = 2;
         case 'bitwiseoperator'
@@ -169,6 +171,19 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
                ~strcmpi(char(lire(p, 'logicop', 'AND')), 'NOT')
                 nEntrees = entier(lire(p, 'NumInputPorts', 1));
             end
+        case 'discreteintegrator'
+            % u, remise, condition initiale ; puis la sortie, le port de
+            % saturation, le port d'état
+            nEntrees = 1 + ~strcmpi(char(lire(p, 'ExternalReset', 'none')), 'none') + ...
+                       strcmpi(char(lire(p, 'InitialConditionSource', 'internal')), 'external');
+            nSorties = 1 + strcmpi(char(lire(p, 'ShowSaturationPort', 'off')), 'on') + ...
+                       strcmpi(char(lire(p, 'ShowStatePort', 'off')), 'on');
+        case 'delay'
+            % u, d, enable, remise, x0
+            nEntrees = 1 + strcmpi(char(lire(p, 'DelayLengthSource', 'Dialog')), 'Input port') + ...
+                       strcmpi(char(lire(p, 'ShowEnablePort', 'off')), 'on') + ...
+                       ~strcmpi(char(lire(p, 'ExternalReset', 'None')), 'None') + ...
+                       strcmpi(char(lire(p, 'InitialConditionSource', 'Dialog')), 'Input port');
         case 'pidcontroller'
             % u, puis l'entrée de remise, puis les conditions initiales I0
             % et D0 des parties qui en ont

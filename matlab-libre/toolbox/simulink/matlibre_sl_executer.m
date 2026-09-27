@@ -184,6 +184,7 @@ function T = preparer(c)
     % les fonctions qui lisent l'instant et leur période : MATLIBRE_SL_INSTANT
     T.instant = false(1, n);
     T.periodes = c.cadence;
+    T.decalages = c.decalage;
     for k = find(strcmp(c.types, 'matlabfunction'))
         T.instant(k) = isfield(c.fonctions{k}, 'instant') && c.fonctions{k}.instant;
         T.formes{k} = cell(1, c.nIn(k));
@@ -238,6 +239,27 @@ function T = preparer(c)
     for k = find(strcmp(c.types, 'integrator'))
         w = (numel(c.seg{k}) - 6) / 2;
         if c.seg{k}(2 + 2 * w) > 0 || c.seg{k}(3 + 2 * w) ~= 0
+            T.reinit(end + 1) = k;
+        end
+    end
+    % Les intégrateurs discrets et les retards à remise ou à condition
+    % initiale externe se remettent de même.
+    for k = find(strcmp(c.types, 'discreteintegrator'))
+        w = c.largeur(c.portDebut(k));
+        q = 4 + 2 * w;
+        if c.seg{k}(q) > 0 || c.seg{k}(q + 1) ~= 0
+            T.reinit(end + 1) = k;
+        end
+    end
+    % un Variable Transport Delay refait la passe quand son retard change
+    for k = find(strcmp(c.types, 'variabletransportdelay'))
+        T.reinit(end + 1) = k;
+    end
+    % un Delay qui lit sa longueur, s'active, se remet ou lit x0
+    T.retardAvance = false(1, n);
+    for k = find(strcmp(c.types, 'delay'))
+        T.retardAvance(k) = numel(c.seg{k}) > 1;
+        if T.retardAvance(k) && (c.seg{k}(4) ~= 0 || c.seg{k}(5) > 0 || c.seg{k}(6) ~= 0)
             T.reinit(end + 1) = k;
         end
     end
@@ -359,7 +381,7 @@ function T = preparer(c)
                   'discreteintegrator', 'discretetransferfcn', 'discretefilter', ...
                   'discretestatespace', 'randomnumber', 'uniformrandomnumber', 'garde', ...
                   'counterfreerunning', 'counterlimited', 'repeatingsequencestair', 'ic', ...
-                  'discretederivative', 'tappeddelay', 'difference'}
+                  'discretederivative', 'tappeddelay', 'difference', 'variabletransportdelay'}
                 T.aMettreAJour(end + 1) = k;
             case 'signalgenerator'
                 if c.sub(k) == 4
@@ -378,7 +400,7 @@ function T = preparer(c)
                     T.aMettreAJour(end + 1) = k;
                 end
             case 'delay'
-                if c.seg{k}(1) > 0
+                if c.seg{k}(1) > 0 || (numel(c.seg{k}) > 1 && c.seg{k}(2) > 0)
                     T.aMettreAJour(end + 1) = k;
                 end
             case 'transportdelay'
@@ -2416,6 +2438,8 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         else
                             V(a:b) = retardVariable(T, k, p, t, b - a + 1);
                         end
+                    case 78   % variable transport delay
+                        V(a:b) = sortieRetardVariable(T, k, p, V, Z, e, a, b, t);
                     case 76   % PID : P u + intégrale + N (D u - filtre)
                         u = V(eA(e + 1):eB(e + 1));
                         xa = T.xA(k);
@@ -2450,24 +2474,36 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                     case 80   % delay
                         if T.P(p) == 0
                             V(a:b) = V(eA(e + 1):eB(e + 1));
-                        else
+                        elseif ~T.retardAvance(k)
                             w = b - a + 1;
                             debut = zA(k) + 1 + (Z(zA(k)) - 1) * w;
                             V(a:b) = Z(debut:debut + w - 1);
+                        else
+                            V(a:b) = sortieRetard(T, k, p, V, Z, e, a, b);
                         end
                     case 81   % memory
                         V(a:b) = Z(zA(k):zA(k) + b - a);
                     case 82   % zero-order hold
                         V(a:b) = V(eA(e + 1):eB(e + 1));
                     case 83   % discrete-time integrator
-                        xk = Z(zA(k):zA(k) + b - a);
+                        w = b - a + 1;
+                        xk = Z(zA(k):zA(k) + w - 1);
                         switch T.P(p + 1)
                             case 1
-                                V(a:b) = xk;
+                                y = xk;
                             case 2
-                                V(a:b) = xk + T.P(p) * V(eA(e + 1):eB(e + 1));
+                                y = xk + T.P(p) * V(eA(e + 1):eB(e + 1));
                             otherwise
-                                V(a:b) = xk + T.P(p) * V(eA(e + 1):eB(e + 1)) / 2;
+                                y = xk + T.P(p) * V(eA(e + 1):eB(e + 1)) / 2;
+                        end
+                        if T.P(p + 2) ~= 0
+                            haut = T.P(p + 3:p + 2 + w);
+                            bas = T.P(p + 3 + w:p + 2 + 2 * w);
+                            y = min(max(y, bas), haut);
+                        end
+                        V(a:b) = y;
+                        if T.nOut(k) > 1
+                            V = portsDTI(T, k, p, V, Z, y, xk, t);
                         end
                     case {84, 85}   % discrete transfer fcn, discrete filter
                         V(a:b) = sortieFiltre(T, p, Z, zA(k), V(eA(e + 1):eB(e + 1)));
@@ -3055,7 +3091,20 @@ end
 function [x, Z, refaire] = remettre(T, V, Z, x, t)
     refaire = false;
     for k = T.reinit
-        [x, Z, remis] = remettreIntegrateur(T, k, V, Z, x, t);
+        switch T.code(k)
+            case 83
+                [Z, remis] = remettreDTI(T, k, V, Z, t);
+            case 80
+                [Z, remis] = remettreRetard(T, k, V, Z, t);
+            case 78
+                % le retard lu à la passe d'avant peut précéder son entrée
+                z = T.zA(k);
+                tau = V(T.eA(T.eD(k) + 2));
+                remis = ~isequal(Z(z + 2), tau);
+                Z(z + 2) = tau;
+            otherwise
+                [x, Z, remis] = remettreIntegrateur(T, k, V, Z, x, t);
+        end
         refaire = refaire || remis;
     end
     for g = T.remises
@@ -3072,6 +3121,268 @@ function [x, Z, refaire] = remettre(T, V, Z, x, t)
             end
             refaire = true;
         end
+    end
+end
+
+% Le Variable Transport Delay : la valeur d'entrée dont la date de sortie
+% est l'instant présent — la date d'entrée plus le retard lu à l'entrée
+% (transport), ou l'instant moins le retard lu maintenant (time delay) —,
+% interpolée entre deux échantillons ; avant le premier, la sortie
+% initiale.
+function y = sortieRetardVariable(T, k, p, V, Z, e, a, b, t)
+    w = b - a + 1;
+    L = T.P(p + 2);
+    ci = T.P(p + 4:p + 3 + w);
+    tau = min(max(V(T.eA(e + 2)), 0), T.P(p + 1));
+    if tau == 0 && T.P(p + 3) ~= 0
+        y = V(T.eA(e + 1):T.eB(e + 1)) + zeros(w, 1);
+        return
+    end
+    z = T.zA(k);
+    n = Z(z);
+    if n == 0
+        y = ci;
+        return
+    end
+    cible = t;
+    if T.P(p) == 2
+        cible = t - tau;
+    end
+    tete = Z(z + 1);
+    dates = Z(z + 3:z + 2 + L);
+    valeurs = reshape(Z(z + 3 + L:z + 2 + L + w * L), w, L);
+    ancien = mod(tete - n - 1, L) + 1;
+    recent = mod(tete - 2, L) + 1;
+    if cible < dates(ancien)
+        y = ci;
+        return
+    end
+    if cible >= dates(recent)
+        y = valeurs(:, recent);
+        return
+    end
+    bas = 0;
+    haut = n - 1;
+    while haut - bas > 1
+        milieu = floor((bas + haut) / 2);
+        if dates(mod(ancien + milieu - 1, L) + 1) <= cible
+            bas = milieu;
+        else
+            haut = milieu;
+        end
+    end
+    i0 = mod(ancien + bas - 1, L) + 1;
+    i1 = mod(ancien + haut - 1, L) + 1;
+    y = valeurs(:, i0);
+    if dates(i1) > dates(i0)
+        f = (cible - dates(i0)) / (dates(i1) - dates(i0));
+        y = (1 - f) * y + f * valeurs(:, i1);
+    end
+end
+
+% Le front ou le niveau qui remet un état, comme pour l'intégrateur : 1
+% montant, 2 descendant, 3 l'un ou l'autre, 4 niveau (et son retour à
+% zéro), 5 niveau seul.
+function d = frontDeRemise(genre, avant, r)
+    switch genre
+        case 1
+            d = (avant < 0 & r >= 0) | (avant == 0 & r > 0);
+        case 2
+            d = (avant > 0 & r <= 0) | (avant == 0 & r < 0);
+        case 3
+            d = (avant < 0 & r >= 0) | (avant == 0 & r ~= 0) | (avant > 0 & r <= 0);
+        case 4
+            d = r ~= 0 | (avant ~= 0 & r == 0);
+        otherwise
+            d = r ~= 0;
+    end
+end
+
+% Les ports de plus du Discrete-Time Integrator : la saturation (1 à la
+% borne haute, -1 à la basse, 0 entre elles) et l'état — celui d'avant la
+% remise, à l'instant où elle a lieu.
+function V = portsDTI(T, k, p, V, Z, y, xk, t)
+    a = T.oA(k);
+    w = T.oB(k) - a + 1;
+    q = p + 3 + 2 * w;
+    pd = T.pd(k);
+    port = 2;
+    if T.P(q + 3) ~= 0
+        sat = zeros(w, 1);
+        if T.P(p + 2) ~= 0
+            sat = double(y >= T.P(p + 3:p + 2 + w)) - double(y <= T.P(p + 3 + w:p + 2 + 2 * w));
+        end
+        V(T.poA(pd + port - 1):T.poB(pd + port - 1)) = sat;
+        port = port + 1;
+    end
+    if T.P(q + 4) ~= 0
+        etat = xk;
+        wr = T.P(q + 2);
+        if T.P(q) > 0 || T.P(q + 1) ~= 0
+            z = T.zA(k);
+            if Z(z + 2 * w + wr + 1) == t
+                etat = Z(z + w + 1 + wr:z + 2 * w + wr);
+            end
+        end
+        V(T.poA(pd + port - 1):T.poB(pd + port - 1)) = etat;
+    end
+end
+
+% Le Discrete-Time Integrator revient à sa condition initiale — le
+% paramètre, ou l'entrée x0 — au front que demande ExternalReset, à ses
+% instants d'échantillonnage ; une condition initiale externe se lit au
+% premier instant.
+function [Z, remis] = remettreDTI(T, k, V, Z, t)
+    remis = false;
+    g = T.garde(k);
+    if g > 0 && V(T.oA(g)) == 0
+        return
+    end
+    if T.mode(k) == 2 && ~estInstant(t, T.periodes(k), T.decalages(k))
+        return
+    end
+    p = T.pA(k);
+    w = T.oB(k) - T.oA(k) + 1;
+    q = p + 3 + 2 * w;
+    remise = T.P(q);
+    externe = T.P(q + 1);
+    wr = T.P(q + 2);
+    z = T.zA(k);
+    e = T.eD(k);
+    if externe
+        rang = 2 + (remise > 0);
+        ci = V(T.eA(e + rang):T.eB(e + rang)) + zeros(w, 1);
+    else
+        ci = T.Z0(z:z + w - 1);
+    end
+    if T.P(p + 2) ~= 0
+        ci = min(max(ci, T.P(p + 3 + w:p + 2 + 2 * w)), T.P(p + 3:p + 2 + w));
+    end
+    masque = false(w, 1);
+    premier = Z(z + w) == 0;
+    if remise > 0
+        r = V(T.eA(e + 2):T.eB(e + 2));
+        avant = Z(z + w + 1:z + w + wr);
+        if premier
+            avant = r;   % pas de front au premier instant
+        end
+        d = frontDeRemise(remise, avant, r);
+        if numel(d) == w
+            masque = d(:);
+        else
+            masque(:) = any(d);
+        end
+        Z(z + w + 1:z + w + wr) = r;
+    end
+    if premier
+        Z(z + w) = 1;
+        if externe
+            Z(z:z + w - 1) = ci;
+            remis = true;
+        end
+    end
+    if any(masque)
+        xk = Z(z:z + w - 1);
+        Z(z + w + 1 + wr:z + 2 * w + wr) = xk;
+        Z(z + 2 * w + wr + 1) = t;
+        xk(masque) = ci(masque);
+        Z(z:z + w - 1) = xk;
+        remis = true;
+    end
+end
+
+% La sortie d'un Delay dont la longueur vient d'une entrée, qu'une entrée
+% active ou qui se remet : l'entrée d'il y a L pas, lue dans un tampon de
+% la taille maximale ; désactivé, la sortie tenue.
+function y = sortieRetard(T, k, p, V, Z, e, a, b)
+    w = b - a + 1;
+    taille = T.P(p + 1);
+    z = T.zA(k);
+    % désactivé à cet instant — ce que la remise a lu de l'entrée enable
+    if Z(z + taille * w + w + 2 + T.P(p + 6)) ~= 0
+        y = Z(z + 1 + taille * w:z + taille * w + w);
+        return
+    end
+    L = taille;
+    if T.P(p + 2) ~= 0
+        L = min(max(floor(V(T.eA(e + 2))), 0), taille);
+    end
+    if L == 0
+        y = V(T.eA(e + 1):T.eB(e + 1)) + zeros(w, 1);
+        return
+    end
+    tete = Z(z);
+    position = mod(tete - 1 - L, taille) + 1;
+    debut = z + 1 + (position - 1) * w;
+    y = Z(debut:debut + w - 1);
+end
+
+% Le Delay revient à sa condition initiale, tout son tampon, au front de
+% son entrée de remise ; une condition initiale x0 se lit au premier
+% instant.
+function [Z, remis] = remettreRetard(T, k, V, Z, t)
+    remis = false;
+    g = T.garde(k);
+    if g > 0 && V(T.oA(g)) == 0
+        return
+    end
+    if T.mode(k) == 2 && ~estInstant(t, T.periodes(k), T.decalages(k))
+        return
+    end
+    p = T.pA(k);
+    w = T.oB(k) - T.oA(k) + 1;
+    taille = T.P(p + 1);
+    variable = T.P(p + 2);
+    active = T.P(p + 3);
+    remise = T.P(p + 4);
+    externe = T.P(p + 5);
+    wr = T.P(p + 6);
+    z = T.zA(k);
+    e = T.eD(k);
+    if taille == 0
+        return
+    end
+    rangRemise = 2 + variable + active;
+    if active
+        % l'entrée enable se lit ici, une fois les sorties calculées : la
+        % passe se refait quand elle change, sans que le retard devienne
+        % à transmission directe
+        id = z + taille * w + w + 2 + wr;
+        desactive = double(V(T.eA(e + 2 + variable)) <= 0);
+        if Z(id) ~= desactive
+            Z(id) = desactive;
+            remis = true;
+        end
+    end
+    if externe
+        rangCi = rangRemise + (remise > 0);
+        ci = V(T.eA(e + rangCi):T.eB(e + rangCi)) + zeros(w, 1);
+        tampon = repmat(ci, taille, 1);
+    else
+        tampon = T.Z0(z + 1:z + taille * w);
+        ci = tampon(end - w + 1:end);
+    end
+    ip = z + 1 + taille * w + w;   % le drapeau du premier instant
+    premier = Z(ip) == 0;
+    remettreTout = false;
+    if remise > 0
+        r = V(T.eA(e + rangRemise):T.eB(e + rangRemise));
+        avant = Z(ip + 1:ip + wr);
+        if premier
+            avant = r;
+        end
+        remettreTout = any(frontDeRemise(remise, avant, r));
+        Z(ip + 1:ip + wr) = r;
+    end
+    if premier
+        Z(ip) = 1;
+        remettreTout = remettreTout || externe;
+    end
+    if remettreTout
+        Z(z) = 1;
+        Z(z + 1:z + taille * w) = tampon;
+        Z(z + 1 + taille * w:z + taille * w + w) = ci;
+        remis = true;
     end
 end
 
@@ -4005,21 +4316,46 @@ function Z = majs(T, V, Z, t, touche, x)
                 Z(z) = n + 1;
             case 80   % delay
                 L = T.P(p);
+                if T.retardAvance(k)
+                    L = T.P(p + 1);   % la taille du tampon
+                    if Z(z + L * w + w + 2 + T.P(p + 6)) ~= 0
+                        continue   % désactivé : la sortie et les états tiennent
+                    end
+                    Z(z + 1 + L * w:z + L * w + w) = V(a:b);   % la sortie tenue
+                end
                 tete = Z(z);
                 debut = z + 1 + (tete - 1) * w;
                 Z(debut:debut + w - 1) = u;
                 Z(z) = mod(tete, L) + 1;
             case 81   % memory
                 Z(z:z + w - 1) = u;
+            case 78   % variable transport delay : l'échantillon, daté de sa sortie
+                L = T.P(p + 2);
+                n = Z(z);
+                tete = Z(z + 1);
+                tau = min(max(V(T.eA(e + 2)), 0), T.P(p + 1));
+                date = t;
+                if T.P(p) == 1
+                    date = t + tau;   % transport : il sortira quand il aura parcouru le retard
+                end
+                Z(z + 2 + tete) = date;
+                debut = z + 3 + L + (tete - 1) * w;
+                Z(debut:debut + w - 1) = u;
+                Z(z + 1) = mod(tete, L) + 1;
+                Z(z) = min(n + 1, L);
             case 83   % discrete-time integrator
                 switch T.P(p + 1)
                     case 1
-                        Z(z:z + w - 1) = Z(z:z + w - 1) + T.P(p) * u;
+                        xn = Z(z:z + w - 1) + T.P(p) * u;
                     case 2
-                        Z(z:z + w - 1) = V(a:b);
+                        xn = V(a:b);
                     otherwise
-                        Z(z:z + w - 1) = V(a:b) + T.P(p) * u / 2;
+                        xn = V(a:b) + T.P(p) * u / 2;
                 end
+                if T.P(p + 2) ~= 0
+                    xn = min(max(xn, T.P(p + 3 + w:p + 2 + 2 * w)), T.P(p + 3:p + 2 + w));
+                end
+                Z(z:z + w - 1) = xn;
             case {84, 85}   % discrete transfer fcn, discrete filter
                 m = T.P(p);
                 if m > 0

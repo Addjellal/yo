@@ -44,6 +44,10 @@ const BlocBibliotheque blocs[] = {
     {"Sources", "inport", "L'entrée du modèle, vue par LINMOD", "'Port', 1"},
     {"Sources", "fromworkspace", "Un signal lu dans l'espace de travail",
      "'VariableName', 'signal'"},
+    {"Sources", "fromspreadsheet", "Un signal lu dans un tableur (CSV)",
+     "'FileName', 'signal.csv'"},
+    {"Sources", "repeatingsequenceinterpolated", "Une séquence datée, répétée",
+     "'tsamp', 0.01"},
     {"Sources", "clock", "Le temps de la simulation", ""},
     {"Sources", "digitalclock", "Le temps, échantillonné", "'SampleTime', 0.1"},
     {"Sources", "pulsegenerator", "Un train d'impulsions",
@@ -171,6 +175,7 @@ const BlocBibliotheque blocs[] = {
     {"Aiguillage", "multiportswitch", "Index Vector : l'élément de l'entrée que la commande désigne",
      "'Inputs', 1, 'DataPortOrder', 'Zero-based contiguous'"},
     {"Aiguillage", "environmentcontroller", "Rend l'entrée Sim en simulation", ""},
+    {"Aiguillage", "bustovector", "Un bus de scalaires, en vecteur", ""},
     {"Aiguillage", "reshape", "Change les dimensions du signal", ""},
     {"Aiguillage", "goto", "Envoie son entrée aux blocs From de même étiquette",
      "'GotoTag', 'A'"},
@@ -212,6 +217,8 @@ const BlocBibliotheque blocs[] = {
      "'P', 1, 'I', 0, 'D', 0, 'N', 100"},
     {"Continu", "transportdelay", "Retarde le signal d'une durée",
      "'DelayTime', 1, 'InitialOutput', 0"},
+    {"Continu", "variabletransportdelay", "Retarde u de la durée que donne l'entrée tau",
+     "'VariableDelayType', 'Variable time delay'"},
     {"Continu", "zeropole", "Une transmittance par ses zéros, ses pôles et son gain",
      "'Zeros', [], 'Poles', -1, 'Gain', 1"},
 
@@ -232,6 +239,15 @@ const BlocBibliotheque blocs[] = {
      "'A', 0.5, 'B', 1, 'C', 1, 'D', 0, 'SampleTime', 0.1"},
     {"Discret", "discretefilter", "Un filtre en puissances de z^-1",
      "'Numerator', 1, 'Denominator', [1 -0.5], 'SampleTime', 0.1"},
+    {"Discret", "delay", "Resettable Delay : se remet par l'entrée R, repart de x0",
+     "'ExternalReset', 'Rising', 'InitialConditionSource', 'Input port', 'SampleTime', 0.1"},
+    {"Discret", "delay", "Enabled Delay : tient sa sortie tant que enable est nul",
+     "'ShowEnablePort', 'on', 'SampleTime', 0.1"},
+    {"Discret", "delay", "Variable Integer Delay : la longueur par l'entrée d",
+     "'DelayLengthSource', 'Input port', 'SampleTime', 0.1"},
+    {"Discret", "discreteintegrator", "Un intégrateur discret borné",
+     "'LimitOutput', 'on', 'UpperSaturationLimit', 1, 'LowerSaturationLimit', -1, "
+     "'SampleTime', 0.1"},
     {"Discret", "discretefirfilter", "Un filtre à réponse impulsionnelle finie",
      "'Coefficients', [0.5 0.5], 'SampleTime', 0.1"},
     {"Discret", "transferfcnfirstorder", "(1 - p) z / (z - p)", "'PoleZ', 0.95"},
@@ -240,6 +256,7 @@ const BlocBibliotheque blocs[] = {
     {"Discret", "transferfcnleadorlag", "K (z - zéro) / (z - pôle)",
      "'PoleZ', 0.95, 'ZeroZ', 0.75"},
     {"Discret", "transferfcnrealzero", "(z - zéro) / z", "'ZeroZ', 0.75"},
+    {"Discret", "firstorderhold", "Prolonge les deux derniers échantillons", "'Ts', 0.1"},
 
     // Les blocs de code : une expression, une fonction MATLAB, et la
     // machine à états de Stateflow.

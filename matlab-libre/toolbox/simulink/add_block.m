@@ -32,6 +32,12 @@ function modele = add_block(modele, type, nom, varargin)
 %     signalgenerator WaveForm (sine, square, sawtooth, random),
 %                  Amplitude, Frequency, Units (rad/sec, Hertz)
 %     repeatingsequencestair OutValues, tsamp   une valeur par instant
+%     repeatingsequenceinterpolated OutValues, TimeValues, LookUpMeth,
+%                  tsamp — la séquence datée, de période la dernière date
+%     fromspreadsheet FileName (un fichier texte : CSV, TXT), Range,
+%                  InterpolationWithinTimeRange,
+%                  ExtrapolationAfterLastDataPoint — la première colonne
+%                  donne les instants, les suivantes le signal
 %
 %   Les blocs à cassure — abs, sign, saturation, deadzone, relay,
 %   relational, comparaisons, minmax, switch, hitcrossing, backlash,
@@ -120,6 +126,7 @@ function modele = add_block(modele, type, nom, varargin)
 %     multiportswitch Inputs, DataPortOrder ; une seule entrée de données
 %                  (« Index Vector ») : l'élément que désigne la commande
 %     environmentcontroller —              deux entrées, Sim et Coder : rend Sim
+%     bustovector  —                            un bus de scalaires, en vecteur
 %     mux          Inputs (un nombre, ou les largeurs)
 %     demux        Outputs (un nombre, ou les largeurs)
 %     selector     Indices
@@ -164,6 +171,11 @@ function modele = add_block(modele, type, nom, varargin)
 %     statespace   A, B, C, D, X0
 %     zeropole     Zeros, Poles, Gain
 %     transportdelay DelayTime, InitialOutput, BufferSize
+%     variabletransportdelay VariableDelayType ('Variable transport delay' :
+%                  la durée qu'on lit quand le signal entre ; 'Variable
+%                  time delay' : celle qu'on lit quand il sort),
+%                  MaximumDelay, InitialOutput, MaximumPoints, ZeroDelay —
+%                  deux entrées : u, et le retard
 %     pidcontroller P, I, D, N (dérivée filtrée par N/(1+N/s)), Controller
 %                  (PID, PI, PD, P, I), Form (Parallel, Ideal), TimeDomain
 %                  (Continuous-time, Discrete-time : SampleTime,
@@ -179,11 +191,25 @@ function modele = add_block(modele, type, nom, varargin)
 %
 %   Discret — ils ne calculent qu'aux instants de leur période :
 %     delay        InitialCondition, DelayLength, SampleTime ; aussi
-%                  nommé unitdelay
+%                  nommé unitdelay ; DelayLengthSource ('Input port' : la
+%                  longueur par une entrée d, jusqu'à DelayLengthUpperLimit),
+%                  ShowEnablePort (entrée enable : désactivé, il tient sa
+%                  sortie et ses états), ExternalReset (Rising, Falling,
+%                  Either, Level, Level hold), InitialConditionSource
+%                  ('Input port' : entrée x0) — les entrées : u, d, enable,
+%                  remise, x0 ; Resettable Delay, Enabled Delay et
+%                  Variable Integer Delay de la bibliothèque en sont réglés
 %     memory       InitialCondition             la valeur du pas précédent
 %     zoh          SampleTime (dix pas par défaut)
 %     discreteintegrator Gain, SampleTime, InitialCondition,
 %                  IntegratorMethod : ForwardEuler, BackwardEuler, Trapezoidal
+%                  (ou 'Integration: ...', et 'Accumulation: ...', qui ne
+%                  multiplie pas par la période), LimitOutput,
+%                  UpperSaturationLimit, LowerSaturationLimit,
+%                  ExternalReset (rising, falling, either, level, sampled
+%                  level), InitialConditionSource (external : entrée x0),
+%                  ShowSaturationPort, ShowStatePort — les entrées : u,
+%                  remise, x0 ; les sorties : y, saturation, état
 %     discretetransferfcn Numerator, Denominator (puissances de z),
 %                  SampleTime
 %     discretefilter Numerator, Denominator (puissances de z^-1), SampleTime
@@ -196,6 +222,8 @@ function modele = add_block(modele, type, nom, varargin)
 %     transferfcnfirstorder PoleZ, ICPrevOutput   (1 - p) z / (z - p)
 %     transferfcnleadorlag PoleZ, ZeroZ, Gain, ICPrevOutput, ICPrevInput
 %     transferfcnrealzero ZeroZ, ICPrevInput      (z - zéro) / z
+%     firstorderhold Ts                         prolonge les deux derniers
+%                                               échantillons en ligne droite
 %
 %   Sorties :
 %     outport      Port, InitialOutput, OutputWhenDisabled (held, reset)
@@ -490,7 +518,8 @@ function avance = prereglages(designation)
     end
     texte = char(designation);
     barre = find(texte == '/', 1, 'last');
-    if ~isempty(barre)
+    bibliotheque = ~isempty(barre);
+    if bibliotheque
         texte = texte(barre + 1:end);
     end
     signes = {'Signs', 'Inputs', 'ListOfSigns'};
@@ -516,6 +545,21 @@ function avance = prereglages(designation)
             avance = {'Operator', 'rSqrt', {'Operator'}};
         case 'discretepidcontroller'
             avance = {'TimeDomain', 'Discrete-time', {'TimeDomain'}};
+        case 'delay'
+            % le Delay de la bibliothèque retarde de deux pas ; le type
+            % « delay » de MatLibre, comme Unit Delay, d'un seul
+            if bibliotheque
+                avance = {'DelayLength', 2, {'DelayLength'}};
+            end
+        case 'variabletimedelay'
+            avance = {'VariableDelayType', 'Variable time delay', {'VariableDelayType'}};
+        case 'resettabledelay'
+            avance = {'ExternalReset', 'Rising', {'ExternalReset'}; ...
+                      'InitialConditionSource', 'Input port', {'InitialConditionSource'}};
+        case 'enableddelay'
+            avance = {'ShowEnablePort', 'on', {'ShowEnablePort'}};
+        case 'variableintegerdelay'
+            avance = {'DelayLengthSource', 'Input port', {'DelayLengthSource'}};
     end
 end
 

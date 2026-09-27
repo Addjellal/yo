@@ -5803,6 +5803,248 @@ for kE = 1:size(casPid, 1)
 end
 fprintf('PID et blocs de periode : %d cas d''erreur verifies\n', size(casPid, 1));
 
+%% ----------------------------- 43. Discrete-Time Integrator et Delay complets
+% L'intégrateur discret se borne, montre sa saturation et son état, se
+% remet par une entrée, lit sa condition initiale d'une autre, et accumule
+% sans période ; le Delay lit sa longueur d'une entrée, s'active, se remet
+% et lit x0. Ni l'un ni l'autre ne devient à transmission directe : dans
+% une boucle, il la coupe toujours.
+reglageI = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 6};
+dti = new_system('dti');
+dti = add_block(dti, 'constant', 'c', 'Value', 1);
+dti = add_block(dti, 'discreteintegrator', 'i', 'SampleTime', 1, 'LimitOutput', 'on', ...
+                'UpperSaturationLimit', 3, 'ShowSaturationPort', 'on', 'ShowStatePort', 'on');
+dti = add_line(dti, 'c', 'i');
+dti = add_block(add_block(add_block(dti, 'outport', 'y'), 'outport', 's'), 'outport', 'x');
+dti = add_line(add_line(add_line(dti, 'i/1', 'y'), 'i/2', 's'), 'i/3', 'x');
+r = sim(dti, reglageI{:});
+assert(isequal(r.yout', [0 1 2 3 3 3 3; 0 0 0 1 1 1 1; 0 1 2 3 3 3 3]), ...
+       'borne, port de saturation et port d''etat');
+r = sim(set_param(dti, 'i', 'IntegratorMethod', 'Accumulation: Forward Euler', ...
+                  'SampleTime', 0.5, 'LimitOutput', 'off'), 'Solver', 'FixedStepDiscrete', ...
+        'FixedStep', 0.5, 'StopTime', 3);
+assert(isequal(r.yout(:, 1)', 0:6), 'l''accumulation ne multiplie pas par la periode');
+r = sim(set_param(dti, 'i', 'IntegratorMethod', 'Integration: Backward Euler', ...
+                  'LimitOutput', 'off'), reglageI{:});
+assert(isequal(r.yout(:, 1)', 1:7), 'Integration: Backward Euler, nom de Simulink');
+remiseI = new_system('remiseI');
+remiseI = add_block(remiseI, 'constant', 'c', 'Value', 1);
+remiseI = add_block(remiseI, 'step', 'r', 'Time', 3);
+remiseI = add_block(remiseI, 'constant', 'x0', 'Value', 10);
+remiseI = add_block(remiseI, 'discreteintegrator', 'i', 'SampleTime', 1, ...
+                    'ExternalReset', 'rising', 'InitialConditionSource', 'external', ...
+                    'ShowStatePort', 'on');
+remiseI = add_line(add_line(add_line(remiseI, 'c', 'i', 1), 'r', 'i', 2), 'x0', 'i', 3);
+remiseI = add_block(add_block(remiseI, 'outport', 'y'), 'outport', 'x');
+remiseI = add_line(add_line(remiseI, 'i/1', 'y'), 'i/2', 'x');
+r = sim(remiseI, reglageI{:});
+assert(isequal(r.yout', [10 11 12 10 11 12 13; 10 11 12 13 11 12 13]), ...
+       'la remise a l''instant meme ; le port d''etat rend l''etat d''avant la remise');
+boucleI = new_system('boucleI');
+boucleI = add_block(boucleI, 'constant', 'c', 'Value', 1);
+boucleI = add_block(boucleI, 'sum', 's', 'Signs', '+-');
+boucleI = add_block(boucleI, 'discreteintegrator', 'i', 'SampleTime', 1, 'ExternalReset', 'level');
+boucleI = add_block(boucleI, 'constant', 'rz', 'Value', 0);
+boucleI = add_line(add_line(boucleI, 'c', 's', 1), 'i', 's', 2);
+boucleI = add_line(add_line(boucleI, 's', 'i', 1), 'rz', 'i', 2);
+boucleI = add_line(add_block(boucleI, 'outport', 'y'), 'i', 'y');
+etatAvertissement = warning('off', 'all');
+r = sim(boucleI, reglageI{:});
+warning(etatAvertissement);
+assert(isequal(r.yout', [0 1 1 1 1 1 1]), 'l''integrateur a remise coupe encore la boucle');
+% le Delay
+variable = new_system('variable');
+variable = add_block(variable, 'clock', 't');
+variable = add_block(variable, 'constant', 'L', 'Value', 2);
+variable = add_block(variable, 'simulink/Discrete/Variable Integer Delay', 'z', ...
+                     'DelayLengthUpperLimit', 5, 'SampleTime', 1, 'InitialCondition', -1);
+variable = add_line(add_line(variable, 't', 'z', 1), 'L', 'z', 2);
+variable = add_line(add_block(variable, 'outport', 'y'), 'z', 'y');
+r = sim(variable, reglageI{:});
+assert(isequal(r.yout', [-1 -1 0 1 2 3 4]), 'la longueur du retard lue d''une entree');
+r = sim(set_param(variable, 'L', 'Value', 9), reglageI{:});
+assert(isequal(r.yout', [-1 -1 -1 -1 -1 0 1]), 'la longueur est bornee par DelayLengthUpperLimit');
+r = sim(set_param(variable, 'L', 'Value', 0), reglageI{:});
+assert(isequal(r.yout', 0:6), 'une longueur nulle passe l''entree telle quelle');
+active = new_system('active');
+active = add_block(active, 'clock', 't');
+active = add_block(active, 'pulsegenerator', 'en', 'Period', 4, 'PulseWidth', 50);
+active = add_block(active, 'simulink/Discrete/Enabled Delay', 'z', 'SampleTime', 1);
+active = add_line(add_line(active, 't', 'z', 1), 'en', 'z', 2);
+active = add_line(add_block(active, 'outport', 'y'), 'z', 'y');
+r = sim(active, reglageI{:});
+assert(isequal(r.yout', [0 0 0 0 1 4 4]), 'desactive, le retard tient sa sortie et ses etats');
+remis = new_system('remis');
+remis = add_block(remis, 'clock', 't');
+remis = add_block(remis, 'step', 'r', 'Time', 3);
+remis = add_block(remis, 'constant', 'x0', 'Value', 7);
+remis = add_block(remis, 'simulink/Discrete/Resettable Delay', 'z', 'SampleTime', 1);
+remis = add_line(add_line(add_line(remis, 't', 'z', 1), 'r', 'z', 2), 'x0', 'z', 3);
+remis = add_line(add_block(remis, 'outport', 'y'), 'z', 'y');
+r = sim(set_param(remis, 'z', 'DelayLength', 2), reglageI{:});
+assert(isequal(r.yout', [7 7 0 7 7 3 4]), 'le tampon entier revient a x0 au front de remise');
+assert(get_param(add_block(new_system('d2'), 'simulink/Discrete/Delay', 'z'), 'z', ...
+                 'DelayLength') == 2, 'le Delay de la bibliotheque retarde de deux pas');
+assert(get_param(add_block(new_system('d1'), 'delay', 'z'), 'z', 'DelayLength') == 1, ...
+       'le type delay de MatLibre, comme Unit Delay, d''un seul');
+boucleD = new_system('boucleD');
+boucleD = add_block(boucleD, 'constant', 'c', 'Value', 1);
+boucleD = add_block(boucleD, 'sum', 's', 'Signs', '++');
+boucleD = add_block(boucleD, 'simulink/Discrete/Enabled Delay', 'z', 'SampleTime', 1);
+boucleD = add_block(boucleD, 'constant', 'en', 'Value', 1);
+boucleD = add_line(add_line(boucleD, 'c', 's', 1), 'z', 's', 2);
+boucleD = add_line(add_line(boucleD, 's', 'z', 1), 'en', 'z', 2);
+boucleD = add_line(add_block(boucleD, 'outport', 'y'), 'z', 'y');
+r = sim(boucleD, reglageI{:});
+assert(isequal(r.yout', 0:6), 'le retard a activation coupe la boucle d''un accumulateur');
+casRetard = {
+    @() sim(set_param(dti, 'i', 'LowerSaturationLimit', 5), 1), ...
+        'Simulink:blocks:DiscreteIntegratorLimits', 'dti/i'
+    @() sim(set_param(dti, 'i', 'Gain', [1 2]), 1), ...
+        'Simulink:blocks:DiscreteIntegratorGain', 'dti/i'
+    @() sim(set_param(variable, 'z', 'DelayLengthUpperLimit', 0), 1), ...
+        'Simulink:blocks:DelayLengthUpperLimit', 'variable/z'
+    @() sim(set_param(remis, 'z', 'ExternalReset', 'Parfois'), 1), ...
+        'Simulink:Parameters:InvalidValue', 'Rising'
+    };
+for kE = 1:size(casRetard, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('casRetard{kE, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casRetard{kE, 2}) && ~isempty(strfind(message, casRetard{kE, 3})), ...
+           sprintf('integrateur et retard, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casRetard{kE, 2}, vu, message));
+end
+fprintf('integrateur discret et retard : %d cas d''erreur verifies\n', size(casRetard, 1));
+
+%% ------------------ 44. Retards variables, tenue du premier ordre, séquences, tableurs
+% Variable Time Delay lit son retard quand le signal sort, Variable
+% Transport Delay quand il entre ; tous deux coupent une boucle. First-Order
+% Hold prolonge ses deux derniers échantillons ; Repeating Sequence
+% Interpolated répète sa table ; From Spreadsheet lit un tableur en texte ;
+% Bus to Vector aplatit un bus.
+retardV = new_system('retardV');
+retardV = add_block(retardV, 'clock', 't');
+retardV = add_block(retardV, 'constant', 'tau', 'Value', 0.3);
+retardV = add_block(retardV, 'simulink/Continuous/Variable Time Delay', 'd', 'InitialOutput', -1);
+retardV = add_line(add_line(retardV, 't', 'd', 1), 'tau', 'd', 2);
+retardV = add_line(add_block(retardV, 'outport', 'y'), 'd', 'y');
+reglageV = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 1};
+attendu = max(0:0.1:1, 0.3) - 0.3;
+attendu(1:3) = -1;
+for genre = {'Variable time delay', 'Variable transport delay'}
+    r = sim(set_param(retardV, 'd', 'VariableDelayType', genre{1}), reglageV{:});
+    assert(max(abs(r.yout' - attendu)) < 1e-12, ['retard constant : ' genre{1}]);
+end
+assert(strcmp(get_param(retardV, 'd', 'VariableDelayType'), 'Variable time delay'), ...
+       'Variable Time Delay est un Variable Transport Delay regle d''avance');
+croissant = new_system('croissant');
+croissant = add_block(croissant, 'clock', 't');
+croissant = add_block(croissant, 'gain', 'g', 'Gain', 0.5);
+croissant = add_block(croissant, 'variabletransportdelay', 'd', 'VariableDelayType', ...
+                      'Variable time delay');
+croissant = add_line(add_line(add_line(croissant, 't', 'g'), 't', 'd', 1), 'g', 'd', 2);
+croissant = add_line(add_block(croissant, 'outport', 'y'), 'd', 'y');
+r = sim(croissant, 'Solver', 'ode45', 'StopTime', 2);
+assert(abs(r.yout(end) - 1) < 1e-6, 'retard de t/2 : y(2) = u(1)');
+retour = new_system('retour');
+retour = add_block(retour, 'integrator', 'i', 'InitialCondition', 1);
+retour = add_block(retour, 'constant', 'tau', 'Value', 0.5);
+retour = add_block(retour, 'variabletransportdelay', 'd', 'VariableDelayType', ...
+                   'Variable time delay', 'InitialOutput', 1);
+retour = add_block(retour, 'gain', 'g', 'Gain', -1);
+retour = add_line(add_line(retour, 'i', 'd', 1), 'tau', 'd', 2);
+retour = add_line(add_line(retour, 'd', 'g'), 'g', 'i');
+retour = add_line(add_block(retour, 'outport', 'y'), 'i', 'y');
+r = sim(retour, 'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 1);
+assert(abs(r.yout(51) - 0.5) < 1e-9 && abs(r.yout(end) - 0.125) < 1e-4, ...
+       'x'' = -x(t - 0.5) : le retard coupe la boucle, sans boucle algebrique');
+% First-Order Hold
+tenue = new_system('tenue');
+tenue = add_block(tenue, 'simulink/Sources/Sine Wave', 's');
+tenue = add_block(tenue, 'simulink/Discrete/First-Order Hold', 'h', 'Ts', 0.5);
+tenue = add_line(add_line(add_block(tenue, 'outport', 'y'), 's', 'h'), 'h', 'y');
+r = sim(tenue, 'Solver', 'ode4', 'FixedStep', 0.25, 'StopTime', 2);
+t = r.tout;
+tk = floor(t / 0.5 + 1e-9) * 0.5;
+avant = max(tk - 0.5, 0);
+attendu = sin(tk) + (sin(tk) - sin(avant)) / 0.5 .* (t - tk);
+assert(max(abs(r.yout - attendu)) < 1e-12, 'First-Order Hold : la droite des deux derniers echantillons');
+% Repeating Sequence Interpolated
+sequence = new_system('sequence');
+sequence = add_block(sequence, 'simulink/Sources/Repeating Sequence Interpolated', 's', ...
+                     'tsamp', 0.05);
+sequence = add_line(add_block(sequence, 'outport', 'y'), 's', 'y');
+r = sim(sequence, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.05, 'StopTime', 1.2);
+attendu = interp1([0 0.1 0.5 0.6 1], [3 1 4 2 1], mod(r.tout, 1));
+assert(max(abs(r.yout - attendu)) < 1e-12, 'la sequence datee, repetee avec la periode 1');
+r = sim(set_param(sequence, 's', 'LookUpMeth', 'Use Input Below'), 'Solver', ...
+        'FixedStepDiscrete', 'FixedStep', 0.05, 'StopTime', 1.2);
+assert(isequal(r.yout(1:4)', [3 3 1 1]), 'Use Input Below : la valeur de la date d''avant');
+% From Spreadsheet
+dossierTab = tempname();
+mkdir(dossierTab);
+fichierTab = fullfile(dossierTab, 'signal.csv');
+writematrix([0 0 10; 1 2 20; 2 4 30], fichierTab);
+tableur = new_system('tableur');
+tableur = add_block(tableur, 'simulink/Sources/From Spreadsheet', 's', 'FileName', fichierTab);
+tableur = add_line(add_block(tableur, 'outport', 'y'), 's', 'y');
+r = sim(tableur, 'Solver', 'ode4', 'FixedStep', 0.5, 'StopTime', 3);
+assert(isequal(r.yout', [0:6; 10:5:40]), 'interpole et prolonge le tableur');
+r = sim(set_param(tableur, 's', 'InterpolationWithinTimeRange', 'Zero order hold', ...
+                  'ExtrapolationAfterLastDataPoint', 'Hold last value'), 'Solver', 'ode4', ...
+        'FixedStep', 0.5, 'StopTime', 3);
+assert(isequal(r.yout', [0 0 2 2 4 4 4; 10 10 20 20 30 30 30]), 'tenue d''ordre zero, puis tenue');
+fichierMauvais = fullfile(dossierTab, 'mauvais.csv');
+writematrix([2 1; 1 2], fichierMauvais);
+% Bus to Vector
+bv = new_system('bv');
+bv = add_block(bv, 'constant', 'a', 'Value', 1);
+bv = add_block(bv, 'constant', 'c', 'Value', 2);
+bv = add_block(bv, 'buscreator', 'bc', 'Inputs', 2);
+bv = add_block(bv, 'simulink/Signal Attributes/Bus to Vector', 'v');
+bv = add_block(bv, 'gain', 'g', 'Gain', [1 10]);
+bv = add_line(add_line(bv, 'a', 'bc', 1), 'c', 'bc', 2);
+bv = add_line(add_line(bv, 'bc', 'v'), 'v', 'g');
+bv = add_line(add_block(bv, 'outport', 'y'), 'g', 'y');
+r = sim(bv, 1);
+assert(isequal(r.yout(end, :), [1 20]), 'Bus to Vector : le bus devient un vecteur');
+casRetardV = {
+    @() sim(set_param(retardV, 'd', 'MaximumDelay', 0), 1), ...
+        'Simulink:blocks:VariableTransportDelayMaximum', 'retardV/d'
+    @() sim(set_param(retardV, 'tau', 'Value', [0.1 0.2]), 1), ...
+        'Simulink:blocks:VariableTransportDelayInput', 'retardV/d'
+    @() sim(set_param(tenue, 'h', 'Ts', 0), 1), 'Simulink:blocks:FirstOrderHoldSampleTime', 'tenue/h'
+    @() sim(set_param(sequence, 's', 'TimeValues', [0 1]), 1), ...
+        'Simulink:blocks:RepeatingSequenceSize', 'sequence/s'
+    @() sim(set_param(sequence, 's', 'TimeValues', [0 0.5 0.2 0.6 1]), 1), ...
+        'Simulink:blocks:RepeatingSequenceTimes', 'sequence/s'
+    @() sim(set_param(tableur, 's', 'FileName', fullfile(dossierTab, 'absent.csv')), 1), ...
+        'Simulink:blocks:FromSpreadsheetNotFound', 'tableur/s'
+    @() sim(set_param(tableur, 's', 'FileName', fichierMauvais), 1), ...
+        'Simulink:blocks:FromSpreadsheetInvalidData', 'tableur/s'
+    };
+for kE = 1:size(casRetardV, 1)
+    vu = '';
+    message = '';
+    try
+        evalc('casRetardV{kE, 1}();');
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casRetardV{kE, 2}) && ~isempty(strfind(message, casRetardV{kE, 3})), ...
+           sprintf('retards variables et sources, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casRetardV{kE, 2}, vu, message));
+end
+rmdir(dossierTab, 's');
+fprintf('retards variables et sources : %d cas d''erreur verifies\n', size(casRetardV, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
