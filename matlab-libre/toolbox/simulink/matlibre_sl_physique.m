@@ -379,6 +379,7 @@ end
 % --- les réseaux -------------------------------------------------------------
 
 function modele = reseaux(modele)
+    verifierSignaux(modele);
     modele = signauxPhysiques(modele);
     n = numel(modele.blocs);
     physique = false(1, n);
@@ -449,6 +450,70 @@ function modele = reseaux(modele)
     end
     modele.connexions = zeros(0, 4);
     modele = convertisseurs(modele);
+end
+
+% Un signal physique ne se relie qu'à des ports de signal physique : un
+% signal de Simulink y entre par un Simulink-PS Converter, et en sort par un
+% PS-Simulink Converter, comme dans Simscape. Les ports d'un sous-système
+% déplié le laissent passer tel quel.
+function verifierSignaux(modele)
+    liens = matlibre_sl_liens(modele);
+    if isempty(liens)
+        return
+    end
+    n = numel(modele.blocs);
+    types = cellfun(@(b) b.type, modele.blocs, 'UniformOutput', false);
+    T = tableSignaux();
+    signal = ismember(types, T(:, 1));
+    nomModele = char(modele.nom);
+    chemin = @(k) [nomModele '/' modele.blocs{k}.nom];
+    for l = 1:size(liens, 1)
+        cible = liens(l, 2);
+        entree = liens(l, 3);
+        if strcmp(types{cible}, 'signalconversion')
+            continue   % un port de sous-système : le signal passe
+        end
+        [origine, physique] = sourceDe(liens, types, signal, liens(l, 1), liens(l, 4), n);
+        attendu = signal(cible) || (strcmp(types{cible}, 'pssimulinkconverter') && ...
+                                    entree == 1);
+        if ~attendu
+            [~, ~, e] = portsDe(types{cible});
+            attendu = entree <= e;
+        end
+        if physique && ~attendu
+            error('Simscape:Network:PhysicalSignalToSimulink', ...
+                  ['Le signal physique de ''%s'' entre dans le port %d de ''%s'', un port ' ...
+                   'de Simulink : un signal physique en sort par un PS-Simulink ' ...
+                   'Converter.'], chemin(origine), entree, chemin(cible));
+        elseif ~physique && attendu
+            error('Simscape:Network:SimulinkToPhysicalSignal', ...
+                  ['Le signal de Simulink de ''%s'' entre dans le port de signal physique ' ...
+                   '%d de ''%s'' : un signal de Simulink devient physique par un ' ...
+                   'Simulink-PS Converter.'], chemin(origine), entree, chemin(cible));
+        end
+    end
+end
+
+% Le bloc d'où vient un signal, en remontant les ports de sous-système
+% dépliés, et s'il est physique : la sortie d'un bloc de signaux physiques,
+% d'un Simulink-PS Converter ou d'un capteur.
+function [k, physique] = sourceDe(liens, types, signal, k, q, n)
+    for pas = 1:n
+        if ~strcmp(types{k}, 'signalconversion')
+            break
+        end
+        amont = find(liens(:, 2) == k & liens(:, 3) == 1, 1);
+        if isempty(amont)
+            break
+        end
+        q = liens(amont, 4);
+        k = liens(amont, 1);
+    end
+    physique = signal(k) || strcmp(types{k}, 'simulinkpsconverter');
+    if ~physique
+        [~, ~, ~, s] = portsDe(types{k});
+        physique = q <= s;
+    end
 end
 
 % Les blocs de signaux physiques : un signal physique n'est qu'un signal,
@@ -701,7 +766,8 @@ function modele = convertisseurs(modele)
             modele.blocs{k} = remplace(bloc, 'transferfcn', struct('Numerator', a, ...
                                                                   'Denominator', den));
         elseif a ~= 1
-            modele.blocs{k} = remplace(bloc, 'gain', struct('Gain', a));
+            % le gain rend un double : un signal physique en est un
+            modele.blocs{k} = remplace(bloc, 'gain', struct('Gain', a, 'OutDataTypeStr', 'double'));
         elseif b ~= 0
             modele.blocs{k} = remplace(bloc, 'bias', struct('Bias', b));
             continue

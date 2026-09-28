@@ -6732,7 +6732,7 @@ rlc = add_line(rlc, 'V/RConn1', 'G/LConn1');
 rlc = add_line(rlc, 'S/RConn1', 'V/RConn1');
 rlc = add_line(rlc, 'VS/LConn1', 'C/LConn1');
 rlc = add_line(rlc, 'VS/RConn1', 'G/LConn1');
-rlc = add_line(rlc, 'VS', 'y');
+rlc = versSimulink(rlc, 'VS', 'y');
 r = sim(rlc, 'Solver', 'ode45', 'StopTime', 5, 'RelTol', 1e-9, 'AbsTol', 1e-12);
 % LC s^2 + RC s + 1 = 0,5 s^2 + s + 1 : racines -1 +- i
 t = r.tout;
@@ -6753,7 +6753,7 @@ ac = add_line(ac, 'I/LConn1', 'G/LConn1');
 ac = add_line(ac, 'S/RConn1', 'G/LConn1');
 ac = add_line(ac, 'VS/LConn1', 'R/LConn1');
 ac = add_line(ac, 'VS/RConn1', 'R/RConn1');
-ac = add_line(ac, 'VS', 'y');
+ac = versSimulink(ac, 'VS', 'y');
 r = sim(ac, 'Solver', 'ode4', 'FixedStep', 1e-4, 'StopTime', 0.02);
 assert(max(abs(r.yout - 2 * cos(2 * pi * 50 * r.tout))) < 1e-9, ...
        'le courant sort par le - : 2 mA dans 1 kOhm, dephase de 90 degres');
@@ -6776,7 +6776,7 @@ interne = add_line(interne, 'V/RConn1', 'G/LConn1');
 interne = add_line(interne, 'S/RConn1', 'G/LConn1');
 interne = add_line(interne, 'VS/LConn1', 'C/LConn1');
 interne = add_line(interne, 'VS/RConn1', 'G/LConn1');
-interne = add_line(interne, 'VS', 'y');
+interne = versSimulink(interne, 'VS', 'y');
 dehors = new_system('dehors');
 dehors = add_block(dehors, 'step', 'e', 'Time', 0, 'After', 2);
 dehors = add_block(dehors, 'subsystem', 'rc', 'Model', interne);
@@ -6793,7 +6793,7 @@ court = add_block(court, 'voltagesensor', 'VS');
 court = add_line(add_line(court, 'R/LConn1', 'G/LConn1'), 'R/RConn1', 'G/LConn1');
 court = add_line(add_line(court, 'S/RConn1', 'G/LConn1'), 'VS/LConn1', 'R/LConn1');
 court = add_line(court, 'VS/RConn1', 'G/LConn1');
-court = add_line(add_block(court, 'outport', 'y'), 'VS', 'y');
+court = versSimulink(add_block(court, 'outport', 'y'), 'VS', 'y');
 r = sim(court, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.2);
 assert(isequal(r.yout, zeros(3, 1)), 'une resistance court-circuitee ne porte aucune tension');
 % .slx et .m relisent les connexions physiques
@@ -6872,7 +6872,7 @@ msd = add_line(msd, 'B/RConn1', 'G/LConn1');
 msd = add_line(msd, 'S/RConn1', 'G/LConn1');
 msd = add_line(msd, 'X/LConn1', 'M/LConn1');
 msd = add_line(msd, 'X/RConn1', 'G/LConn1');
-msd = add_line(add_line(msd, 'X/1', 'v'), 'X/2', 'x');
+msd = versSimulink(versSimulink(msd, 'X/1', 'v'), 'X/2', 'x');
 r = sim(msd, 'Solver', 'ode45', 'StopTime', 6, 'RelTol', 1e-9, 'AbsTol', 1e-12);
 t = r.tout;
 % x'' + 2 x' + 10 x = 10 : racines -1 +- 3i
@@ -6890,7 +6890,7 @@ rot = add_block(rot, 'mechanicalrotationalreference', 'G');
 rot = add_block(rot, 'solverconfiguration', 'S');
 rot = add_block(rot, 'idealrotationalmotionsensor', 'W', 'phi0', 90, 'phi0_unit', 'deg');
 rot = add_block(add_block(rot, 'outport', 'w'), 'outport', 'a');
-rot = add_line(rot, 'c', 'T');
+rot = versPhysique(rot, 'c', 'T');
 rot = add_line(rot, 'T/LConn1', 'J/LConn1');
 rot = add_line(rot, 'T/RConn1', 'G/LConn1');
 rot = add_line(rot, 'D/LConn1', 'J/LConn1');
@@ -6898,7 +6898,7 @@ rot = add_line(rot, 'D/RConn1', 'G/LConn1');
 rot = add_line(rot, 'S/RConn1', 'G/LConn1');
 rot = add_line(rot, 'W/LConn1', 'J/LConn1');
 rot = add_line(rot, 'W/RConn1', 'G/LConn1');
-rot = add_line(add_line(rot, 'W/1', 'w'), 'W/2', 'a');
+rot = versSimulink(versSimulink(rot, 'W/1', 'w'), 'W/2', 'a');
 r = sim(rot, 'Solver', 'ode4', 'FixedStep', 1e-4, 'StopTime', 0.5);
 t = r.tout;
 assert(max(abs(r.yout(:, 1) - 10 * (1 - exp(-10 * t)))) < 1e-8 && ...
@@ -6931,7 +6931,7 @@ moteur = add_line(moteur, 'D/RConn1', 'GM/LConn1');
 moteur = add_line(moteur, 'W/LConn1', 'J/LConn1');
 moteur = add_line(moteur, 'W/RConn1', 'GM/LConn1');
 moteur = add_line(moteur, 'S/RConn1', 'GE/LConn1');
-moteur = add_line(add_line(moteur, 'W/1', 'w'), 'I', 'i');
+moteur = versSimulink(versSimulink(moteur, 'W/1', 'w'), 'I', 'i');
 r = sim(moteur, 'Solver', 'ode15s', 'StopTime', 2, 'RelTol', 1e-8, 'AbsTol', 1e-10);
 wFinal = 12 / (0.1 + 1 * 1e-4 / 0.1);
 assert(abs(r.yout(end, 1) - wFinal) < 1e-4 && abs(r.yout(end, 2) - 1e-4 * wFinal / 0.1) < 1e-6, ...
@@ -6991,7 +6991,7 @@ th = add_block(th, 'solverconfiguration', 'S');
 th = add_block(th, 'idealtemperaturesensor', 'T');
 th = add_block(th, 'idealheatflowsensor', 'P');
 th = add_block(add_block(th, 'outport', 'y'), 'outport', 'perte');
-th = add_line(add_line(th, 'q', 'Q'), 'ambiant', 'Ta');
+th = versPhysique(versPhysique(th, 'q', 'Q'), 'ambiant', 'Ta');
 th = add_line(th, 'Q/LConn1', 'G/LConn1');
 th = add_line(th, 'Q/RConn1', 'M/LConn1');
 th = add_line(th, 'P/LConn1', 'M/LConn1');
@@ -7001,7 +7001,7 @@ th = add_line(th, 'Ta/LConn1', 'G/LConn1');
 th = add_line(th, 'S/RConn1', 'G/LConn1');
 th = add_line(th, 'T/LConn1', 'M/LConn1');
 th = add_line(th, 'T/RConn1', 'G/LConn1');
-th = add_line(add_line(th, 'T', 'y'), 'P', 'perte');
+th = versSimulink(versSimulink(th, 'T', 'y'), 'P', 'perte');
 r = sim(th, 'Solver', 'ode4', 'FixedStep', 1, 'StopTime', 2000);
 t = r.tout;
 % m c dT/dt = 50 - h S (T - Ta) : T = Ta + 10 (1 - exp(-t / 200))
@@ -7028,7 +7028,7 @@ paroi = add_line(paroi, 'mur/RConn1', 'froid/LConn1');
 paroi = add_line(paroi, 'T/LConn1', 'chaud/LConn1');
 paroi = add_line(paroi, 'T/RConn1', 'G/LConn1');
 paroi = add_line(paroi, 'S/RConn1', 'G/LConn1');
-paroi = add_line(paroi, 'T', 'y');
+paroi = versSimulink(paroi, 'T', 'y');
 r = sim(paroi, 'Solver', 'ode45', 'StopTime', 200, 'RelTol', 1e-9, 'AbsTol', 1e-9);
 t = r.tout;
 % G = 50 * 20e-4 / 5e-3 = 20 W/K ; C1 = 400, C2 = 1200 J/K ; tau = 1 / (G (1/C1 + 1/C2)) = 15 s
@@ -7087,7 +7087,7 @@ arbre = add_block(arbre, 'mechanicalrotationalreference', 'G');
 arbre = add_block(arbre, 'solverconfiguration', 'S');
 arbre = add_block(arbre, 'idealrotationalmotionsensor', 'W');
 arbre = add_block(arbre, 'outport', 'w');
-arbre = add_line(add_line(arbre, 'c', 'T'), 'T/LConn1', 'J1/LConn1');
+arbre = add_line(versPhysique(arbre, 'c', 'T'), 'T/LConn1', 'J1/LConn1');
 arbre = add_line(arbre, 'T/RConn1', 'G/LConn1');
 arbre = add_line(arbre, 'J2/LConn1', 'J1/LConn1');
 arbre = add_line(arbre, 'D/LConn1', 'J1/LConn1');
@@ -7095,7 +7095,7 @@ arbre = add_line(arbre, 'D/RConn1', 'G/LConn1');
 arbre = add_line(arbre, 'S/RConn1', 'G/LConn1');
 arbre = add_line(arbre, 'W/LConn1', 'J1/LConn1');
 arbre = add_line(arbre, 'W/RConn1', 'G/LConn1');
-arbre = add_line(arbre, 'W/1', 'w');
+arbre = versSimulink(arbre, 'W/1', 'w');
 r = sim(arbre, 'Solver', 'ode45', 'StopTime', 1, 'RelTol', 1e-10, 'AbsTol', 1e-12);
 assert(max(abs(r.yout - 10 * (1 - exp(-r.tout / 0.4)))) < 1e-8, ...
        'deux inerties solidaires : une seule, de 0.04 kg.m^2');
@@ -7112,13 +7112,13 @@ chauffe = add_block(chauffe, 'thermalreference', 'G');
 chauffe = add_block(chauffe, 'solverconfiguration', 'S');
 chauffe = add_block(chauffe, 'idealtemperaturesensor', 'T');
 chauffe = add_block(chauffe, 'outport', 'y');
-chauffe = add_line(add_line(chauffe, 'q', 'Q'), 'Q/LConn1', 'G/LConn1');
+chauffe = add_line(versPhysique(chauffe, 'q', 'Q'), 'Q/LConn1', 'G/LConn1');
 chauffe = add_line(chauffe, 'Q/RConn1', 'M1/LConn1');
 chauffe = add_line(chauffe, 'M2/LConn1', 'M1/LConn1');
 chauffe = add_line(chauffe, 'T/LConn1', 'M1/LConn1');
 chauffe = add_line(chauffe, 'T/RConn1', 'G/LConn1');
 chauffe = add_line(chauffe, 'S/RConn1', 'G/LConn1');
-chauffe = add_line(chauffe, 'T', 'y');
+chauffe = versSimulink(chauffe, 'T', 'y');
 r = sim(chauffe, 'Solver', 'ode45', 'StopTime', 10);
 assert(abs(r.yout(end) - 300.25) < 1e-9, 'deux masses sur un noeud : 100 J pour 400 J/K');
 % un ressort au bout libre ne porte aucun effort
@@ -7132,14 +7132,14 @@ libre = add_block(libre, 'mechanicaltranslationalreference', 'G');
 libre = add_block(libre, 'solverconfiguration', 'S');
 libre = add_block(libre, 'idealtranslationalmotionsensor', 'X');
 libre = add_block(add_block(libre, 'outport', 'v'), 'outport', 'x');
-libre = add_line(add_line(libre, 'f', 'F'), 'F/LConn1', 'M/LConn1');
+libre = add_line(versPhysique(libre, 'f', 'F'), 'F/LConn1', 'M/LConn1');
 libre = add_line(libre, 'F/RConn1', 'G/LConn1');
 libre = add_line(libre, 'K/LConn1', 'M/LConn1');
 libre = add_line(libre, 'K/RConn1', 'L/LConn1');
 libre = add_line(libre, 'S/RConn1', 'G/LConn1');
 libre = add_line(libre, 'X/LConn1', 'M/LConn1');
 libre = add_line(libre, 'X/RConn1', 'G/LConn1');
-libre = add_line(add_line(libre, 'X/1', 'v'), 'X/2', 'x');
+libre = versSimulink(versSimulink(libre, 'X/1', 'v'), 'X/2', 'x');
 r = sim(libre, 'Solver', 'ode45', 'StopTime', 1, 'RelTol', 1e-10, 'AbsTol', 1e-12);
 assert(max(abs(r.yout(:, 1) - 2 * r.tout)) < 1e-9 && max(abs(r.yout(:, 2) - r.tout .^ 2)) < 1e-9, ...
        'un ressort au bout libre : la masse accelere seule');
@@ -7156,7 +7156,7 @@ contraires = add_line(contraires, 'J2/LConn1', 'J1/LConn1');
 contraires = add_line(contraires, 'W/LConn1', 'J1/LConn1');
 contraires = add_line(contraires, 'W/RConn1', 'G/LConn1');
 contraires = add_line(contraires, 'S/RConn1', 'G/LConn1');
-contraires = add_line(contraires, 'W/1', 'w');
+contraires = versSimulink(contraires, 'W/1', 'w');
 lastwarn('');
 texte52 = evalc('r = sim(contraires, 1);');
 [~, identifiant] = lastwarn();
@@ -7185,7 +7185,7 @@ couple = add_line(couple, 'V2/LConn1', 'T/RConn1');
 couple = add_line(couple, 'V2/RConn1', 'G2/LConn1');
 couple = add_line(couple, 'V1/LConn1', 'T/LConn1');
 couple = add_line(couple, 'V1/RConn1', 'G/LConn1');
-couple = add_line(add_line(couple, 'V2', 'y2'), 'V1', 'y1');
+couple = versSimulink(versSimulink(couple, 'V2', 'y2'), 'V1', 'y1');
 r = sim(couple, 'Solver', 'ode45', 'StopTime', 0.1, 'RelTol', 1e-10, 'AbsTol', 1e-12);
 assert(max(abs(r.yout(:, 1) - 1.6 * r.yout(:, 2))) < 1e-9, ...
        'secondaire ouvert : v2 = M / L1 v1');
@@ -7218,7 +7218,7 @@ vitesse = add_line(vitesse, 'V/RConn1', 'G/LConn1');
 vitesse = add_line(vitesse, 'V/LConn1', 'F/LConn1');
 vitesse = add_line(vitesse, 'F/RConn1', 'M/LConn1');
 vitesse = add_line(vitesse, 'S/RConn1', 'G/LConn1');
-vitesse = add_line(vitesse, 'F', 'f');
+vitesse = versSimulink(vitesse, 'F', 'f');
 filtre = set_param(vitesse, 'SP', 'FilteringAndDerivatives', ...
                    'Filter input, derivatives calculated', 'InputFilterTimeConstant', 10, ...
                    'InputFilterTimeConstant_unit', 'ms');
@@ -7251,7 +7251,7 @@ transfo = add_line(transfo, 'R/RConn1', 'G2/LConn1');
 transfo = add_line(transfo, 'T/RConn2', 'G2/LConn1');
 transfo = add_line(transfo, 'V2/LConn1', 'R/LConn1');
 transfo = add_line(transfo, 'V2/RConn1', 'G2/LConn1');
-transfo = add_line(add_line(transfo, 'I1', 'i1'), 'V2', 'v2');
+transfo = versSimulink(versSimulink(transfo, 'I1', 'i1'), 'V2', 'v2');
 r = sim(transfo, 1);
 assert(abs(r.yout(end, 1) - 0.25) < 1e-12 && abs(r.yout(end, 2) - 5) < 1e-12, ...
        'transformateur ideal : v2 = v1 / n, i1 = i2 / n');
@@ -7279,7 +7279,7 @@ for inverseur = [true false]
     end
     ao = add_line(ao, 'VS/LConn1', 'A/RConn1');
     ao = add_line(ao, 'VS/RConn1', 'G/LConn1');
-    ao = add_line(ao, 'VS', 'y');
+    ao = versSimulink(ao, 'VS', 'y');
     r = sim(ao, 1);
     assert(abs(r.yout(end) - (inverseur * -10 + ~inverseur * 11)) < 1e-9, ...
            'amplificateur operationnel : -Rf/R1 en inverseur, 1 + Rf/R1 sinon');
@@ -7293,13 +7293,13 @@ reducteur = add_block(reducteur, 'mechanicalrotationalreference', 'G');
 reducteur = add_block(reducteur, 'solverconfiguration', 'S');
 reducteur = add_block(reducteur, 'idealrotationalmotionsensor', 'We');
 reducteur = add_block(reducteur, 'outport', 'we');
-reducteur = add_line(add_line(reducteur, 'c', 'T'), 'T/RConn1', 'G/LConn1');
+reducteur = add_line(versPhysique(reducteur, 'c', 'T'), 'T/RConn1', 'G/LConn1');
 reducteur = add_line(reducteur, 'T/LConn1', 'R/LConn1');
 reducteur = add_line(reducteur, 'R/RConn1', 'J/LConn1');
 reducteur = add_line(reducteur, 'S/RConn1', 'G/LConn1');
 reducteur = add_line(reducteur, 'We/LConn1', 'R/LConn1');
 reducteur = add_line(reducteur, 'We/RConn1', 'G/LConn1');
-reducteur = add_line(reducteur, 'We/1', 'we');
+reducteur = versSimulink(reducteur, 'We/1', 'we');
 r = sim(reducteur, 'Solver', 'ode45', 'StopTime', 1);
 assert(max(abs(r.yout - 100 * r.tout)) < 1e-9, ...
        'reducteur de rapport 4 : l''inertie vue de l''entree est divisee par 16');
@@ -7313,13 +7313,13 @@ roue = add_block(roue, 'mechanicaltranslationalreference', 'GT');
 roue = add_block(roue, 'solverconfiguration', 'S');
 roue = add_block(roue, 'idealtranslationalmotionsensor', 'X');
 roue = add_block(roue, 'outport', 'v');
-roue = add_line(add_line(roue, 'c', 'T'), 'T/RConn1', 'GR/LConn1');
+roue = add_line(versPhysique(roue, 'c', 'T'), 'T/RConn1', 'GR/LConn1');
 roue = add_line(roue, 'T/LConn1', 'W/LConn1');
 roue = add_line(roue, 'W/RConn1', 'M/LConn1');
 roue = add_line(roue, 'S/RConn1', 'GR/LConn1');
 roue = add_line(roue, 'X/LConn1', 'M/LConn1');
 roue = add_line(roue, 'X/RConn1', 'GT/LConn1');
-roue = add_line(roue, 'X/1', 'v');
+roue = versSimulink(roue, 'X/1', 'v');
 r = sim(roue, 'Solver', 'ode45', 'StopTime', 1);
 r2 = sim(set_param(roue, 'W', 'orientation', 'Drives in negative direction'), ...
          'Solver', 'ode45', 'StopTime', 1);
@@ -7334,14 +7334,14 @@ inerteur = add_block(inerteur, 'mechanicaltranslationalreference', 'G');
 inerteur = add_block(inerteur, 'solverconfiguration', 'S');
 inerteur = add_block(inerteur, 'idealtranslationalmotionsensor', 'X');
 inerteur = add_block(inerteur, 'outport', 'v');
-inerteur = add_line(add_line(inerteur, 'f', 'F'), 'F/LConn1', 'M/LConn1');
+inerteur = add_line(versPhysique(inerteur, 'f', 'F'), 'F/LConn1', 'M/LConn1');
 inerteur = add_line(inerteur, 'F/RConn1', 'G/LConn1');
 inerteur = add_line(inerteur, 'B/LConn1', 'M/LConn1');
 inerteur = add_line(inerteur, 'B/RConn1', 'G/LConn1');
 inerteur = add_line(inerteur, 'S/RConn1', 'G/LConn1');
 inerteur = add_line(inerteur, 'X/LConn1', 'M/LConn1');
 inerteur = add_line(inerteur, 'X/RConn1', 'G/LConn1');
-inerteur = add_line(inerteur, 'X/1', 'v');
+inerteur = versSimulink(inerteur, 'X/1', 'v');
 r = sim(inerteur, 'Solver', 'ode45', 'StopTime', 1);
 assert(max(abs(r.yout - r.tout)) < 1e-12, 'un inerteur de 2 kg s''ajoute a la masse');
 lineaire = new_system('lineaire');
@@ -7364,7 +7364,7 @@ lineaire = add_line(lineaire, 'C/RConn2', 'GM/LConn1');
 lineaire = add_line(lineaire, 'D/RConn1', 'GM/LConn1');
 lineaire = add_line(lineaire, 'X/LConn1', 'D/LConn1');
 lineaire = add_line(lineaire, 'X/RConn1', 'GM/LConn1');
-lineaire = add_line(lineaire, 'X/1', 'v');
+lineaire = versSimulink(lineaire, 'X/1', 'v');
 r = sim(lineaire, 1);
 assert(abs(r.yout(end) - 0.5) < 1e-12, 'moteur lineaire : 2 = i + 2 v et 2 i = 4 v');
 % les sources commandées, et les unités des convertisseurs
@@ -7397,7 +7397,7 @@ commandees = add_line(commandees, 'R3/RConn1', 'G/LConn1');
 commandees = add_line(commandees, 'H/RConn2', 'G/LConn1');
 commandees = add_line(commandees, 'VH/LConn1', 'R3/LConn1');
 commandees = add_line(commandees, 'VH/RConn1', 'G/LConn1');
-commandees = add_line(add_line(commandees, 'VE', 'ye'), 'VH', 'yh');
+commandees = versSimulink(versSimulink(commandees, 'VE', 'ye'), 'VH', 'yh');
 r = sim(commandees, 1);
 assert(abs(r.yout(end, 1) - 15) < 1e-12 && abs(r.yout(end, 2) - 10.5) < 1e-12, ...
        'sources commandees : 5 x 3 V, et 7 Ohm x 1.5 A');
@@ -7562,7 +7562,7 @@ for k53 = 1:size(fonctions, 1)
     f = add_block(f, 'ramp', 'rampe', 'Slope', 1, 'InitialOutput', -2.3);
     f = add_block(f, fonctions{k53, 1}, 'bloc', fonctions{k53, 2}{:});
     f = add_block(f, 'outport', 'y');
-    f = add_line(add_line(f, 'rampe', 'bloc'), 'bloc', 'y');
+    f = versSimulink(versPhysique(f, 'rampe', 'bloc'), 'bloc', 'y');
     r = sim(f, 'Solver', 'ode45', 'StopTime', 4.2, 'MaxStep', 0.1);
     u = r.tout - 2.3;
     attendu = fonctions{k53, 3}(u);
@@ -7585,17 +7585,17 @@ choix53 = add_block(choix53, 'psdivide', 'quotient');
 choix53 = add_block(choix53, 'psproduct', 'produit');
 choix53 = add_block(choix53, 'mux', 'tout', 'Inputs', 5);
 choix53 = add_block(choix53, 'outport', 'y');
-choix53 = add_line(choix53, 'a', 'aiguille', 1);
-choix53 = add_line(choix53, 'horloge', 'aiguille', 2);
-choix53 = add_line(choix53, 'b', 'aiguille', 3);
-choix53 = add_line(add_line(choix53, 'horloge', 'haut', 1), 'b', 'haut', 2);
-choix53 = add_line(add_line(choix53, 'horloge', 'bas', 1), 'a', 'bas', 2);
-choix53 = add_line(choix53, 'horloge', 'retard');
-choix53 = add_line(add_line(choix53, 'a', 'quotient', 1), 'b', 'quotient', 2);
-choix53 = add_line(add_line(choix53, 'a', 'produit', 1), 'horloge', 'produit', 2);
+choix53 = versPhysique(choix53, 'a', 'aiguille', 1);
+choix53 = versPhysique(choix53, 'horloge', 'aiguille', 2);
+choix53 = versPhysique(choix53, 'b', 'aiguille', 3);
+choix53 = versPhysique(versPhysique(choix53, 'horloge', 'haut', 1), 'b', 'haut', 2);
+choix53 = versPhysique(versPhysique(choix53, 'horloge', 'bas', 1), 'a', 'bas', 2);
+choix53 = versPhysique(choix53, 'horloge', 'retard');
+choix53 = versPhysique(versPhysique(choix53, 'a', 'quotient', 1), 'b', 'quotient', 2);
+choix53 = versPhysique(versPhysique(choix53, 'a', 'produit', 1), 'horloge', 'produit', 2);
 for k = 1:5
     noms53 = {'aiguille', 'haut', 'bas', 'retard', 'quotient'};
-    choix53 = add_line(choix53, noms53{k}, 'tout', k);
+    choix53 = versSimulink(choix53, noms53{k}, 'tout', k);
 end
 choix53 = add_line(choix53, 'tout', 'y');
 r = sim(choix53, 'Solver', 'ode45', 'StopTime', 2, 'MaxStep', 0.01);
@@ -7618,8 +7618,8 @@ borne = add_block(borne, 'pulsegenerator', 'remise', 'Period', 1, 'PulseWidth', 
 borne = add_block(borne, 'psintegrator', 'I', 'ExternalReset', 'Rising', ...
                   'LimitOutput', 'Upper', 'UpperLimit', 0.3);
 borne = add_block(borne, 'outport', 'y');
-borne = add_line(add_line(borne, 'un', 'I', 1), 'remise', 'I', 2);
-borne = add_line(borne, 'I', 'y');
+borne = versPhysique(versPhysique(borne, 'un', 'I', 1), 'remise', 'I', 2);
+borne = versSimulink(borne, 'I', 'y');
 r = sim(borne, 'Solver', 'ode45', 'StopTime', 1, 'MaxStep', 0.01);
 t = r.tout;
 assert(max(r.yout) <= 0.3 + 1e-12 && abs(interp1(t, r.yout, 0.2) - 0.2) < 1e-9 && ...
@@ -7630,7 +7630,7 @@ table53 = new_system('table53');
 table53 = add_block(table53, 'ramp', 'r', 'Slope', 1, 'InitialOutput', -1);
 table53 = add_block(table53, 'pslookuptable1d', 'T', 'x', [0 1 2 3], 'f', [0 1 4 9]);
 table53 = add_block(table53, 'outport', 'y');
-table53 = add_line(add_line(table53, 'r', 'T'), 'T', 'y');
+table53 = versSimulink(versPhysique(table53, 'r', 'T'), 'T', 'y');
 r = sim(table53, 'Solver', 'ode45', 'StopTime', 5, 'MaxStep', 0.1);
 u = r.tout - 1;
 lineaire = interp1([0 1 2 3], [0 1 4 9], min(max(u, 0), 3));
@@ -7649,7 +7649,7 @@ table2 = add_block(table2, 'constant', 'b', 'Value', 2.5);
 table2 = add_block(table2, 'pslookuptable2d', 'T', 'x1', [1 2 3], 'x2', [1 2 3 4], ...
                    'f', [1 2 3 4; 5 6 7 8; 9 10 11 12]);
 table2 = add_block(table2, 'outport', 'y');
-table2 = add_line(add_line(add_line(table2, 'a', 'T', 1), 'b', 'T', 2), 'T', 'y');
+table2 = versSimulink(versPhysique(versPhysique(table2, 'a', 'T', 1), 'b', 'T', 2), 'T', 'y');
 r = sim(table2, 1);
 assert(abs(r.yout(end) - 4.5) < 1e-12, 'PS Lookup Table (2D) : f(x1, x2), x1 le long des lignes');
 fichier53 = [tempname() '.slx'];
@@ -8063,6 +8063,248 @@ for kE = 1:size(refus55, 1)
 end
 fprintf('types enumeres : %d refus nommes verifies\n', size(refus55, 1));
 
+%% ------------------------------- 56. Batterie croisée des blocs et des types
+% Chaque type de bloc du catalogue, nourri de chacun des types de données
+% — double, single, entiers, booléen, virgule fixe, énuméré, complexe —,
+% se simule ou est refusé par une erreur qui nomme le bloc, jamais par une
+% erreur interne. Là où il se simule, la classe de sa sortie suit les
+% règles de Simulink : un aiguillage, un retard, une conversion de signal
+% rendent le type de leur entrée ; un calcul garde un entier ou une virgule
+% fixe et fait d'un booléen un double ; une comparaison rend un booléen ;
+% une fonction en virgule flottante garde la simple précision et refuse
+% un entier ; un bloc de signaux physiques refuse un signal de Simulink.
+genres56 = {'double', '0.5', 'double'; 'single', 'single(0.5)', 'single'; ...
+            'int8', 'int8(3)', 'int8'; 'uint16', 'uint16(3)', 'uint16'; ...
+            'int32', 'int32(-3)', 'int32'; 'boolean', 'true', 'logical'; ...
+            'fixdt', 'fi(0.5, 1, 16, 8)', 'embedded.fi'; ...
+            'enum', 'JourEssai.Mardi', 'JourEssai'; 'complexe', '0.5 + 0.25i', 'double'};
+nG56 = size(genres56, 1);
+catalogue56 = matlibre_sl_catalogue();
+types56 = {};
+for kT = 1:numel(catalogue56)
+    if ~strcmp(catalogue56(kT).famille, 'Interne')
+        types56{end + 1} = catalogue56(kT).type; %#ok<SAGROW>
+    end
+end
+% pour chaque type de bloc et chaque genre : la classe de la sortie, ou
+% l'identifiant du refus
+classes56 = containers.Map();
+refus56 = containers.Map();
+nSimules56 = 0;
+for kT = 1:numel(types56)
+    for kG = 1:nG56
+        m56 = batterieType(types56{kT}, genres56{kG, 2});
+        cle = [types56{kT} '|' genres56{kG, 1}];
+        try
+            r56 = [];
+            evalc('r56 = sim(m56, ''Solver'', ''ode1'', ''FixedStep'', 0.1, ''StopTime'', 0.3);');
+            nSimules56 = nSimules56 + 1;
+            classe = '';
+            if isfield(r56, 'yout') && ~isempty(r56.yout)
+                classe = class(r56.yout);
+                if isnumeric(r56.yout) && ~isreal(r56.yout)
+                    classe = [classe ' complexe'];
+                end
+            end
+            classes56(cle) = classe;
+        catch err
+            id = err.identifier;
+            assert((strncmp(id, 'Simulink:', 9) || strncmp(id, 'Stateflow:', 10) || ...
+                    strncmp(id, 'Simscape:', 9)) && ~isempty(strfind(err.message, 'bt/')), ...
+                   sprintf('%s sur un %s : erreur interne %s : %s', types56{kT}, ...
+                           genres56{kG, 1}, id, err.message));
+            refus56(cle) = id;
+        end
+    end
+end
+% les règles, genre par genre ; « = » : la classe de l'entrée, « - » : un
+% refus, quel qu'il soit
+attendu56 = @(type, genre) [type '|' genre];
+passe56 = {'zoh', 'memory', 'delay', 'ratetransition', 'signalconversion', ...
+           'signalspecification', 'reshape', 'mux', 'concatenate', 'manualswitch', 'outport', ...
+           'ic', 'selector', 'merge'};
+for kT = 1:numel(passe56)
+    for kG = 1:nG56
+        cle = attendu56(passe56{kT}, genres56{kG, 1});
+        if strcmp(genres56{kG, 1}, 'enum') && any(strcmp(passe56{kT}, {'memory', 'delay', 'ic'}))
+            % leur condition initiale numérique ne vaut pas pour un membre
+            assert(isKey(refus56, cle) && strcmp(refus56(cle), ...
+                   'Simulink:DataType:EnumParameterMismatch'), ...
+                   sprintf('%s : une condition initiale numerique sur un membre', cle));
+            continue
+        end
+        vu = '';
+        if isKey(classes56, cle), vu = classes56(cle); end
+        voulu = genres56{kG, 3};
+        if strcmp(genres56{kG, 1}, 'complexe'), voulu = 'double complexe'; end
+        assert(strcmp(vu, voulu), sprintf('%s : %s attendu, %s rendu', cle, voulu, vu));
+    end
+end
+calcul56 = {'gain', 'sum', 'product', 'abs', 'unaryminus', 'bias', 'sign', 'rounding', ...
+            'saturation', 'deadzone', 'quantizer', 'difference', 'ratelimiter', 'backlash'};
+for kT = 1:numel(calcul56)
+    for kG = 1:7
+        cle = attendu56(calcul56{kT}, genres56{kG, 1});
+        voulu = genres56{kG, 3};
+        if strcmp(genres56{kG, 1}, 'boolean'), voulu = 'double'; end
+        vu = '';
+        if isKey(classes56, cle), vu = classes56(cle); end
+        assert(strcmp(vu, voulu), sprintf('%s : %s attendu, %s rendu', cle, voulu, vu));
+    end
+    cle = attendu56(calcul56{kT}, 'enum');
+    assert(isKey(refus56, cle) && strcmp(refus56(cle), 'Simulink:DataType:EnumTypeNotSupported'), ...
+           sprintf('%s : un calcul refuse un membre', cle));
+end
+comparaison56 = {'relational', 'comparetoconstant', 'comparetozero', 'logic', 'detectchange', ...
+                 'detectincrease', 'detectdecrease', 'intervaltest'};
+for kT = 1:numel(comparaison56)
+    for kG = 1:7
+        cle = attendu56(comparaison56{kT}, genres56{kG, 1});
+        vu = '';
+        if isKey(classes56, cle), vu = classes56(cle); end
+        assert(strcmp(vu, 'logical'), sprintf('%s : logical attendu, %s rendu', cle, vu));
+    end
+end
+assert(strcmp(classes56('relational|enum'), 'logical'), 'deux membres se comparent');
+for type = {'trigonometry', 'polynomial', 'math', 'sqrt'}
+    assert(strcmp(classes56([type{1} '|double']), 'double') && ...
+           strcmp(classes56([type{1} '|single']), 'single'), ...
+           sprintf('%s garde la simple precision', type{1}));
+end
+for type = {'trigonometry', 'polynomial'}
+    for kG = 3:7
+        cle = attendu56(type{1}, genres56{kG, 1});
+        assert(isKey(refus56, cle) && strcmp(refus56(cle), ...
+               'Simulink:DataType:InputPortDataTypeMismatch'), ...
+               sprintf('%s : un calcul en virgule flottante seulement', cle));
+    end
+end
+for kG = 3:7
+    cle = attendu56('magnitudeangletocomplex', genres56{kG, 1});
+    assert(isKey(refus56, cle) && strcmp(refus56(cle), ...
+           'Simulink:DataType:InputPortDataTypeMismatch'), sprintf('%s : refuse', cle));
+end
+assert(strcmp(refus56('realimagtocomplex|fixdt'), 'Simulink:DataType:InputPortDataTypeMismatch'), ...
+       'pas de complexe a virgule fixe');
+assert(strcmp(classes56('realimagtocomplex|single'), 'single complexe'), ...
+       'Real-Imag to Complex en simple precision');
+signauxPhysiques56 = {'psgain', 'psadd', 'psabs', 'psintegrator', 'psswitch', ...
+                      'pslookuptable1d', 'pssimulinkconverter'};
+for kT = 1:numel(signauxPhysiques56)
+    for kG = 1:nG56
+        cle = attendu56(signauxPhysiques56{kT}, genres56{kG, 1});
+        assert(isKey(refus56, cle) && strcmp(refus56(cle), ...
+               'Simscape:Network:SimulinkToPhysicalSignal'), ...
+               sprintf('%s : un signal de Simulink n''entre pas dans un port physique', cle));
+    end
+end
+for type = {'psconstant', 'simulinkpsconverter'}
+    cle = attendu56(type{1}, 'double');
+    assert(isKey(refus56, cle) && strcmp(refus56(cle), ...
+           'Simscape:Network:PhysicalSignalToSimulink'), ...
+           sprintf('%s : un signal physique ne sort pas vers Simulink sans convertisseur', cle));
+end
+fprintf('blocs et types : %d simulations, %d refus nommes\n', nSimules56, refus56.Count);
+
+% Un signal physique qui passe les ports d'un sous-système reste physique :
+% il ne se lit pas hors du réseau sans PS-Simulink Converter.
+dedans56 = new_system('dedans56');
+dedans56 = add_block(dedans56, 'psconstant', 'k', 'Constant', 2);
+dedans56 = add_block(dedans56, 'outport', 's');
+dedans56 = add_line(dedans56, 'k', 's');
+m56 = new_system('dehors56');
+m56 = add_block(m56, 'subsystem', 'sous', 'Model', dedans56);
+m56 = add_block(m56, 'gain', 'g', 'Gain', 3);
+m56 = add_block(m56, 'outport', 'y');
+m56 = add_line(add_line(m56, 'sous/1', 'g/1'), 'g/1', 'y/1');
+vu = '';
+try
+    sim(m56, 1);
+catch err
+    vu = err.identifier;
+    message = err.message;
+end
+assert(strcmp(vu, 'Simscape:Network:PhysicalSignalToSimulink') && ...
+       ~isempty(strfind(message, 'dehors56/sous/k')) && ~isempty(strfind(message, 'dehors56/g')), ...
+       'le signal physique traverse le sous-systeme, et le Gain le refuse');
+m56 = add_block(delete_line(m56, 'sous/1', 'g/1'), 'pssimulinkconverter', 'convertit');
+m56 = add_line(add_line(m56, 'sous/1', 'convertit/1'), 'convertit/1', 'g/1');
+r56 = sim(m56, 1);
+assert(abs(r56.yout(end) - 6) < 1e-12, 'avec le convertisseur, le Gain lit le signal physique');
+% Un signal physique est un double : le Simulink-PS Converter y ramène un
+% entier, dans son unité, et le PS-Simulink Converter le rend en double.
+m56 = new_system('versDouble56');
+m56 = add_block(m56, 'constant', 'c', 'Value', 'int8(3)');
+m56 = add_block(m56, 'simulinkpsconverter', 'sp', 'InputSignalUnit', 'mA');
+m56 = add_block(m56, 'psgain', 'g', 'Gain', 2);
+m56 = add_block(m56, 'pssimulinkconverter', 'ps', 'OutputSignalUnit', 'mA');
+m56 = add_block(m56, 'outport', 'y');
+m56 = add_line(add_line(m56, 'c/1', 'sp/1'), 'sp/1', 'g/1');
+m56 = add_line(add_line(m56, 'g/1', 'ps/1'), 'ps/1', 'y/1');
+r56 = sim(m56, 1);
+assert(isa(r56.yout, 'double') && abs(r56.yout(end) - 6) < 1e-12, ...
+       'le signal physique est un double, en unites SI');
+m56 = set_param(set_param(m56, 'sp', 'InputSignalUnit', '1'), 'ps', 'OutputSignalUnit', '1');
+r56 = sim(m56, 1);
+assert(isa(r56.yout, 'double') && r56.yout(end) == 6, 'sans unite aussi');
+
+% Chaque type de bloc nourri d'un scalaire, d'une ligne, d'une colonne et
+% d'une matrice : un calcul élément par élément garde la forme de son
+% entrée, un produit scalaire ou une largeur rendent un scalaire, et une
+% forme qu'un bloc ne prend pas est refusée en le nommant.
+formes56 = {'scalaire', '0.5', 1; 'ligne', '[0.5 1.5 2.5]', 3; ...
+            'colonne', '[0.5; 1.5; 2.5]', 3; 'matrice', '[0.5 1.5; 2.5 3.5]', 4};
+tailles56 = containers.Map();
+refusFormes56 = containers.Map();
+for kT = 1:numel(catalogue56)
+    if any(strcmp(catalogue56(kT).famille, {'Interne', 'Simscape'}))
+        continue
+    end
+    type = catalogue56(kT).type;
+    for kF = 1:size(formes56, 1)
+        m56 = batterieType(type, formes56{kF, 2});
+        cle = [type '|' formes56{kF, 1}];
+        try
+            r56 = [];
+            evalc('r56 = sim(m56, ''Solver'', ''ode1'', ''FixedStep'', 0.1, ''StopTime'', 0.3);');
+            if isfield(r56, 'yout') && ~isempty(r56.yout)
+                tailles56(cle) = size(r56.yout);
+            end
+        catch err
+            id = err.identifier;
+            assert((strncmp(id, 'Simulink:', 9) || strncmp(id, 'Stateflow:', 10) || ...
+                    strncmp(id, 'Simscape:', 9)) && ~isempty(strfind(err.message, 'bt/')), ...
+                   sprintf('%s sur une %s : erreur interne %s : %s', type, formes56{kF, 1}, ...
+                           id, err.message));
+            refusFormes56(cle) = id;
+        end
+    end
+end
+elements56 = {'gain', 'sum', 'product', 'abs', 'sign', 'bias', 'unaryminus', 'rounding', ...
+              'saturation', 'deadzone', 'relay', 'quantizer', 'logic', 'relational', 'switch', ...
+              'manualswitch', 'zoh', 'memory', 'delay', 'integrator', 'discreteintegrator', ...
+              'discretetransferfcn', 'math', 'trigonometry', 'sqrt', 'lookup', ...
+              'signalconversion', 'datatypeconversion', 'ic', 'merge', 'outport'};
+for kT = 1:numel(elements56)
+    for kF = 1:size(formes56, 1)
+        cle = [elements56{kT} '|' formes56{kF, 1}];
+        assert(isKey(tailles56, cle) && isequal(tailles56(cle), [4 formes56{kF, 3}]), ...
+               sprintf('%s : element par element, la forme de l''entree', cle));
+    end
+end
+for type = {'dotproduct', 'width'}
+    for kF = 1:size(formes56, 1)
+        cle = [type{1} '|' formes56{kF, 1}];
+        assert(isequal(tailles56(cle), [4 1]), sprintf('%s : un scalaire', cle));
+    end
+end
+assert(strcmp(refusFormes56('switchcase|ligne'), 'Simulink:blocks:SwitchCaseInputNotScalar') && ...
+       strcmp(refusFormes56('tappeddelay|ligne'), 'Simulink:Engine:DimensionMismatch') && ...
+       strcmp(refusFormes56('transferfcn|colonne'), 'Simulink:Engine:DimensionMismatch'), ...
+       'les formes qu''un bloc ne prend pas');
+fprintf('blocs et formes : %d simulations, %d refus nommes\n', tailles56.Count, ...
+        refusFormes56.Count);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -8406,4 +8648,44 @@ function r = enumCommande(ordre, indices)
     m = add_line(m, 'b/1', 'ms/3');
     m = add_line(m, 'ms/1', 'y/1');
     r = sim(m, 'StopTime', 0.02);
+end
+
+function m = versPhysique(m, source, cible, varargin)
+    % Un signal de Simulink rendu physique, comme Simscape le veut : SOURCE
+    % entre dans CIBLE par un Simulink-PS Converter, un seul par source.
+    nom = ['SPS_' strrep(source, '/', '_')];
+    if ~any(cellfun(@(b) strcmp(b.nom, nom), m.blocs))
+        m = add_block(m, 'simulinkpsconverter', nom);
+        m = add_line(m, source, nom);
+    end
+    m = add_line(m, nom, cible, varargin{:});
+end
+
+function m = versSimulink(m, source, cible, varargin)
+    % Un signal physique rendu à Simulink : SOURCE entre dans CIBLE par un
+    % PS-Simulink Converter, un seul par source.
+    nom = ['PSS_' strrep(source, '/', '_')];
+    if ~any(cellfun(@(b) strcmp(b.nom, nom), m.blocs))
+        m = add_block(m, 'pssimulinkconverter', nom);
+        m = add_line(m, source, nom);
+    end
+    m = add_line(m, nom, cible, varargin{:});
+end
+
+function m = batterieType(type, valeur)
+    % Le bloc TYPE, chacune de ses entrées nourrie d'une constante VALEUR,
+    % chacune de ses sorties vers un Outport.
+    m = new_system('bt');
+    m = add_block(m, type, 'b');
+    [ne, ns] = matlibre_sl_ports(m.blocs{end});
+    if isnan(ne), ne = 1; end
+    if isnan(ns), ns = 1; end
+    for i = 1:ne
+        m = add_block(m, 'constant', sprintf('c%d', i), 'Value', valeur);
+        m = add_line(m, sprintf('c%d/1', i), sprintf('b/%d', i));
+    end
+    for j = 1:ns
+        m = add_block(m, 'outport', sprintf('o%d', j));
+        m = add_line(m, sprintf('b/%d', j), sprintf('o%d/1', j));
+    end
 end

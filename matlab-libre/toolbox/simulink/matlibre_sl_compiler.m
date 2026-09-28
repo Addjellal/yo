@@ -694,10 +694,11 @@ function [type, p] = normaliser(type, p, chemin)
             p = struct('Script', sprintf('function y = fcn(u)\ny = u(:);\n'), 'SampleTime', -1);
             type = 'matlabfunction';
         case {'simulinkpsconverter', 'pssimulinkconverter'}
-            % un signal physique n'est qu'un signal : le convertisseur passe
-            p = struct('ConversionOutput', 'Signal copy', 'NombreDePorts', 1, ...
-                       'OutDataTypeStr', 'Inherit: auto');
-            type = 'signalconversion';
+            % un signal physique est un double : le convertisseur y ramène
+            % son entrée, comme dans Simscape
+            p = struct('OutDataTypeStr', 'double', 'ConvertRealWorld', 'Real World Value (RWV)', ...
+                       'RndMeth', 'Zero', 'SaturateOnIntegerOverflow', 'off', 'SampleTime', -1);
+            type = 'datatypeconversion';
         case {'complextorealimag', 'complextomagnitudeangle'}
             % les deux parties d'un complexe, ou l'une d'elles
             if strcmp(type, 'complextorealimag')
@@ -3931,6 +3932,12 @@ function c = abaisser(c, pas, tDebut)
                 typeEntree = 2;
                 if c.entrees{k}(1) > 0
                     typeEntree = c.typePort(c.entrees{k}(1));
+                    if c.largeur(c.entrees{k}(1)) ~= 1
+                        error('Simulink:blocks:SwitchCaseInputNotScalar', ...
+                              ['L''entree de ''%s'' porte %d valeurs : un Switch Case choisit ' ...
+                               'son cas d''apres un scalaire.'], ch, ...
+                              c.largeur(c.entrees{k}(1)));
+                    end
                 end
                 accorderIndices(typeEntree, classeCas, ch, 'CaseConditions', 'cas');
                 seg = [numel(c.objets{k}); strcmpi(p.ShowDefaultCase, 'on')];

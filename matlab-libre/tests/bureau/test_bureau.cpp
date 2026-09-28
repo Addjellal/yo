@@ -1676,8 +1676,11 @@ if strcmp(type, 'opamp')
     m = add_line(add_line(m, 'retour/LConn1', 'opamp/RConn1'), 'retour/RConn1', 'opamp/LConn2');
 end
 for k = 1:e
+    % une commande de Simulink devient physique par un Simulink-PS Converter
     nom = sprintf('commande%d', k);
-    m = add_line(add_block(m, 'constant', nom), nom, type, k);
+    convertisseur = sprintf('versPhysique%d', k);
+    m = add_block(add_block(m, 'constant', nom), 'simulinkpsconverter', convertisseur);
+    m = add_line(add_line(m, nom, convertisseur), convertisseur, type, k);
 end
 end
 )");

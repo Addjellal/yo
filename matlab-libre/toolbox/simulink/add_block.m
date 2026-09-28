@@ -287,6 +287,12 @@ function modele = add_block(modele, type, nom, varargin)
 %                  accurrentsource amp, frequency, shift (degrés)
 %     controlledvoltagesource, controlledcurrentsource — commandées par
 %                  leur entrée ; voltagesensor, currentsensor — une sortie
+%                  Ces entrées et sorties sont des signaux physiques, comme
+%                  celles des blocs de signaux physiques (psgain...) : un
+%                  signal de Simulink y entre par simulinkpsconverter et en
+%                  sort par pssimulinkconverter ; une liaison directe entre
+%                  un port de Simulink et un port de signal physique est
+%                  refusée, comme dans Simscape.
 %     opamp — +, - (LConn1, LConn2), sortie (RConn1) : v(+) = v(-)
 %     idealtransformer n — primaire (LConn1, LConn2), secondaire (RConn1,
 %                  RConn2) : v1 = n v2, i2 = n i1 ; mutualinductor L1, L2,

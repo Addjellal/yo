@@ -455,7 +455,8 @@ function s = regle(c, k, tE)
     ch = c.chemins{k};
     n = c.nOut(k);
     arithmetique = {'gain', 'sum', 'product', 'bias', 'unaryminus', 'abs', 'dotproduct', ...
-                    'rounding', 'quantizer', 'saturation', 'deadzone', 'sign'};
+                    'rounding', 'quantizer', 'saturation', 'deadzone', 'sign', 'difference', ...
+                    'ratelimiter', 'backlash'};
     switch c.types{k}
         case 'constant'
             r = typeFixe(p, ch);
@@ -526,11 +527,20 @@ function s = regle(c, k, tE)
             r = commun(tE([1 min(3, end)]));
         case 'multiportswitch'
             r = commun(tE(2:end));
+        case {'trigonometry', 'math', 'sqrt', 'polynomial'}
+            % en virgule flottante : single si toutes les entrées le sont
+            r = 2;
+            if any(tE == 0)
+                r = 0;
+            elseif all(tE == 3)
+                r = 3;
+            end
         case 'matlabfunction'
             if any(tE == 0)
                 s = [];
                 return
             end
+            verifierFlottants(c, k, tE);   % avant l'appel d'essai, qui échouerait
             s = classesFonction(c, k, tE);
             return
         case 'chart'
@@ -611,8 +621,9 @@ function verifier(c, k, tE, t)
     doublesSeuls = {'integrator', 'secondorderintegrator', 'derivative', 'transferfcn', ...
                     'statespace', 'zeropole', 'transportdelay', 'pidcontroller', ...
                     'variabletransportdelay', ...
-                    'trigonometry', 'fcn', 'interpretedmatlabfunction', 'sfunction', ...
+                    'fcn', 'interpretedmatlabfunction', 'sfunction', ...
                     'msfunction'};
+    verifierFlottants(c, k, tE);
     if any(strcmp(c.types{k}, doublesSeuls))
         for j = 1:numel(tE)
             if tE(j) ~= 2
@@ -677,6 +688,36 @@ function verifier(c, k, tE, t)
                           mat2str(p.Value, 6), ch, nomDe(attendu), b(1), b(2));
                 end
             end
+    end
+end
+
+% Les blocs qui ne calculent qu'en virgule flottante — double ou single — :
+% Trigonometric Function, Polynomial, Magnitude-Angle to Complex ; et Real-
+% Imag to Complex, qui ne forme pas de complexe à virgule fixe.
+function verifierFlottants(c, k, tE)
+    p = c.p{k};
+    ch = c.chemins{k};
+    bibliotheque = '';
+    if strcmp(c.types{k}, 'matlabfunction') && isfield(p, 'Bibliotheque')
+        bibliotheque = p.Bibliotheque;
+    end
+    if any(strcmp(c.types{k}, {'trigonometry', 'polynomial'})) || ...
+       strcmp(bibliotheque, 'magnitudeangletocomplex')
+        j = find(tE ~= 2 & tE ~= 3 & tE <= 200, 1);
+        if ~isempty(j)
+            error('Simulink:DataType:InputPortDataTypeMismatch', ...
+                  ['L''entree %d de ''%s'' recoit un signal de type %s, mais ce bloc ne ' ...
+                   'calcule qu''en virgule flottante (double, single) : convertissez le ' ...
+                   'signal (Data Type Conversion).'], j, ch, nomDe(max(tE(j), 2)));
+        end
+    elseif strcmp(bibliotheque, 'realimagtocomplex')
+        j = find(tE > 100 & tE <= 200, 1);
+        if ~isempty(j)
+            error('Simulink:DataType:InputPortDataTypeMismatch', ...
+                  ['L''entree %d de ''%s'' recoit un signal de type %s : MatLibre ne forme ' ...
+                   'pas de complexe a virgule fixe ; convertissez les parties en double ' ...
+                   'ou en single (Data Type Conversion).'], j, ch, nomDe(tE(j)));
+        end
     end
 end
 
