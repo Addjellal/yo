@@ -210,6 +210,11 @@ function modele = add_block(modele, type, nom, varargin)
 %     transferfcn  Numerator, Denominator
 %     statespace   A, B, C, D, X0
 %     zeropole     Zeros, Poles, Gain
+%   OutMin et OutMax, vides par défaut, bornent la sortie des blocs de
+%   calcul (Constant, Gain, Sum, Product, Abs, Data Type Conversion,
+%   Switch, Multiport Switch, Saturation, les filtres discrets...), et
+%   l'entrée d'un Outport : SignalRangeChecking dit ce que fait une valeur
+%   qui en sort ; la valeur d'un Constant doit s'y tenir.
 %     transportdelay DelayTime, InitialOutput, BufferSize (la taille
 %                  initiale : le tampon grandit au besoin), FixedBuffer
 %                  ('on' : il garde sa taille, écrase ses plus anciens

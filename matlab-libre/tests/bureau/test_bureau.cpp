@@ -2560,7 +2560,8 @@ end
                                             {QStringLiteral("ode4")}, {QStringLiteral("ode45")});
                 verifier(!boite.champ(QStringLiteral("MaxConsecutiveZCs"))->isEnabled() &&
                              !boite.liste(QStringLiteral("MaxConsecutiveZCsMsg"))->isEnabled() &&
-                             boite.liste(QStringLiteral("SignalInfNanChecking"))->isEnabled(),
+                             boite.liste(QStringLiteral("SignalInfNanChecking"))->isEnabled() &&
+                             boite.liste(QStringLiteral("SignalRangeChecking"))->isEnabled(),
                          "a pas fixe, les diagnostics du solveur ne valent pas, ceux des "
                          "donnees si");
                 verifier(boite.liste(QStringLiteral("IntegerOverflowMsg"))->currentText() ==

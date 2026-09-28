@@ -274,6 +274,9 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
     nouvelleListe(QStringLiteral("SignalInfNanChecking"), formulaireDonneesDiag,
                   QStringLiteral("une sortie vaut Inf ou NaN"), kNiveaux,
                   QStringLiteral("Une sortie de bloc infinie ou indéfinie à un pas majeur"));
+    nouvelleListe(QStringLiteral("SignalRangeChecking"), formulaireDonneesDiag,
+                  QStringLiteral("un signal sort de sa plage"), kNiveaux,
+                  QStringLiteral("Un signal hors de la plage [OutMin, OutMax] de son bloc"));
     nouvelleListe(QStringLiteral("IntegerOverflowMsg"), formulaireDonneesDiag,
                   QStringLiteral("un entier déborde et se replie"), kNiveaux,
                   QStringLiteral("Un entier ou une virgule fixe sort des bornes de son type, "

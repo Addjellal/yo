@@ -72,6 +72,21 @@ function varargout = matlibre_sl_config(action, varargin)
 %                                     seuil suivant sans le localiser
 %     SignalInfNanChecking 'none'     une sortie de bloc qui vaut Inf ou
 %                                     NaN à un pas majeur
+%     SignalRangeChecking  'none'     un signal hors de la plage [OutMin,
+%                                     OutMax] de son bloc
+%     DataTypeOverride     'UseLocalSettings'  'Double', 'Single' ou
+%                                     'ScaledDouble' : les types
+%                                     numériques des signaux et des
+%                                     paramètres se remplacent par le
+%                                     double ou le single — pour voir un
+%                                     modèle à virgule fixe sans ses
+%                                     débordements —, les booléens et les
+%                                     énumérations jamais ; 'Off' comme
+%                                     'UseLocalSettings' n'en remplace
+%                                     aucun
+%     DataTypeOverrideAppliesTo 'AllNumericTypes'  ou 'Floating-point',
+%                                     ou 'Fixed-point' (les entiers et
+%                                     les virgules fixes)
 %     IntegerOverflowMsg   'warning'  un entier ou une virgule fixe qui
 %                                     déborde de son type et s'y replie
 %     IntegerSaturationMsg 'warning'  ... et s'y sature
@@ -195,7 +210,9 @@ function d = defauts()
                'OutputTimes', '[]', 'MinStepSizeMsg', 'warning', ...
                'MaxConsecutiveMinStep', 1, 'MaxConsecutiveZCs', 1000, ...
                'MaxConsecutiveZCsMsg', 'error', 'SignalInfNanChecking', 'none', ...
-               'IntegerOverflowMsg', 'warning', 'IntegerSaturationMsg', 'warning');
+               'IntegerOverflowMsg', 'warning', 'IntegerSaturationMsg', 'warning', ...
+               'SignalRangeChecking', 'none', 'DataTypeOverride', 'UseLocalSettings', ...
+               'DataTypeOverrideAppliesTo', 'AllNumericTypes');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -327,10 +344,14 @@ function v = valider(nom, v)
             end
         case {'AlgebraicLoopMsg', 'UnconnectedInputMsg', 'UnconnectedOutputMsg', ...
               'MaxConsecutiveZCsMsg', 'SignalInfNanChecking', 'IntegerOverflowMsg', ...
-              'IntegerSaturationMsg'}
+              'IntegerSaturationMsg', 'SignalRangeChecking'}
             v = choix(nom, v, {'none', 'warning', 'error'});
         case 'MinStepSizeMsg'
             v = choix(nom, v, {'warning', 'error'});
+        case 'DataTypeOverride'
+            v = choix(nom, v, {'UseLocalSettings', 'ScaledDouble', 'Double', 'Single', 'Off'});
+        case 'DataTypeOverrideAppliesTo'
+            v = choix(nom, v, {'AllNumericTypes', 'Floating-point', 'Fixed-point'});
         case 'ZeroCrossControl'
             v = choix(nom, v, {'UseLocalSettings', 'EnableAll', 'DisableAll'});
         case {'StartTime', 'StopTime', 'FixedStep', 'RelTol'}

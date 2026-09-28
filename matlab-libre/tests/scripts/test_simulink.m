@@ -9121,6 +9121,199 @@ r64 = sim(m64, 'Solver', 'ode3', 'FixedStep', 'auto', 'StopTime', Inf);
 assert(max(abs(r64.tout(:)' - (0:0.2:1))) < 1e-12, 'sans fin et sans periode : 0,2 s');
 fprintf('pas fixe automatique : ok\n');
 
+%% ----------------------------------------- 65. Plages de sortie, OutMin et OutMax
+% Un bloc de calcul borne sa sortie par OutMin et OutMax, un Outport son
+% entrée ; SignalRangeChecking dit ce que fait une valeur qui en sort —
+% rien, un avertissement par bloc, ou l'arrêt, en nommant le bloc,
+% l'instant et l'élément. La valeur d'un Constant doit s'y tenir, dès la
+% compilation.
+m65 = new_system('plage65');
+m65 = add_block(m65, 'clock', 't');
+m65 = add_block(m65, 'gain', 'g', 'Gain', 1, 'OutMax', 1.5);
+m65 = add_block(m65, 'outport', 'y');
+m65 = add_line(add_line(m65, 't', 'g'), 'g', 'y');
+assert(isempty(get_param(m65, 'y', 'OutMin')) && get_param(m65, 'g', 'OutMax') == 1.5 && ...
+       strcmp(get_param(m65, 'SignalRangeChecking'), 'none'), ...
+       'OutMin et OutMax, vides par defaut ; SignalRangeChecking a none');
+reglage65 = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 2};
+lastwarn('');
+r65 = sim(m65, reglage65{:});
+[~, id65] = lastwarn();
+assert(isempty(id65) && abs(r65.yout(end) - 2) < 1e-12, ...
+       'SignalRangeChecking none : la plage ne borne rien, elle se verifie');
+lastwarn('');
+sim(m65, reglage65{:}, 'SignalRangeChecking', 'warning');
+[message65, id65] = lastwarn();
+assert(strcmp(id65, 'Simulink:Engine:SignalRangeViolation') && ...
+       ~isempty(strfind(message65, 'plage65/g')) && ~isempty(strfind(message65, 't = 1.6')) && ...
+       ~isempty(strfind(message65, '[-Inf, 1.5]')), ...
+       'SignalRangeChecking warning : le bloc, l''instant, la plage');
+vu65 = '';
+try
+    sim(m65, reglage65{:}, 'Solver', 'ode45', 'SignalRangeChecking', 'error');
+catch err
+    vu65 = err.identifier;
+end
+assert(strcmp(vu65, 'Simulink:Engine:SignalRangeViolation'), ...
+       'SignalRangeChecking error, a pas variable : l''arret');
+% par élément, et à l'entrée d'un Outport
+m65 = new_system('vecteur65');
+m65 = add_block(m65, 'clock', 't');
+m65 = add_block(m65, 'gain', 'g', 'Gain', [1; 2], 'OutMax', [10 1]);
+m65 = add_block(m65, 'outport', 'y', 'OutMin', -1, 'OutMax', 5);
+m65 = add_line(add_line(m65, 't', 'g'), 'g', 'y');
+vu65 = '';
+message65 = '';
+try
+    sim(m65, reglage65{:}, 'SignalRangeChecking', 'error');
+catch err
+    vu65 = err.identifier;
+    message65 = err.message;
+end
+assert(strcmp(vu65, 'Simulink:Engine:SignalRangeViolation') && ...
+       ~isempty(strfind(message65, 'vecteur65/g')) && ~isempty(strfind(message65, 'element 2')) && ...
+       ~isempty(strfind(message65, 't = 0.6')), ...
+       'une plage par element : le second, borne a 1, sort le premier, a t = 0,6');
+m65 = set_param(m65, 'g', 'OutMax', []);
+message65 = '';
+try
+    sim(m65, reglage65{:}, 'StopTime', 3, 'SignalRangeChecking', 'error');
+catch err
+    message65 = err.message;
+end
+assert(~isempty(strfind(message65, 'vecteur65/y')) && ~isempty(strfind(message65, 't = 2.6')), ...
+       'l''Outport verifie son entree : 2 t depasse 5 a t = 2,6');
+% Les refus de la compilation
+m65 = new_system('constante65');
+m65 = add_block(m65, 'constant', 'c', 'Value', 5, 'OutMax', 3);
+m65 = add_block(m65, 'outport', 'y');
+m65 = add_line(m65, 'c', 'y');
+refus65 = {
+    @() sim(m65, reglage65{:}), 'Simulink:Parameters:ValueOutsideOutMinMax', 'constante65/c'
+    @() sim(set_param(m65, 'c', 'OutMax', [], 'OutMin', 6), reglage65{:}), ...
+        'Simulink:Parameters:ValueOutsideOutMinMax', '[6, Inf]'
+    @() sim(set_param(m65, 'c', 'OutMin', 4, 'OutMax', 3), reglage65{:}), ...
+        'Simulink:blocks:InvalidOutMinMax', 'constante65/c'
+    @() sim(set_param(m65, 'c', 'OutMax', [7 8 9]), reglage65{:}), ...
+        'Simulink:blocks:InvalidOutMinMax', 'constante65/c'
+    };
+for kE = 1:size(refus65, 1)
+    vu65 = '';
+    message65 = '';
+    try
+        refus65{kE, 1}();
+    catch err
+        vu65 = err.identifier;
+        message65 = err.message;
+    end
+    assert(strcmp(vu65, refus65{kE, 2}) && ~isempty(strfind(message65, refus65{kE, 3})), ...
+           sprintf('plages, cas %d : %s attendu, %s rendu (%s)', kE, refus65{kE, 2}, vu65, ...
+                   message65));
+end
+% Les plages voyagent dans le .slx.
+dossier65 = fullfile(tempdir(), 'plage65');
+if ~exist(dossier65, 'dir')
+    mkdir(dossier65);
+end
+m65 = set_param(m65, 'c', 'Value', 2, 'OutMin', 0, 'OutMax', 3);
+relu65 = load_system(save_system(m65, fullfile(dossier65, 'constante65.slx')));
+assert(strcmp(num2str(get_param(relu65, 'c', 'OutMin')), '0') && ...
+       strcmp(num2str(get_param(relu65, 'c', 'OutMax')), '3'), ...
+       'OutMin et OutMax voyagent dans le .slx');
+vu65 = '';
+try
+    sim(set_param(relu65, 'c', 'Value', 3.5), reglage65{:});
+catch err
+    vu65 = err.identifier;
+end
+assert(strcmp(vu65, 'Simulink:Parameters:ValueOutsideOutMinMax'), ...
+       'relue, la plage borne encore la valeur du Constant');
+fprintf('plages de sortie : ok\n');
+
+%% ------------------------------------------------------ 66. Data Type Override
+% DataTypeOverride remplace, le temps d'une simulation, les types
+% numériques des signaux et des paramètres par le double ou le single —
+% pour voir un modèle entier ou à virgule fixe sans ses débordements —,
+% sur tous les types ou sur les seuls flottants, ou les seuls entiers et
+% virgules fixes ; les booléens et les énumérations restent ce qu'ils
+% sont.
+m66 = new_system('surcharge66');
+m66 = add_block(m66, 'constant', 'a', 'Value', 'int8(100)');
+m66 = add_block(m66, 'constant', 'b', 'Value', 'int8(100)');
+m66 = add_block(m66, 'sum', 'somme');
+m66 = add_block(m66, 'relationaloperator', 'plus', 'Operator', '>');
+m66 = add_block(m66, 'outport', 'y');
+m66 = add_block(m66, 'toworkspace', 'tw', 'VariableName', 'plus66', 'SaveFormat', 'Array');
+m66 = add_line(add_line(add_line(m66, 'a', 'somme', 1), 'b', 'somme', 2), 'somme', 'y');
+m66 = add_line(add_line(add_line(m66, 'somme', 'plus', 1), 'a', 'plus', 2), 'plus', 'tw');
+reglage66 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1, ...
+             'IntegerOverflowMsg', 'none'};
+assert(strcmp(get_param(m66, 'DataTypeOverride'), 'UseLocalSettings') && ...
+       strcmp(get_param(m66, 'DataTypeOverrideAppliesTo'), 'AllNumericTypes'), ...
+       'DataTypeOverride, a son defaut de Simulink');
+r66 = sim(m66, reglage66{:});
+assert(isequal(double(r66.yout(:)'), [-56 -56]) && isa(r66.yout, 'int8'), ...
+       'sans surcharge : 100 + 100 se replie en int8');
+for mode66 = {'Double', 'ScaledDouble'}
+    r66 = sim(m66, reglage66{:}, 'DataTypeOverride', mode66{1});
+    assert(isequal(r66.yout(:)', [200 200]) && isa(r66.yout, 'double') && ...
+           isa(evalin('base', 'plus66'), 'logical'), ...
+           [mode66{1} ' : la somme en double, sans repli ; le booleen reste booleen']);
+end
+r66 = sim(m66, reglage66{:}, 'DataTypeOverride', 'Double', ...
+          'DataTypeOverrideAppliesTo', 'Floating-point');
+assert(isa(r66.yout, 'int8'), 'Floating-point : les entiers ne sont pas touches');
+r66 = sim(m66, reglage66{:}, 'DataTypeOverride', 'Off');
+assert(isa(r66.yout, 'int8'), 'Off : rien n''est remplace');
+evalin('base', 'clear plus66');
+% Un tiers en double, en single sous la surcharge
+m66 = new_system('flottant66');
+m66 = add_block(m66, 'constant', 'c', 'Value', 1);
+m66 = add_block(m66, 'gain', 'g', 'Gain', 1/3);
+m66 = add_block(m66, 'outport', 'y');
+m66 = add_line(add_line(m66, 'c', 'g'), 'g', 'y');
+r66 = sim(m66, reglage66{:}, 'DataTypeOverride', 'Single');
+assert(isa(r66.yout, 'single') && r66.yout(1) == single(1/3), 'Single : un tiers en simple precision');
+r66 = sim(m66, reglage66{:}, 'DataTypeOverride', 'Single', ...
+          'DataTypeOverrideAppliesTo', 'Fixed-point');
+assert(isa(r66.yout, 'double'), 'Fixed-point : les flottants ne sont pas touches');
+% Une virgule fixe dans un bloc continu : refusée, sauf sous la surcharge
+m66 = new_system('continu66');
+m66 = add_block(m66, 'constant', 'c', 'Value', 1, 'OutDataTypeStr', 'fixdt(1,16,8)');
+m66 = add_block(m66, 'integrator', 'x');
+m66 = add_block(m66, 'outport', 'y');
+m66 = add_line(add_line(m66, 'c', 'x'), 'x', 'y');
+vu66 = '';
+try
+    sim(m66, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 1);
+catch err
+    vu66 = err.identifier;
+end
+assert(strncmp(vu66, 'Simulink:', 9), 'un integrateur refuse une virgule fixe');
+r66 = sim(m66, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 1, 'DataTypeOverride', 'Double');
+assert(abs(r66.yout(end) - 1) < 1e-12, 'sous la surcharge, la virgule fixe devient un double');
+% Les valeurs refusées
+refus66 = {
+    @() set_param(m66, 'DataTypeOverride', 'Tout'), 'DataTypeOverride'
+    @() set_param(m66, 'DataTypeOverrideAppliesTo', 'Integer'), 'DataTypeOverrideAppliesTo'
+    };
+for kE = 1:size(refus66, 1)
+    vu66 = '';
+    message66 = '';
+    try
+        refus66{kE, 1}();
+    catch err
+        vu66 = err.identifier;
+        message66 = err.message;
+    end
+    assert(strcmp(vu66, 'Simulink:Config:InvalidValue') && ...
+           ~isempty(strfind(message66, refus66{kE, 2})), ...
+           sprintf('surcharge, cas %d : %s rendu (%s)', kE, vu66, message66));
+end
+% la surcharge ne survit pas à sa simulation
+assert(isequal(matlibre_sl_types('surcharge'), [0 1]), 'la surcharge se leve apres la simulation');
+fprintf('data type override : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

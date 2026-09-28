@@ -26,6 +26,8 @@ function varargout = sim(modele, varargin)
 %   MaxConsecutiveMinStep, et les diagnostics AlgebraicLoopMsg,
 %   UnconnectedInputMsg, UnconnectedOutputMsg, MaxConsecutiveZCsMsg,
 %   SignalInfNanChecking — une sortie de bloc Inf ou NaN —,
+%   SignalRangeChecking — un signal hors de la plage [OutMin, OutMax] de
+%   son bloc —,
 %   IntegerOverflowMsg et IntegerSaturationMsg — un entier ou une virgule
 %   fixe qui déborde de son type, replié ou saturé — (none, warning ou
 %   error), et MinStepSizeMsg (warning ou error). Un avertissement ne
@@ -463,7 +465,8 @@ function [T, J, instants] = derouler(c, config, variable, solveur, tDebut, tFina
     niveaux = {'none', 'warning', 'error'};
     T.niveaux = struct('repli', find(strcmp(niveaux, config.IntegerOverflowMsg)) - 1, ...
                        'saturation', find(strcmp(niveaux, config.IntegerSaturationMsg)) - 1, ...
-                       'infini', find(strcmp(niveaux, config.SignalInfNanChecking)) - 1);
+                       'infini', find(strcmp(niveaux, config.SignalInfNanChecking)) - 1, ...
+                       'plage', find(strcmp(niveaux, config.SignalRangeChecking)) - 1);
     T.alertes = containers.Map('KeyType', 'char', 'ValueType', 'logical');
     if variable
         reglages = reglagesVariables(config, nomModele);

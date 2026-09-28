@@ -114,6 +114,37 @@ function T = preparer(c)
     T.castK = c.castK;
     T.arrondiK = c.arrondiK;
     T.saturerK = c.saturerK;
+    % Les plages [OutMin, OutMax] : la sortie du bloc, ou l'entrée d'un
+    % Outport, élément par élément.
+    T.plages = struct('k', {}, 'a', {}, 'b', {}, 'bas', {}, 'haut', {});
+    if isfield(c, 'plage')
+        for k = 1:c.n
+            P = c.plage{k};
+            if isempty(P)
+                continue
+            end
+            if strcmp(c.types{k}, 'outport')
+                if isempty(c.entrees{k}) || c.entrees{k}(1) == 0
+                    continue
+                end
+                a = c.inA{k}(1);
+                b = c.inB{k}(1);
+            elseif c.nOut(k) >= 1
+                a = c.oA(k);
+                b = c.oB(k);
+            else
+                continue
+            end
+            w = b - a + 1;
+            if ~any(numel(P.bas) == [1 w]) || ~any(numel(P.haut) == [1 w])
+                error('Simulink:blocks:InvalidOutMinMax', ...
+                      ['OutMin et OutMax de ''%s'' ont un element pour tous, ou un par ' ...
+                       'element de son signal, qui en a %d.'], c.chemins{k}, w);
+            end
+            T.plages(end + 1) = struct('k', k, 'a', a, 'b', b, 'bas', P.bas + zeros(w, 1), ...
+                                       'haut', P.haut + zeros(w, 1));
+        end
+    end
     T.nom = c.nom;
     T.chemins = c.chemins;
     T.noms = c.noms;
@@ -732,7 +763,8 @@ function J = simuler(T, instants, solveur, reprise)
     end
     nx = numel(x);
     journal = T.journal;
-    infini = isfield(T, 'niveaux') && T.niveaux.infini > 0;
+    infini = isfield(T, 'niveaux') && (T.niveaux.infini > 0 || ...
+                                       (T.niveaux.plage > 0 && ~isempty(T.plages)));
     releveV = zeros(numel(journal), N);
     etats = zeros(nx, N);
     G = size(T.groupes, 1);
@@ -956,7 +988,9 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         imposes = imposes.imposes;
     end
     imposes = sort(double(imposes(:)));
-    infini = isfield(T, 'niveaux') && T.niveaux.infini > 0;   % SignalInfNanChecking
+    % SignalInfNanChecking et SignalRangeChecking
+    infini = isfield(T, 'niveaux') && (T.niveaux.infini > 0 || ...
+                                       (T.niveaux.plage > 0 && ~isempty(T.plages)));
     solveur = lower(char(solveur));
     nx = numel(T.x0);
     discret = strcmp(solveur, 'variablestepdiscrete') || nx == 0;
@@ -2943,9 +2977,13 @@ end
 
 % SignalInfNanChecking : une sortie de bloc qui vaut Inf ou NaN à un pas
 % majeur. Les blocs se lisent dans l'ordre du calcul : le premier nommé
-% est celui d'où l'infini part.
+% est celui d'où l'infini part. SignalRangeChecking : une sortie hors de la
+% plage [OutMin, OutMax] de son bloc.
 function verifierFinitude(T, V, t)
-    if all(isfinite(V))
+    if T.niveaux.plage > 0
+        verifierPlages(T, V, t);
+    end
+    if T.niveaux.infini == 0 || all(isfinite(V))
         return
     end
     for k = T.listeTout(:).'
@@ -2972,6 +3010,23 @@ function verifierFinitude(T, V, t)
             alerter(T, T.niveaux.infini, 'Simulink:Engine:BlockOutputInfNaN', ...
                     sprintf('infini:%d', k), texte);
         end
+    end
+end
+
+function verifierPlages(T, V, t)
+    for q = 1:numel(T.plages)
+        P = T.plages(q);
+        v = real(V(P.a:P.b));
+        i = find(v < P.bas | v > P.haut, 1);
+        if isempty(i)
+            continue
+        end
+        texte = sprintf(['Le signal de ''%s'' vaut %g a t = %g (element %d), hors de la ' ...
+                         'plage [%g, %g] que donnent OutMin et OutMax. SignalRangeChecking ' ...
+                         'regle ce diagnostic.'], T.chemins{P.k}, v(i), t, i, P.bas(i), ...
+                        P.haut(i));
+        alerter(T, T.niveaux.plage, 'Simulink:Engine:SignalRangeViolation', ...
+                sprintf('plage:%d', P.k), texte);
     end
 end
 

@@ -42,9 +42,24 @@ function c = matlibre_sl_compiler(modele, options)
     % fautif. Un modèle intérieur — celui d'un sous-système itéré — se
     % compile au milieu d'un autre : on rend l'état d'avant en sortant.
     avant = enCours('sauver');
+    % Le Data Type Override du modèle vaut le temps de la compilation : les
+    % types des signaux et des paramètres s'y résolvent.
+    surchargeAvant = matlibre_sl_types('surcharge');
+    config = [];
+    if isstruct(options) && isfield(options, 'config')
+        config = options.config;
+    end
+    if isempty(config) && isstruct(modele)
+        config = matlibre_sl_config('lire', modele);
+    end
+    if isstruct(config) && isfield(config, 'DataTypeOverride')
+        matlibre_sl_types('surcharge', config.DataTypeOverride, ...
+                          config.DataTypeOverrideAppliesTo);
+    end
     try
         c = compiler(modele, options);
     catch err
+        matlibre_sl_types('surcharge', surchargeAvant);
         [k, bloc, chemin] = enCours('lire');
         enCours('restaurer', avant);
         if k == 0 || strncmp(err.identifier, 'Simulink:', 9) || ...
@@ -53,6 +68,7 @@ function c = matlibre_sl_compiler(modele, options)
         end
         throw(matlibre_sl_fautif(err, bloc.type, bloc.parametres, chemin));
     end
+    matlibre_sl_types('surcharge', surchargeAvant);
     enCours('restaurer', avant);
 end
 
@@ -100,6 +116,8 @@ function c = compiler(modele, options)
     % Les réglages des signaux qui partent de chaque bloc — leur nom, leur
     % journalisation —, que SIM lit pour logsout.
     c.signaux = cell(1, n);
+    % La plage [OutMin, OutMax] de chaque bloc qui en dit une, vide sinon.
+    c.plage = cell(1, n);
 
     % --- 1. types et paramètres ---------------------------------------------
     enCours('modele', modele.blocs, cellfun(@(b) [nomModele '/' char(b.nom)], ...
@@ -127,6 +145,7 @@ function c = compiler(modele, options)
             c.signaux{k} = bloc.signaux;
         end
         c.p{k} = lireParametres(entree, bloc, c.chemins{k});
+        c.plage{k} = plageDeSortie(c.types{k}, c.p{k}, c.chemins{k});
         % Un bloc qui n'est qu'une autre façon d'en écrire un se ramène à lui :
         % Band-Limited White Noise à Random Number, Discrete Zero-Pole à
         % Discrete Transfer Fcn.
@@ -3188,6 +3207,54 @@ function c = periodes(c, pas, verifier)
             c.majeurSeul(k) = true;
         elseif isinf(c.cadence(k))
             c.majeurSeul(k) = true;
+        end
+    end
+end
+
+% La plage de sortie d'un bloc : OutMin et OutMax, des nombres réels —
+% un par élément, ou un pour tous —, vides pour ne rien borner. La valeur
+% d'un Constant doit s'y tenir, comme Simulink le vérifie à la compilation.
+function P = plageDeSortie(type, p, chemin)
+    P = [];
+    if ~isfield(p, 'OutMin') || (isempty(p.OutMin) && isempty(p.OutMax))
+        return
+    end
+    bas = p.OutMin;
+    haut = p.OutMax;
+    valide = @(v) isempty(v) || ((isnumeric(v) || islogical(v)) && isreal(v) && ...
+                                 isvector(v) && ~any(isnan(double(v(:)))));
+    if ~valide(bas) || ~valide(haut)
+        error('Simulink:blocks:InvalidOutMinMax', ...
+              ['OutMin et OutMax de ''%s'' sont des nombres reels — un par element, ou un ' ...
+               'pour tous —, ou vides.'], chemin);
+    end
+    if isempty(bas)
+        bas = -Inf;
+    end
+    if isempty(haut)
+        haut = Inf;
+    end
+    bas = double(bas(:));
+    haut = double(haut(:));
+    if numel(bas) ~= numel(haut) && numel(bas) > 1 && numel(haut) > 1
+        error('Simulink:blocks:InvalidOutMinMax', ...
+              'OutMin et OutMax de ''%s'' n''ont pas le meme nombre d''elements.', chemin);
+    end
+    if any(bas > haut)
+        error('Simulink:blocks:InvalidOutMinMax', ...
+              'OutMin de ''%s'' depasse son OutMax : la plage [%s, %s] est vide.', chemin, ...
+              mat2str(bas.'), mat2str(haut.'));
+    end
+    P = struct('bas', bas, 'haut', haut);
+    if strcmp(type, 'constant') && (isnumeric(p.Value) || islogical(p.Value)) && ...
+       isreal(p.Value)
+        v = double(p.Value(:));
+        if (numel(bas) == 1 || numel(bas) == numel(v)) && ...
+           (numel(haut) == 1 || numel(haut) == numel(v)) && any(v < bas | v > haut)
+            error('Simulink:Parameters:ValueOutsideOutMinMax', ...
+                  ['La valeur %s du Constant ''%s'' sort de la plage [%s, %s] que donnent ' ...
+                   'OutMin et OutMax.'], mat2str(p.Value), chemin, mat2str(bas.'), ...
+                  mat2str(haut.'));
         end
     end
 end

@@ -61,6 +61,15 @@ function varargout = matlibre_sl_types(action, varargin)
 %   tableau de membres, 'Couleur.Rouge' ou '[Couleur.Rouge Couleur.Vert]',
 %   comme un modèle l'enregistre.
 %
+%   MATLIBRE_SL_TYPES('surcharge',MODE,PORTEE) pose le Data Type Override
+%   de Simulink le temps d'une compilation : MODE 'Double', 'Single' ou
+%   'ScaledDouble' remplace les types numériques — tous
+%   ('AllNumericTypes'), les flottants ('Floating-point') ou les entiers et
+%   virgules fixes ('Fixed-point') —, les booléens et les énumérations
+%   jamais ; 'UseLocalSettings' et 'Off' n'en remplacent aucun.
+%   MATLIBRE_SL_TYPES('surcharge') rend l'état, que la même action
+%   restaure.
+%
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
 %   Exemple :
@@ -99,6 +108,8 @@ function varargout = matlibre_sl_types(action, varargin)
             varargout{1} = double(enumeration(registreEnum('classe', varargin{1})));
         case 'texte'
             varargout{1} = texteMembres(varargin{1});
+        case 'surcharge'
+            varargout{1} = surcharge(varargin{:});
         otherwise
             error('Simulink:DataType:Action', 'Action inconnue : %s.', char(action));
     end
@@ -275,6 +286,10 @@ end
 % Le code d'un type décrit par un NUMERICTYPE : un entier de MATLAB quand
 % il en est un (fixdt(1,16,0) est int16), sinon un type à virgule fixe.
 function code = codeDuType(T)
+    code = surcharger(codeDuTypeLocal(T));
+end
+
+function code = codeDuTypeLocal(T)
     switch T.Mode
         case 'double'
             code = 2;
@@ -295,6 +310,51 @@ function code = codeDuType(T)
             else
                 code = registre('code', double(l));
             end
+    end
+end
+
+% Data Type Override : l'état — le code qui remplace, 0 pour aucun, et la
+% portée, 1 tous les types numériques, 2 les flottants, 3 les entiers et
+% les virgules fixes —, persistant le temps d'une compilation.
+function etat = surcharge(varargin)
+    persistent courant
+    if isempty(courant)
+        courant = [0 1];
+    end
+    etat = courant;
+    if nargin == 0
+        return
+    end
+    if isnumeric(varargin{1})
+        courant = varargin{1};
+        return
+    end
+    code = 0;
+    switch char(varargin{1})
+        case {'Double', 'ScaledDouble'}
+            code = 2;
+        case 'Single'
+            code = 3;
+    end
+    portee = 1;
+    if nargin > 1
+        portee = find(strcmp(char(varargin{2}), ...
+                             {'AllNumericTypes', 'Floating-point', 'Fixed-point'}), 1);
+    end
+    courant = [code, portee];
+end
+
+% Un type sous le Data Type Override : un double ou un single, un entier
+% ou une virgule fixe devient le type qui les remplace, selon la portée ;
+% un booléen, une énumération, un type hérité restent ce qu'ils sont.
+function code = surcharger(code)
+    etat = surcharge();
+    if etat(1) == 0 || code <= 0 || code == 10 || code > 200
+        return
+    end
+    flottant = code == 2 || code == 3;
+    if (flottant && etat(2) ~= 3) || (~flottant && etat(2) ~= 2)
+        code = etat(1);
     end
 end
 
@@ -328,6 +388,7 @@ function code = codeDe(nom)
     elseif isempty(code)
         code = codeFixeDe(nom);
     end
+    code = surcharger(code);
 end
 
 % Un type à virgule fixe écrit : 'fixdt(1,16,8)', 'sfix16_En8', ou le nom
@@ -419,6 +480,11 @@ function t = propager(c)
             t(t == 0) = 2;   % une boucle que rien ne type : double
             break
         end
+    end
+    % Le Data Type Override : chaque type numérique propagé — un double par
+    % défaut, un entier hérité — se remplace
+    for q = 1:numel(t)
+        t(q) = surcharger(t(q));
     end
     for k = 1:c.n
         verifier(c, k, typesEntrees(c, k, t), t);
