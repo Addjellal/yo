@@ -252,6 +252,10 @@ function texte = ecrireValeur(valeur, nomBloc, nomParametre)
         end
     elseif isnumeric(valeur)
         texte = mat2str(valeur, 17);
+    elseif isobject(valeur) && isenum(valeur)
+        % un membre s'écrit comme Simulink le range, en texte : il se
+        % relit à la simulation
+        texte = citer(matlibre_sl_types('texte', valeur));
     else
         error('Simulink:Commands:SaveUnsupported', ...
               ['Le parametre ''%s'' du bloc ''%s'' est de classe ''%s'' : ' ...

@@ -42,7 +42,7 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
         return
     end
     switch type
-        case {'constant', 'step', 'ramp', 'sine', 'clock', 'digitalclock', ...
+        case {'constant', 'enumeratedconstant', 'step', 'ramp', 'sine', 'clock', 'digitalclock', ...
               'pulsegenerator', 'ground', 'repeatingsequence', 'randomnumber', ...
               'uniformrandomnumber', 'inport', 'fromworkspace', 'from', 'chirp', ...
               'bandlimitedwhitenoise', 'counterfreerunning', 'counterlimited', ...
@@ -141,7 +141,29 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
         case 'switch'
             nEntrees = 3;
         case 'multiportswitch'
-            nEntrees = 1 + entier(lire(p, 'Inputs', 3));
+            % la commande, les ports de données — autant que d'indices
+            % quand on les désigne —, et le port du cas par défaut
+            nDonnees = entier(lire(p, 'Inputs', 3));
+            if strcmpi(char(lire(p, 'DataPortOrder', 'One-based contiguous')), 'Specify indices')
+                indices = lire(p, 'DataPortIndices', '{1,2,3}');
+                if ischar(indices) || isstring(indices)
+                    try
+                        indices = eval(char(indices));
+                    catch
+                        indices = NaN;
+                    end
+                end
+                if iscell(indices)
+                    nDonnees = numel(indices);
+                elseif isnumeric(indices) && ~any(isnan(indices(:))) || isobject(indices)
+                    nDonnees = numel(indices);
+                else
+                    nDonnees = NaN;
+                end
+            end
+            nEntrees = 1 + nDonnees + strcmpi(char(lire(p, 'DataPortForDefault', ...
+                                                       'Last data port')), ...
+                                              'Additional data port');
         case 'buscreator'
             nEntrees = compterNoms(lire(p, 'Inputs', '2'));
         case 'busassignment'

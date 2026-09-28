@@ -121,7 +121,7 @@ function c = compiler(modele, options)
             c.garde(k) = bloc.garde;
         end
         if isfield(bloc, 'sortieConditionnelle')
-            c.sortieCond{k} = bloc.sortieConditionnelle;
+            c.sortieCond{k} = sortieInitiale(bloc.sortieConditionnelle, c.chemins{k});
         end
         if isfield(bloc, 'signaux')
             c.signaux{k} = bloc.signaux;
@@ -254,6 +254,7 @@ function c = compiler(modele, options)
 
     % --- 6 bis. types de données ---------------------------------------------
     c.typePort = matlibre_sl_types('propager', c);
+    c = initialesEnumerees(c);
     % --- 6 ter. complexité : ce qui est complexe, ce qui le refuse ---------
     c.sourceComplexe = false(1, n);
     for k = find(strcmp(c.types, 'fromworkspace'))
@@ -406,6 +407,24 @@ function p = lireParametres(entree, bloc, chemin)
                 % l'objet donné tel quel, plutôt que par son nom
                 v = matlibre_sl_parametre('valeur', v, 'la valeur donnee', chemin, nom);
             end
+            if isobject(v) && isenum(v)
+                % un membre d'énumération : sa valeur entière, et sa classe,
+                % que la propagation des types lit ('Enum: Couleur')
+                classe = class(v);
+                try
+                    v = double(v);
+                catch
+                    error('Simulink:DataType:EnumTypeNotInteger', ...
+                          ['Le parametre ''%s'' du bloc ''%s'' est un membre de ''%s'', une ' ...
+                           'enumeration dont les membres ne portent pas de valeurs ' ...
+                           'entieres : derivez-la de Simulink.IntEnumType et donnez a ' ...
+                           'chaque membre sa valeur, Rouge(1).'], nom, chemin, classe);
+                end
+                if ~isfield(p, 'Classes')
+                    p.Classes = struct();
+                end
+                p.Classes.(nom) = ['Enum: ' classe];
+            end
             if ~(isnumeric(v) || islogical(v))
                 error('Simulink:Parameters:InvalidValue', ...
                       'Le parametre ''%s'' du bloc ''%s'' doit etre numerique.', nom, chemin);
@@ -442,6 +461,10 @@ end
 
 function [type, p] = normaliser(type, p, chemin)
     switch type
+        case 'enumeratedconstant'
+            % un Constant dont la valeur est un membre, et le type celui de
+            % son énumération (OutDataTypeStr, 'Enum: Couleur')
+            type = 'constant';
         case 'sum'
             verifierSignes(p.Signs, '+-', chemin, 'Signs', ...
                            'des + et des - (et des | pour espacer les ports)');
@@ -3182,7 +3205,7 @@ function c = abaisser(c, pas, tDebut)
             case 'constant'
                 seg = double(p.Value(:));
                 type = c.typePort(c.portDebut(k));
-                if type > 100
+                if type > 100 && type <= 200
                     seg = double(matlibre_sl_types('convertir', type, seg));
                 end
             case 'step'                   % [Time; Before; After], w chacun
@@ -3255,7 +3278,8 @@ function c = abaisser(c, pas, tDebut)
             % --- opérations ---
             case 'gain'                   % [lignes; colonnes; K(:)]
                 K = double(p.Gain);
-                if c.entrees{k}(1) > 0 && c.typePort(c.entrees{k}(1)) > 100
+                if c.entrees{k}(1) > 0 && c.typePort(c.entrees{k}(1)) > 100 && ...
+                   c.typePort(c.entrees{k}(1)) <= 200
                     % une entrée à virgule fixe : le gain sur la grille de
                     % son propre type, comme Simulink le range
                     typeK = matlibre_sl_types('parametreGain', p, ...
@@ -3425,8 +3449,11 @@ function c = abaisser(c, pas, tDebut)
                 sub = find(strcmp(p.Criteria, {'u2 >= Threshold', 'u2 > Threshold', 'u2 ~= 0'}));
                 seuil = double(p.Threshold(:));
                 seg = [numel(seuil); seuil];
-            case 'multiportswitch'        % [nombre de donnees; base zero]
-                seg = [c.nIn(k) - 1; strcmp(p.DataPortOrder, 'Zero-based contiguous')];
+            case 'multiportswitch'
+                % [données; base zéro; indices dits; port de plus; diagnostic;
+                %  type de la commande; pour chaque port de données : n, ses
+                %  indices]
+                seg = segmentMultiport(c, k, p, ch);
             case 'demux'                  % [debut; fin] par sortie
                 bornes = zeros(2 * c.nOut(k), 1);
                 debut = 1;
@@ -3465,6 +3492,12 @@ function c = abaisser(c, pas, tDebut)
                        find(strcmp(arrondis, p.RndMeth)); ...
                        strcmp(p.SaturateOnIntegerOverflow, 'on'); ...
                        strcmp(p.ConvertRealWorld, 'Stored Integer (SI)'); typeEntree];
+                if seg(1) > 200
+                    % vers un type énuméré : les valeurs de ses membres, que
+                    % chaque entrée doit porter
+                    valeurs = matlibre_sl_types('valeurs', seg(1));
+                    seg = [seg; numel(valeurs); valeurs(:)];
+                end
             case 'selector'               % [n; indices]
                 indices = double(p.Indices(:));
                 seg = [numel(indices); indices];
@@ -3894,7 +3927,12 @@ function c = abaisser(c, pas, tDebut)
                 [c.objets{k}, nCond] = conditionsSi(p, c.nIn(k), ch, c, k);
                 seg = [c.nIn(k); nCond; strcmpi(p.ShowElse, 'on')];
             case 'switchcase'             % [cas; défaut]
-                c.objets{k} = casDe(p.CaseConditions, ch);
+                [c.objets{k}, classeCas] = casDe(p.CaseConditions, ch);
+                typeEntree = 2;
+                if c.entrees{k}(1) > 0
+                    typeEntree = c.typePort(c.entrees{k}(1));
+                end
+                accorderIndices(typeEntree, classeCas, ch, 'CaseConditions', 'cas');
                 seg = [numel(c.objets{k}); strcmpi(p.ShowDefaultCase, 'on')];
             case {'fcn', 'interpretedmatlabfunction'}   % [largeur d'entrée]  poignée dans objets
                 c.objets{k} = c.fonctions{k}.h;
@@ -3920,7 +3958,8 @@ function c = abaisser(c, pas, tDebut)
                 z0 = T0.x0(nc + 1:nc + nd);
                 seg = [nc; nd; w * (c.nOut(k) > 0); T0.tailles(4)];
             case 'merge'                  % [entrées; valeur initiale (w); garde de chaque source]
-                seg = [c.nIn(k); etendre(p.InitialOutput, w, ch, 'InitialOutput'); ...
+                seg = [c.nIn(k); etendre(initialeEnum(c, k, p, 'InitialOutput'), w, ch, ...
+                                         'InitialOutput'); ...
                        gardesDesSources(c, k)];
         end
         c.seg{k} = double(seg(:));
@@ -4462,14 +4501,21 @@ function s = dimsFonction(c, k, dE)
         if strncmp(err.identifier, 'Simulink:', 9) && ~isempty(strfind(err.message, c.chemins{k}))
             rethrow(err);
         end
-        error('Simulink:blocks:MATLABFunctionError', ...
-              'La fonction du bloc ''%s'' echoue sur des entrees nulles : %s', ...
-              c.chemins{k}, err.message);
+        % les types ne sont pas encore connus : une fonction qui lit des
+        % membres d'énumération s'essaie sur le membre par défaut de
+        % chacune de celles que le schéma emploie
+        [sorties, ok] = essaiEnumere(c, h, u, c.nOut(k));
+        if ~ok
+            error('Simulink:blocks:MATLABFunctionError', ...
+                  'La fonction du bloc ''%s'' echoue sur des entrees nulles : %s', ...
+                  c.chemins{k}, err.message);
+        end
     end
     clear(func2str(h));
     s = cell(1, c.nOut(k));
     for q = 1:c.nOut(k)
-        if ~(isnumeric(sorties{q}) || islogical(sorties{q})) || ndims(sorties{q}) > 2
+        membre = isobject(sorties{q}) && isenum(sorties{q});
+        if ~(isnumeric(sorties{q}) || islogical(sorties{q}) || membre) || ndims(sorties{q}) > 2
             error('Simulink:blocks:MATLABFunctionOutput', ...
                   ['La sortie %d du bloc ''%s'' n''est pas un tableau de nombres a deux ' ...
                    'dimensions.'], q, c.chemins{k});
@@ -4480,6 +4526,46 @@ function s = dimsFonction(c, k, dE)
                   'La sortie %d du bloc ''%s'' est vide.', q, c.chemins{k});
         end
         s{q} = d;
+    end
+end
+
+% Une MATLAB Function appelée sur le membre par défaut d'une énumération
+% que le schéma emploie, à la place de ses entrées nulles.
+function [sorties, ok] = essaiEnumere(c, h, u, nOut)
+    sorties = cell(1, nOut);
+    ok = false;
+    classes = {};
+    for k = 1:c.n
+        p = c.p{k};
+        if isfield(p, 'Classes')
+            valeurs = struct2cell(p.Classes);
+            for i = 1:numel(valeurs)
+                if ischar(valeurs{i}) && strncmp(valeurs{i}, 'Enum:', 5)
+                    classes{end + 1} = valeurs{i}; %#ok<AGROW>
+                end
+            end
+        end
+        if isfield(p, 'OutDataTypeStr') && ischar(p.OutDataTypeStr) && ...
+           strncmp(p.OutDataTypeStr, 'Enum:', 5)
+            classes{end + 1} = p.OutDataTypeStr; %#ok<AGROW>
+        end
+    end
+    for classe = unique(classes)
+        code = matlibre_sl_types('code', classe{1});
+        if code <= 200
+            continue
+        end
+        v = u;
+        try
+            for j = 1:numel(v)
+                v{j} = matlibre_sl_types('convertir', code, ...
+                                         matlibre_sl_types('defaut', code) * ones(size(u{j})));
+            end
+            [sorties{:}] = h(v{:});
+            ok = true;
+            return
+        catch
+        end
     end
 end
 
@@ -4799,27 +4885,185 @@ function liste = expressionsSinonSi(texte)
 end
 
 % Les cas d'un Switch Case : une cellule de valeurs entières, écrite comme
-% dans Simulink, « {1, [2 3], 7} ».
-function cas = casDe(texte, chemin)
+% dans Simulink, « {1, [2 3], 7} », ou de membres d'une même énumération,
+% « {Couleur.Rouge, [Couleur.Vert Couleur.Bleu]} » — CLASSE la nomme alors.
+function [cas, classe] = casDe(texte, chemin)
+    [cas, classe] = indicesDe(texte, chemin, 'Simulink:blocks:SwitchCaseConditionsInvalid', ...
+                              'Les cas');
+end
+
+% Une cellule d'indices : des entiers, ou des membres d'une même
+% énumération, ramenés à leurs valeurs.
+function [cas, classe] = indicesDe(texte, chemin, identifiant, quoi)
     cas = texte;
+    classe = '';
     if ischar(cas) || isstring(cas)
         try
             cas = evalin('base', char(cas));
         catch err
-            error('Simulink:blocks:SwitchCaseConditionsInvalid', ...
-                  'Les cas de ''%s'' ne s''evaluent pas : %s', chemin, err.message);
+            error(identifiant, '%s de ''%s'' ne s''evaluent pas : %s', quoi, chemin, ...
+                  err.message);
         end
     end
-    if isnumeric(cas)
+    if isnumeric(cas) || (isobject(cas) && isenum(cas))
         cas = num2cell(cas);
+    end
+    if iscell(cas) && ~isempty(cas) && all(cellfun(@(v) isobject(v) && isenum(v), cas))
+        classes = cellfun(@class, cas, 'UniformOutput', false);
+        if any(~strcmp(classes, classes{1}))
+            error(identifiant, ['%s de ''%s'' melangent des membres de %s et de %s : ils ' ...
+                                'sont d''une seule enumeration.'], quoi, chemin, classes{1}, ...
+                  classes{find(~strcmp(classes, classes{1}), 1)});
+        end
+        classe = classes{1};
+        try
+            cas = cellfun(@(v) double(v), cas, 'UniformOutput', false);
+        catch
+            error('Simulink:DataType:EnumTypeNotInteger', ...
+                  ['%s de ''%s'' sont des membres de ''%s'', une enumeration dont les ' ...
+                   'membres ne portent pas de valeurs entieres.'], quoi, chemin, classe);
+        end
     end
     if ~iscell(cas) || isempty(cas) || ...
        ~all(cellfun(@(v) isnumeric(v) && ~isempty(v) && all(v(:) == round(v(:))), cas))
-        error('Simulink:blocks:SwitchCaseConditionsInvalid', ...
-              ['Les cas de ''%s'' sont une cellule de valeurs entieres, comme ' ...
-               '{1, [2 3], 7}.'], chemin);
+        error(identifiant, ['%s de ''%s'' sont une cellule de valeurs entieres, comme ' ...
+                            '{1, [2 3], 7}, ou de membres d''une enumeration.'], quoi, chemin);
     end
     cas = cellfun(@(v) double(v(:)), cas, 'UniformOutput', false);
+end
+
+% Des indices énumérés vont avec une entrée de leur type, des indices
+% entiers avec une entrée numérique.
+function accorderIndices(typeEntree, classe, chemin, parametre, quoi)
+    classeEntree = matlibre_sl_types('enum', typeEntree);
+    if strcmp(classeEntree, classe)
+        return
+    end
+    if isempty(classe)
+        error('Simulink:DataType:EnumTypeMismatch', ...
+              ['L''entree de ''%s'' est de type %s, et ses %s (%s) sont des entiers : ' ...
+               'donnez-les en membres de %s.'], chemin, ...
+              matlibre_sl_types('nom', typeEntree), quoi, parametre, classeEntree);
+    elseif isempty(classeEntree)
+        error('Simulink:DataType:EnumTypeMismatch', ...
+              ['Les %s de ''%s'' (%s) sont des membres de %s, et son entree est de type ' ...
+               '%s : elle doit etre de type Enum: %s.'], quoi, chemin, parametre, classe, ...
+              matlibre_sl_types('nom', max(2, typeEntree)), classe);
+    else
+        error('Simulink:DataType:EnumTypeMismatch', ...
+              ['Les %s de ''%s'' (%s) sont des membres de %s, et son entree est de type ' ...
+               '%s.'], quoi, chemin, parametre, classe, matlibre_sl_types('nom', typeEntree));
+    end
+end
+
+% Le segment d'un Multiport Switch : ses ports de données, numérotés à
+% partir de un ou de zéro, ou désignés chacun par ses indices ; le port du
+% cas par défaut — le dernier, ou un port de plus — et ce qu'on dit quand
+% la commande ne désigne aucun port.
+function seg = segmentMultiport(c, k, p, ch)
+    specifies = strcmp(p.DataPortOrder, 'Specify indices');
+    plus = strcmp(p.DataPortForDefault, 'Additional data port');
+    diagnostic = find(strcmp(p.DiagnosticForDefault, {'None', 'Warning', 'Error'})) - 1;
+    nDonnees = c.nIn(k) - 1 - plus;
+    typeCommande = 2;
+    if c.entrees{k}(1) > 0
+        typeCommande = c.typePort(c.entrees{k}(1));
+    end
+    seg = [nDonnees; strcmp(p.DataPortOrder, 'Zero-based contiguous'); specifies; plus; ...
+           diagnostic; typeCommande];
+    if ~specifies
+        if typeCommande > 200
+            error('Simulink:DataType:EnumTypeMismatch', ...
+                  ['La commande de ''%s'' est de type %s : ses ports de donnees se designent ' ...
+                   'alors par des membres, DataPortOrder ''Specify indices'' et ' ...
+                   'DataPortIndices {%s.%s, ...}.'], ch, matlibre_sl_types('nom', typeCommande), ...
+                  matlibre_sl_types('enum', typeCommande), premierMembre(typeCommande));
+        end
+        return
+    end
+    [indices, classe] = indicesDe(p.DataPortIndices, ch, ...
+                                  'Simulink:blocks:MultiPortSwitchInvalidIndices', ...
+                                  'Les indices des ports de donnees');
+    if numel(indices) ~= nDonnees
+        error('Simulink:blocks:MultiPortSwitchInvalidIndices', ...
+              ['''%s'' a %d port(s) de donnees et %d indice(s) (DataPortIndices) : il en ' ...
+               'faut un par port.'], ch, nDonnees, numel(indices));
+    end
+    tous = vertcat(indices{:});
+    if numel(unique(tous)) < numel(tous)
+        error('Simulink:blocks:MultiPortSwitchInvalidIndices', ...
+              '''%s'' designe deux ports de donnees par un meme indice (DataPortIndices).', ch);
+    end
+    accorderIndices(typeCommande, classe, ch, 'DataPortIndices', 'indices de ports');
+    for j = 1:nDonnees
+        seg = [seg; numel(indices{j}); indices{j}(:)]; %#ok<AGROW>
+    end
+end
+
+function n = premierMembre(code)
+    [~, noms] = enumeration(matlibre_sl_types('enum', code));
+    n = noms{1};
+end
+
+% La valeur initiale d'une sortie énumérée qu'on ne dit pas — zéro, le
+% défaut du bloc — : le membre par défaut de son type.
+function v = initialeEnum(c, k, p, nom)
+    v = p.(nom);
+    type = c.typePort(c.portDebut(k));
+    if type > 200 && ~(isfield(p, 'Classes') && isfield(p.Classes, nom)) && ...
+       all(double(v(:)) == 0)
+        v = matlibre_sl_types('defaut', type);
+    end
+end
+
+% La sortie initiale d'un sous-système conditionnel, évaluée comme un
+% paramètre : un membre d'énumération y garde sa classe.
+function s = sortieInitiale(s, chemin)
+    s.classe = '';
+    v = s.initiale;
+    if ischar(v) || isstring(v)
+        v = matlibre_sl_expression(char(v), chemin, 'InitialOutput', 'classe');
+    end
+    if isobject(v) && isenum(v)
+        s.classe = class(v);
+        try
+            v = double(v);
+        catch
+            error('Simulink:DataType:EnumTypeNotInteger', ...
+                  ['La sortie initiale de ''%s'' est un membre de ''%s'', une enumeration ' ...
+                   'dont les membres ne portent pas de valeurs entieres.'], chemin, s.classe);
+        end
+    end
+    s.initiale = v;
+end
+
+% Une sortie conditionnelle énumérée part d'un membre de son type : celui
+% qu'on lui donne, ou le membre par défaut quand on ne dit rien.
+function c = initialesEnumerees(c)
+    for k = 1:c.n
+        if isempty(c.sortieCond{k}) || c.nOut(k) == 0
+            continue
+        end
+        type = c.typePort(c.portDebut(k));
+        s = c.sortieCond{k};
+        if type <= 200
+            if ~isempty(s.classe)
+                error('Simulink:DataType:EnumParameterMismatch', ...
+                      ['La sortie initiale de ''%s'' est un membre de %s, et son signal est ' ...
+                       'de type %s.'], c.chemins{k}, s.classe, matlibre_sl_types('nom', ...
+                                                                              max(type, 2)));
+            end
+            continue
+        end
+        classe = matlibre_sl_types('enum', type);
+        if isempty(s.classe) && all(double(s.initiale(:)) == 0)
+            c.sortieCond{k}.initiale = matlibre_sl_types('defaut', type);
+        elseif ~strcmp(s.classe, classe)
+            error('Simulink:DataType:EnumParameterMismatch', ...
+                  ['La sortie initiale de ''%s'' doit etre un membre de %s, le type de son ' ...
+                   'signal (InitialOutput).'], c.chemins{k}, classe);
+        end
+    end
 end
 
 % Pour chaque entrée d'un Merge, la garde du sous-système d'où vient son
@@ -5145,7 +5389,7 @@ end
 function v = surGrille(c, k, v)
     if isfield(c, 'typePort') && c.nOut(k) > 0
         type = c.typePort(c.portDebut(k));
-        if type > 100
+        if type > 100 && type <= 200
             v = double(matlibre_sl_types('convertir', type, v));
         end
     end

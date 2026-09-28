@@ -45,6 +45,22 @@ function varargout = matlibre_sl_types(action, varargin)
 %   MATLIBRE_SL_TYPES('classe',CODE) la classe MATLAB ('logical' pour
 %   boolean).
 %
+%   Un type énuméré s'écrit 'Enum: Couleur', où Couleur est une
+%   énumération de valeurs entières — dérivée de Simulink.IntEnumType ou
+%   d'un entier de MATLAB. Ses codes vont à partir de 201, dans l'ordre où
+%   on les rencontre. Son signal porte la valeur entière de chaque membre ;
+%   il ne se calcule pas — un gain, une somme le refusent —, mais il se
+%   retarde, s'aiguille, se compare à un membre du même type et se
+%   convertit en entier (Data Type Conversion). K =
+%   MATLIBRE_SL_TYPES('enum',CODE) rend la classe d'un type énuméré, '' pour
+%   un autre type ; V = MATLIBRE_SL_TYPES('defaut',CODE) la valeur de son
+%   membre par défaut — celui que rend la méthode statique getDefaultValue
+%   de la classe, le premier membre sinon — ; V =
+%   MATLIBRE_SL_TYPES('valeurs',CODE) les valeurs de ses membres ; T =
+%   MATLIBRE_SL_TYPES('texte',M) le texte MATLAB d'un membre ou d'un
+%   tableau de membres, 'Couleur.Rouge' ou '[Couleur.Rouge Couleur.Vert]',
+%   comme un modèle l'enregistre.
+%
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
 %   Exemple :
@@ -72,13 +88,27 @@ function varargout = matlibre_sl_types(action, varargin)
             varargout{1} = codeDeValeur(varargin{1});
         case 'parametreGain'
             varargout{1} = codeParametreGain(varargin{:});
+        case 'enum'
+            varargout{1} = '';
+            if varargin{1} > 200
+                varargout{1} = registreEnum('classe', varargin{1});
+            end
+        case 'defaut'
+            varargout{1} = defautEnum(varargin{1});
+        case 'valeurs'
+            varargout{1} = double(enumeration(registreEnum('classe', varargin{1})));
+        case 'texte'
+            varargout{1} = texteMembres(varargin{1});
         otherwise
             error('Simulink:DataType:Action', 'Action inconnue : %s.', char(action));
     end
 end
 
 function n = nomDe(code)
-    if code > 100
+    if code > 200
+        n = ['Enum: ' registreEnum('classe', code)];
+        return
+    elseif code > 100
         n = nomFixe(registre('ligne', code));
         return
     end
@@ -105,7 +135,10 @@ end
 % La classe MATLAB d'un signal : un type à virgule fixe se calcule en
 % double, ses valeurs ramenées à la grille de son type après chaque bloc.
 function k = classeDe(code)
-    if code > 100
+    if code > 200
+        k = registreEnum('classe', code);
+        return
+    elseif code > 100
         k = 'double';
         return
     end
@@ -116,7 +149,10 @@ function k = classeDe(code)
 end
 
 function v = convertir(code, v)
-    if code > 100
+    if code > 200
+        % les valeurs entières deviennent les membres qui les portent
+        v = feval(registreEnum('classe', code), double(v));
+    elseif code > 100
         v = fi(v, typeNumerique(code));
     elseif code > 2
         v = cast(v, classeDe(code));
@@ -155,6 +191,87 @@ function varargout = registre(action, x)
     end
 end
 
+% Les types énumérés rencontrés, par le nom de leur classe, numérotés à
+% partir de 201 dans l'ordre où on les rencontre.
+function varargout = registreEnum(action, x)
+    persistent classesEnum
+    if isempty(classesEnum)
+        classesEnum = {};
+    end
+    switch action
+        case 'code'
+            k = find(strcmp(classesEnum, x), 1);
+            if isempty(k)
+                classesEnum{end + 1} = x;
+                k = numel(classesEnum);
+            end
+            varargout{1} = 200 + k;
+        otherwise
+            varargout{1} = classesEnum{x - 200};
+    end
+end
+
+% Le code du type énuméré d'une classe : -3 si la classe n'est pas une
+% énumération, -4 si ses membres ne portent pas des valeurs entières —
+% Simulink n'admet que les énumérations entières.
+function code = codeEnumDe(classe)
+    code = -3;
+    if isempty(regexp(classe, '^[A-Za-z]\w*(\.[A-Za-z]\w*)*$', 'once'))
+        return
+    end
+    try
+        membres = enumeration(classe);
+    catch
+        return
+    end
+    if isempty(membres)
+        return
+    end
+    try
+        v = double(membres);
+    catch
+        code = -4;
+        return
+    end
+    if any(v ~= round(v)) || any(abs(v) > 2 ^ 31)
+        code = -4;
+        return
+    end
+    code = registreEnum('code', classe);
+end
+
+% Le texte MATLAB d'un membre, ou d'un tableau de membres ligne par ligne.
+function t = texteMembres(m)
+    classe = class(m);
+    if isscalar(m)
+        t = [classe '.' char(m)];
+        return
+    end
+    lignes = cell(1, size(m, 1));
+    for i = 1:size(m, 1)
+        noms = cellfun(@(n) [classe '.' n], cellstr(m(i, :)), 'UniformOutput', false);
+        lignes{i} = strjoin(noms, ' ');
+    end
+    t = ['[' strjoin(lignes, '; ') ']'];
+end
+
+% La valeur du membre par défaut d'un type énuméré : celui que rend la
+% méthode statique getDefaultValue de la classe, le premier sinon.
+function v = defautEnum(code)
+    classe = registreEnum('classe', code);
+    membres = enumeration(classe);
+    defaut = membres(1);
+    if ismethod(defaut, 'getDefaultValue')
+        defaut = feval([classe '.getDefaultValue']);
+        if ~isa(defaut, classe) || ~isscalar(defaut)
+            error('Simulink:DataType:EnumDefaultValue', ...
+                  ['La methode getDefaultValue de l''enumeration ''%s'' doit rendre l''un ' ...
+                   'de ses membres.'], classe);
+        end
+    end
+    v = double(defaut);
+end
+
 % Le code d'un type décrit par un NUMERICTYPE : un entier de MATLAB quand
 % il en est un (fixdt(1,16,0) est int16), sinon un type à virgule fixe.
 function code = codeDuType(T)
@@ -185,6 +302,8 @@ end
 function code = codeDeValeur(v)
     if isa(v, 'embedded.fi')
         code = codeDuType(numerictype(v));
+    elseif isobject(v) && isenum(v)
+        code = codeEnumDe(class(v));
     else
         code = codeDe(class(v));
     end
@@ -204,7 +323,9 @@ function code = codeDe(nom)
     if strcmp(nom, 'logical')
         code = 10;
     end
-    if isempty(code)
+    if isempty(code) && strncmp(nom, 'Enum:', 5)
+        code = codeEnumDe(strtrim(nom(6:end)));
+    elseif isempty(code)
         code = codeFixeDe(nom);
     end
 end
@@ -251,13 +372,24 @@ function t = typeFixe(p, chemin)
         error('Simulink:DataType:UnspecifiedScaling', ...
               ['Le type ''%s'' du bloc ''%s'' ne dit pas son echelle : donnez-lui ses bits ' ...
                'apres la virgule, fixdt(S,W,F).'], char(p.OutDataTypeStr), chemin);
+    elseif t == -3
+        error('Simulink:DataType:EnumTypeUndefined', ...
+              ['Le type ''%s'' du bloc ''%s'' nomme une classe qui n''est pas une ' ...
+               'enumeration connue : definissez-la par classdef, avec un bloc ' ...
+               'enumeration, dans un fichier du chemin.'], char(p.OutDataTypeStr), chemin);
+    elseif t == -4
+        error('Simulink:DataType:EnumTypeNotInteger', ...
+              ['Le type ''%s'' du bloc ''%s'' est une enumeration dont les membres ne ' ...
+               'portent pas de valeurs entieres : derivez-la de Simulink.IntEnumType ' ...
+               '(classdef Couleur < Simulink.IntEnumType) et donnez a chaque membre sa ' ...
+               'valeur, Rouge(1).'], char(p.OutDataTypeStr), chemin);
     end
     if t < 0
         error('Simulink:DataType:UnknownDataType', ...
               ['Le type ''%s'' du bloc ''%s'' est inconnu : les types sont double, single, ' ...
                'int8, uint8, int16, uint16, int32, uint32, boolean, les types a virgule ' ...
-               'fixe (fixdt(1,16,8), sfix16_En8), ou ''Inherit: ...''.'], ...
-              char(p.OutDataTypeStr), chemin);
+               'fixe (fixdt(1,16,8), sfix16_En8), les types enumeres (''Enum: Couleur''), ' ...
+               'ou ''Inherit: ...''.'], char(p.OutDataTypeStr), chemin);
     end
 end
 
@@ -368,7 +500,7 @@ function s = regle(c, k, tE)
                                      {'Inherit: Same as first input', 'Inherit: Same as input'}))
                 r = tE(1);
             elseif r == 0
-                if any(tE > 100) && all(tE > 0)
+                if any(tE > 100 & tE <= 200) && all(tE > 0)
                     r = regleInterne(c.types{k}, p, tE, ch);
                 elseif strcmp(c.types{k}, 'gain')
                     r = commun(tE(1:min(1, end)));
@@ -382,6 +514,12 @@ function s = regle(c, k, tE)
               'ratelimiter', 'tappeddelay', 'difference', 'busselector', 'busassignment', ...
               'algebraicconstraint'}
             r = commun(tE(1:min(1, end)));
+            if r == 0 && any(strcmp(c.types{k}, {'memory', 'delay'})) && ...
+               ~isempty(classeParametre(p, 'InitialCondition'))
+                % dans une boucle, un retard énuméré prend le type de sa
+                % condition initiale, un membre
+                r = codeDe(p.Classes.InitialCondition);
+            end
         case {'minmax', 'mux', 'concatenate', 'merge', 'dotproduct'}
             r = commun(tE);
         case 'switch'
@@ -418,7 +556,7 @@ function s = classesFonction(c, k, tE)
         if c.entrees{k}(j) > 0
             d = c.dims{c.entrees{k}(j)};
         end
-        u{j} = convertir(tE(j), zeros(d));
+        u{j} = valeurEssai(tE(j), 0, d);
     end
     sorties = cell(1, c.nOut(k));
     try
@@ -441,6 +579,16 @@ function s = classesFonction(c, k, tE)
     end
 end
 
+% Une valeur d'essai du type CODE, de dimensions D : V, ou le membre par
+% défaut d'un type énuméré — une valeur quelconque n'en est pas un membre.
+function u = valeurEssai(code, v, d)
+    if code > 200
+        u = convertir(code, defautEnum(code) * ones(d));
+    else
+        u = convertir(code, v .* ones(d));
+    end
+end
+
 function s = classesGraphe(c, k)
     code = c.fonctions{k};
     s = 2 * ones(1, c.nOut(k));
@@ -459,6 +607,7 @@ end
 function verifier(c, k, tE, t)
     p = c.p{k};
     ch = c.chemins{k};
+    verifierEnum(c, k, tE, t);
     doublesSeuls = {'integrator', 'secondorderintegrator', 'derivative', 'transferfcn', ...
                     'statespace', 'zeropole', 'transportdelay', 'pidcontroller', ...
                     'variabletransportdelay', ...
@@ -506,7 +655,7 @@ function verifier(c, k, tE, t)
             end
         case 'constant'
             attendu = typeFixe(p, ch);
-            if attendu > 100
+            if attendu > 100 && attendu <= 200
                 T = typeNumerique(attendu);
                 [bas, haut] = matlibre_fixe_bornes(T);
                 v = (double(p.Value(:)) - T.Bias) / T.Slope;
@@ -529,6 +678,158 @@ function verifier(c, k, tE, t)
                 end
             end
     end
+end
+
+% --- les types énumérés --------------------------------------------------
+
+% Les blocs qui admettent un signal énuméré, entrée par entrée : ceux qui
+% le retardent, l'aiguillent, le rangent, le comparent ou le convertissent
+% sans calculer dessus — la liste de la documentation de Simulink.
+function admis = entreesEnumAdmises(c, k, nE)
+    p = c.p{k};
+    admis = false(1, nE);
+    switch c.types{k}
+        case {'mux', 'demux', 'concatenate', 'selector', 'reshape', 'merge', 'inport', ...
+              'signalconversion', 'datatypeconversion', 'ic', 'zoh', 'memory', ...
+              'ratetransition', 'outport', 'terminator', 'scope', 'display', 'toworkspace', ...
+              'manualswitch', 'relational', 'comparetoconstant', 'switchcase', 'width', ...
+              'goto', 'from', 'multiportswitch'}
+            admis(:) = true;
+        case 'delay'
+            admis(1) = true;   % le signal retardé ; longueur, activation, remise sont numériques
+        case 'switch'
+            admis([1 min(3, end)]) = true;   % les données, pas la commande
+        case 'matlabfunction'
+            admis(:) = ~isfield(p, 'Bibliotheque');   % une fonction écrite par l'utilisateur
+    end
+end
+
+% La classe énumérée d'un paramètre, '' s'il est numérique.
+function classe = classeParametre(p, nom)
+    classe = '';
+    if isfield(p, 'Classes') && isfield(p.Classes, nom) && strncmp(p.Classes.(nom), 'Enum:', 5)
+        classe = strtrim(p.Classes.(nom)(6:end));
+    end
+end
+
+function verifierEnum(c, k, tE, t)
+    p = c.p{k};
+    ch = c.chemins{k};
+    type = c.types{k};
+    % un membre ne se donne qu'aux paramètres qui valent un signal : la
+    % valeur d'une constante, une condition ou une sortie initiale, la
+    % constante d'une comparaison
+    if isfield(p, 'Classes')
+        admis = struct('constant', {{'Value'}}, 'ic', {{'Value'}}, ...
+                       'delay', {{'InitialCondition'}}, 'memory', {{'InitialCondition'}}, ...
+                       'merge', {{'InitialOutput'}}, 'outport', {{'InitialOutput'}}, ...
+                       'comparetoconstant', {{'const'}});
+        noms = fieldnames(p.Classes);
+        for i = 1:numel(noms)
+            if strncmp(p.Classes.(noms{i}), 'Enum:', 5) && ...
+               ~(isfield(admis, type) && any(strcmp(noms{i}, admis.(type))))
+                error('Simulink:DataType:EnumParameterMismatch', ...
+                      ['Le parametre ''%s'' de ''%s'' est un membre de %s : ce parametre ' ...
+                       'attend un nombre.'], noms{i}, ch, strtrim(p.Classes.(noms{i})(6:end)));
+            end
+        end
+    end
+    if strcmp(type, 'datatypeconversion') && ~isempty(tE) && c.nOut(k) > 0
+        % une énumération se convertit en entier et un entier en
+        % énumération, non une énumération en une autre, ni en virgule fixe
+        entree = tE(1);
+        sortie = t(c.portDebut(k));
+        fixe = @(x) x > 100 && x <= 200;
+        if entree ~= sortie && ((entree > 200 && sortie > 200) || ...
+                                (entree > 200 && fixe(sortie)) || (sortie > 200 && fixe(entree)))
+            error('Simulink:DataType:EnumTypeMismatch', ...
+                  ['''%s'' convertirait un signal de type %s en %s : un type enumere se ' ...
+                   'convertit en entier, et un entier en type enumere. Passez par un ' ...
+                   'entier (int32).'], ch, nomDe(entree), nomDe(sortie));
+        end
+    end
+    enumE = tE > 200;
+    if any(enumE)
+        j = find(enumE & ~entreesEnumAdmises(c, k, numel(tE)), 1);
+        if ~isempty(j)
+            error('Simulink:DataType:EnumTypeNotSupported', ...
+                  ['L''entree %d de ''%s'' recoit un signal de type %s : ce bloc ne calcule ' ...
+                   'pas sur un type enumere. Convertissez le signal en entier (Data Type ' ...
+                   'Conversion), ou comparez-le a un membre (Relational Operator).'], j, ch, ...
+                  nomDe(tE(j)));
+        end
+    end
+    % les entrées qui doivent partager un même type
+    switch type
+        case {'relational', 'mux', 'concatenate', 'merge', 'manualswitch'}
+            groupe = 1:numel(tE);
+        case 'switch'
+            groupe = [1 min(3, numel(tE))];
+        case 'multiportswitch'
+            groupe = 2:numel(tE);
+        otherwise
+            groupe = [];
+    end
+    groupe = groupe(groupe <= numel(tE));
+    if any(tE(groupe) > 200) && any(tE(groupe) ~= tE(groupe(1)))
+        j = groupe(find(tE(groupe) ~= tE(groupe(find(tE(groupe) > 200, 1))), 1));
+        a = groupe(find(tE(groupe) > 200, 1));
+        error('Simulink:DataType:EnumTypeMismatch', ...
+              ['Les entrees %d et %d de ''%s'' sont de types %s et %s : un type enumere ne ' ...
+               'se melange qu''a lui-meme. Convertissez l''autre signal (Data Type ' ...
+               'Conversion).'], a, j, ch, nomDe(tE(a)), nomDe(tE(j)));
+    end
+    % un paramètre qui est un membre : du type du signal, et réciproquement
+    parametres = {};
+    switch type
+        case 'comparetoconstant'
+            parametres = {'const', tE(1)};
+        case {'delay', 'memory'}
+            parametres = {'InitialCondition', tE(1)};
+        case 'ic'
+            parametres = {'Value', tE(1)};
+        case 'merge'
+            parametres = {'InitialOutput', tE(1)};
+        case 'constant'
+            typeSortie = typeFixe(p, ch);
+            if typeSortie > 200 || ~isempty(classeParametre(p, 'Value'))
+                parametres = {'Value', typeSortie};
+            end
+    end
+    if isempty(parametres) || isempty(tE) && ~strcmp(type, 'constant')
+        return
+    end
+    nom = parametres{1};
+    attendu = parametres{2};
+    classe = classeParametre(p, nom);
+    if attendu == 0 && ~isempty(classe)
+        return   % une constante qui hérite du type de sa valeur
+    end
+    if attendu > 200 && isempty(classe) && any(strcmp(type, {'merge', 'outport'})) && ...
+       all(double(p.(nom)(:)) == 0)
+        return   % la sortie initiale par défaut : le membre par défaut
+    end
+    if attendu > 200 && ~strcmp(classe, registreEnum('classe', attendu))
+        if isempty(classe)
+            vu = 'une valeur numerique';
+        else
+            vu = ['un membre de ' classe];
+        end
+        error('Simulink:DataType:EnumParameterMismatch', ...
+              ['Le parametre ''%s'' de ''%s'' est %s, et le signal est de type %s : ' ...
+               'donnez-lui un membre de cette enumeration, comme %s.%s.'], nom, ch, vu, ...
+              nomDe(attendu), registreEnum('classe', attendu), premierMembre(attendu));
+    elseif attendu <= 200 && ~isempty(classe)
+        error('Simulink:DataType:EnumParameterMismatch', ...
+              ['Le parametre ''%s'' de ''%s'' est un membre de %s, et le signal est de ' ...
+               'type %s : un membre ne vaut que pour un signal de son type.'], nom, ch, ...
+              classe, nomDe(max(attendu, 2)));
+    end
+end
+
+function n = premierMembre(code)
+    [~, noms] = enumeration(registreEnum('classe', code));
+    n = noms{1};
 end
 
 % --- la complexité des signaux ------------------------------------------
@@ -672,7 +973,7 @@ function [s, sonde] = complexiteFonction(c, k, xE, sonde)
                 end
                 u{j} = valeur * ones(d);
                 if isfield(c, 'typePort') && c.entrees{k}(j) > 0
-                    u{j} = convertir(c.typePort(c.entrees{k}(j)), u{j});
+                    u{j} = valeurEssai(c.typePort(c.entrees{k}(j)), u{j}, d);
                 end
                 if xE(j)
                     u{j} = complex(u{j});

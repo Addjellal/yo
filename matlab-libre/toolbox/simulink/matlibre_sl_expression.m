@@ -48,14 +48,23 @@ function valeur = matlibre_sl_expression(texte, nomBloc, nomParametre, classe)
                'expression ne s''evalue pas dans l''espace de travail de ' ...
                'base : %s'], nomParametre, nomBloc, texte, err.message);
     end
-    if ~isnumeric(valeur) && ~islogical(valeur)
+    % un membre d'énumération passe : sa classe dit le type du signal
+    membre = isobject(valeur) && isenum(valeur);
+    if ~isnumeric(valeur) && ~islogical(valeur) && ~membre
         error('Simulink:Commands:ParametreNonNumerique', ...
               ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'', qui rend un ' ...
                '%s : il faut un nombre.'], nomParametre, nomBloc, texte, ...
               class(valeur));
     end
     if nargin < 4 || ~strcmp(classe, 'classe')
-        valeur = double(valeur);
+        try
+            valeur = double(valeur);
+        catch
+            error('Simulink:Commands:ParametreNonNumerique', ...
+                  ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'', un membre de %s qui ' ...
+                   'ne porte pas de valeur entiere : il faut un nombre.'], nomParametre, ...
+                  nomBloc, texte, class(valeur));
+        end
     end
 end
 

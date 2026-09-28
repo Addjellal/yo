@@ -404,6 +404,32 @@ Valeur Interpreteur::membreEnumeration(const std::shared_ptr<DefinitionClasse>& 
     return membre;
 }
 
+// Un tableau d'énumération agrandi par une écriture au-delà de sa fin :
+// MATLAB comble les cases nouvelles du membre par défaut, le premier de la
+// classe (« j = Jour.Mardi; j(3) = Jour.Lundi »).
+void Interpreteur::completerEnumeration(Valeur& v) {
+    if (!v.st) return;
+    auto itm = v.st->champs.find(champMembre);
+    if (itm == v.st->champs.end()) return;
+    bool trou = false;
+    for (const auto& x : itm->second) trou = trou || x.estVide();
+    if (!trou) return;
+    auto def = classeDefinie(v.nomObjet);
+    if (!def || def->enumerations.empty()) return;
+    const Valeur defaut = membreEnumeration(def, def->enumerations[0]);
+    v.detacherStructure();
+    const std::size_t n = v.st->champs[champMembre].size();
+    for (std::size_t k = 0; k < n; ++k) {
+        if (!v.st->champs[champMembre][k].estVide()) continue;
+        for (auto& kv : v.st->champs) {
+            if (k >= kv.second.size()) continue;
+            auto itd = defaut.st->champs.find(kv.first);
+            if (itd != defaut.st->champs.end() && !itd->second.empty())
+                kv.second[k] = itd->second[0];
+        }
+    }
+}
+
 Valeur Interpreteur::membresEnumeration(const std::shared_ptr<DefinitionClasse>& def) {
     std::vector<Valeur> membres;
     for (const auto& nom : def->enumerations) membres.push_back(membreEnumeration(def, nom));

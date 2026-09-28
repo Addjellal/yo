@@ -192,6 +192,7 @@ public:
     // alors ses arguments, au lieu de convertir une valeur en membre.
     bool enConstructionEnumeration = false;
     bool estEnumeration(const Valeur& v) const;
+    void completerEnumeration(Valeur& v);
     bool baseEnumeration(const std::shared_ptr<DefinitionClasse>& def, Classe& base);
     Valeur membreEnumeration(const std::shared_ptr<DefinitionClasse>& def,
                              const std::string& nom);

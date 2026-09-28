@@ -38,6 +38,8 @@ namespace {
 // qu'ADD_BLOCK reconnaît, avec une valeur par défaut qui simule.
 const BlocBibliotheque blocs[] = {
     {"Sources", "constant", "Une valeur constante", "'Value', 1"},
+    {"Sources", "enumeratedconstant", "Un membre d'une énumération, constant",
+     "'Value', 'SlDemoSign.Positive'"},
     {"Sources", "step", "Un échelon à l'instant dit", "'Time', 1, 'After', 1"},
     {"Sources", "ramp", "Une rampe de pente donnée", "'Slope', 1"},
     {"Sources", "sine", "Une sinusoïde", "'Amplitude', 1, 'Frequency', 1"},

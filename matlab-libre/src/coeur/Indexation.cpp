@@ -746,7 +746,9 @@ Valeur Interpreteur::affecterIndex(Valeur base, const std::vector<ElementAcces>&
     auto idx = evaluerIndices(e.args, &base, 0, (int)e.args.size());
     if (k + 1 == chaine.size()) {
         if (suppression && e.genre == '(') return supprimer(base, idx);
-        return ecrire(std::move(base), idx, v, e.genre);
+        Valeur r = ecrire(std::move(base), idx, v, e.genre);
+        if (e.genre == '(' && estEnumeration(r)) completerEnumeration(r);
+        return r;
     }
     // Accès intermédiaire : lire, modifier, réécrire.
     Valeur sous;
@@ -764,7 +766,9 @@ Valeur Interpreteur::affecterIndex(Valeur base, const std::vector<ElementAcces>&
     }
     (void)existe;
     Valeur nouvelle = affecterIndex(std::move(sous), chaine, k + 1, v, suppression);
-    return ecrire(std::move(base), idx, nouvelle, e.genre);
+    Valeur r = ecrire(std::move(base), idx, nouvelle, e.genre);
+    if (e.genre == '(' && estEnumeration(r)) completerEnumeration(r);
+    return r;
 }
 
 }  // namespace matlibre

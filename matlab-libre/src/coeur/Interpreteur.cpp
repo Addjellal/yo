@@ -311,9 +311,23 @@ std::vector<std::string> Interpreteur::nomsNatifs() const {
     return noms;
 }
 
-void Interpreteur::ajouterChemin(const std::string& dossier, bool enTete) {
+// Un dossier du chemin se range en absolu, comme dans MATLAB : écrit
+// relatif, il désignerait un autre dossier dès qu'on change de dossier
+// courant, et un « rehash » fait ailleurs perdrait ses fonctions.
+static std::string dossierAbsolu(const std::string& dossier) {
     std::string d = dossier;
-    if (!d.empty() && d.back() == '/') d.pop_back();
+    while (d.size() > 1 && d.back() == '/') d.pop_back();
+    if (d.empty()) return d;
+    std::error_code ec;
+    fs::path p = fs::absolute(fs::path(d), ec);
+    if (ec) return d;
+    std::string r = p.lexically_normal().string();
+    while (r.size() > 1 && r.back() == '/') r.pop_back();
+    return r;
+}
+
+void Interpreteur::ajouterChemin(const std::string& dossier, bool enTete) {
+    const std::string d = dossierAbsolu(dossier);
     auto it = std::find(chemin_.begin(), chemin_.end(), d);
     if (it != chemin_.end()) chemin_.erase(it);
     if (enTete) chemin_.insert(chemin_.begin(), d);
@@ -322,7 +336,7 @@ void Interpreteur::ajouterChemin(const std::string& dossier, bool enTete) {
 }
 
 void Interpreteur::retirerChemin(const std::string& dossier) {
-    auto it = std::find(chemin_.begin(), chemin_.end(), dossier);
+    auto it = std::find(chemin_.begin(), chemin_.end(), dossierAbsolu(dossier));
     if (it != chemin_.end()) chemin_.erase(it);
     reindexerChemin();
 }
@@ -978,6 +992,19 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
     }
     auto def = classeDefinie(nom);
     if (def) return {construireObjet(*this, def, args)};
+    // « feval('Couleur.getDefaultValue') », « feval('Jour.Mardi') » : une
+    // méthode statique, ou un membre d'énumération, nommés par un texte.
+    const std::size_t point = nom.rfind('.');
+    if (point != std::string::npos && point > 0 && point + 1 < nom.size()) {
+        if (auto defC = classeDefinie(nom.substr(0, point))) {
+            const std::string membre = nom.substr(point + 1);
+            if (defC->aMethode(membre) && defC->estStatique(membre))
+                return appelerUtilisateur(defC->methodes[membre], args, nargout);
+            if (args.empty() && std::find(defC->enumerations.begin(), defC->enumerations.end(),
+                                          membre) != defC->enumerations.end())
+                return {membreEnumeration(defC, membre)};
+        }
+    }
     erreur("MATLAB:UndefinedFunction",
            "Unrecognized function or variable '" + nom + "'.");
 }

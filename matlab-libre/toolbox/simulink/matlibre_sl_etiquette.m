@@ -20,6 +20,7 @@ function texte = matlibre_sl_etiquette(bloc)
     end
     switch bloc.type
         case 'constant',   texte = nombre(p, 'Value', 0);
+        case 'enumeratedconstant', texte = nombre(p, 'Value', 'SlDemoSign.Positive');
         case 'gain',       texte = nombre(p, 'Gain', 1);
         case 'integrator', texte = '1/s';
         case 'derivative', texte = 'du/dt';
@@ -87,6 +88,10 @@ function t = nombre(p, nom, defaut)
     % dirait pas. C'est ce que Simulink affiche dans le bloc.
     if ischar(v) || isstring(v)
         t = char(v);
+        return
+    end
+    if isobject(v) && isenum(v)
+        t = matlibre_sl_types('texte', v);   % un membre : « Couleur.Rouge »
         return
     end
     if isscalar(v) && v == round(v)

@@ -7779,6 +7779,290 @@ end
 fprintf('reseaux physiques tires au hasard : %d simulations, %d refus nommes\n', ...
         simulations54, refus54);
 
+%% ----------------------------------------------------------- 55. Types énumérés
+% Un signal énuméré porte un membre d'une énumération entière — dérivée de
+% Simulink.IntEnumType ou d'un entier — : il se retarde, s'aiguille, se
+% compare à un membre du même type et se convertit en entier, mais ne se
+% calcule pas. Chaque faute est refusée en nommant le bloc.
+
+% Enumerated Constant : SlDemoSign.Positive, d'emblée.
+m55 = new_system('enumConstante');
+m55 = add_block(m55, 'enumeratedconstant', 'c');
+m55 = add_block(m55, 'toworkspace', 'tw', 'VariableName', 'signes55');
+m55 = add_line(m55, 'c/1', 'tw/1');
+sim(m55, 'StopTime', 0.05);
+assert(isa(signes55, 'SlDemoSign') && all(signes55 == SlDemoSign.Positive), ...
+       'enumeres : Enumerated Constant rend SlDemoSign.Positive');
+m55 = set_param(m55, 'c', 'OutDataTypeStr', 'Enum: JourEssai', 'Value', 'JourEssai.Mercredi');
+sim(m55, 'StopTime', 0.05);
+assert(isa(signes55, 'JourEssai') && all(signes55 == JourEssai.Mercredi), ...
+       'enumeres : une autre enumeration');
+
+% Les comparaisons : deux membres d'un même type, par leurs valeurs.
+m55 = new_system('enumCompare');
+m55 = add_block(m55, 'constant', 'a', 'Value', 'JourEssai.Mardi');
+m55 = add_block(m55, 'constant', 'b', 'Value', JourEssai.Mercredi);   % le membre même
+operateurs55 = {'==', '~=', '<', '>='};
+attendus55 = [0 1 1 0];
+for q = 1:numel(operateurs55)
+    m55 = add_block(m55, 'relational', sprintf('r%d', q), 'Operator', operateurs55{q});
+    m55 = add_block(m55, 'outport', sprintf('y%d', q), 'Port', q);
+    m55 = add_line(m55, 'a/1', sprintf('r%d/1', q));
+    m55 = add_line(m55, 'b/1', sprintf('r%d/2', q));
+    m55 = add_line(m55, sprintf('r%d/1', q), sprintf('y%d/1', q));
+end
+m55 = add_block(m55, 'comparetoconstant', 'cc', 'relop', '==', 'const', 'JourEssai.Mardi');
+m55 = add_block(m55, 'outport', 'y5', 'Port', 5);
+m55 = add_line(m55, 'a/1', 'cc/1');
+m55 = add_line(m55, 'cc/1', 'y5/1');
+r55 = sim(m55, 'StopTime', 0.02);
+assert(isequal(double(r55.yout(1, :)), [attendus55 1]), ...
+       'enumeres : ==, ~=, <, >= et Compare To Constant');
+
+% Multiport Switch : une commande énumérée désigne ses ports par des
+% membres ; des indices entiers se groupent, et le cas par défaut prend
+% un port de plus.
+m55 = new_system('enumAiguillage');
+m55 = add_block(m55, 'constant', 'j', 'Value', 'JourEssai.Mercredi');
+for q = 1:3
+    m55 = add_block(m55, 'constant', sprintf('d%d', q), 'Value', 10 * q);
+end
+m55 = add_block(m55, 'multiportswitch', 'ms', 'DataPortOrder', 'Specify indices', ...
+                'DataPortIndices', '{JourEssai.Lundi, JourEssai.Mardi, JourEssai.Mercredi}');
+m55 = add_block(m55, 'outport', 'y');
+m55 = add_line(m55, 'j/1', 'ms/1');
+for q = 1:3
+    m55 = add_line(m55, sprintf('d%d/1', q), sprintf('ms/%d', q + 1));
+end
+m55 = add_line(m55, 'ms/1', 'y/1');
+[ne55, ns55] = matlibre_sl_ports(struct('type', 'multiportswitch', 'nom', 'ms', ...
+    'parametres', struct('DataPortOrder', 'Specify indices', ...
+                         'DataPortIndices', '{1, [2 3]}', ...
+                         'DataPortForDefault', 'Additional data port')));
+assert(ne55 == 4 && ns55 == 1, 'enumeres : la commande, deux ports de donnees, le defaut');
+r55 = sim(m55, 'StopTime', 0.02);
+assert(r55.yout(1) == 30, 'enumeres : Mercredi designe le troisieme port');
+m55 = new_system('indicesGroupes');
+m55 = add_block(m55, 'clock', 't');
+m55 = add_block(m55, 'rounding', 'r', 'Operator', 'floor');
+m55 = add_block(m55, 'constant', 'a', 'Value', 10);
+m55 = add_block(m55, 'constant', 'b', 'Value', 20);
+m55 = add_block(m55, 'constant', 'd', 'Value', -1);
+m55 = add_block(m55, 'multiportswitch', 'ms', 'DataPortOrder', 'Specify indices', ...
+                'DataPortIndices', '{1, [2 3]}', 'DataPortForDefault', 'Additional data port', ...
+                'DiagnosticForDefault', 'None');
+m55 = add_block(m55, 'outport', 'y');
+m55 = add_line(m55, 't/1', 'r/1');
+m55 = add_line(m55, 'r/1', 'ms/1');
+m55 = add_line(m55, 'a/1', 'ms/2');
+m55 = add_line(m55, 'b/1', 'ms/3');
+m55 = add_line(m55, 'd/1', 'ms/4');
+m55 = add_line(m55, 'ms/1', 'y/1');
+m55 = set_param(m55, 'Solver', 'ode1', 'FixedStep', 1, 'StopTime', 5);
+r55 = sim(m55);
+assert(isequal(r55.yout(:)', [-1 10 20 20 -1 -1]), ...
+       'enumeres : des indices groupes, et un port pour le cas par defaut');
+% le programme engendré aiguille de même
+dossier55 = tempname();
+mkdir(dossier55);
+ancien55 = pwd();
+cd(dossier55);
+matlibre_sl_ecrire(m55, 'indicesProg55.m');
+rehash;
+programme55 = indicesProg55(5, 1);
+cd(ancien55);
+rmdir(dossier55, 's');
+assert(isequal(programme55.signaux.ms, r55.signaux.ms), ...
+       'enumeres : le programme engendre aiguille comme SIM');
+% le cas par défaut averti
+m55 = set_param(m55, 'ms', 'DiagnosticForDefault', 'Warning', ...
+                'DataPortForDefault', 'Last data port');
+m55 = delete_line(m55, 'd/1', 'ms/4');
+m55 = delete_block(m55, 'd');
+lastwarn('');
+r55 = sim(m55);
+[~, idAvert55] = lastwarn();
+assert(strcmp(idAvert55, 'Simulink:blocks:MultiPortSwitchIndexOutOfRange') && ...
+       isequal(r55.yout(:)', [20 10 20 20 20 20]), ...
+       'enumeres : le dernier port pour le cas par defaut, avec un avertissement');
+
+% Switch Case : des cas qui sont des membres.
+m55 = new_system('enumCas');
+m55 = add_block(m55, 'constant', 'j', 'Value', 'JourEssai.Mercredi');
+m55 = add_block(m55, 'switchcase', 'selon', 'CaseConditions', ...
+                '{JourEssai.Lundi, [JourEssai.Mardi JourEssai.Mercredi]}', 'ShowDefaultCase', 'off');
+m55 = add_line(m55, 'j', 'selon');
+for q = 1:2
+    branche55 = new_system(sprintf('casEnum%d', q));
+    branche55 = add_block(branche55, 'constant', 'v', 'Value', 10 * q);
+    branche55 = add_block(branche55, 'outport', 'y', 'Port', 1);
+    branche55 = add_block(branche55, 'actionport', 'Action');
+    branche55 = add_line(branche55, 'v', 'y');
+    m55 = add_block(m55, 'subsystem', sprintf('c%d', q), 'Model', branche55);
+    m55 = add_line(m55, sprintf('selon/%d', q), sprintf('c%d/Ifaction', q));
+end
+m55 = add_block(m55, 'merge', 'fusion', 'Inputs', 2);
+m55 = add_line(m55, 'c1', 'fusion', 1);
+m55 = add_line(m55, 'c2', 'fusion', 2);
+r55 = sim(m55, 'Solver', 'ode1', 'StopTime', 0.2, 'FixedStep', 0.1);
+assert(all(r55.signaux.fusion == 20), 'enumeres : Mercredi est dans le second cas');
+
+% Data Type Conversion : d'un entier à un membre, et retour.
+m55 = new_system('enumConversion');
+m55 = add_block(m55, 'constant', 'n', 'Value', 'int32(10)');
+m55 = add_block(m55, 'datatypeconversion', 'versEnum', 'OutDataTypeStr', 'Enum: NiveauEssai');
+m55 = add_block(m55, 'datatypeconversion', 'versEntier', 'OutDataTypeStr', 'int32');
+m55 = add_block(m55, 'toworkspace', 'tw', 'VariableName', 'niveaux55');
+m55 = add_block(m55, 'outport', 'y');
+m55 = add_line(m55, 'n/1', 'versEnum/1');
+m55 = add_line(m55, 'versEnum/1', 'tw/1');
+m55 = add_line(m55, 'versEnum/1', 'versEntier/1');
+m55 = add_line(m55, 'versEntier/1', 'y/1');
+r55 = sim(m55, 'StopTime', 0.02);
+assert(isa(niveaux55, 'NiveauEssai') && niveaux55(1) == NiveauEssai.Haut && ...
+       isa(r55.yout, 'int32') && r55.yout(1) == 10, 'enumeres : int32(10) est Haut, et revient');
+
+% Une machine à états : un retard énuméré et une MATLAB Function qui rend
+% l'état suivant. Dans la boucle, le retard prend le type de sa condition
+% initiale.
+m55 = new_system('feuTricolore');
+m55 = add_block(m55, 'delay', 'etat', 'InitialCondition', 'LumiereEssai.Rouge', 'SampleTime', 1);
+m55 = add_block(m55, 'matlabfunction', 'suivante', 'Script', sprintf([ ...
+    'function s = suivante(e)\nswitch e\n    case LumiereEssai.Rouge\n' ...
+    '        s = LumiereEssai.Vert;\n    case LumiereEssai.Vert\n' ...
+    '        s = LumiereEssai.Orange;\n    otherwise\n        s = LumiereEssai.Rouge;\nend']));
+m55 = add_block(m55, 'constant', 'rouge', 'Value', 'LumiereEssai.Rouge');
+m55 = add_block(m55, 'relational', 'arret', 'Operator', '==');
+m55 = add_block(m55, 'toworkspace', 'tw', 'VariableName', 'feux55');
+m55 = add_block(m55, 'outport', 'y');
+m55 = add_line(m55, 'etat/1', 'suivante/1');
+m55 = add_line(m55, 'suivante/1', 'etat/1');
+m55 = add_line(m55, 'etat/1', 'tw/1');
+m55 = add_line(m55, 'etat/1', 'arret/1');
+m55 = add_line(m55, 'rouge/1', 'arret/2');
+m55 = add_line(m55, 'arret/1', 'y/1');
+pe55 = get_param(m55, 'etat', 'PortHandles');
+m55 = set_param(m55, pe55.Outport(1), 'Name', 'feu', 'DataLogging', 'on');
+r55 = sim(m55, 'Solver', 'FixedStepDiscrete', 'StopTime', 5, 'FixedStep', 1);
+cycle55 = [LumiereEssai.Rouge; LumiereEssai.Vert; LumiereEssai.Orange];
+assert(isequal(feux55, [cycle55; cycle55]), 'enumeres : rouge, vert, orange, et ainsi de suite');
+assert(isequal(double(r55.yout(:)'), [1 0 0 1 0 0]), 'enumeres : l''arret au rouge');
+journal55 = r55.logsout.getElement('feu');
+assert(isa(journal55.Values.Data, 'LumiereEssai') && ...
+       isequal(journal55.Values.Data, [cycle55; cycle55]), ...
+       'enumeres : le journal garde les membres');
+r55 = sim(m55, 'Solver', 'FixedStepDiscrete', 'StopTime', 1, 'FixedStep', 1, ...
+          'SaveFormat', 'Dataset');
+assert(isa(r55.yout.getElement(1).Values.Data, 'logical'), 'enumeres : yout en Dataset');
+
+% Un sous-système activé qui revient à sa sortie initiale : le membre par
+% défaut, celui que rend getDefaultValue.
+m55 = new_system('enumActive');
+m55 = add_block(m55, 'pulsegenerator', 'p', 'Period', 2, 'PulseWidth', 50);
+interne55 = new_system('interne55');
+interne55 = add_block(interne55, 'constant', 'v', 'Value', 'LumiereEssai.Orange');
+interne55 = add_block(interne55, 'outport', 'y', 'Port', 1, 'OutputWhenDisabled', 'reset');
+interne55 = add_block(interne55, 'enableport', 'Enable');
+interne55 = add_line(interne55, 'v', 'y');
+m55 = add_block(m55, 'subsystem', 's', 'Model', interne55);
+m55 = add_line(m55, 'p', 's/Enable');
+m55 = add_block(m55, 'toworkspace', 'tw', 'VariableName', 'active55');
+m55 = add_line(m55, 's/1', 'tw/1');
+sim(m55, 'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 3);
+O55 = LumiereEssai.Orange;
+V55 = LumiereEssai.Vert;
+assert(isequal(active55, [O55; O55; V55; V55; O55; O55; V55]), ...
+       'enumeres : a l''arret, le membre par defaut');
+
+% Un membre donné en objet s'enregistre en texte, comme Simulink range ses
+% paramètres, et se relit.
+m55 = new_system('enumSauve');
+m55 = add_block(m55, 'constant', 'c', 'Value', JourEssai.Mercredi);
+m55 = add_block(m55, 'outport', 'y');
+m55 = add_line(m55, 'c/1', 'y/1');
+dossier55 = tempname();
+mkdir(dossier55);
+ancien55 = pwd();
+cd(dossier55);
+for ext55 = {'.slx', '.m'}
+    save_system(m55, ['enumSauve' ext55{1}]);
+    rehash;
+    relu55 = load_system(['enumSauve' ext55{1}]);
+    r55 = sim(relu55, 'StopTime', 0.02);
+    assert(isa(r55.yout, 'JourEssai') && r55.yout(1) == JourEssai.Mercredi && ...
+           strcmp(get_param(relu55, 'c', 'Value'), 'JourEssai.Mercredi'), ...
+           sprintf('enumeres : le membre s''enregistre et se relit (%s)', ext55{1}));
+end
+cd(ancien55);
+rmdir(dossier55, 's');
+
+% Ce que Simulink refuse, et nomme.
+refus55 = {
+    @() enumDeux('==', 'JourEssai.Mardi', 2), 'Simulink:DataType:EnumTypeMismatch', 'deux/op'
+    @() enumDeux('<', 'JourEssai.Mardi', 'NiveauEssai.Haut'), ...
+        'Simulink:DataType:EnumTypeMismatch', 'Enum: NiveauEssai'
+    @() enumApres('gain', {'Gain', 2}), 'Simulink:DataType:EnumTypeNotSupported', 'apres/b'
+    @() enumApres('integrator', {}), 'Simulink:DataType:EnumTypeNotSupported', 'apres/b'
+    @() enumApres('delay', {'SampleTime', 0.1}), 'Simulink:DataType:EnumParameterMismatch', ...
+        'InitialCondition'
+    @() enumApres('switchcase', {'CaseConditions', '{1, 2}'}), ...
+        'Simulink:DataType:EnumTypeMismatch', 'apres/b'
+    @() enumApres('datatypeconversion', {'OutDataTypeStr', 'Enum: NiveauEssai'}), ...
+        'Simulink:DataType:EnumTypeMismatch', 'apres/b'
+    @() enumApres('comparetoconstant', {'const', 'NiveauEssai.Bas', 'relop', '=='}), ...
+        'Simulink:DataType:EnumParameterMismatch', 'NiveauEssai'
+    @() sim(add_line(add_block(add_block(add_block(add_block(new_system('sw'), 'constant', ...
+        'a', 'Value', 1), 'constant', 'c', 'Value', 'JourEssai.Mardi'), 'switch', 'sw'), ...
+        'outport', 'y'), 'c/1', 'sw/2')), 'Simulink:DataType:EnumTypeNotSupported', 'sw/sw'
+    @() sim(add_line(add_block(add_block(new_system('mx'), 'constant', 'a', 'Value', ...
+        'JourEssai.Mardi'), 'mux', 'x', 'Inputs', 2), 'a/1', 'x/1')), ...
+        'Simulink:DataType:EnumTypeMismatch', 'mx/x'
+    @() enumSource('Value', 2, 'OutDataTypeStr', 'Enum: JourEssai'), ...
+        'Simulink:DataType:EnumParameterMismatch', 'JourEssai.Lundi'
+    @() enumSource('Value', 'JourEssai.Mardi', 'OutDataTypeStr', 'Enum: Inconnue'), ...
+        'Simulink:DataType:EnumTypeUndefined', 'Inconnue'
+    @() enumSource('Value', 'JourEssai.Mardi', 'OutDataTypeStr', 'int32'), ...
+        'Simulink:DataType:EnumParameterMismatch', 'source/c'
+    @() enumSource('Value', 'CouleurEssai.Rouge'), 'Simulink:DataType:EnumTypeNotInteger', ...
+        'CouleurEssai'
+    @() sim(add_line(add_line(add_block(add_block(add_block(new_system('gainMembre'), ...
+        'constant', 'a', 'Value', 1), 'gain', 'g', 'Gain', 'JourEssai.Mardi'), 'outport', ...
+        'y'), 'a/1', 'g/1'), 'g/1', 'y/1')), 'Simulink:DataType:EnumParameterMismatch', ...
+        'gainMembre/g'
+    @() sim(add_line(add_line(add_block(add_block(add_block(new_system('manuel'), ...
+        'constant', 'a', 'Value', 'JourEssai.Mardi'), 'constant', 'b', 'Value', 2), ...
+        'manualswitch', 'sw'), 'a/1', 'sw/1'), 'b/1', 'sw/2')), ...
+        'Simulink:DataType:EnumTypeMismatch', 'manuel/sw'
+    @() enumCommande('One-based contiguous', '{1,2}'), 'Simulink:DataType:EnumTypeMismatch', ...
+        'Specify indices'
+    @() enumCommande('Specify indices', '{1, 2}'), 'Simulink:DataType:EnumTypeMismatch', ...
+        'DataPortIndices'
+    @() enumCommande('Specify indices', '{JourEssai.Lundi, [JourEssai.Lundi JourEssai.Mardi]}'), ...
+        'Simulink:blocks:MultiPortSwitchInvalidIndices', 'multi/ms'
+    @() enumCommande('Specify indices', '{JourEssai.Lundi, NiveauEssai.Bas}'), ...
+        'Simulink:blocks:MultiPortSwitchInvalidIndices', 'NiveauEssai'
+    @() enumCommande('Specify indices', '{JourEssai.Lundi, JourEssai.Mercredi}'), ...
+        'Simulink:blocks:MultiPortSwitchIndexOutOfRange', 'JourEssai.Mardi'
+    @() sim(add_line(add_line(add_block(add_block(add_block(new_system('conv'), 'constant', ...
+        'n', 'Value', 'int32(3)'), 'datatypeconversion', 'e', 'OutDataTypeStr', ...
+        'Enum: NiveauEssai'), 'outport', 'y'), 'n/1', 'e/1'), 'e/1', 'y/1'), 'StopTime', 0.02), ...
+        'Simulink:DataType:EnumInvalidValue', 'conv/e'
+    };
+for kE = 1:size(refus55, 1)
+    vu = '';
+    message = '';
+    try
+        refus55{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, refus55{kE, 2}) && ~isempty(strfind(message, refus55{kE, 3})), ...
+           sprintf('types enumeres, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   refus55{kE, 2}, vu, message));
+end
+fprintf('types enumeres : %d refus nommes verifies\n', size(refus55, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -8069,4 +8353,57 @@ function m = aleaRefusComplexe(type, varargin)
         nom = sprintf('y%d', q);
         m = add_line(add_block(m, 'outport', nom), sprintf('b/%d', q), nom);
     end
+end
+
+function r = enumDeux(operateur, a, b)
+    % Deux constantes comparées par un opérateur relationnel.
+    m = new_system('deux');
+    m = add_block(m, 'constant', 'a', 'Value', a);
+    m = add_block(m, 'constant', 'b', 'Value', b);
+    m = add_block(m, 'relational', 'op', 'Operator', operateur);
+    m = add_block(m, 'outport', 'y');
+    m = add_line(m, 'a/1', 'op/1');
+    m = add_line(m, 'b/1', 'op/2');
+    m = add_line(m, 'op/1', 'y/1');
+    r = sim(m, 'StopTime', 0.02);
+end
+
+function r = enumApres(type, parametres)
+    % Un membre de JourEssai qui entre dans un bloc de ce type.
+    m = new_system('apres');
+    m = add_block(m, 'constant', 'a', 'Value', 'JourEssai.Mardi');
+    m = add_block(m, type, 'b', parametres{:});
+    m = add_line(m, 'a/1', 'b/1');
+    [~, nSorties] = matlibre_sl_ports(struct('type', type, 'nom', 'b', ...
+                                             'parametres', struct(parametres{:})));
+    if nSorties > 0 && ~strcmp(type, 'switchcase')
+        m = add_block(m, 'outport', 'y');
+        m = add_line(m, 'b/1', 'y/1');
+    end
+    r = sim(m, 'StopTime', 0.2);
+end
+
+function r = enumSource(varargin)
+    % Une constante réglée comme on le dit.
+    m = new_system('source');
+    m = add_block(m, 'constant', 'c', varargin{:});
+    m = add_block(m, 'outport', 'y');
+    m = add_line(m, 'c/1', 'y/1');
+    r = sim(m, 'StopTime', 0.02);
+end
+
+function r = enumCommande(ordre, indices)
+    % Un Multiport Switch commandé par JourEssai.Mardi.
+    m = new_system('multi');
+    m = add_block(m, 'constant', 'j', 'Value', 'JourEssai.Mardi');
+    m = add_block(m, 'constant', 'a', 'Value', 10);
+    m = add_block(m, 'constant', 'b', 'Value', 20);
+    m = add_block(m, 'multiportswitch', 'ms', 'Inputs', 2, 'DataPortOrder', ordre, ...
+                  'DataPortIndices', indices);
+    m = add_block(m, 'outport', 'y');
+    m = add_line(m, 'j/1', 'ms/1');
+    m = add_line(m, 'a/1', 'ms/2');
+    m = add_line(m, 'b/1', 'ms/3');
+    m = add_line(m, 'ms/1', 'y/1');
+    r = sim(m, 'StopTime', 0.02);
 end

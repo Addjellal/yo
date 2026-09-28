@@ -499,6 +499,16 @@ n = NiveauEssai.Haut;
 assert(isa(int32(n), 'int32') && int32(n) == 10 && isa(n, 'Simulink.IntEnumType') && ...
        n > NiveauEssai.Bas);
 assert(isempty(NiveauEssai.getDescription()));
+% un tableau agrandi au-delà de sa fin se comble du membre par défaut, le
+% premier ; feval atteint un membre ou une méthode statique par son nom
+agrandi = NiveauEssai.Haut;
+agrandi(3) = NiveauEssai.Haut;
+assert(isequal(agrandi, [NiveauEssai.Haut NiveauEssai.Bas NiveauEssai.Haut]));
+carre = JourEssai.Mardi;
+carre(2, 2) = JourEssai.Mercredi;
+assert(isequal(carre, [JourEssai.Mardi JourEssai.Lundi; JourEssai.Lundi JourEssai.Mercredi]));
+assert(feval('JourEssai.Mardi') == JourEssai.Mardi);
+assert(isempty(feval('NiveauEssai.getDescription')));
 % ce qu'une énumération refuse
 refusEnum = {
     @() JourEssai(7), 'MATLAB:class:CannotConvert'
@@ -509,6 +519,7 @@ refusEnum = {
     @() JourEssai.Lundi == FeuEssai.Rouge, 'MATLAB:UndefinedFunction'
     @() JourEssai(1, 2), 'MATLAB:class:EnumerationConstructor'
     @() sort(feux), 'MATLAB:UndefinedFunction'
+    @() feval('JourEssai.Jeudi'), 'MATLAB:UndefinedFunction'
     };
 for kE = 1:size(refusEnum, 1)
     vu = '';

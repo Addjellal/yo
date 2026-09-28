@@ -142,9 +142,10 @@ motifs = {'\d+ fonctions natives', sprintf('%d fonctions natives', natives)
           'fonctions natives — \d+,', sprintf('fonctions natives — %d,', natives)
           % Le compte peut se trouver a la ligne suivante : on garde
           % l'espacement tel quel plutot que de recoller le paragraphe.
-          'réparties en(\s*)\*\*\d+ modules\*\*', ...
-              sprintf('réparties en$1**%d modules**', modules)
-          'réparties en(\s*)\d+ modules', sprintf('réparties en$1%d modules', modules)
+          % le nombre ne suit pas « $1 » directement : « $175 » se lirait
+          % comme le jeton 17 suivi d'un 5 ; il passe par une marque
+          'réparties en(\s*)\*\*\d+ modules\*\*', 'réparties en$1**@MODULES@ modules**'
+          'réparties en(\s*)\d+ modules', 'réparties en$1@MODULES@ modules'
           'les \d+ modules et leur', sprintf('les %d modules et leur', modules)
           'les \d+ fonctions, avec leur aide', ...
               sprintf('les %d fonctions, avec leur aide', natives + total)
@@ -168,6 +169,7 @@ for f = 1:numel(fichiers)
     for m = 1:size(motifs, 1)
         texte = regexprep(texte, motifs{m, 1}, motifs{m, 2});
     end
+    texte = strrep(texte, '@MODULES@', sprintf('%d', modules));
     if ~strcmp(texte, avant)
         fid = fopen(fichiers{f}, 'w');
         fprintf(fid, '%s', texte);

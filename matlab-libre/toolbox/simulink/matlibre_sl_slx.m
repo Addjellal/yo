@@ -1113,6 +1113,8 @@ function t = texteValeur(v)
     elseif iscellstr(v)
         t = ['{' strjoin(cellfun(@(c) ['''' strrep(c, '''', '''''') ''''], v, ...
                                  'UniformOutput', false), ', ') '}'];
+    elseif isobject(v) && isenum(v)
+        t = matlibre_sl_types('texte', v);   % un membre : 'Couleur.Rouge'
     else
         t = '';
     end

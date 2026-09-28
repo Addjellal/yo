@@ -2196,6 +2196,19 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                         V(a:b) = y;
                     case 34   % data type conversion
+                        if T.P(p) > 200
+                            % vers un type énuméré : chaque valeur doit être
+                            % celle d'un membre
+                            valeurs = T.P(p + 6:p + 5 + T.P(p + 5));
+                            fautive = find(~ismember(u, valeurs), 1);
+                            if ~isempty(fautive)
+                                classe = matlibre_sl_types('enum', T.P(p));
+                                error('Simulink:DataType:EnumInvalidValue', ...
+                                      ['L''entree de ''%s'' vaut %g a t = %g : aucun membre ' ...
+                                       'de %s ne porte cette valeur, qui ne se convertit ' ...
+                                       'donc pas.'], T.chemins{k}, u(fautive), t, classe);
+                            end
+                        end
                         if T.P(p + 3) ~= 0
                             u = entierStocke(T.P(p + 4), u, T.fixes);   % Stored Integer (SI)
                         end
@@ -2372,34 +2385,7 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                             V(a:b) = y;
                         end
                     case 61   % multiport switch
-                        commande = V(eA(e + 1));
-                        rang = fix(commande) + T.P(p + 1);
-                        if T.P(p + 1)
-                            base = 'a partir de zero';
-                        else
-                            base = 'a partir de un';
-                        end
-                        if T.P(p) == 1
-                            % une seule entrée de données : l'Index Vector en
-                            % choisit un élément
-                            donnees = V(eA(e + 2):eB(e + 2));
-                            if ~(rang >= 1 && rang <= numel(donnees))
-                                error('Simulink:blocks:MultiPortSwitchIndexOutOfRange', ...
-                                      ['L''entree de commande de ''%s'' vaut %g a t = %g : elle ' ...
-                                       'doit designer l''un des %d elements de son entree de ' ...
-                                       'donnees, numerotes %s.'], T.chemins{k}, commande, t, ...
-                                      numel(donnees), base);
-                            end
-                            V(a:b) = donnees(rang);
-                        else
-                            if ~(rang >= 1 && rang <= T.P(p))
-                                error('Simulink:blocks:MultiPortSwitchIndexOutOfRange', ...
-                                      ['L''entree de commande de ''%s'' vaut %g a t = %g : elle ' ...
-                                       'doit designer l''une de ses %d entrees de donnees, ' ...
-                                       'numerotees %s.'], T.chemins{k}, commande, t, T.P(p), base);
-                            end
-                            V(a:b) = V(eA(e + 1 + rang):eB(e + 1 + rang));
-                        end
+                        V(a:b) = aiguillerMultiport(T, k, p, e, V, t, eA, eB);
                     case {62, 65}   % mux, concatenate
                         if code(k) == 65 && sub(k) == 2
                             V(a:b) = concatener(T, p, V, e);
@@ -3570,10 +3556,90 @@ function V = portsIntegrateur(T, k, V, Z, t, p, a, b)
     end
 end
 
+% Un Multiport Switch : la commande désigne un port de données — par son
+% rang, à partir de un ou de zéro, ou par l'un des indices qu'on lui a
+% donnés (Specify indices) — ; sinon passe le port du cas par défaut, le
+% dernier ou un port de plus, avec ce que DiagnosticForDefault veut qu'on
+% en dise : rien, un avertissement, ou une erreur.
+function y = aiguillerMultiport(T, k, p, e, V, t, eA, eB)
+    P = T.P;
+    nDonnees = P(p);
+    zero = P(p + 1);
+    specifies = P(p + 2);
+    plus = P(p + 3);
+    diagnostic = P(p + 4);
+    commande = V(eA(e + 1));
+    base = 'a partir de un';
+    if zero
+        base = 'a partir de zero';
+    end
+    if nDonnees == 1 && ~specifies && ~plus
+        % une seule entrée de données : l'Index Vector en choisit un élément
+        rang = fix(commande) + zero;
+        donnees = V(eA(e + 2):eB(e + 2));
+        if ~(rang >= 1 && rang <= numel(donnees))
+            error('Simulink:blocks:MultiPortSwitchIndexOutOfRange', ...
+                  ['L''entree de commande de ''%s'' vaut %g a t = %g : elle doit designer ' ...
+                   'l''un des %d elements de son entree de donnees, numerotes %s.'], ...
+                  T.chemins{k}, commande, t, numel(donnees), base);
+        end
+        y = donnees(rang);
+        return
+    end
+    rang = 0;
+    if specifies
+        q = p + 6;
+        for j = 1:nDonnees
+            n = P(q);
+            if any(P(q + 1:q + n) == fix(commande))
+                rang = j;
+                break
+            end
+            q = q + n + 1;
+        end
+    elseif fix(commande) + zero >= 1 && fix(commande) + zero <= nDonnees
+        rang = fix(commande) + zero;
+    end
+    if rang == 0
+        if diagnostic > 0
+            texte = sprintf('%g', commande);
+            if P(p + 5) > 200
+                % une commande énumérée : le membre qu'elle porte
+                classe = matlibre_sl_types('enum', P(p + 5));
+                try
+                    texte = [classe '.' char(feval(classe, commande))];
+                catch
+                end
+            end
+            if specifies
+                attendu = 'l''un des indices de ses ports de donnees (DataPortIndices)';
+            else
+                attendu = sprintf('l''une de ses %d entrees de donnees, numerotees %s', ...
+                                  nDonnees, base);
+            end
+            if diagnostic == 2
+                error('Simulink:blocks:MultiPortSwitchIndexOutOfRange', ...
+                      'L''entree de commande de ''%s'' vaut %s a t = %g : elle doit designer %s.', ...
+                      T.chemins{k}, texte, t, attendu);
+            end
+            warning('Simulink:blocks:MultiPortSwitchIndexOutOfRange', ...
+                    ['L''entree de commande de ''%s'' vaut %s a t = %g, et ne designe aucun ' ...
+                     'de ses ports de donnees : le port du cas par defaut passe.'], ...
+                    T.chemins{k}, texte, t);
+        end
+        rang = nDonnees + plus;
+    end
+    y = V(eA(e + 1 + rang):eB(e + 1 + rang));
+end
+
 % Une conversion de type : le signal reste un double, mais prend les valeurs
 % que le type admet — arrondi selon le mode demandé, puis saturé ou
 % replié modulo 2^n à la façon des entiers de Simulink.
 function y = convertirType(type, arrondi, saturer, u, fixes, stocke)
+    if type > 200
+        y = u;   % un type énuméré : le signal porte déjà la valeur d'un membre
+        return
+    end
     switch type
         case {1, 2}   % hérité, double : rien ne change
             y = u;

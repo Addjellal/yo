@@ -630,7 +630,7 @@ function [initiales, sortie, derivee, maj] = ecrireBloc(c, k, v, variables, u)
             end
         case 'multiportswitch'
             sortie = {sprintf('choix_%s = fix(%s(1)) + %s;', v, u{1}, nombre(s(2)))};
-            if s(1) == 1
+            if s(1) == 1 && ~s(3) && ~s(4)
                 % l'Index Vector : un élément de l'unique entrée de données
                 sortie = [sortie, {sprintf('if choix_%s < 1 || choix_%s > numel(%s)', v, v, u{2}), ...
                     sprintf(['    error(''Simulink:blocks:MultiPortSwitchIndexOutOfRange'', ' ...
@@ -639,18 +639,41 @@ function [initiales, sortie, derivee, maj] = ecrireBloc(c, k, v, variables, u)
                     sprintf('%s = %s(choix_%s);', y, u{2}, v)}];
                 return
             end
+            % [données; base zéro; indices dits; port de plus; diagnostic;
+            %  type de la commande; pour chaque port : n, ses indices]
+            q = 7;
             for j = 1:s(1)
-                if j == 1
-                    sortie{end + 1} = sprintf('if choix_%s == 1', v); %#ok<AGROW>
+                if s(3)
+                    % les indices dits : la commande est l'un d'eux
+                    condition = sprintf('any(fix(%s(1)) == %s)', u{1}, ...
+                                        nombre(s(q + 1:q + s(q))));
+                    q = q + s(q) + 1;
                 else
-                    sortie{end + 1} = sprintf('elseif choix_%s == %d', v, j); %#ok<AGROW>
+                    condition = sprintf('choix_%s == %d', v, j);
+                end
+                if j == 1
+                    sortie{end + 1} = sprintf('if %s', condition); %#ok<AGROW>
+                else
+                    sortie{end + 1} = sprintf('elseif %s', condition); %#ok<AGROW>
                 end
                 sortie{end + 1} = sprintf('    %s = %s;', y, etendu(u{j + 1}, w)); %#ok<AGROW>
             end
-            sortie = [sortie, {'else', ...
-                sprintf(['    error(''Simulink:blocks:MultiPortSwitchIndexOutOfRange'', ' ...
-                         '''L''''entree de commande de %s vaut %%g a t = %%g.'', %s(1), t);'], ...
-                        strrep(c.chemins{k}, '''', ''''''), u{1}), 'end'}];
+            sortie{end + 1} = 'else';
+            chemin = strrep(c.chemins{k}, '''', '''''');
+            if s(5) == 2
+                sortie{end + 1} = sprintf(['    error(''Simulink:blocks:MultiPortSwitchIndexOutOfRange'', ' ...
+                                           '''L''''entree de commande de %s vaut %%g a t = %%g.'', %s(1), t);'], ...
+                                          chemin, u{1});
+            else
+                if s(5) == 1
+                    sortie{end + 1} = sprintf(['    warning(''Simulink:blocks:MultiPortSwitchIndexOutOfRange'', ' ...
+                                               '''L''''entree de commande de %s vaut %%g a t = %%g.'', %s(1), t);'], ...
+                                              chemin, u{1});
+                end
+                % le port du cas par défaut : le dernier, ou un port de plus
+                sortie{end + 1} = sprintf('    %s = %s;', y, etendu(u{s(1) + s(4) + 1}, w));
+            end
+            sortie{end + 1} = 'end';
         case 'mux'
             sortie = {sprintf('%s = [%s];', y, strjoin(u, '; '))};
         case 'concatenate'

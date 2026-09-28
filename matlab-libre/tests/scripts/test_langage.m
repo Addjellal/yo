@@ -1024,6 +1024,23 @@ poigneeCompteur();
 clear(func2str(poigneeCompteur));
 assert(poigneeCompteur() == 1, 'clear(func2str(h)) aussi');
 rmpath(dossierPersistant);
+% Un dossier ajouté par un chemin relatif se range en absolu : un rehash
+% fait depuis un autre dossier ne perd pas ses fonctions.
+ancienRelatif = pwd();
+cd(fileparts(dossierPersistant));
+[~, feuilleRelative] = fileparts(dossierPersistant);
+addpath(feuilleRelative);
+cd(tempdir());
+dossierAilleurs = tempname();
+mkdir(dossierAilleurs);
+cd(dossierAilleurs);
+rehash;
+cd(ancienRelatif);
+rmdir(dossierAilleurs, 's');
+assert(exist('compteurPersistant', 'file') == 2, 'le dossier relatif reste sur le chemin');
+assert(any(strcmp(strsplit(path, pathsep), dossierPersistant)), 'et il y est en absolu');
+rmpath(dossierPersistant);
+assert(~any(strcmp(strsplit(path, pathsep), dossierPersistant)), 'rmpath le retire');
 
 % Les fonctions d'un fichier vivent ensemble : une poignée vers l'une
 % d'elles garde le fichier entier, même quand le cache du chemin l'a

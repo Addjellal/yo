@@ -8,7 +8,11 @@ function modele = add_block(modele, type, nom, varargin)
 %   que GET_PARAM(...,'BlockType') rend.
 %
 %   Sources — elles n'ont pas d'entrée :
-%     constant     Value, SampleTime            scalaire, vecteur ou matrice
+%     constant     Value, SampleTime            scalaire, vecteur ou matrice ;
+%                  un membre d'énumération (Couleur.Rouge) donne un signal
+%                  de type énuméré
+%     enumeratedconstant OutDataTypeStr ('Enum: SlDemoSign'), Value
+%                  (SlDemoSign.Positive) — un membre, constant
 %     step         Time, Before, After
 %     ramp         Slope, Start, InitialOutput
 %     sine         Amplitude, Frequency, Phase, Bias, SampleTime
@@ -60,9 +64,11 @@ function modele = add_block(modele, type, nom, varargin)
 %                  Inherit via internal rule', 'Inherit: Same as first
 %                  input', ou un type) ; gain, ParamDataTypeStr
 %     datatypeconversion OutDataTypeStr (double, single, int8 … uint32,
-%                  boolean, fixdt(1,16,8), sfix16_En8), RndMeth,
-%                  SaturateOnIntegerOverflow, ConvertRealWorld (Real World
-%                  Value (RWV), Stored Integer (SI) : garde l'entier stocké)
+%                  boolean, fixdt(1,16,8), sfix16_En8, Enum: Couleur),
+%                  RndMeth, SaturateOnIntegerOverflow, ConvertRealWorld
+%                  (Real World Value (RWV), Stored Integer (SI) : garde
+%                  l'entier stocké) ; un membre devient sa valeur entière,
+%                  un entier le membre qui la porte
 %     abs, sign, unaryminus, bias (Bias), dotproduct
 %     math         Operator : exp, log, 10^u, log10, magnitude^2, square,
 %                  sqrt, pow, conj, reciprocal, hypot, rem, mod,
@@ -144,8 +150,13 @@ function modele = add_block(modele, type, nom, varargin)
 %   Aiguillage :
 %     switch       Threshold, Criteria : 'u2 >= Threshold', 'u2 > Threshold',
 %                  'u2 ~= 0' — la première entrée passe, ou la troisième
-%     multiportswitch Inputs, DataPortOrder ; une seule entrée de données
-%                  (« Index Vector ») : l'élément que désigne la commande
+%     multiportswitch Inputs, DataPortOrder ('One-based contiguous',
+%                  'Zero-based contiguous', 'Specify indices'),
+%                  DataPortIndices ({1, [2 3], 4}, ou des membres pour une
+%                  commande énumérée), DataPortForDefault ('Last data port',
+%                  'Additional data port'), DiagnosticForDefault (Error,
+%                  Warning, None) ; une seule entrée de données (« Index
+%                  Vector ») : l'élément que désigne la commande
 %     environmentcontroller —              deux entrées, Sim et Coder : rend Sim
 %     bustovector  —                            un bus de scalaires, en vecteur
 %     busassignment AssignedSignals ('a,b.c') — le bus, puis un signal par
@@ -392,7 +403,9 @@ function modele = add_block(modele, type, nom, varargin)
 %     if           NumInputs, IfExpression, ElseIfExpressions, ShowElse —
 %                  conditions sur u1, u2... ; une sortie d'action par
 %                  branche
-%     switchcase   CaseConditions ('{1, [2 3]}'), ShowDefaultCase
+%     switchcase   CaseConditions ('{1, [2 3]}', ou des membres pour une
+%                  entrée énumérée : '{Couleur.Rouge, Couleur.Vert}'),
+%                  ShowDefaultCase
 %     modelreference ModelName             un autre modèle — variable,
 %                  fichier .m, .slx ou .mdl —, relu à chaque simulation
 %

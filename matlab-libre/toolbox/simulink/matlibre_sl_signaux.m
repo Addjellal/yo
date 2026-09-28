@@ -437,6 +437,11 @@ function ds = journal(c, T, J, instants)
                 rangs = rangs(max(1, end - str2double(reglage.DataLoggingMaxPoints) + 1):end);
             end
             valeurs = mettreEnForme(donnees(:, rangs), R.dims, numel(rangs));
+            type = c.typePort(c.portDebut(k) + reglage.Port - 1);
+            if type > 200
+                % un signal énuméré se journalise en membres de son type
+                valeurs = matlibre_sl_types('convertir', type, valeurs);
+            end
             nom = reglage.Name;
             if strcmp(reglage.DataLoggingNameMode, 'Custom')
                 nom = reglage.DataLoggingName;
