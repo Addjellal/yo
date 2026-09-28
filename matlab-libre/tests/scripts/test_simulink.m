@@ -8305,6 +8305,269 @@ assert(strcmp(refusFormes56('switchcase|ligne'), 'Simulink:blocks:SwitchCaseInpu
 fprintf('blocs et formes : %d simulations, %d refus nommes\n', tailles56.Count, ...
         refusFormes56.Count);
 
+%% ---------------------------------------------------------- 57. Bus typés
+% Un bus garde le type de chacun de ses éléments : un Bus Selector rend
+% celui de l'élément qu'il choisit, un bus traverse un retard, une mémoire,
+% un bloqueur ou un aiguillage, et un type de bus déclare le type de ses
+% éléments, que Bus Creator et Bus Assignment doivent respecter.
+m57 = new_system('busMeles');
+m57 = add_block(m57, 'constant', 'a', 'Value', 'int8(5)');
+m57 = add_block(m57, 'constant', 'b', 'Value', 'true');
+m57 = add_block(m57, 'constant', 'c', 'Value', 'JourEssai.Mardi');
+m57 = add_block(m57, 'constant', 'd', 'Value', 2.5);
+m57 = add_block(m57, 'buscreator', 'bc', 'Inputs', 'a,b,c,d');
+m57 = add_block(m57, 'busselector', 'bs', 'OutputSignals', 'a,b,c,d');
+noms57 = {'a', 'b', 'c', 'd'};
+for q = 1:4
+    m57 = add_line(m57, sprintf('%s/1', noms57{q}), sprintf('bc/%d', q));
+    m57 = add_block(m57, 'toworkspace', sprintf('tw%d', q), 'VariableName', ...
+                    sprintf('busMele%d', q));
+    m57 = add_line(m57, sprintf('bs/%d', q), sprintf('tw%d/1', q));
+end
+m57 = add_line(m57, 'bc/1', 'bs/1');
+sim(m57, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 0.2);
+assert(isa(busMele1, 'int8') && busMele1(1) == 5 && islogical(busMele2) && ...
+       isa(busMele3, 'JourEssai') && busMele3(1) == JourEssai.Mardi && ...
+       isa(busMele4, 'double') && busMele4(1) == 2.5, ...
+       'bus types : chaque element garde son type');
+
+% Un bus traverse un retard, une mémoire, un bloqueur, un aiguillage.
+for passage57 = {'delay', 'memory', 'zoh', 'ratetransition', 'manualswitch'}
+    m57 = new_system('busPasse');
+    m57 = add_block(m57, 'constant', 'a', 'Value', 'int8(5)');
+    m57 = add_block(m57, 'constant', 'b', 'Value', 2.5);
+    m57 = add_block(m57, 'buscreator', 'bc', 'Inputs', 'a,b');
+    if strcmp(passage57{1}, 'delay')
+        m57 = add_block(m57, 'delay', 'p', 'SampleTime', 0.1, 'InitialCondition', 0);
+    else
+        m57 = add_block(m57, passage57{1}, 'p');
+    end
+    m57 = add_block(m57, 'busselector', 'bs', 'OutputSignals', 'a,b');
+    m57 = add_block(m57, 'outport', 'ya');
+    m57 = add_block(m57, 'outport', 'yb');
+    m57 = add_line(add_line(m57, 'a/1', 'bc/1'), 'b/1', 'bc/2');
+    m57 = add_line(add_line(m57, 'bc/1', 'p/1'), 'p/1', 'bs/1');
+    if strcmp(passage57{1}, 'manualswitch')
+        m57 = add_line(m57, 'bc/1', 'p/2');
+    end
+    m57 = add_line(add_line(m57, 'bs/1', 'ya/1'), 'bs/2', 'yb/1');
+    r57 = sim(m57, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 0.3);
+    assert(isequal(r57.yout(end, :), [5 2.5]), ...
+           sprintf('un bus traverse %s', passage57{1}));
+end
+
+% Un type de bus déclare le type de ses éléments.
+e57a = Simulink.BusElement;
+e57a.Name = 'a';
+e57a.DataType = 'int8';
+e57b = Simulink.BusElement;
+e57b.Name = 'b';
+e57j = Simulink.BusElement;
+e57j.Name = 'jour';
+e57j.DataType = 'Enum: JourEssai';
+Capteurs57 = Simulink.Bus;
+Capteurs57.Elements = [e57a e57b e57j];
+assignin('base', 'Capteurs57', Capteurs57);
+m57 = new_system('busType');
+m57 = add_block(m57, 'constant', 'a', 'Value', 'int8(5)');
+m57 = add_block(m57, 'constant', 'b', 'Value', 2.5);
+m57 = add_block(m57, 'constant', 'j', 'Value', 'JourEssai.Mercredi');
+m57 = add_block(m57, 'buscreator', 'bc', 'Inputs', 'a,b,jour', 'OutDataTypeStr', ...
+                'Bus: Capteurs57');
+m57 = add_block(m57, 'busselector', 'bs', 'OutputSignals', 'a,jour');
+m57 = add_block(m57, 'outport', 'ya');
+m57 = add_block(m57, 'toworkspace', 'tw', 'VariableName', 'jourDuBus57');
+m57 = add_line(add_line(add_line(m57, 'a/1', 'bc/1'), 'b/1', 'bc/2'), 'j/1', 'bc/3');
+m57 = add_line(add_line(m57, 'bc/1', 'bs/1'), 'bs/1', 'ya/1');
+m57 = add_line(m57, 'bs/2', 'tw/1');
+r57 = sim(m57, 1);
+assert(isa(r57.yout, 'int8') && r57.yout(end) == 5 && isa(jourDuBus57, 'JourEssai') && ...
+       jourDuBus57(end) == JourEssai.Mercredi, 'le type de bus : int8 et JourEssai');
+% une entrée du modèle typée par le bus
+m57 = new_system('busEntre');
+m57 = add_block(m57, 'inport', 'e', 'OutDataTypeStr', 'Bus: Capteurs57');
+m57 = add_block(m57, 'busselector', 'bs', 'OutputSignals', 'a');
+m57 = add_block(m57, 'outport', 'y');
+m57 = add_line(add_line(m57, 'e/1', 'bs/1'), 'bs/1', 'y/1');
+r57 = sim(m57, 1);
+assert(isa(r57.yout, 'int8'), 'une entree de type Bus: Capteurs57 rend ses elements types');
+% des bus emboîtés
+e57i = Simulink.BusElement;
+e57i.Name = 'interne';
+e57i.DataType = 'Bus: Capteurs57';
+e57c = Simulink.BusElement;
+e57c.Name = 'c';
+Exterieur57 = Simulink.Bus;
+Exterieur57.Elements = [e57i e57c];
+assignin('base', 'Exterieur57', Exterieur57);
+m57 = new_system('busEmboite');
+m57 = add_block(m57, 'constant', 'a', 'Value', 'int8(5)');
+m57 = add_block(m57, 'constant', 'b', 'Value', 2.5);
+m57 = add_block(m57, 'constant', 'j', 'Value', 'JourEssai.Lundi');
+m57 = add_block(m57, 'constant', 'c', 'Value', 7);
+m57 = add_block(m57, 'buscreator', 'dedans', 'Inputs', 'a,b,jour');
+m57 = add_block(m57, 'buscreator', 'dehors', 'Inputs', 'interne,c', 'OutDataTypeStr', ...
+                'Bus: Exterieur57');
+m57 = add_block(m57, 'busselector', 'bs', 'OutputSignals', 'interne.a,c');
+m57 = add_block(m57, 'outport', 'ya');
+m57 = add_block(m57, 'outport', 'yc');
+m57 = add_line(add_line(add_line(m57, 'a/1', 'dedans/1'), 'b/1', 'dedans/2'), 'j/1', 'dedans/3');
+m57 = add_line(add_line(m57, 'dedans/1', 'dehors/1'), 'c/1', 'dehors/2');
+m57 = add_line(add_line(add_line(m57, 'dehors/1', 'bs/1'), 'bs/1', 'ya/1'), 'bs/2', 'yc/1');
+r57 = sim(m57, 1);
+assert(isequal(double(r57.yout(end, :)), [5 7]), 'le bus emboite garde interne.a');
+% le Bus Assignment garde le type de l'élément
+m57 = new_system('busAffecte');
+m57 = add_block(m57, 'constant', 'a', 'Value', 'int8(5)');
+m57 = add_block(m57, 'constant', 'b', 'Value', 2.5);
+m57 = add_block(m57, 'constant', 'n', 'Value', 'int8(-3)');
+m57 = add_block(m57, 'buscreator', 'bc', 'Inputs', 'a,b');
+m57 = add_block(m57, 'busassignment', 'ba', 'AssignedSignals', 'a');
+m57 = add_block(m57, 'busselector', 'bs', 'OutputSignals', 'a');
+m57 = add_block(m57, 'outport', 'y');
+m57 = add_line(add_line(m57, 'a/1', 'bc/1'), 'b/1', 'bc/2');
+m57 = add_line(add_line(m57, 'bc/1', 'ba/1'), 'n/1', 'ba/2');
+m57 = add_line(add_line(m57, 'ba/1', 'bs/1'), 'bs/1', 'y/1');
+r57 = sim(m57, 1);
+assert(isa(r57.yout, 'int8') && r57.yout(end) == -3, 'Bus Assignment : un int8 remplace un int8');
+
+refus57 = {
+    @() sim(set_param(busTypeAvec('a', 5), 'bc', 'OutDataTypeStr', 'Bus: Capteurs57'), 1), ...
+        'Simulink:Bus:ElementDataTypeMismatch', 'type int8'
+    @() sim(busTypeAvec('jour', 3), 1), 'Simulink:Bus:ElementDataTypeMismatch', 'Enum: JourEssai'
+    @() sim(set_param(m57, 'n', 'Value', 7), 1), 'Simulink:Bus:AssignmentDataTypeMismatch', ...
+        'busAffecte/ba'
+    @() sim(set_param(busEmboiteAvec(5), 'dehors', 'OutDataTypeStr', 'Bus: Exterieur57'), 1), ...
+        'Simulink:Bus:ElementDataTypeMismatch', 'interne.a'
+    };
+for kE = 1:size(refus57, 1)
+    vu = '';
+    message = '';
+    try
+        refus57{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, refus57{kE, 2}) && ~isempty(strfind(message, refus57{kE, 3})), ...
+           sprintf('bus types, cas %d : %s attendu, %s rendu (%s)', kE, refus57{kE, 2}, vu, ...
+                   message));
+end
+fprintf('bus types : %d refus nommes verifies\n', size(refus57, 1));
+
+%% ------------------------------------------------ 58. Cadences et solveurs
+% Chaque type de bloc nourri d'un signal échantillonné : un modèle discret
+% ne dépend pas du solveur à pas fixe qui le fait avancer — FixedStepDiscrete,
+% ode1, ode3 et ode4 en rendent exactement les mêmes valeurs. Un bloc à
+% état continu refuse FixedStepDiscrete ; une période qui n'est pas un
+% multiple du pas est refusée en nommant le bloc.
+solveurs58 = {'FixedStepDiscrete', 'ode1', 'ode3', 'ode4'};
+comparaisons58 = 0;
+for kT = 1:numel(catalogue56)
+    if any(strcmp(catalogue56(kT).famille, {'Interne', 'Simscape'}))
+        continue
+    end
+    type = catalogue56(kT).type;
+    m58 = batterieCadence(type, 0.1);
+    reference58 = [];
+    for kS = 1:numel(solveurs58)
+        try
+            r58 = [];
+            evalc(['r58 = sim(m58, ''Solver'', solveurs58{kS}, ''FixedStep'', 0.1, ' ...
+                   '''StopTime'', 1);']);
+        catch err
+            id = err.identifier;
+            assert((strncmp(id, 'Simulink:', 9) || strncmp(id, 'Stateflow:', 10)) && ...
+                   ~isempty(strfind(err.message, 'bc/')), ...
+                   sprintf('%s sous %s : erreur interne %s : %s', type, solveurs58{kS}, id, ...
+                           err.message));
+            if kS == 1
+                break   % un état continu : le modèle n'est pas discret
+            end
+            continue
+        end
+        if ~isfield(r58, 'yout') || isempty(r58.yout)
+            break
+        end
+        if kS == 1
+            reference58 = double(r58.yout);   % FixedStepDiscrete : la référence
+            continue
+        end
+        comparaisons58 = comparaisons58 + 1;
+        assert(isequal(size(double(r58.yout)), size(reference58)) && ...
+               max(abs(double(r58.yout(:)) - reference58(:))) < 1e-12, ...
+               sprintf('%s : %s rend d''autres valeurs que FixedStepDiscrete', type, ...
+                       solveurs58{kS}));
+    end
+end
+fprintf('cadences et solveurs : %d comparaisons de modeles discrets\n', comparaisons58);
+% un état continu refuse FixedStepDiscrete ; une période hors du pas est
+% refusée ; deux cadences se mêlent
+refus58 = {
+    @() sim(batterieCadence('integrator', 0.1), 'Solver', 'FixedStepDiscrete', ...
+            'FixedStep', 0.1, 'StopTime', 1), 'Simulink:', 'bc/b'
+    @() sim(batterieCadence('gain', 0.15), 'Solver', 'ode1', 'FixedStep', 0.1, ...
+            'StopTime', 1), 'Simulink:SampleTime:NotMultipleOfFixedStep', 'bc/'
+    };
+for kE = 1:size(refus58, 1)
+    vu = '';
+    message = '';
+    try
+        refus58{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strncmp(vu, refus58{kE, 2}, numel(refus58{kE, 2})) && ...
+           ~isempty(strfind(message, refus58{kE, 3})), ...
+           sprintf('cadences, cas %d : %s attendu, %s rendu (%s)', kE, refus58{kE, 2}, vu, ...
+                   message));
+end
+m58 = batterieCadence('zoh', 0.1);
+m58 = set_param(m58, 'b', 'SampleTime', 0.2);
+r58 = sim(m58, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 1);
+assert(all(r58.yout(2:2:end) == r58.yout(1:2:end - 1)), ...
+       'un bloqueur a 0,2 s tient deux pas d''une source a 0,1 s');
+
+%% ------------------------------------------ 59. Stateflow et types énumérés
+% Un diagramme Stateflow calcule sur des membres d'énumération : une sortie
+% dont la valeur initiale est un membre est un signal énuméré, et une entrée
+% énumérée arrive au diagramme en membre, qu'il compare aux siens.
+f59 = sfchart('feu59');
+f59 = sfstate(f59, 'rouge', 'en: feu = LumiereEssai.Rouge;');
+f59 = sfstate(f59, 'vert', 'en: feu = LumiereEssai.Vert;');
+f59 = sfstate(f59, 'orange', 'en: feu = LumiereEssai.Orange;');
+f59 = sftransition(f59, 'rouge', 'vert', '[after(2, tick)]');
+f59 = sftransition(f59, 'vert', 'orange', '[after(2, tick)]');
+f59 = sftransition(f59, 'orange', 'rouge', '[after(1, tick)]');
+m59 = new_system('feux59');
+m59 = add_block(m59, 'chart', 'feux', 'Chart', f59, 'Inputs', 0, 'Outputs', {'feu'}, ...
+                'InitialContext', struct('feu', LumiereEssai.Rouge), 'SampleTime', 1);
+m59 = add_block(m59, 'toworkspace', 'tw', 'VariableName', 'feux59');
+m59 = add_line(m59, 'feux/1', 'tw/1');
+sim(m59, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 6);
+R59 = LumiereEssai.Rouge;
+V59 = LumiereEssai.Vert;
+O59 = LumiereEssai.Orange;
+assert(isequal(feux59, [R59; R59; V59; V59; O59; R59; R59]), ...
+       'Stateflow : le feu rend des membres, dans l''ordre de ses etats');
+j59 = sfchart('jour59');
+j59 = sfstate(j59, 'repos', 'en: y = 0;');
+j59 = sfstate(j59, 'travail', 'en: y = 1;');
+j59 = sftransition(j59, 'repos', 'travail', '[u == JourEssai.Mardi]');
+j59 = sftransition(j59, 'travail', 'repos', '[u ~= JourEssai.Mardi]');
+m59 = new_system('jour59');
+m59 = add_block(m59, 'constant', 'j', 'Value', 'JourEssai.Mardi');
+m59 = add_block(m59, 'chart', 'c', 'Chart', j59, 'Inputs', 1, 'Outputs', {'y'}, ...
+                'InitialContext', struct('y', 0), 'SampleTime', 1);
+m59 = add_block(m59, 'outport', 'o');
+m59 = add_line(add_line(m59, 'j/1', 'c/1'), 'c/1', 'o/1');
+r59 = sim(m59, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 3);
+assert(isequal(r59.yout(:)', [0 1 1 1]), 'Stateflow : Mardi, le membre recu, fait passer');
+r59 = sim(set_param(m59, 'j', 'Value', 'JourEssai.Lundi'), 'Solver', 'FixedStepDiscrete', ...
+          'FixedStep', 1, 'StopTime', 3);
+assert(all(r59.yout == 0), 'Stateflow : Lundi ne fait pas passer');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -8682,6 +8945,57 @@ function m = batterieType(type, valeur)
     if isnan(ns), ns = 1; end
     for i = 1:ne
         m = add_block(m, 'constant', sprintf('c%d', i), 'Value', valeur);
+        m = add_line(m, sprintf('c%d/1', i), sprintf('b/%d', i));
+    end
+    for j = 1:ns
+        m = add_block(m, 'outport', sprintf('o%d', j));
+        m = add_line(m, sprintf('b/%d', j), sprintf('o%d/1', j));
+    end
+end
+
+function m = busTypeAvec(element, valeur)
+    % Le bus de type Capteurs57, l'élément ELEMENT réglé à VALEUR.
+    valeurs = struct('a', 'int8(5)', 'b', '2.5', 'jour', 'JourEssai.Lundi');
+    valeurs.(element) = valeur;
+    m = new_system('busFaux');
+    m = add_block(m, 'constant', 'a', 'Value', valeurs.a);
+    m = add_block(m, 'constant', 'b', 'Value', valeurs.b);
+    m = add_block(m, 'constant', 'j', 'Value', valeurs.jour);
+    m = add_block(m, 'buscreator', 'bc', 'Inputs', 'a,b,jour', 'OutDataTypeStr', ...
+                  'Bus: Capteurs57');
+    m = add_block(m, 'busselector', 'bs', 'OutputSignals', 'b');
+    m = add_block(m, 'outport', 'y');
+    m = add_line(add_line(add_line(m, 'a/1', 'bc/1'), 'b/1', 'bc/2'), 'j/1', 'bc/3');
+    m = add_line(add_line(m, 'bc/1', 'bs/1'), 'bs/1', 'y/1');
+end
+
+function m = busEmboiteAvec(a)
+    % Des bus emboîtés dont l'élément interne.a vaut A (un double).
+    m = new_system('emboiteFaux');
+    m = add_block(m, 'constant', 'a', 'Value', a);
+    m = add_block(m, 'constant', 'b', 'Value', 2.5);
+    m = add_block(m, 'constant', 'j', 'Value', 'JourEssai.Lundi');
+    m = add_block(m, 'constant', 'c', 'Value', 7);
+    m = add_block(m, 'buscreator', 'dedans', 'Inputs', 'a,b,jour');
+    m = add_block(m, 'buscreator', 'dehors', 'Inputs', 'interne,c');
+    m = add_block(m, 'busselector', 'bs', 'OutputSignals', 'c');
+    m = add_block(m, 'outport', 'y');
+    m = add_line(add_line(add_line(m, 'a/1', 'dedans/1'), 'b/1', 'dedans/2'), 'j/1', 'dedans/3');
+    m = add_line(add_line(m, 'dedans/1', 'dehors/1'), 'c/1', 'dehors/2');
+    m = add_line(add_line(m, 'dehors/1', 'bs/1'), 'bs/1', 'y/1');
+end
+
+function m = batterieCadence(type, periode)
+    % Le bloc TYPE, ses entrées nourries de sinus échantillonnés à PERIODE,
+    % ses sorties vers des Outport.
+    m = new_system('bc');
+    m = add_block(m, type, 'b');
+    [ne, ns] = matlibre_sl_ports(m.blocs{end});
+    if isnan(ne), ne = 1; end
+    if isnan(ns), ns = 1; end
+    for i = 1:ne
+        m = add_block(m, 'sine', sprintf('c%d', i), 'Amplitude', 0.5, 'Bias', 1.5, ...
+                      'Frequency', 2 * i, 'SampleTime', periode);
         m = add_line(m, sprintf('c%d/1', i), sprintf('b/%d', i));
     end
     for j = 1:ns

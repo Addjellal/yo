@@ -200,6 +200,16 @@ function T = preparer(c)
     T.instant = false(1, n);
     T.periodes = c.cadence;
     T.decalages = c.decalage;
+    for k = find(strcmp(c.types, 'chart'))
+        % un diagramme reçoit un membre là où son entrée est énumérée
+        T.classesEntree{k} = repmat({''}, 1, c.nIn(k));
+        for j = 1:c.nIn(k)
+            source = c.entrees{k}(j);
+            if source > 0 && isfield(c, 'typePort') && c.typePort(source) > 200
+                T.classesEntree{k}{j} = c.typePort(source);
+            end
+        end
+    end
     for k = find(strcmp(c.types, 'matlabfunction'))
         T.instant(k) = isfield(c.fonctions{k}, 'instant') && c.fonctions{k}.instant;
         T.formes{k} = cell(1, c.nIn(k));
@@ -2934,6 +2944,15 @@ end
 % actif et le contexte vivent dans les graphes du simulateur, une poignée
 % que chaque simulation recrée ; un instant déjà vu ne refait pas le pas —
 % une passe refaite au même instant rend les mêmes sorties.
+% L'entrée J d'un diagramme : un membre d'énumération si le signal est
+% énuméré, tel quel sinon.
+function u = entreeGraphe(T, k, j, u)
+    classes = T.classesEntree{k};
+    if j <= numel(classes) && isnumeric(classes{j}) && ~isempty(classes{j})
+        u = matlibre_sl_types('convertir', classes{j}, u);
+    end
+end
+
 function V = pasGraphe(T, k, V, p, e, t)
     graphes = T.graphes;
     G = T.objets{k};
@@ -2960,11 +2979,11 @@ function V = pasGraphe(T, k, V, p, e, t)
         if nIn == 0
             u = [];
         elseif nIn == 1
-            u = V(T.eA(e + 1):T.eB(e + 1));
+            u = entreeGraphe(T, k, 1, V(T.eA(e + 1):T.eB(e + 1)));
         else
             u = cell(1, nIn);
             for j = 1:nIn
-                u{j} = V(T.eA(e + j):T.eB(e + j));
+                u{j} = entreeGraphe(T, k, j, V(T.eA(e + j):T.eB(e + j)));
             end
         end
         if isstruct(etat.contexte)

@@ -405,7 +405,7 @@ function t = propager(c)
             if all(t(ports) > 0)
                 continue
             end
-            s = regle(c, k, typesEntrees(c, k, t));
+            s = regle(c, k, typesEntrees(c, k, t), t);
             if isempty(s) || any(s == 0)
                 continue
             end
@@ -450,7 +450,7 @@ function r = commun(tE)
     end
 end
 
-function s = regle(c, k, tE)
+function s = regle(c, k, tE, t)
     p = c.p{k};
     ch = c.chemins{k};
     n = c.nOut(k);
@@ -512,7 +512,7 @@ function s = regle(c, k, tE)
         case {'abs', 'unaryminus', 'sign', 'rounding', 'saturation', 'deadzone', ...
               'quantizer', 'bias', 'zoh', 'memory', 'delay', 'ratetransition', 'from', ...
               'selector', 'reshape', 'demux', 'ic', 'manualswitch', 'wraptozero', 'backlash', ...
-              'ratelimiter', 'tappeddelay', 'difference', 'busselector', 'busassignment', ...
+              'ratelimiter', 'tappeddelay', 'difference', 'busassignment', ...
               'algebraicconstraint'}
             r = commun(tE(1:min(1, end)));
             if r == 0 && any(strcmp(c.types{k}, {'memory', 'delay'})) && ...
@@ -523,6 +523,9 @@ function s = regle(c, k, tE)
             end
         case {'minmax', 'mux', 'concatenate', 'merge', 'dotproduct'}
             r = commun(tE);
+        case 'busselector'
+            s = typesChoisis(c, k, t);
+            return
         case 'switch'
             r = commun(tE([1 min(3, end)]));
         case 'multiportswitch'
@@ -553,6 +556,82 @@ function s = regle(c, k, tE)
         r = 2;   % un calcul sur des booléens rend un double
     end
     s = r * ones(1, n);
+end
+
+% Le type de chaque sortie d'un Bus Selector : celui de l'élément qu'elle
+% choisit ; un bus, ou des éléments de types mêlés, passent en double,
+% comme le vecteur qui les porte.
+function s = typesChoisis(c, k, t)
+    n = c.nOut(k);
+    s = 2 * ones(1, n);
+    if ~isfield(c, 'choixBus') || isempty(c.choixBus{k}) || isempty(c.formeBus{k})
+        return
+    end
+    codes = typesElements(c.formeBus{k}, t);
+    if any(codes == 0)
+        s = [];   % un élément n'est pas encore typé
+        return
+    end
+    choix = c.choixBus{k};
+    if isfield(c.p{k}, 'OutputAsBus') && strcmp(c.p{k}.OutputAsBus, 'on')
+        return
+    end
+    for q = 1:min(n, numel(choix))
+        morceau = codes(choix(q).debut:choix(q).debut + choix(q).largeur - 1);
+        if all(morceau == morceau(1))
+            s(q) = morceau(1);
+        end
+    end
+end
+
+% Les types des valeurs d'un bus, un code par valeur : celui du signal qui
+% forme chaque élément, ou celui que son type de bus déclare ; 0 tant que
+% l'un n'est pas connu.
+function codes = typesElements(forme, t)
+    codes = zeros(1, 0);
+    for j = 1:numel(forme)
+        e = forme(j);
+        if ~isempty(e.sous)
+            codes = [codes, typesElements(e.sous, t)]; %#ok<AGROW>
+        elseif isfield(e, 'donnee') && ~isempty(e.donnee)
+            code = codeDe(e.donnee);
+            if code <= 0
+                code = 2;   % un élément hérité, ou d'un type que MatLibre ne range pas
+            end
+            codes = [codes, code * ones(1, e.largeur)]; %#ok<AGROW>
+        elseif isfield(e, 'source') && e.source > 0
+            codes = [codes, t(e.source) * ones(1, e.largeur)]; %#ok<AGROW>
+        else
+            codes = [codes, 2 * ones(1, e.largeur)]; %#ok<AGROW>
+        end
+    end
+end
+
+% Un bus de type déclaré : chaque élément reçoit un signal de son type.
+function verifierElements(forme, objet, t, qui, nomType, chemin)
+    for j = 1:min(numel(forme), numel(objet.Elements))
+        e = objet.Elements(j);
+        emboite = matlibre_sl_bus('type', e.DataType);
+        if ~isempty(emboite)
+            if ~isempty(forme(j).sous)
+                verifierElements(forme(j).sous, matlibre_sl_bus('objet', emboite, qui), t, ...
+                                 qui, nomType, [chemin forme(j).nom '.']);
+            end
+            continue
+        end
+        attendu = codeDe(char(e.DataType));
+        if attendu <= 0
+            continue   % un élément hérité : pas de contrainte
+        end
+        vu = typesElements(forme(j), t);
+        faux = find(vu ~= attendu & vu > 0, 1);
+        if ~isempty(faux)
+            error('Simulink:Bus:ElementDataTypeMismatch', ...
+                  ['L''element ''%s%s'' du bus de type ''%s'' est de type %s, et ''%s'' lui ' ...
+                   'donne un signal de type %s : convertissez-le (Data Type Conversion).'], ...
+                  chemin, forme(j).nom, nomType, nomDe(attendu), qui, nomDe(vu(faux)));
+        end
+    end
 end
 
 % Les classes de ce que rend une MATLAB Function, appelée sur des zéros
@@ -605,7 +684,7 @@ function s = classesGraphe(c, k)
     for q = 1:min(c.nOut(k), numel(code.sorties))
         nom = code.sorties{q};
         if isfield(code.contexte, nom)
-            r = codeDe(class(code.contexte.(nom)));
+            r = codeDeValeur(code.contexte.(nom));   % un entier, un membre, un fi
             if r > 0
                 s(q) = r;
             end
@@ -648,6 +727,30 @@ function verifier(c, k, tE, t)
         end
     end
     switch c.types{k}
+        case 'buscreator'
+            nomType = '';
+            if isfield(p, 'OutDataTypeStr')
+                nomType = matlibre_sl_bus('type', p.OutDataTypeStr);
+            end
+            if ~isempty(nomType) && isfield(c, 'formeBus') && ~isempty(c.formeBus{k})
+                verifierElements(c.formeBus{k}, matlibre_sl_bus('objet', nomType, ch), t, ch, ...
+                                 nomType, '');
+            end
+        case 'busassignment'
+            if isfield(c, 'choixBus') && ~isempty(c.choixBus{k}) && ~isempty(c.formeBus{k})
+                codes = typesElements(c.formeBus{k}, t);
+                places = c.choixBus{k};
+                for q = 1:min(numel(places), numel(tE) - 1)
+                    morceau = codes(places(q).debut:places(q).debut + places(q).largeur - 1);
+                    if tE(q + 1) > 0 && all(morceau > 0) && any(morceau ~= tE(q + 1))
+                        noms = strtrim(strsplit(char(p.AssignedSignals), ','));
+                        error('Simulink:Bus:AssignmentDataTypeMismatch', ...
+                              ['Le Bus Assignment ''%s'' remplace ''%s'', de type %s, par un ' ...
+                               'signal de type %s : un element garde son type.'], ch, ...
+                              noms{q}, nomDe(morceau(1)), nomDe(tE(q + 1)));
+                    end
+                end
+            end
         case 'merge'
             if any(tE ~= tE(1))
                 [~, j] = max(tE ~= tE(1));
@@ -734,7 +837,8 @@ function admis = entreesEnumAdmises(c, k, nE)
               'signalconversion', 'datatypeconversion', 'ic', 'zoh', 'memory', ...
               'ratetransition', 'outport', 'terminator', 'scope', 'display', 'toworkspace', ...
               'manualswitch', 'relational', 'comparetoconstant', 'switchcase', 'width', ...
-              'goto', 'from', 'multiportswitch'}
+              'goto', 'from', 'multiportswitch', 'buscreator', 'busselector', 'busassignment', ...
+              'chart'}
             admis(:) = true;
         case 'delay'
             admis(1) = true;   % le signal retardé ; longueur, activation, remise sont numériques

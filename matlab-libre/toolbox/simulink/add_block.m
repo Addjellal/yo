@@ -159,6 +159,12 @@ function modele = add_block(modele, type, nom, varargin)
 %                  Vector ») : l'élément que désigne la commande
 %     environmentcontroller —              deux entrées, Sim et Coder : rend Sim
 %     bustovector  —                            un bus de scalaires, en vecteur
+%     buscreator   Inputs ('a,b' : les noms des éléments, ou leur nombre),
+%                  OutDataTypeStr ('Bus: Type') — un bus, dont chaque élément
+%                  garde le type de son signal ; un type de bus impose le sien
+%     busselector  OutputSignals ('a,b.c'), OutputAsBus — les éléments
+%                  choisis, chacun dans son type ; un bus traverse retards,
+%                  mémoires, bloqueurs et aiguillages
 %     busassignment AssignedSignals ('a,b.c') — le bus, puis un signal par
 %                  élément nommé, qui le remplace
 %     mux          Inputs (un nombre, ou les largeurs)

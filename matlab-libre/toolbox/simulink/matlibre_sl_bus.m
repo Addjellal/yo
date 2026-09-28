@@ -100,7 +100,8 @@ function f = forme(objet, qui, profondeur)
         error('Simulink:Bus:BusRecursive', ...
               '%sun type de bus se contient lui-meme, directement ou non.', prefixe(qui));
     end
-    f = struct('nom', {}, 'dims', {}, 'largeur', {}, 'debut', {}, 'sous', {});
+    f = struct('nom', {}, 'dims', {}, 'largeur', {}, 'debut', {}, 'sous', {}, ...
+               'source', {}, 'donnee', {});
     debut = 1;
     elements = objet.Elements;
     for j = 1:numel(elements)
@@ -114,8 +115,12 @@ function f = forme(objet, qui, profondeur)
             d = dimensions(e, qui);
         end
         w = prod(d);
+        donnee = '';
+        if isempty(sous)
+            donnee = char(e.DataType);   % le type de l'élément, que ses signaux prennent
+        end
         f(end + 1) = struct('nom', char(e.Name), 'dims', d, 'largeur', w, 'debut', debut, ...
-                            'sous', {sous}); %#ok<AGROW>
+                            'sous', {sous}, 'source', 0, 'donnee', donnee); %#ok<AGROW>
         debut = debut + w;
     end
 end

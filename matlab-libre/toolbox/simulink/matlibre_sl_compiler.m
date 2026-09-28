@@ -252,6 +252,26 @@ function c = compiler(modele, options)
     c.dimsCourants = c.dims;   % la forme des bus se lit sur les dimensions
     verifierTypesBus(c);
 
+    % les bus : la forme de celui qu'un Bus Selector ou un Bus Assignment
+    % reçoit, et ce qu'il en choisit ; la forme qu'un Bus Creator typé tire
+    % de ses entrées. Les types de leurs éléments s'y liront.
+    c.formeBus = cell(1, n);
+    c.choixBus = cell(1, n);
+    for k = 1:n
+        switch c.types{k}
+            case 'busselector'
+                c.formeBus{k} = formeBus(c, c.entrees{k}(1));
+                c.choixBus{k} = elementsChoisis(c, k);
+            case 'busassignment'
+                c.formeBus{k} = formeBus(c, c.entrees{k}(1));
+                c.choixBus{k} = placesAssignees(c, k, c.formeBus{k});
+            case 'buscreator'
+                if ~isempty(matlibre_sl_bus('type', champ(c.p{k}, 'OutDataTypeStr', '')))
+                    c.formeBus{k} = formeDesEntrees(c, k);
+                end
+        end
+    end
+
     % --- 6 bis. types de données ---------------------------------------------
     c.typePort = matlibre_sl_types('propager', c);
     c = initialesEnumerees(c);
@@ -4454,10 +4474,11 @@ function code = preparerGraphe(p, chemin)
                    'd''entree de l''etat initial ''%s''.'], sorties{q}, chemin, courant);
         end
         v = contexte.(sorties{q});
-        if ~(isnumeric(v) || islogical(v)) || isempty(v) || ndims(v) > 2
+        membre = isobject(v) && isenum(v);   % un membre d'énumération : son type
+        if ~(isnumeric(v) || islogical(v) || membre) || isempty(v) || ndims(v) > 2
             error('Simulink:blocks:ChartOutputType', ...
-                  'La sortie ''%s'' du bloc Chart ''%s'' n''est pas un tableau de nombres.', ...
-                  sorties{q}, chemin);
+                  ['La sortie ''%s'' du bloc Chart ''%s'' n''est pas un tableau de nombres ' ...
+                   'ni de membres d''une enumeration.'], sorties{q}, chemin);
         end
         code.dims{q} = size(v);
     end
@@ -4610,12 +4631,26 @@ function forme = formeBus(c, gp)
                 gp = c.entrees{a}(max(1, min(c.rang(gp), c.nIn(a))));
             case 'busassignment'
                 gp = c.entrees{a}(1);   % le bus passe, éléments remplacés
+            case {'zoh', 'memory', 'delay', 'ratetransition', 'manualswitch', 'merge', 'switch'}
+                % un bloc qui laisse passer un bus, comme dans Simulink : il
+                % vient de sa première entrée — les données d'un Switch, les
+                % entrées d'un Merge portent le même
+                gp = c.entrees{a}(1);
+            case 'multiportswitch'
+                gp = c.entrees{a}(min(2, c.nIn(a)));
             otherwise
                 return
         end
     end
+    forme = formeDesEntrees(c, a);
+end
+
+% La forme du bus que forment les entrées d'un Bus Creator : un élément par
+% entrée, qui garde le port d'où vient son signal — son type s'y lira.
+function forme = formeDesEntrees(c, a)
     noms = nomsDuBus(c.p{a}.Inputs, c.nIn(a));
-    forme = struct('nom', {}, 'dims', {}, 'largeur', {}, 'debut', {}, 'sous', {});
+    forme = struct('nom', {}, 'dims', {}, 'largeur', {}, 'debut', {}, 'sous', {}, ...
+                   'source', {}, 'donnee', {});
     debut = 1;
     for j = 1:c.nIn(a)
         source = c.entrees{a}(j);
@@ -4629,8 +4664,38 @@ function forme = formeBus(c, gp)
         end
         w = prod(d);
         forme(end + 1) = struct('nom', noms{j}, 'dims', d, 'largeur', w, 'debut', debut, ...
-                                'sous', {formeBus(c, source)}); %#ok<AGROW>
+                                'sous', {formeBus(c, source)}, 'source', source, ...
+                                'donnee', ''); %#ok<AGROW>
         debut = debut + w;
+    end
+end
+
+% La place de chaque élément qu'un Bus Assignment remplace, sans en
+% vérifier la largeur, que les segments vérifieront.
+function places = placesAssignees(c, k, forme)
+    places = struct('debut', {}, 'largeur', {});
+    if isempty(forme)
+        return
+    end
+    demandes = strtrim(strsplit(char(c.p{k}.AssignedSignals), ','));
+    for q = 1:numel(demandes)
+        parties = strsplit(demandes{q}, '.');
+        niveau = forme;
+        decalage = 0;
+        element = [];
+        for i = 1:numel(parties)
+            rang = find(strcmp({niveau.nom}, parties{i}), 1);
+            if isempty(rang) || (i < numel(parties) && isempty(niveau(rang).sous))
+                places = struct('debut', {}, 'largeur', {});
+                return   % les segments nommeront la faute
+            end
+            element = niveau(rang);
+            decalage = decalage + element.debut - 1;
+            if i < numel(parties)
+                niveau = element.sous;
+            end
+        end
+        places(end + 1) = struct('debut', decalage + 1, 'largeur', element.largeur); %#ok<AGROW>
     end
 end
 
