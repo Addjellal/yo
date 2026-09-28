@@ -723,6 +723,13 @@ function J = simuler(T, instants, solveur, reprise)
         avancerApres = false;
         premier = true;
     end
+    % Les tampons des retards variables vivent hors de Z ; une simulation
+    % qui reprend garde les siens.
+    if nargin >= 4 && isstruct(reprise) && isfield(reprise, 'tampons')
+        T.tampons = reprise.tampons;
+    else
+        T.tampons = nouveauxTampons(T);
+    end
     nx = numel(x);
     journal = T.journal;
     releveV = zeros(numel(journal), N);
@@ -792,6 +799,29 @@ function J = simuler(T, instants, solveur, reprise)
     end
     J = struct('releve', releveV(:, 1:dernier), 'etats', etats(:, 1:dernier), ...
                'dernier', dernier, 'arret', Z(1) ~= 0, 'V', V, 'Z', Z, 'x', x);
+    J.tampons = T.tampons;
+end
+
+% Les tampons des retards, hors de Z parce qu'ils grandissent : celui du
+% retard pur à pas variable, et celui du Variable Transport Delay à tout
+% pas. Chacun garde, en anneau, les instants et les valeurs ; ecrase dit
+% qu'un tampon fixe a perdu un échantillon dont il avait encore besoin.
+function tampons = nouveauxTampons(T)
+    tampons = containers.Map('KeyType', 'double', 'ValueType', 'any');
+    for k = find(T.code == 75 | T.code == 78)
+        p = T.pA(k);
+        w = T.oB(k) - T.oA(k) + 1;
+        if T.code(k) == 75
+            if T.fixe || T.P(p) == 0
+                continue
+            end
+            L = T.P(p + 1);
+        else
+            L = T.P(p + 2);
+        end
+        tampons(k) = struct('t', zeros(L, 1), 'v', zeros(w, L), 'tete', 1, 'n', 0, ...
+                            'ecrase', false, 'debut', 0);
+    end
 end
 
 function deriveeInfinie(T, dx, t)
@@ -941,17 +971,8 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     M.J = [];
     M.dfdt = [];
 
-    % Les tampons du retard pur, hors de Z : ils grandissent au besoin.
-    tampons = containers.Map('KeyType', 'double', 'ValueType', 'any');
-    for k = find(T.code == 75)
-        p = T.pA(k);
-        if T.P(p) > 0
-            w = T.oB(k) - T.oA(k) + 1;
-            L = T.P(p + 1);
-            tampons(k) = struct('t', zeros(L, 1), 'v', zeros(w, L), 'tete', 1, 'n', 0);
-        end
-    end
-    T.tampons = tampons;
+    % Les tampons des retards, hors de Z : ils grandissent au besoin.
+    T.tampons = nouveauxTampons(T);
 
     duree = tFinal - tDebut;
     if ischar(reglages.MaxStep)
@@ -1806,17 +1827,34 @@ end
 % par dichotomie les deux échantillons qui encadrent t - retard, et l'on
 % interpole entre eux.
 function y = retardVariable(T, k, p, t, w)
-    B = T.tampons(k);
+    y = lireTampon(T.tampons(k), t - T.P(p), T.P(p + 2:p + 1 + w));
+end
+
+% La valeur d'un tampon de retard à l'instant cible : interpolée entre
+% les deux échantillons qui l'encadrent, trouvés par dichotomie ; au-delà
+% du plus récent, celui-ci ; avant le plus ancien, la sortie initiale ci
+% — ou, si un tampon fixe a écrasé ce qu'il fallait, l'extrapolation
+% linéaire de ses deux plus anciens échantillons, comme Simulink ; avant
+% le tout premier échantillon (debut), toujours la sortie initiale.
+function y = lireTampon(B, cible, ci)
     if B.n == 0
-        y = T.P(p + 2:p + 1 + w);
+        y = ci;
         return
     end
-    cible = t - T.P(p);
     L = numel(B.t);
     ancien = mod(B.tete - B.n - 1, L) + 1;
     recent = mod(B.tete - 2, L) + 1;
     if cible < B.t(ancien)
-        y = T.P(p + 2:p + 1 + w);
+        y = ci;
+        if B.ecrase && B.n > 1 && cible >= B.debut
+            suivant = mod(ancien, L) + 1;
+            if B.t(suivant) > B.t(ancien)
+                f = (cible - B.t(ancien)) / (B.t(suivant) - B.t(ancien));
+                y = (1 - f) * B.v(:, ancien) + f * B.v(:, suivant);
+            else
+                y = B.v(:, ancien);
+            end
+        end
         return
     end
     if cible >= B.t(recent)
@@ -1842,17 +1880,24 @@ function y = retardVariable(T, k, p, t, w)
     end
 end
 
-% Une valeur de plus dans le tampon d'un retard pur. Plein, il écrase le
-% plus ancien échantillon s'il ne sert plus ; sinon il double, comme le
-% bloc de Simulink qui alloue au-delà de sa taille initiale.
+% Une valeur de plus dans le tampon d'un retard pur.
 function pousserRetard(T, k, p, t, u)
+    w = numel(u);
     tampons = T.tampons;
-    B = tampons(k);
+    tampons(k) = empiler(tampons(k), t, u, t - T.P(p), T.P(p + 2 + w) ~= 0);
+end
+
+% Un échantillon de plus, daté, dans un tampon. Plein, il écrase le plus
+% ancien s'il ne sert plus — si le suivant date d'avant limite, la plus
+% vieille date qu'on lira désormais — ; sinon il double, comme le bloc de
+% Simulink qui alloue au-delà de sa taille initiale. Un tampon fixe
+% (FixedBuffer) écrase quand même, et le note.
+function B = empiler(B, date, u, limite, fixe)
     L = numel(B.t);
     if B.n == L
         ancien = B.tete;   % plein : la tête est aussi le plus ancien
         suivant = mod(ancien, L) + 1;
-        if B.t(suivant) > t - T.P(p)
+        if B.t(suivant) > limite && ~fixe
             % Le plus ancien sert encore : on déroule l'anneau et l'on double.
             ordre = [ancien:L, 1:ancien - 1];
             B.t = [B.t(ordre); zeros(L, 1)];
@@ -1860,14 +1905,17 @@ function pousserRetard(T, k, p, t, u)
             B.tete = L + 1;
             L = 2 * L;
         else
+            B.ecrase = B.ecrase || B.t(suivant) > limite;
             B.n = B.n - 1;
         end
     end
-    B.t(B.tete) = t;
+    if B.n == 0
+        B.debut = date;
+    end
+    B.t(B.tete) = date;
     B.v(:, B.tete) = u;
     B.tete = mod(B.tete, L) + 1;
     B.n = B.n + 1;
-    tampons(k) = B;
 end
 
 % === un point ==================================================================
@@ -3214,16 +3262,15 @@ end
 % initiale.
 function y = sortieRetardVariable(T, k, p, V, Z, e, a, b, t)
     w = b - a + 1;
-    L = T.P(p + 2);
     ci = T.P(p + 4:p + 3 + w);
     tau = min(max(V(T.eA(e + 2)), 0), T.P(p + 1));
     if tau == 0 && T.P(p + 3) ~= 0
         y = V(T.eA(e + 1):T.eB(e + 1)) + zeros(w, 1);
         return
     end
-    z = T.zA(k);
-    n = Z(z);
-    if n == 0
+    % Z compte les échantillons depuis la dernière remise : zéro, le
+    % tampon est vide, même s'il garde ceux d'avant.
+    if Z(T.zA(k)) == 0 || ~isfield(T, 'tampons') || ~isKey(T.tampons, k)
         y = ci;
         return
     end
@@ -3231,36 +3278,7 @@ function y = sortieRetardVariable(T, k, p, V, Z, e, a, b, t)
     if T.P(p) == 2
         cible = t - tau;
     end
-    tete = Z(z + 1);
-    dates = Z(z + 3:z + 2 + L);
-    valeurs = reshape(Z(z + 3 + L:z + 2 + L + w * L), w, L);
-    ancien = mod(tete - n - 1, L) + 1;
-    recent = mod(tete - 2, L) + 1;
-    if cible < dates(ancien)
-        y = ci;
-        return
-    end
-    if cible >= dates(recent)
-        y = valeurs(:, recent);
-        return
-    end
-    bas = 0;
-    haut = n - 1;
-    while haut - bas > 1
-        milieu = floor((bas + haut) / 2);
-        if dates(mod(ancien + milieu - 1, L) + 1) <= cible
-            bas = milieu;
-        else
-            haut = milieu;
-        end
-    end
-    i0 = mod(ancien + bas - 1, L) + 1;
-    i1 = mod(ancien + haut - 1, L) + 1;
-    y = valeurs(:, i0);
-    if dates(i1) > dates(i0)
-        f = (cible - dates(i0)) / (dates(i1) - dates(i0));
-        y = (1 - f) * y + f * valeurs(:, i1);
-    end
+    y = lireTampon(T.tampons(k), cible, ci);
 end
 
 % Le front ou le niveau qui remet un état, comme pour l'intégrateur : 1
@@ -4552,19 +4570,32 @@ function Z = majs(T, V, Z, t, touche, x)
             case 81   % memory
                 Z(z:z + w - 1) = u;
             case 78   % variable transport delay : l'échantillon, daté de sa sortie
-                L = T.P(p + 2);
-                n = Z(z);
-                tete = Z(z + 1);
+                if ~isfield(T, 'tampons') || ~isKey(T.tampons, k)
+                    continue
+                end
+                tampons = T.tampons;
+                B = tampons(k);
+                if Z(z) == 0
+                    % remis (ou premier pas) : le tampon repart vide
+                    B.n = 0;
+                    B.tete = 1;
+                    B.ecrase = false;
+                end
                 tau = min(max(V(T.eA(e + 2)), 0), T.P(p + 1));
                 date = t;
+                limite = t - T.P(p + 1);
                 if T.P(p) == 1
-                    date = t + tau;   % transport : il sortira quand il aura parcouru le retard
+                    % transport : il sortira quand il aura parcouru le
+                    % retard, pas avant celui qui l'a précédé — le tampon
+                    % reste trié
+                    date = t + tau;
+                    if B.n > 0
+                        date = max(date, B.t(mod(B.tete - 2, numel(B.t)) + 1));
+                    end
+                    limite = t;
                 end
-                Z(z + 2 + tete) = date;
-                debut = z + 3 + L + (tete - 1) * w;
-                Z(debut:debut + w - 1) = u;
-                Z(z + 1) = mod(tete, L) + 1;
-                Z(z) = min(n + 1, L);
+                tampons(k) = empiler(B, date, u + zeros(w, 1), limite, T.P(p + 4 + w) ~= 0);
+                Z(z) = Z(z) + 1;
             case 83   % discrete-time integrator
                 switch T.P(p + 1)
                     case 1

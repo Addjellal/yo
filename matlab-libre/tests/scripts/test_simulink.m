@@ -8568,6 +8568,201 @@ r59 = sim(set_param(m59, 'j', 'Value', 'JourEssai.Lundi'), 'Solver', 'FixedStepD
           'FixedStep', 1, 'StopTime', 3);
 assert(all(r59.yout == 0), 'Stateflow : Lundi ne fait pas passer');
 
+%% ------------------------ 60. Retards à tampon extensible, pas fixe et pas variable
+% Le tampon d'un Variable Transport Delay n'a que MaximumPoints pour taille
+% initiale : il grandit au besoin, comme celui de Simulink, et un petit pas
+% garde toute l'histoire que le retard demande. FixedBuffer le fige : il
+% écrase alors ses plus anciens échantillons et extrapole ce qu'il n'a
+% plus. Une remise vide le tampon ; une simulation sans fin le garde d'une
+% tranche à l'autre.
+u60 = @(s) (s >= 0) .* (0.8 * sin(2 * s) + 0.3);
+tau60 = @(s) 0.3 * sin(2 * s) + 0.5;
+instants60 = (0:0.05:2)';
+genres60 = {'Variable transport delay', 'Variable time delay'};
+for g = 1:2
+    m60 = new_system('tampon60');
+    m60 = add_block(m60, 'variabletransportdelay', 'b', 'VariableDelayType', genres60{g}, ...
+                    'MaximumPoints', 16);
+    m60 = add_block(m60, 'sine', 'c1', 'Amplitude', 0.8, 'Bias', 0.3, 'Frequency', 2);
+    m60 = add_block(m60, 'sine', 'c2', 'Amplitude', 0.3, 'Bias', 0.5, 'Frequency', 2);
+    m60 = add_line(add_line(m60, 'c1/1', 'b/1'), 'c2/1', 'b/2');
+    m60 = add_line(add_block(m60, 'outport', 'o'), 'b/1', 'o/1');
+    exacte60 = zeros(size(instants60));
+    for i = 1:numel(instants60)
+        t = instants60(i);
+        if g == 1   % transport : l'échantillon entré en s sort en s + tau(s)
+            s = t - 0.5;
+            for it = 1:40
+                s = s - (s + tau60(s) - t) / (1 + 0.6 * cos(2 * s));
+            end
+        else        % time delay : le retard lu à la sortie
+            s = t - tau60(t);
+        end
+        exacte60(i) = u60(s);
+    end
+    garde60 = instants60 > 0.8;   % avant, la sortie initiale tient
+    r60 = sim(m60, 'Solver', 'ode4', 'FixedStep', 1e-3, 'StopTime', 2);
+    [~, rangs60] = ismember(round(instants60 * 1e3), round(r60.tout * 1e3));
+    assert(max(abs(r60.yout(rangs60(garde60)) - exacte60(garde60))) < 1e-5, ...
+           [genres60{g} ' : 2000 pas dans un tampon de 16, qui grandit']);
+    r60 = sim(m60, instants60, simset('Solver', 'ode45', 'RelTol', 1e-8, 'AbsTol', 1e-10, ...
+                                      'MaxStep', 0.01));
+    assert(max(abs(r60.yout(garde60) - exacte60(garde60))) < 1e-4, ...
+           [genres60{g} ' : a pas variable, contre la solution exacte']);
+end
+assert(strcmp(get_param(m60, 'b', 'FixedBuffer'), 'off'), 'FixedBuffer vaut off d''office');
+% FixedBuffer : 16 échantillons de t^2, les plus anciens écrasés ; t - 0,5
+% tombe avant eux, et la sortie prolonge la droite des deux plus anciens.
+% Avant le premier échantillon, la sortie initiale tient toujours.
+fixe60 = new_system('fixe60');
+fixe60 = add_block(fixe60, 'clock', 't');
+fixe60 = add_block(fixe60, 'math', 'carre', 'Operator', 'square');
+fixe60 = add_block(fixe60, 'constant', 'tau', 'Value', 0.5);
+fixe60 = add_block(fixe60, 'variabletransportdelay', 'd', 'VariableDelayType', ...
+                   'Variable time delay', 'MaximumPoints', 16, 'InitialOutput', -1);
+fixe60 = add_block(fixe60, 'outport', 'y');
+fixe60 = add_line(add_line(fixe60, 't', 'carre'), 'carre', 'd', 1);
+fixe60 = add_line(add_line(fixe60, 'tau', 'd', 2), 'd', 'y');
+libre60 = sim(fixe60, 'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 1.5);
+t60 = libre60.tout;
+apres60 = t60 > 0.505;
+assert(max(abs(libre60.yout(apres60) - (t60(apres60) - 0.5) .^ 2)) < 1e-12 && ...
+       all(libre60.yout(t60 < 0.495) == -1), 'le tampon qui grandit garde toute l''histoire');
+fixe60 = set_param(fixe60, 'd', 'FixedBuffer', 'on');
+fige60 = sim(fixe60, 'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 1.5);
+a60 = t60 - 0.16;   % les deux plus anciens échantillons gardés
+extrapole60 = a60 .^ 2 + (t60 - 0.5 - a60) .* (2 * a60 + 0.01);
+assert(max(abs(fige60.yout(apres60) - extrapole60(apres60))) < 1e-9 && ...
+       all(fige60.yout(t60 < 0.495) == -1), ...
+       'FixedBuffer : la droite des deux plus anciens echantillons, pas la sortie initiale');
+dossier60 = fullfile(tempdir(), 'tampon60');
+if ~exist(dossier60, 'dir')
+    mkdir(dossier60);
+end
+relu60 = load_system(save_system(fixe60, fullfile(dossier60, 'fixe60.slx')));
+assert(strcmp(get_param(relu60, 'd', 'FixedBuffer'), 'on'), 'FixedBuffer voyage dans le .slx');
+% Le retard pur à pas variable : même tampon, même règle.
+pur60 = new_system('pur60');
+pur60 = add_block(pur60, 'clock', 't');
+pur60 = add_block(pur60, 'math', 'carre', 'Operator', 'square');
+pur60 = add_block(pur60, 'transportdelay', 'd', 'DelayTime', 0.5, 'BufferSize', 16);
+pur60 = add_block(pur60, 'outport', 'y');
+pur60 = add_line(add_line(add_line(pur60, 't', 'carre'), 'carre', 'd'), 'd', 'y');
+reglage60 = simset('Solver', 'ode45', 'MaxStep', 0.01);
+r60 = sim(pur60, [0 1 1.5], reglage60);
+assert(max(abs(r60.yout(2:3) - [0.25; 1])) < 1e-4, 'retard pur : le tampon grandit');
+r60 = sim(set_param(pur60, 'd', 'FixedBuffer', 'on'), [0 1 1.5], reglage60);
+assert(all(abs(r60.yout(2:3) - [0.25; 1]) > 1e-3) && all(isfinite(r60.yout)), ...
+       'retard pur, FixedBuffer : il a perdu ses anciens echantillons et extrapole');
+% Une remise vide le tampon : le sous-système activé repart de sa sortie
+% initiale pendant le retard.
+interne60 = new_system('interne60');
+interne60 = add_block(interne60, 'inport', 'e', 'Port', 1);
+interne60 = add_block(interne60, 'constant', 'tau', 'Value', 0.2);
+interne60 = add_block(interne60, 'variabletransportdelay', 'd', 'VariableDelayType', ...
+                      'Variable time delay', 'InitialOutput', 5);
+interne60 = add_block(interne60, 'outport', 's', 'Port', 1);
+interne60 = add_block(interne60, 'enableport', 'Enable', 'StatesWhenEnabling', 'reset');
+interne60 = add_line(add_line(interne60, 'e', 'd', 1), 'tau', 'd', 2);
+interne60 = add_line(interne60, 'd', 's');
+remis60 = new_system('remis60');
+remis60 = add_block(remis60, 'clock', 'horloge');
+remis60 = add_block(remis60, 'pulsegenerator', 'porte', 'Period', 2, 'PulseWidth', 50);
+remis60 = add_block(remis60, 'subsystem', 'sous', 'Model', interne60);
+remis60 = add_block(remis60, 'outport', 'y');
+remis60 = add_line(add_line(remis60, 'horloge', 'sous/1'), 'porte', 'sous/Enable');
+remis60 = add_line(remis60, 'sous', 'y');
+for solveur = {'ode4', 'ode45'}
+    r60 = sim(remis60, 'Solver', solveur{1}, 'FixedStep', 0.01, 'MaxStep', 0.01, ...
+              'StopTime', 3);
+    t60 = r60.tout;
+    y60 = r60.yout;
+    actif60 = (t60 > 0.21 & t60 < 0.99) | (t60 > 2.21 & t60 < 2.99);
+    assert(max(abs(y60(actif60) - (t60(actif60) - 0.2))) < 1e-6 && ...
+           all(y60(t60 < 0.19) == 5) && all(y60(t60 > 2.01 & t60 < 2.19) == 5), ...
+           [solveur{1} ' : remis, le tampon repart vide et la sortie initiale revient']);
+end
+% Une simulation sans fin avance par tranches de 4096 pas : le tampon
+% passe de l'une à l'autre.
+fin60 = new_system('fin60');
+fin60 = add_block(fin60, 'clock', 't');
+fin60 = add_block(fin60, 'constant', 'tau', 'Value', 0.5);
+fin60 = add_block(fin60, 'variabletransportdelay', 'd', 'VariableDelayType', ...
+                  'Variable time delay');
+fin60 = add_block(fin60, 'comparetoconstant', 'assez', 'relop', '>=', 'const', 8.5);
+fin60 = add_block(fin60, 'stopsimulation', 'stop');
+fin60 = add_block(fin60, 'outport', 'y');
+fin60 = add_line(add_line(fin60, 't', 'd', 1), 'tau', 'd', 2);
+fin60 = add_line(add_line(add_line(fin60, 't', 'assez'), 'assez', 'stop'), 'd', 'y');
+fin60 = set_param(fin60, 'Solver', 'ode4', 'FixedStep', 2e-3, 'StopTime', Inf);
+r60 = sim(fin60);
+t60 = r60.tout;
+assert(abs(t60(end) - 8.5) < 1e-9 && ...
+       max(abs(r60.yout(t60 > 0.505) - (t60(t60 > 0.505) - 0.5))) < 1e-9, ...
+       'sans fin : 4250 pas, le tampon traverse les tranches');
+fprintf('retards a tampon extensible : ok\n');
+
+%% ------------------------------------------ 61. Batterie des solveurs à pas variable
+% Chaque type de bloc nourri de sinus, simulé par ode45, ode23 et ode15s à
+% tolérances fines, rend aux instants demandés ce que rend ode4 à pas fin.
+% Les blocs qui ne calculent qu'aux pas majeurs — compteurs, limiteurs de
+% pente, dérivée, mémoire, et les blocs discrets qui héritent de leur
+% entrée une période continue — dépendent des pas par nature, comme dans
+% Simulink : ils sont mis à part. C'est cette batterie qui a trouvé le
+% tampon trop court du retard variable (section 60).
+solveurs61 = {'ode45', 'ode23', 'ode15s'};
+instants61 = (0:0.05:1)';
+parPas61 = {'counterfreerunning', 'counterlimited', 'ratelimiter', 'ratelimiterdynamic', ...
+            'derivative', 'delay', 'memory', 'zoh', 'discreteintegrator', ...
+            'discretetransferfcn', 'discretefilter', 'discretefirfilter', ...
+            'transferfcnfirstorder', 'transferfcnleadorlag', 'transferfcnrealzero', ...
+            'discretezeropole'};
+comparaisons61 = 0;
+for kT = 1:numel(catalogue56)
+    type = catalogue56(kT).type;
+    if any(strcmp(catalogue56(kT).famille, {'Interne', 'Simscape'})) || ...
+       any(strcmp(type, parPas61))
+        continue
+    end
+    m61 = batterieSinus(type);
+    try
+        ref61 = [];
+        evalc('ref61 = sim(m61, ''Solver'', ''ode4'', ''FixedStep'', 1e-3, ''StopTime'', 1);');
+    catch
+        continue   % refusé à pas fixe : la batterie des types en répond
+    end
+    if ~isfield(ref61, 'yout') || isempty(ref61.yout)
+        continue
+    end
+    [~, rangs61] = ismember(round(instants61 * 1e3), round(ref61.tout * 1e3));
+    yref61 = double(ref61.yout(rangs61, :));
+    for kS = 1:numel(solveurs61)
+        r61 = [];
+        try
+            evalc(['r61 = sim(m61, instants61, simset(''Solver'', solveurs61{kS}, ' ...
+                   '''RelTol'', 1e-8, ''AbsTol'', 1e-10, ''MaxStep'', 0.01));']);
+        catch err
+            assert((strncmp(err.identifier, 'Simulink:', 9) || ...
+                    strncmp(err.identifier, 'Stateflow:', 10)) && ...
+                   ~isempty(strfind(err.message, 'bv/')), ...
+                   sprintf('%s sous %s : erreur interne %s : %s', type, solveurs61{kS}, ...
+                           err.identifier, err.message));
+            continue
+        end
+        assert(numel(r61.tout) == numel(instants61) && ...
+               max(abs(r61.tout(:) - instants61)) < 1e-9, ...
+               sprintf('%s sous %s : les instants demandes, et eux seuls', type, ...
+                       solveurs61{kS}));
+        comparaisons61 = comparaisons61 + 1;
+        y61 = double(r61.yout);
+        assert(max(abs(y61(:) - yref61(:))) < 1e-3 * max(1, max(abs(yref61(:)))), ...
+               sprintf('%s sous %s : ecart de %g avec ode4 a pas fin', type, solveurs61{kS}, ...
+                       max(abs(y61(:) - yref61(:)))));
+    end
+end
+fprintf('solveurs a pas variable : %d comparaisons\n', comparaisons61);
+assert(comparaisons61 > 250, 'la batterie a pas variable compare assez de modeles');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -8996,6 +9191,29 @@ function m = batterieCadence(type, periode)
     for i = 1:ne
         m = add_block(m, 'sine', sprintf('c%d', i), 'Amplitude', 0.5, 'Bias', 1.5, ...
                       'Frequency', 2 * i, 'SampleTime', periode);
+        m = add_line(m, sprintf('c%d/1', i), sprintf('b/%d', i));
+    end
+    for j = 1:ns
+        m = add_block(m, 'outport', sprintf('o%d', j));
+        m = add_line(m, sprintf('b/%d', j), sprintf('o%d/1', j));
+    end
+end
+
+function m = batterieSinus(type)
+    % Le bloc TYPE, ses entrées nourries de sinus continus, ses sorties vers
+    % des Outport. Le retard que reçoit un Variable Transport Delay varie
+    % moins vite que le temps, sans quoi ses échantillons se doubleraient.
+    m = new_system('bv');
+    m = add_block(m, type, 'b');
+    [ne, ns] = matlibre_sl_ports(m.blocs{end});
+    if isnan(ne), ne = 1; end
+    if isnan(ns), ns = 1; end
+    for i = 1:ne
+        m = add_block(m, 'sine', sprintf('c%d', i), 'Amplitude', 0.8, 'Bias', 0.3 * i, ...
+                      'Frequency', 2 * i);
+        if strcmp(type, 'variabletransportdelay') && i == 2
+            m = set_param(m, 'c2', 'Amplitude', 0.2, 'Bias', 0.5, 'Frequency', 2);
+        end
         m = add_line(m, sprintf('c%d/1', i), sprintf('b/%d', i));
     end
     for j = 1:ns

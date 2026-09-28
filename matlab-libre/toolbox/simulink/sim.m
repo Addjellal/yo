@@ -538,6 +538,7 @@ function [instants, J] = sansFin(T, tDebut, pas, solveur)
         end
         fait = fait + tranche;
         reprise = struct('V', J.V, 'Z', J.Z, 'x', J.x, 'i0', fait, 'avancer', true);
+        reprise.tampons = J.tampons;
     end
     J.releve = releve;
     J.etats = etats;

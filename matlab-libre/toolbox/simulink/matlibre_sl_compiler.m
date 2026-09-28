@@ -3748,6 +3748,7 @@ function c = abaisser(c, pas, tDebut)
                     error('Simulink:blocks:TransportDelayNegativeDelay', ...
                           'Le bloc ''%s'' demande un retard negatif.', ch);
                 end
+                % [retard; longueur; sortie initiale w; tampon fixe]
                 if c.variable
                     % À pas variable, le tampon garde les instants avec les
                     % valeurs, et grandit au besoin : il vit hors de Z, dans
@@ -3755,16 +3756,23 @@ function c = abaisser(c, pas, tDebut)
                     % initiale, BufferSize.
                     longueur = max(16, round(double(p.BufferSize)));
                     seg = [p.DelayTime; longueur; ...
-                           etendre(p.InitialOutput, w, ch, 'InitialOutput')];
+                           etendre(p.InitialOutput, w, ch, 'InitialOutput'); ...
+                           strcmp(p.FixedBuffer, 'on')];
                 else
                     longueur = ceil(p.DelayTime / pas - 1e-9) + 2;
                     seg = [p.DelayTime; longueur; ...
-                           etendre(p.InitialOutput, w, ch, 'InitialOutput')];
+                           etendre(p.InitialOutput, w, ch, 'InitialOutput'); ...
+                           strcmp(p.FixedBuffer, 'on')];
                     z0 = [0; zeros(w * longueur, 1)];
                 end
             case 'variabletransportdelay'
-                % [genre; retard maximal; taille; zéro direct; sortie initiale w]
-                % Z : [nombre; tête; retard vu; instants L; valeurs w x L]
+                % [genre; retard maximal; taille; zéro direct; sortie
+                % initiale w; tampon fixe]
+                % Z : [échantillons depuis la remise; 0; retard vu] — les
+                % échantillons eux-mêmes vivent hors de Z, dans les tampons
+                % du simulateur : le tampon grandit au besoin, comme celui
+                % de Simulink dont MaximumPoints n'est que la taille
+                % initiale.
                 tMax = double(p.MaximumDelay);
                 if ~(isscalar(tMax) && tMax > 0)
                     error('Simulink:blocks:VariableTransportDelayMaximum', ...
@@ -3773,8 +3781,9 @@ function c = abaisser(c, pas, tDebut)
                 L = max(16, round(double(p.MaximumPoints)));
                 genre = 1 + strcmp(p.VariableDelayType, 'Variable time delay');
                 seg = [genre; tMax; L; strcmp(p.ZeroDelay, 'on'); ...
-                       etendre(p.InitialOutput, w, ch, 'InitialOutput')];
-                z0 = [0; 1; NaN; zeros(L, 1); zeros(w * L, 1)];
+                       etendre(p.InitialOutput, w, ch, 'InitialOutput'); ...
+                       strcmp(p.FixedBuffer, 'on')];
+                z0 = [0; 0; NaN];
             case 'algebraicconstraint'    % [f(z) = z ; valeur de départ w]
                 seg = [strcmp(p.Constraint, 'f(z) = z'); ...
                        etendre(p.InitialGuess, w, ch, 'InitialGuess')];

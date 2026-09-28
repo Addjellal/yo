@@ -146,7 +146,8 @@ totalité.
    continu ou discret avec ses bornes, son anti-emballement, sa remise et
    ses conditions initiales externes, l'intégrateur discret borné à
    remise, le Delay à longueur variable, activé ou remis, les retards
-   variables, la tenue du premier ordre, les tableurs, l'Algebraic
+   variables (leur tampon grandit au besoin, comme dans Simulink), la
+   tenue du premier ordre, les tableurs, l'Algebraic
    Constraint et le Bus Assignment ; les blocs
    de vérification (Check Static et Check Dynamic) arrêtent la simulation
    en nommant le bloc et l'instant. Les sous-systèmes

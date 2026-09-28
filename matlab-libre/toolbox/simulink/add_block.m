@@ -210,12 +210,16 @@ function modele = add_block(modele, type, nom, varargin)
 %     transferfcn  Numerator, Denominator
 %     statespace   A, B, C, D, X0
 %     zeropole     Zeros, Poles, Gain
-%     transportdelay DelayTime, InitialOutput, BufferSize
+%     transportdelay DelayTime, InitialOutput, BufferSize (la taille
+%                  initiale : le tampon grandit au besoin), FixedBuffer
+%                  ('on' : il garde sa taille, écrase ses plus anciens
+%                  échantillons et extrapole ce qu'il n'a plus)
 %     variabletransportdelay VariableDelayType ('Variable transport delay' :
 %                  la durée qu'on lit quand le signal entre ; 'Variable
 %                  time delay' : celle qu'on lit quand il sort),
-%                  MaximumDelay, InitialOutput, MaximumPoints, ZeroDelay —
-%                  deux entrées : u, et le retard
+%                  MaximumDelay, InitialOutput, MaximumPoints (taille
+%                  initiale du tampon), ZeroDelay, FixedBuffer — deux
+%                  entrées : u, et le retard
 %     pidcontroller P, I, D, N (dérivée filtrée par N/(1+N/s)), Controller
 %                  (PID, PI, PD, P, I), Form (Parallel, Ideal), TimeDomain
 %                  (Continuous-time, Discrete-time : SampleTime,
