@@ -164,7 +164,9 @@ totalité.
    pose, câble, règle et simule ; Ctrl+E ouvre les paramètres de
    configuration — solveur, import et export des données (champs
    relevés et leurs noms, décimation, affinage Refine, instants de
-   sortie ajoutés ou seuls relevés), diagnostics. Les fichiers `.slx` et `.mdl` de MathWorks se lisent —
+   sortie ajoutés ou seuls relevés), diagnostics (sortie Inf ou NaN,
+   entier qui déborde, pas minimal, passages par zéro de suite). Les
+   fichiers `.slx` et `.mdl` de MathWorks se lisent —
    blocs, liens, sous-systèmes, masques, configuration du solveur — et
    `save_system` écrit un `.slx` que Simulink relit ; un bloc qu'on ne
    connaît pas est nommé dans l'erreur, avec tous les autres. Les

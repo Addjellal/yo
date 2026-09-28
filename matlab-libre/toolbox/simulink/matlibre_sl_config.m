@@ -38,7 +38,14 @@ function varargout = matlibre_sl_config(action, varargin)
 %                                     VariableStepDiscrete, et
 %                                     VariableStepAuto (ode45, ou le
 %                                     discret).
-%     FixedStep            0.01       le pas, en pas fixe
+%     FixedStep            0.01       le pas, en pas fixe ; 'auto' : le pas
+%                                     fondamental — le plus grand commun
+%                                     diviseur des périodes
+%                                     d'échantillonnage et de leurs
+%                                     décalages —, ou sans période la
+%                                     durée en cinquante pas (0,2 s sans
+%                                     fin), au plus le tiers de la
+%                                     période du sinus le plus rapide
 %     MaxStep, MinStep, InitialStep   'auto'  bornes du pas variable
 %     RelTol               1e-3       tolérance relative du pas variable
 %     AbsTol               'auto'     tolérance absolue du pas variable
@@ -54,6 +61,24 @@ function varargout = matlibre_sl_config(action, varargin)
 %     AlgebraicLoopMsg     'warning'  boucle algébrique : none, warning, error
 %     UnconnectedInputMsg  'warning'  entrée non reliée : none, warning, error
 %     UnconnectedOutputMsg 'none'     sortie non reliée : none, warning, error
+%     MinStepSizeMsg       'warning'  à pas variable, plus de
+%     MaxConsecutiveMinStep 1         MaxConsecutiveMinStep pas de suite
+%                                     au pas minimal MinStep sans tenir
+%                                     la tolérance : warning, ou error
+%     MaxConsecutiveZCs    1000       plus de MaxConsecutiveZCs passages
+%     MaxConsecutiveZCsMsg 'error'    par zéro de suite, sans que le
+%                                     temps avance : none ou warning
+%                                     continuent en franchissant le
+%                                     seuil suivant sans le localiser
+%     SignalInfNanChecking 'none'     une sortie de bloc qui vaut Inf ou
+%                                     NaN à un pas majeur
+%     IntegerOverflowMsg   'warning'  un entier ou une virgule fixe qui
+%                                     déborde de son type et s'y replie
+%     IntegerSaturationMsg 'warning'  ... et s'y sature
+%                                     (SaturateOnIntegerOverflow) ; ces
+%                                     trois-là valent none, warning ou
+%                                     error, l'avertissement une fois par
+%                                     bloc et par simulation
 %     LoadExternalInput    'off'      'on' : les entrées du modèle lisent
 %                                     ExternalInput
 %     InitFcn, StartFcn, StopFcn, PreLoadFcn, PostLoadFcn, PreSaveFcn,
@@ -167,7 +192,10 @@ function d = defauts()
                'SaveState', 'off', 'StateSaveName', 'xout', 'SaveOutput', 'on', ...
                'OutputSaveName', 'yout', 'Decimation', 1, 'LimitDataPoints', 'off', ...
                'MaxDataPoints', 1000, 'OutputOption', 'RefineOutputTimes', 'Refine', 1, ...
-               'OutputTimes', '[]');
+               'OutputTimes', '[]', 'MinStepSizeMsg', 'warning', ...
+               'MaxConsecutiveMinStep', 1, 'MaxConsecutiveZCs', 1000, ...
+               'MaxConsecutiveZCsMsg', 'error', 'SignalInfNanChecking', 'none', ...
+               'IntegerOverflowMsg', 'warning', 'IntegerSaturationMsg', 'warning');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -297,8 +325,12 @@ function v = valider(nom, v)
             if isstring(v)
                 v = char(v);
             end
-        case {'AlgebraicLoopMsg', 'UnconnectedInputMsg', 'UnconnectedOutputMsg'}
+        case {'AlgebraicLoopMsg', 'UnconnectedInputMsg', 'UnconnectedOutputMsg', ...
+              'MaxConsecutiveZCsMsg', 'SignalInfNanChecking', 'IntegerOverflowMsg', ...
+              'IntegerSaturationMsg'}
             v = choix(nom, v, {'none', 'warning', 'error'});
+        case 'MinStepSizeMsg'
+            v = choix(nom, v, {'warning', 'error'});
         case 'ZeroCrossControl'
             v = choix(nom, v, {'UseLocalSettings', 'EnableAll', 'DisableAll'});
         case {'StartTime', 'StopTime', 'FixedStep', 'RelTol'}
@@ -313,7 +345,8 @@ function v = valider(nom, v)
             v = choix(nom, v, {'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'ode8'});
         case 'SaveFormat'
             v = choix(nom, v, {'Array', 'Structure', 'StructureWithTime', 'Dataset'});
-        case {'NumberNewtonIterations', 'Decimation', 'Refine', 'MaxDataPoints'}
+        case {'NumberNewtonIterations', 'Decimation', 'Refine', 'MaxDataPoints', ...
+              'MaxConsecutiveMinStep', 'MaxConsecutiveZCs'}
             v = entier(nom, v, 1, Inf);
         case 'OutputOption'
             v = choix(nom, v, {'RefineOutputTimes', 'AdditionalOutputTimes', ...

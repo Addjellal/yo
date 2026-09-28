@@ -328,6 +328,12 @@ function c = compiler(modele, options)
     end
 
     % --- 8. périodes d'échantillonnage -------------------------------------
+    % FixedStep 'auto' : le pas se déduit des périodes, avant qu'elles ne
+    % se rapportent à lui
+    if champ(options, 'pasAuto', false)
+        pas = pasFondamental(c, tDebut, tFinal);
+        c.pas = pas;
+    end
     c = periodes(c, pas);
 
     % --- 9. ce que le calcul lira : paramètres et états ---------------------
@@ -2891,7 +2897,10 @@ end
 % rythme de l'entrée la plus rapide. Une période qui n'est pas un multiple
 % du pas fixe est refusée, comme dans Simulink : le bloc tomberait entre
 % deux pas.
-function c = periodes(c, pas)
+function c = periodes(c, pas, verifier)
+    if nargin < 3
+        verifier = true;   % faux : les périodes seules, sans les rapporter au pas
+    end
     n = c.n;
     c.cadence = -ones(1, n);
     c.decalage = zeros(1, n);
@@ -3160,7 +3169,7 @@ function c = periodes(c, pas)
             % À pas variable, le solveur s'arrête sur chaque instant
             % d'échantillonnage : une période n'a rien à diviser.
             c.majeurSeul(k) = true;
-        elseif c.cadence(k) > 0 && isfinite(c.cadence(k))
+        elseif verifier && c.cadence(k) > 0 && isfinite(c.cadence(k))
             rapport = c.cadence(k) / pas;
             if abs(rapport - round(rapport)) > 1e-9 * max(1, rapport) || round(rapport) < 1
                 error('Simulink:SampleTime:NotMultipleOfFixedStep', ...
@@ -3189,6 +3198,78 @@ function [periode, decalage] = lirePeriode(v)
     decalage = 0;
     if numel(v) >= 2
         decalage = v(2);
+    end
+end
+
+% FixedStep 'auto', comme dans Simulink : le pas fondamental, plus grand
+% commun diviseur des périodes d'échantillonnage du modèle et de leurs
+% décalages. Sans période, la durée en cinquante pas — 0,2 s sans fin —, au
+% plus le tiers de la période de la sinusoïde la plus rapide d'un Sine
+% Wave ou d'un Signal Generator. Les périodes se lisent comme à la
+% compilation ; celles qu'un bloc tient du pas lui-même ne comptent pas.
+function pas = pasFondamental(c, tDebut, tFinal)
+    essai = periodes(c, Inf, false);
+    valeurs = [essai.cadence(essai.cadence > 0 & isfinite(essai.cadence)), ...
+               essai.decalage(essai.decalage > 0 & isfinite(essai.decalage))];
+    if ~isempty(valeurs)
+        pas = pgcdReel(valeurs);
+        return
+    end
+    pas = 0.2;
+    if isfinite(tFinal) && tFinal > tDebut
+        pas = (tFinal - tDebut) / 50;
+    end
+    frequence = 0;   % en hertz
+    for k = 1:c.n
+        p = c.p{k};
+        switch c.types{k}
+            case 'sine'
+                frequence = max(frequence, max(abs(double(p.Frequency(:)))) / (2 * pi));
+            case 'signalgenerator'
+                f = max(abs(double(p.Frequency(:))));
+                if strcmp(p.Units, 'rad/sec')
+                    f = f / (2 * pi);
+                end
+                frequence = max(frequence, f);
+        end
+    end
+    if frequence > 0
+        pas = min(pas, 1 / (3 * frequence));
+    end
+end
+
+% Le plus grand commun diviseur de périodes réelles : en entiers quand
+% elles sont décimales, sinon par Euclide, un reste sous la précision des
+% périodes valant zéro.
+function g = pgcdReel(v)
+    for echelle = 10 .^ (0:9)
+        e = v * echelle;
+        if all(abs(e - round(e)) <= 1e-9 * max(1, e))
+            e = round(e);
+            g = e(1);
+            for x = e(2:end)
+                while x ~= 0
+                    [g, x] = deal(x, mod(g, x));
+                end
+            end
+            g = g / echelle;
+            return
+        end
+    end
+    g = v(1);
+    for x = v(2:end)
+        a = max(g, x);
+        b = min(g, x);
+        tolerance = 1e-9 * a;
+        while b > tolerance
+            r = mod(a, b);
+            if r > b - tolerance
+                r = 0;
+            end
+            a = b;
+            b = r;
+        end
+        g = a;
     end
 end
 

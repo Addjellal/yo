@@ -732,6 +732,7 @@ function J = simuler(T, instants, solveur, reprise)
     end
     nx = numel(x);
     journal = T.journal;
+    infini = isfield(T, 'niveaux') && T.niveaux.infini > 0;
     releveV = zeros(numel(journal), N);
     etats = zeros(nx, N);
     G = size(T.groupes, 1);
@@ -756,6 +757,9 @@ function J = simuler(T, instants, solveur, reprise)
             if refaire
                 [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, i, true, touche);
             end
+        end
+        if infini
+            verifierFinitude(T, V, t);
         end
         releveV(:, r) = V(journal);
         etats(:, r) = x;
@@ -952,6 +956,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         imposes = imposes.imposes;
     end
     imposes = sort(double(imposes(:)));
+    infini = isfield(T, 'niveaux') && T.niveaux.infini > 0;   % SignalInfNanChecking
     solveur = lower(char(solveur));
     nx = numel(T.x0);
     discret = strcmp(solveur, 'variablestepdiscrete') || nx == 0;
@@ -998,6 +1003,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     minimumDonne = ~ischar(reglages.MinStep);
     if minimumDonne
         pasMin = double(reglages.MinStep);
+        pasMax = max(pasMax, pasMin);   % un MaxStep automatique ne passe pas sous MinStep
     else
         pasMin = 0;
     end
@@ -1042,6 +1048,9 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
             [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, 0, true, touche);
         end
     end
+    if infini
+        verifierFinitude(T, V, t);
+    end
     [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, V(T.journal), ...
                                                 x, imposes, iImpose, tous);
     T = figerBornes(T, V, x);
@@ -1051,6 +1060,21 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     hForce = [];
     consecutifs = 0;
     averti = false;
+    % Les diagnostics du solveur : MaxConsecutiveZCs passages par zéro de
+    % suite, MaxConsecutiveMinStep pas de suite au pas minimal.
+    maxZC = 1000;
+    niveauZC = 2;
+    auMinimum = 0;
+    maxAuMinimum = 1;
+    erreurAuMinimum = false;
+    if isfield(reglages, 'MaxConsecutiveZCs')
+        maxZC = reglages.MaxConsecutiveZCs;
+        niveauZC = find(strcmp({'none', 'warning', 'error'}, reglages.MaxConsecutiveZCsMsg)) - 1;
+        maxAuMinimum = reglages.MaxConsecutiveMinStep;
+        erreurAuMinimum = strcmp(reglages.MinStepSizeMsg, 'error');
+    end
+    avertiZC = false;
+    sansZC = false;
     while ~arret && (isinf(tFinal) || t < tFinal - toleranceTemps(tFinal))
         % Les états discrets avancent aux instants qui viennent de tomber.
         k1 = zeros(nx, 1);
@@ -1104,7 +1128,9 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                     hPropose = double(reglages.InitialStep);
                 end
             end
-            hPropose = min(hPropose, pasMax);
+            % le pas reste entre MinStep et MaxStep ; seul un instant à
+            % atteindre — une fin, un échantillon, une cassure — le raccourcit
+            hPropose = max(min(hPropose, pasMax), pasMin);
             h = min(hPropose, borne);
             plancher = max(pasMin, 16 * eps(max(abs(t), 1)));
             refus = 0;
@@ -1112,6 +1138,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                 [xNouveau, err, V, Z, aux] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, ...
                                                    touche);
                 if err <= 1
+                    auMinimum = 0;
                     break
                 end
                 if h <= plancher
@@ -1134,12 +1161,25 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                                'precision des nombres. La solution a peut-etre une ' ...
                                'singularite%s.'], t, solveur, plancher, conseil);
                     end
-                    if ~averti
-                        warning('Simulink:Engine:SolverMinStepViolation', ...
-                                ['A t = %g, le solveur %s ne tient pas la tolerance au pas ' ...
-                                 'minimal MinStep = %g : il avance quand meme.'], ...
-                                t, solveur, pasMin);
-                        averti = true;
+                    % MinStep donné : le solveur avance quand même, et
+                    % MinStepSizeMsg parle au-delà de MaxConsecutiveMinStep
+                    % pas minimaux de suite
+                    auMinimum = auMinimum + 1;
+                    if auMinimum > maxAuMinimum
+                        if erreurAuMinimum
+                            error('Simulink:Engine:SolverMinStepViolation', ...
+                                  ['A t = %g, le solveur %s ne tient pas la tolerance au pas ' ...
+                                   'minimal MinStep = %g, %d pas de suite : la simulation ' ...
+                                   's''arrete (MinStepSizeMsg vaut error).'], ...
+                                  t, solveur, pasMin, auMinimum);
+                        end
+                        if ~averti
+                            warning('Simulink:Engine:SolverMinStepViolation', ...
+                                    ['A t = %g, le solveur %s ne tient pas la tolerance au ' ...
+                                     'pas minimal MinStep = %g, %d pas de suite : il avance ' ...
+                                     'quand meme.'], t, solveur, pasMin, auMinimum);
+                            averti = true;
+                        end
                     end
                     break
                 end
@@ -1172,7 +1212,9 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         % juste avant le franchissement, où les blocs calculent encore dans
         % leur ancien mode — c'est la valeur que tient un sous-système qui
         % s'arrête —, l'autre juste après, au pas suivant.
-        if ~isempty(avant)
+        ignorerZC = sansZC;
+        sansZC = false;
+        if ~isempty(avant) && ~ignorerZC
             [Vc, ~] = passe(T, T.listeMineure, V, Z, xNouveau, tNouveau, 0, false, touche);
             apres = passagesZero(T, Vc, Z, xNouveau, tNouveau);
             if any(sign(avant) .* sign(apres) < 0)
@@ -1194,13 +1236,25 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                 end
                 if h <= 1e3 * toleranceTemps(t)
                     consecutifs = consecutifs + 1;
-                    if consecutifs > 1000
-                        error('Simulink:Engine:SolverConsecutiveZCNum', ...
-                              ['Plus de 1000 passages par zero consecutifs a t = %g : le ' ...
-                               'modele bascule sans avancer (comportement de Zenon). ' ...
-                               'Revoyez le seuil qui bascule, ou coupez la detection des ' ...
-                               'passages par zero (ZeroCrossControl, ou le parametre ' ...
-                               'ZeroCross du bloc).'], t);
+                    if consecutifs > maxZC
+                        texte = sprintf(['Plus de %d passages par zero consecutifs a t = %g : ' ...
+                                         'le modele bascule sans avancer (comportement de ' ...
+                                         'Zenon). Revoyez le seuil qui bascule, ou coupez la ' ...
+                                         'detection des passages par zero (ZeroCrossControl, ' ...
+                                         'ou le parametre ZeroCross du bloc) ; ' ...
+                                         'MaxConsecutiveZCs et MaxConsecutiveZCsMsg reglent ' ...
+                                         'ce diagnostic.'], maxZC, t);
+                        if niveauZC == 2
+                            error('Simulink:Engine:SolverConsecutiveZCNum', '%s', texte);
+                        end
+                        if niveauZC == 1 && ~avertiZC
+                            warning('Simulink:Engine:SolverConsecutiveZCNum', '%s', texte);
+                            avertiZC = true;
+                        end
+                        % la simulation continue : le pas suivant franchit
+                        % le seuil sans le localiser
+                        sansZC = true;
+                        consecutifs = 0;
                     end
                 else
                     consecutifs = 0;
@@ -1243,6 +1297,9 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
             if ~isequal(x, xNouveau)
                 M.H.valide = false;
             end
+        end
+        if infini
+            verifierFinitude(T, V, t);
         end
         if affiner > 1
             [temps, releveV, etats, n] = affinerPas(T, affinage, t, x, V, affiner, temps, ...
@@ -2329,8 +2386,12 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         if T.P(p + 3) ~= 0
                             u = entierStocke(T.P(p + 4), u, T.fixes);   % Stored Integer (SI)
                         end
-                        V(a:b) = convertirType(T.P(p), T.P(p + 1), T.P(p + 2), u, T.fixes, ...
-                                               T.P(p + 3) ~= 0);
+                        [y, hors] = convertirType(T.P(p), T.P(p + 1), T.P(p + 2), u, ...
+                                                  T.fixes, T.P(p + 3) ~= 0);
+                        V(a:b) = y;
+                        if majeur && any(hors)
+                            signalerDebordement(T, k, T.P(p + 2) ~= 0, T.P(p), t);
+                        end
                     case 35   % wrap to zero
                         V(a:b) = u .* (u <= T.P(p:p + b - a));
                     case 36   % interval test
@@ -2782,7 +2843,7 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                 end
         end
         if castK(k)
-            V = convertirSorties(T, k, V);
+            V = convertirSorties(T, k, V, majeur, t);
         end
     end
 end
@@ -2837,15 +2898,92 @@ end
 % Les sorties d'un bloc ramenées à leur type : arrondies, repliées ou
 % saturées aux bornes d'un entier, à la précision d'un single, à 0 ou 1
 % pour un booléen.
-function V = convertirSorties(T, k, V)
+function V = convertirSorties(T, k, V, majeur, t)
     pd = T.pd(k);
     for q = 1:T.nOut(k)
         type = T.typePort(pd + q - 1);
         if type > 2
             a = T.poA(pd + q - 1);
             b = T.poB(pd + q - 1);
-            V(a:b) = convertirType(type, T.arrondiK(k), T.saturerK(k), V(a:b), T.fixes);
+            [y, hors] = convertirType(type, T.arrondiK(k), T.saturerK(k), V(a:b), T.fixes);
+            V(a:b) = y;
+            if majeur && any(hors)
+                signalerDebordement(T, k, T.saturerK(k), type, t);
+            end
         end
+    end
+end
+
+% Un entier ou une virgule fixe qui déborde de son type, au pas majeur :
+% replié, IntegerOverflowMsg en décide ; saturé (SaturateOnIntegerOverflow),
+% IntegerSaturationMsg — rien, un avertissement par bloc et par
+% simulation, ou l'arrêt, comme les diagnostics « Wrap on overflow » et
+% « Saturate on overflow » de Simulink.
+function signalerDebordement(T, k, sature, type, t)
+    if ~isfield(T, 'niveaux')
+        return
+    end
+    if sature
+        niveau = T.niveaux.saturation;
+        id = 'Simulink:Engine:SaturateOnOverflow';
+        texte = sprintf(['Debordement sature dans ''%s'' a t = %g : le resultat sort des ' ...
+                         'bornes du type %s, et s''y arrete (saturate on overflow). ' ...
+                         'IntegerSaturationMsg regle ce diagnostic.'], T.chemins{k}, t, ...
+                        matlibre_sl_types('nom', type));
+    else
+        niveau = T.niveaux.repli;
+        id = 'Simulink:Engine:WrapOnOverflow';
+        texte = sprintf(['Debordement replie dans ''%s'' a t = %g : le resultat sort des ' ...
+                         'bornes du type %s, et s''y replie (wrap on overflow). Choisissez un ' ...
+                         'type plus large, ou SaturateOnIntegerOverflow ; IntegerOverflowMsg ' ...
+                         'regle ce diagnostic.'], T.chemins{k}, t, matlibre_sl_types('nom', type));
+    end
+    alerter(T, niveau, id, sprintf('%s:%d', id, k), texte);
+end
+
+% SignalInfNanChecking : une sortie de bloc qui vaut Inf ou NaN à un pas
+% majeur. Les blocs se lisent dans l'ordre du calcul : le premier nommé
+% est celui d'où l'infini part.
+function verifierFinitude(T, V, t)
+    if all(isfinite(V))
+        return
+    end
+    for k = T.listeTout(:).'
+        if k < 0
+            continue
+        end
+        pd = T.pd(k);
+        for q = 1:T.nOut(k)
+            v = V(T.poA(pd + q - 1):T.poB(pd + q - 1));
+            i = find(~isfinite(v), 1);
+            if isempty(i)
+                continue
+            end
+            quoi = 'NaN';
+            if ~isnan(v(i))
+                quoi = 'Inf';
+                if real(v(i)) < 0
+                    quoi = '-Inf';
+                end
+            end
+            texte = sprintf(['Le bloc ''%s'' rend %s pour l''element %d de sa sortie %d au pas ' ...
+                             'majeur t = %g. SignalInfNanChecking regle ce diagnostic.'], ...
+                            T.chemins{k}, quoi, i, q, t);
+            alerter(T, T.niveaux.infini, 'Simulink:Engine:BlockOutputInfNaN', ...
+                    sprintf('infini:%d', k), texte);
+        end
+    end
+end
+
+% Un diagnostic : l'erreur, ou l'avertissement, une seule fois par CLE et
+% par simulation.
+function alerter(T, niveau, id, cle, texte)
+    if niveau == 2
+        error(id, '%s', texte);
+    end
+    if niveau == 1 && ~isKey(T.alertes, cle)
+        T.alertes(cle) = true;
+        warning(id, '%s', texte);
     end
 end
 
@@ -3731,7 +3869,8 @@ end
 % Une conversion de type : le signal reste un double, mais prend les valeurs
 % que le type admet — arrondi selon le mode demandé, puis saturé ou
 % replié modulo 2^n à la façon des entiers de Simulink.
-function y = convertirType(type, arrondi, saturer, u, fixes, stocke)
+function [y, hors] = convertirType(type, arrondi, saturer, u, fixes, stocke)
+    hors = false;
     if type > 200
         y = u;   % un type énuméré : le signal porte déjà la valeur d'un membre
         return
@@ -3789,6 +3928,7 @@ function y = convertirType(type, arrondi, saturer, u, fixes, stocke)
                   0 4294967295];
         b = bornes(type - 3, :);
     end
+    hors = v < b(1) | v > b(2);   % le débordement, que les diagnostics signalent
     if saturer
         y = min(max(v, b(1)), b(2));
     else

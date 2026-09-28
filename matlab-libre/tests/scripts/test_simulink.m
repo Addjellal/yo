@@ -8893,6 +8893,234 @@ assert(strcmp(get_param(relu62, 'OutputOption'), 'AdditionalOutputTimes') && ...
        get_param(relu62, 'Refine') == 3, 'les reglages d''export voyagent dans le .slx');
 fprintf('import et export des donnees : ok\n');
 
+%% ------------------------------------------ 63. Diagnostics de la simulation
+% Les diagnostics de Simulink, réglés comme dans sa boîte de configuration
+% : none, warning — un avertissement par bloc et par simulation — ou
+% error. Une sortie de bloc qui vaut Inf ou NaN (SignalInfNanChecking) ;
+% un entier ou une virgule fixe qui déborde de son type, replié
+% (IntegerOverflowMsg) ou saturé (IntegerSaturationMsg) ; à pas variable,
+% trop de passages par zéro de suite (MaxConsecutiveZCs,
+% MaxConsecutiveZCsMsg), trop de pas de suite au pas minimal qui ne tient
+% pas la tolérance (MaxConsecutiveMinStep, MinStepSizeMsg).
+m63 = new_system('infini63');
+m63 = add_block(m63, 'clock', 't');
+m63 = add_block(m63, 'constant', 'un', 'Value', 1);
+m63 = add_block(m63, 'product', 'div', 'Inputs', '*/');
+m63 = add_block(m63, 'gain', 'g', 'Gain', 2);
+m63 = add_block(m63, 'outport', 'y');
+m63 = add_line(add_line(m63, 'un', 'div', 1), 't', 'div', 2);
+m63 = add_line(add_line(m63, 'div', 'g'), 'g', 'y');
+assert(strcmp(get_param(m63, 'SignalInfNanChecking'), 'none') && ...
+       strcmp(get_param(m63, 'IntegerOverflowMsg'), 'warning') && ...
+       strcmp(get_param(m63, 'IntegerSaturationMsg'), 'warning') && ...
+       strcmp(get_param(m63, 'MinStepSizeMsg'), 'warning') && ...
+       get_param(m63, 'MaxConsecutiveMinStep') == 1 && ...
+       get_param(m63, 'MaxConsecutiveZCs') == 1000 && ...
+       strcmp(get_param(m63, 'MaxConsecutiveZCsMsg'), 'error'), ...
+       'les diagnostics, a leur defaut de Simulink');
+lastwarn('');
+r63 = sim(m63, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.3);
+[~, id63] = lastwarn();
+assert(isempty(id63) && isinf(r63.yout(1)), 'SignalInfNanChecking none : 1/0 passe sans rien dire');
+lastwarn('');
+sim(m63, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.3, 'SignalInfNanChecking', 'warning');
+[message63, id63] = lastwarn();
+assert(strcmp(id63, 'Simulink:Engine:BlockOutputInfNaN') && ~isempty(strfind(message63, 'Inf')), ...
+       'SignalInfNanChecking warning : un avertissement qui nomme le bloc et l''infini');
+for solveur63 = {'ode4', 'ode45'}
+    vu63 = '';
+    message63 = '';
+    try
+        sim(m63, 'Solver', solveur63{1}, 'FixedStep', 0.1, 'StopTime', 0.3, ...
+            'SignalInfNanChecking', 'error');
+    catch err
+        vu63 = err.identifier;
+        message63 = err.message;
+    end
+    assert(strcmp(vu63, 'Simulink:Engine:BlockOutputInfNaN') && ...
+           ~isempty(strfind(message63, 'infini63/div')) && ...
+           ~isempty(strfind(message63, 't = 0')), ...
+           [solveur63{1} ' : SignalInfNanChecking error nomme le bloc d''ou l''infini part']);
+end
+nan63 = set_param(m63, 'un', 'Value', 0);
+vu63 = '';
+message63 = '';
+try
+    sim(nan63, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.3, ...
+        'SignalInfNanChecking', 'error');
+catch err
+    vu63 = err.identifier;
+    message63 = err.message;
+end
+assert(strcmp(vu63, 'Simulink:Engine:BlockOutputInfNaN') && ~isempty(strfind(message63, 'NaN')), ...
+       'SignalInfNanChecking : 0/0 rend NaN');
+% Un entier qui déborde : replié, ou saturé
+m63 = new_system('repli63');
+m63 = add_block(m63, 'constant', 'a', 'Value', 'int8(100)');
+m63 = add_block(m63, 'constant', 'b', 'Value', 'int8(100)');
+m63 = add_block(m63, 'sum', 'somme');
+m63 = add_block(m63, 'outport', 'y');
+m63 = add_line(add_line(add_line(m63, 'a', 'somme', 1), 'b', 'somme', 2), 'somme', 'y');
+reglage63 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 2};
+lastwarn('');
+r63 = sim(m63, reglage63{:});
+[message63, id63] = lastwarn();
+assert(isequal(double(r63.yout(:)'), [-56 -56 -56]) && ...
+       strcmp(id63, 'Simulink:Engine:WrapOnOverflow') && ...
+       ~isempty(strfind(message63, 'repli63/somme')) && ~isempty(strfind(message63, 'int8')), ...
+       'IntegerOverflowMsg warning : 100 + 100 se replie en -56, en le disant');
+lastwarn('');
+r63 = sim(set_param(m63, 'somme', 'SaturateOnIntegerOverflow', 'on'), reglage63{:});
+[message63, id63] = lastwarn();
+assert(isequal(double(r63.yout(:)'), [127 127 127]) && ...
+       strcmp(id63, 'Simulink:Engine:SaturateOnOverflow') && ...
+       ~isempty(strfind(message63, 'repli63/somme')), ...
+       'IntegerSaturationMsg warning : 100 + 100 sature a 127, en le disant');
+lastwarn('');
+r63 = sim(m63, reglage63{:}, 'IntegerOverflowMsg', 'none');
+[~, id63] = lastwarn();
+assert(isempty(id63) && isequal(double(r63.yout(:)'), [-56 -56 -56]), ...
+       'IntegerOverflowMsg none : le repli se tait');
+vu63 = '';
+try
+    sim(m63, reglage63{:}, 'IntegerOverflowMsg', 'error');
+catch err
+    vu63 = err.identifier;
+end
+assert(strcmp(vu63, 'Simulink:Engine:WrapOnOverflow'), 'IntegerOverflowMsg error : l''arret');
+conv63 = new_system('conv63');
+conv63 = add_block(conv63, 'constant', 'a', 'Value', 300);
+conv63 = add_block(conv63, 'datatypeconversion', 'c', 'OutDataTypeStr', 'uint8');
+conv63 = add_block(conv63, 'outport', 'y');
+conv63 = add_line(add_line(conv63, 'a', 'c'), 'c', 'y');
+lastwarn('');
+r63 = sim(conv63, reglage63{:});
+[message63, id63] = lastwarn();
+assert(all(double(r63.yout) == 44) && strcmp(id63, 'Simulink:Engine:WrapOnOverflow') && ...
+       ~isempty(strfind(message63, 'conv63/c')), ...
+       'Data Type Conversion : 300 en uint8 se replie en 44, en le disant');
+% Zénon : x' = -signe(x) bascule sans fin quand x atteint zéro
+m63 = new_system('zenon63');
+m63 = add_block(m63, 'integrator', 'x', 'InitialCondition', 1);
+m63 = add_block(m63, 'sign', 's');
+m63 = add_block(m63, 'gain', 'g', 'Gain', -1);
+m63 = add_block(m63, 'outport', 'y');
+m63 = add_line(add_line(add_line(add_line(m63, 'x', 's'), 's', 'g'), 'g', 'x'), 'x', 'y');
+vu63 = '';
+message63 = '';
+try
+    sim(m63, 'Solver', 'ode45', 'StopTime', 1.1, 'MaxConsecutiveZCs', 20);
+catch err
+    vu63 = err.identifier;
+    message63 = err.message;
+end
+assert(strcmp(vu63, 'Simulink:Engine:SolverConsecutiveZCNum') && ...
+       ~isempty(strfind(message63, '20 passages')), ...
+       'MaxConsecutiveZCs 20 : l''arret, au vingt et unieme');
+lastwarn('');
+r63 = sim(m63, 'Solver', 'ode45', 'StopTime', 1.1, 'MaxConsecutiveZCs', 20, ...
+          'MaxConsecutiveZCsMsg', 'warning');
+[~, id63] = lastwarn();
+assert(strcmp(id63, 'Simulink:Engine:SolverConsecutiveZCNum') && ...
+       abs(r63.tout(end) - 1.1) < 1e-12 && abs(r63.yout(end)) < 0.05, ...
+       'MaxConsecutiveZCsMsg warning : le diagnostic, puis la simulation va a son terme');
+% Le pas minimal : x' = -100 x, qu'un pas de 0,05 ne suit pas
+m63 = new_system('raide63');
+m63 = add_block(m63, 'integrator', 'x', 'InitialCondition', 1);
+m63 = add_block(m63, 'gain', 'g', 'Gain', -100);
+m63 = add_block(m63, 'outport', 'y');
+m63 = add_line(add_line(add_line(m63, 'x', 'g'), 'g', 'x'), 'x', 'y');
+reglage63 = {'Solver', 'ode45', 'StopTime', 0.2, 'MinStep', 0.05, 'RelTol', 1e-6};
+lastwarn('');
+r63 = sim(m63, reglage63{:});
+[message63, id63] = lastwarn();
+assert(numel(r63.tout) == 5 && strcmp(id63, 'Simulink:Engine:SolverMinStepViolation') && ...
+       ~isempty(strfind(message63, '2 pas de suite')), ...
+       'MinStep 0,05 tenu ; au deuxieme pas minimal de suite, l''avertissement');
+lastwarn('');
+sim(m63, reglage63{:}, 'MaxConsecutiveMinStep', 10);
+[~, id63] = lastwarn();
+assert(isempty(id63), 'MaxConsecutiveMinStep 10 : quatre pas minimaux passent');
+vu63 = '';
+try
+    sim(m63, reglage63{:}, 'MinStepSizeMsg', 'error');
+catch err
+    vu63 = err.identifier;
+end
+assert(strcmp(vu63, 'Simulink:Engine:SolverMinStepViolation'), 'MinStepSizeMsg error : l''arret');
+% Les valeurs refusées
+refus63 = {
+    @() set_param(m63, 'SignalInfNanChecking', 'oui'), 'SignalInfNanChecking'
+    @() set_param(m63, 'MinStepSizeMsg', 'none'), 'MinStepSizeMsg'
+    @() set_param(m63, 'MaxConsecutiveZCs', 0), 'MaxConsecutiveZCs'
+    @() set_param(m63, 'MaxConsecutiveMinStep', 2.5), 'MaxConsecutiveMinStep'
+    };
+for kE = 1:size(refus63, 1)
+    vu63 = '';
+    message63 = '';
+    try
+        refus63{kE, 1}();
+    catch err
+        vu63 = err.identifier;
+        message63 = err.message;
+    end
+    assert(strcmp(vu63, 'Simulink:Config:InvalidValue') && ...
+           ~isempty(strfind(message63, refus63{kE, 2})), ...
+           sprintf('diagnostics, cas %d : %s rendu (%s)', kE, vu63, message63));
+end
+fprintf('diagnostics de la simulation : ok\n');
+
+%% ------------------------------------------------ 64. Le pas fixe automatique
+% FixedStep 'auto', comme dans Simulink : le pas fondamental — le plus grand
+% commun diviseur des périodes d'échantillonnage et de leurs décalages — ;
+% sans période, la durée en cinquante pas, 0,2 s sans fin, au plus le
+% tiers de la période du sinus le plus rapide.
+m64 = new_system('auto64');
+m64 = add_block(m64, 'sine', 's1', 'SampleTime', 0.1);
+m64 = add_block(m64, 'sine', 's2', 'SampleTime', 0.25);
+m64 = add_block(m64, 'outport', 'y1');
+m64 = add_block(m64, 'outport', 'y2');
+m64 = add_line(add_line(m64, 's1', 'y1'), 's2', 'y2');
+r64 = sim(m64, 'Solver', 'FixedStepDiscrete', 'FixedStep', 'auto', 'StopTime', 1);
+assert(max(abs(r64.tout(:)' - (0:0.05:1))) < 1e-12, 'le pas fondamental de 0,1 et 0,25 : 0,05');
+r64 = sim(set_param(m64, 's2', 'SampleTime', [0.2 0.05]), 'Solver', 'FixedStepDiscrete', ...
+          'FixedStep', 'auto', 'StopTime', 1);
+assert(max(abs(r64.tout(:)' - (0:0.05:1))) < 1e-12, 'un decalage compte aussi : 0,2 decale de 0,05');
+% un état continu et une période : la période l'emporte sur la durée
+m64 = new_system('mixte64');
+m64 = add_block(m64, 'constant', 'un', 'Value', 1);
+m64 = add_block(m64, 'integrator', 'x');
+m64 = add_block(m64, 'sine', 's', 'SampleTime', 0.1);
+m64 = add_block(m64, 'outport', 'y1');
+m64 = add_block(m64, 'outport', 'y2');
+m64 = add_line(add_line(add_line(m64, 'un', 'x'), 'x', 'y1'), 's', 'y2');
+r64 = sim(m64, 'Solver', 'ode3', 'FixedStep', 'auto', 'StopTime', 10);
+assert(numel(r64.tout) == 101 && abs(r64.tout(2) - 0.1) < 1e-12 && ...
+       abs(r64.yout(end, 1) - 10) < 1e-9, ...
+       'une periode de 0,1 et dix secondes : cent pas, et non cinquante qu''elle refuserait');
+% sans période : la durée en cinquante pas, au plus le tiers de la période
+% du sinus le plus rapide
+r64 = sim(delete_block(delete_block(m64, 's'), 'y2'), 'Solver', 'ode3', 'FixedStep', 'auto', ...
+          'StopTime', 5);
+assert(numel(r64.tout) == 51 && abs(r64.tout(2) - 0.1) < 1e-12, 'sans periode : 5 s en cinquante pas');
+m64 = new_system('rapide64');
+m64 = add_block(m64, 'sine', 's', 'Frequency', 20);
+m64 = add_block(m64, 'integrator', 'x');
+m64 = add_block(m64, 'outport', 'y');
+m64 = add_line(add_line(m64, 's', 'x'), 'x', 'y');
+r64 = sim(m64, 'Solver', 'ode4', 'FixedStep', 'auto', 'StopTime', 10);
+assert(abs(r64.tout(2) - 2 * pi / 60) < 1e-12, ...
+       'un sinus de 20 rad/s : au plus le tiers de sa periode, 2 pi / 60');
+m64 = new_system('sansFin64');
+m64 = add_block(m64, 'clock', 't');
+m64 = add_block(m64, 'integrator', 'x');
+m64 = add_block(m64, 'comparetoconstant', 'assez', 'relop', '>=', 'const', 1);
+m64 = add_block(m64, 'stopsimulation', 'stop');
+m64 = add_line(add_line(add_line(m64, 't', 'x'), 't', 'assez'), 'assez', 'stop');
+r64 = sim(m64, 'Solver', 'ode3', 'FixedStep', 'auto', 'StopTime', Inf);
+assert(max(abs(r64.tout(:)' - (0:0.2:1))) < 1e-12, 'sans fin et sans periode : 0,2 s');
+fprintf('pas fixe automatique : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

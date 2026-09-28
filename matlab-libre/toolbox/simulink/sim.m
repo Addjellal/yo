@@ -22,9 +22,14 @@ function varargout = sim(modele, varargin)
 %   Simulink, que SET_PARAM(MODELE,'Solver','ode4') pose sur le modèle et
 %   que GET_PARAM relit : StartTime, StopTime, Solver, FixedStep, RelTol,
 %   AbsTol, MaxStep, MinStep, InitialStep, MaxOrder, ExtrapolationOrder,
-%   NumberNewtonIterations, ZeroCrossControl, et les
-%   diagnostics AlgebraicLoopMsg, UnconnectedInputMsg et
-%   UnconnectedOutputMsg (none, warning ou error). Un argument explicite
+%   NumberNewtonIterations, ZeroCrossControl, MaxConsecutiveZCs,
+%   MaxConsecutiveMinStep, et les diagnostics AlgebraicLoopMsg,
+%   UnconnectedInputMsg, UnconnectedOutputMsg, MaxConsecutiveZCsMsg,
+%   SignalInfNanChecking — une sortie de bloc Inf ou NaN —,
+%   IntegerOverflowMsg et IntegerSaturationMsg — un entier ou une virgule
+%   fixe qui déborde de son type, replié ou saturé — (none, warning ou
+%   error), et MinStepSizeMsg (warning ou error). Un avertissement ne
+%   vient qu'une fois par bloc et par simulation. Un argument explicite
 %   l'emporte toujours sur le réglage enregistré.
 %
 %   Les solveurs à pas fixe : ode1 (Euler, celui par défaut), ode2
@@ -208,10 +213,13 @@ function varargout = sim(modele, varargin)
         solveur = lower(char(config.ODENIntegrationMethod));
     end
     pas = config.FixedStep;
-    if ischar(pas) && strcmpi(pas, 'auto')
+    pasAuto = ischar(pas) && strcmpi(pas, 'auto');
+    if pasAuto
+        % à pas fixe, la compilation en tire le pas fondamental ; le
+        % cinquantième de la durée sert en attendant, et à pas variable
         pas = (tFinal - tDebut) / 50;
         if ~(pas > 0) || isinf(pas)
-            pas = 0.01;
+            pas = 0.2;
         end
     else
         pas = nombre(pas, nomModele, 'FixedStep');
@@ -221,7 +229,7 @@ function varargout = sim(modele, varargin)
     end
 
     options = struct('pas', pas, 'tDebut', tDebut, 'tFinal', tFinal, 'config', config, ...
-                     'variable', variable);
+                     'variable', variable, 'pasAuto', pasAuto && ~variable);
     % Les entrées externes : le quatrième argument, ou ExternalInput quand
     % LoadExternalInput vaut 'on'. Chaque entrée du modèle y prend sa part.
     if ~isempty(externe)
@@ -230,6 +238,7 @@ function varargout = sim(modele, varargin)
         options.entrees = entreesExternes(modele, config.ExternalInput, nomModele);
     end
     c = matlibre_sl_compiler(modele, options);
+    pas = c.pas;
     if strcmpi(config.LoadInitialState, 'on')
         c.xDepart = etatInitial(config.InitialState, c, nomModele);
     end
@@ -449,6 +458,13 @@ function [T, J, instants] = derouler(c, config, variable, solveur, tDebut, tFina
     T.reglagesSolveur = struct('ExtrapolationOrder', config.ExtrapolationOrder, ...
                                'NumberNewtonIterations', config.NumberNewtonIterations, ...
                                'MaxOrder', config.MaxOrder);
+    % Les diagnostics des données : 0 rien, 1 un avertissement par bloc et
+    % par simulation, 2 une erreur.
+    niveaux = {'none', 'warning', 'error'};
+    T.niveaux = struct('repli', find(strcmp(niveaux, config.IntegerOverflowMsg)) - 1, ...
+                       'saturation', find(strcmp(niveaux, config.IntegerSaturationMsg)) - 1, ...
+                       'infini', find(strcmp(niveaux, config.SignalInfNanChecking)) - 1);
+    T.alertes = containers.Map('KeyType', 'char', 'ValueType', 'logical');
     if variable
         reglages = reglagesVariables(config, nomModele);
         J = matlibre_sl_executer('simulerVariable', T, tDebut, tFinal, solveur, ...
@@ -647,6 +663,10 @@ function r = reglagesVariables(config, nomModele)
               nomModele, 100 * eps);
     end
     r.MaxOrder = config.MaxOrder;
+    r.MinStepSizeMsg = char(config.MinStepSizeMsg);
+    r.MaxConsecutiveMinStep = double(config.MaxConsecutiveMinStep);
+    r.MaxConsecutiveZCs = double(config.MaxConsecutiveZCs);
+    r.MaxConsecutiveZCsMsg = char(config.MaxConsecutiveZCsMsg);
     if ~ischar(r.MinStep) && ~ischar(r.MaxStep) && r.MinStep > r.MaxStep
         error('Simulink:Config:InvalidValue', ...
               ['Le pas minimal %g du modele ''%s'' depasse son pas maximal %g.'], ...

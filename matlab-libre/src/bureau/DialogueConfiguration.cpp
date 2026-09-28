@@ -105,8 +105,9 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
     auto* groupeOptions = new QGroupBox(QStringLiteral("Options du solveur"));
     auto* formulaireOptions = new QFormLayout(groupeOptions);
     nouveauChamp(QStringLiteral("FixedStep"), formulaireOptions, QStringLiteral("Pas fixe"),
-                 QStringLiteral("Le pas d'intégration ; « auto » en prend le cinquantième "
-                                "de la durée"));
+                 QStringLiteral("Le pas d'intégration ; « auto » : le pas fondamental — le plus "
+                                "grand commun diviseur des périodes d'échantillonnage —, ou le "
+                                "cinquantième de la durée"));
     nouveauChamp(QStringLiteral("MaxStep"), formulaireOptions, QStringLiteral("Pas maximal"),
                  QStringLiteral("À pas variable : le plus grand pas permis"));
     nouveauChamp(QStringLiteral("MinStep"), formulaireOptions, QStringLiteral("Pas minimal"),
@@ -140,6 +141,14 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                   {QStringLiteral("UseLocalSettings"), QStringLiteral("EnableAll"),
                    QStringLiteral("DisableAll")},
                   QStringLiteral("La détection des instants où un signal change de signe"));
+    nouveauChamp(QStringLiteral("MaxConsecutiveZCs"), formulaireOptions,
+                 QStringLiteral("Passages par zéro de suite"),
+                 QStringLiteral("À pas variable : combien de passages par zéro de suite, sans "
+                                "que le temps avance, avant le diagnostic"));
+    nouveauChamp(QStringLiteral("MaxConsecutiveMinStep"), formulaireOptions,
+                 QStringLiteral("Pas minimaux de suite"),
+                 QStringLiteral("À pas variable : combien de pas de suite au pas minimal, sans "
+                                "tenir la tolérance, avant le diagnostic"));
     colonneSolveur->addWidget(groupeOptions);
     colonneSolveur->addStretch(1);
     pages_->addWidget(pageSolveur);
@@ -248,6 +257,31 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                   QStringLiteral("une sortie n'est reliée à rien"), kNiveaux,
                   QStringLiteral("Son signal n'est lu par personne"));
     colonneDiagnostics->addWidget(groupeDiagnostics);
+    auto* groupeSolveurDiag = new QGroupBox(QStringLiteral("Solveur à pas variable"));
+    auto* formulaireSolveurDiag = new QFormLayout(groupeSolveurDiag);
+    nouvelleListe(QStringLiteral("MinStepSizeMsg"), formulaireSolveurDiag,
+                  QStringLiteral("le pas minimal ne tient pas la tolérance"),
+                  {QStringLiteral("warning"), QStringLiteral("error")},
+                  QStringLiteral("Plus de « pas minimaux de suite » au pas MinStep : le "
+                                 "solveur avance quand même, ou s'arrête"));
+    nouvelleListe(QStringLiteral("MaxConsecutiveZCsMsg"), formulaireSolveurDiag,
+                  QStringLiteral("les passages par zéro s'enchaînent"), kNiveaux,
+                  QStringLiteral("Plus de « passages par zéro de suite » sans que le temps "
+                                 "avance : le modèle bascule sans fin (Zénon)"));
+    colonneDiagnostics->addWidget(groupeSolveurDiag);
+    auto* groupeDonneesDiag = new QGroupBox(QStringLiteral("Validité des données"));
+    auto* formulaireDonneesDiag = new QFormLayout(groupeDonneesDiag);
+    nouvelleListe(QStringLiteral("SignalInfNanChecking"), formulaireDonneesDiag,
+                  QStringLiteral("une sortie vaut Inf ou NaN"), kNiveaux,
+                  QStringLiteral("Une sortie de bloc infinie ou indéfinie à un pas majeur"));
+    nouvelleListe(QStringLiteral("IntegerOverflowMsg"), formulaireDonneesDiag,
+                  QStringLiteral("un entier déborde et se replie"), kNiveaux,
+                  QStringLiteral("Un entier ou une virgule fixe sort des bornes de son type, "
+                                 "et s'y replie"));
+    nouvelleListe(QStringLiteral("IntegerSaturationMsg"), formulaireDonneesDiag,
+                  QStringLiteral("un entier déborde et sature"), kNiveaux,
+                  QStringLiteral("… et s'y arrête : SaturateOnIntegerOverflow"));
+    colonneDiagnostics->addWidget(groupeDonneesDiag);
     colonneDiagnostics->addStretch(1);
     pages_->addWidget(pageDiagnostics);
 
@@ -298,8 +332,12 @@ void DialogueConfiguration::typeChange() {
     champs_.value(QStringLiteral("FixedStep"))->setEnabled(!variable);
     for (const QString& nom : {QStringLiteral("MaxStep"), QStringLiteral("MinStep"),
                                QStringLiteral("InitialStep"), QStringLiteral("RelTol"),
-                               QStringLiteral("AbsTol")})
+                               QStringLiteral("AbsTol"), QStringLiteral("MaxConsecutiveZCs"),
+                               QStringLiteral("MaxConsecutiveMinStep")})
         champs_.value(nom)->setEnabled(variable);
+    for (const QString& nom : {QStringLiteral("MinStepSizeMsg"),
+                               QStringLiteral("MaxConsecutiveZCsMsg")})
+        listes_.value(nom)->setEnabled(variable);
     solveurChange();
     donneesChange();
 }

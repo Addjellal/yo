@@ -2546,6 +2546,43 @@ end
                                               QStringLiteral("OutputTimes=[0.5 1]")}),
                          "les reglages des donnees ressortent, dans l'ordre des volets");
             }
+            {
+                // Les diagnostics du solveur ne valent qu'a pas variable ;
+                // ceux des donnees toujours.
+                QMap<QString, QString> valeurs;
+                valeurs.insert(QStringLiteral("SolverType"), QStringLiteral("Fixed-step"));
+                valeurs.insert(QStringLiteral("Solver"), QStringLiteral("ode4"));
+                valeurs.insert(QStringLiteral("MaxConsecutiveZCs"), QStringLiteral("1000"));
+                valeurs.insert(QStringLiteral("MaxConsecutiveZCsMsg"), QStringLiteral("error"));
+                valeurs.insert(QStringLiteral("SignalInfNanChecking"), QStringLiteral("none"));
+                valeurs.insert(QStringLiteral("IntegerOverflowMsg"), QStringLiteral("warning"));
+                DialogueConfiguration boite(QStringLiteral("m"), valeurs,
+                                            {QStringLiteral("ode4")}, {QStringLiteral("ode45")});
+                verifier(!boite.champ(QStringLiteral("MaxConsecutiveZCs"))->isEnabled() &&
+                             !boite.liste(QStringLiteral("MaxConsecutiveZCsMsg"))->isEnabled() &&
+                             boite.liste(QStringLiteral("SignalInfNanChecking"))->isEnabled(),
+                         "a pas fixe, les diagnostics du solveur ne valent pas, ceux des "
+                         "donnees si");
+                verifier(boite.liste(QStringLiteral("IntegerOverflowMsg"))->currentText() ==
+                             QLatin1String("warning"),
+                         "le repli des entiers s'affiche a son reglage");
+                boite.choixType()->setCurrentIndex(
+                    boite.choixType()->findText(QStringLiteral("Variable-step")));
+                verifier(boite.champ(QStringLiteral("MaxConsecutiveZCs"))->isEnabled() &&
+                             boite.liste(QStringLiteral("MaxConsecutiveZCsMsg"))->isEnabled(),
+                         "a pas variable, les passages par zero de suite se reglent");
+                QComboBox* infini = boite.liste(QStringLiteral("SignalInfNanChecking"));
+                infini->setCurrentIndex(infini->findText(QStringLiteral("error")));
+                boite.champ(QStringLiteral("MaxConsecutiveZCs"))->setText(QStringLiteral("50"));
+                QStringList noms;
+                for (const auto& c : boite.changements())
+                    noms << c.first + QLatin1Char('=') + c.second;
+                verifier(noms == QStringList({QStringLiteral("SolverType=Variable-step"),
+                                              QStringLiteral("Solver=ode45"),
+                                              QStringLiteral("MaxConsecutiveZCs=50"),
+                                              QStringLiteral("SignalInfNanChecking=error")}),
+                         "les diagnostics changes ressortent, dans l'ordre des volets");
+            }
             verifier(simulink->choixSolveur()->findText(QStringLiteral("ode45")) >= 0,
                      "la barre offre aussi les solveurs a pas variable");
             {
