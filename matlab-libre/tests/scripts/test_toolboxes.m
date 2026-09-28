@@ -893,7 +893,7 @@ resOptions = sim(add_block(new_system('o'), 'constant', 'c', 'Value', 1), 1, opt
 assert(numel(resOptions.temps) == 5);
 refuseOption = false;
 try
-    simset('Decimation', 2);
+    simset('Trace', 'minstep');
 catch err
     refuseOption = strcmp(err.identifier, 'Simulink:Commands:SimsetInconnue');
 end

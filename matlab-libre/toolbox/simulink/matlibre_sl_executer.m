@@ -940,6 +940,17 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     if nargin < 6
         imposes = [];
     end
+    % Les instants relevés : IMPOSES, que le solveur atteint exactement —
+    % seuls, ou avec chacun de ses pas (tous) —, et entre deux pas affiner
+    % - 1 points calculés sur l'état interpolé, comme le Refine de
+    % Simulink.
+    tous = isempty(imposes);
+    affiner = 1;
+    if isstruct(imposes)
+        tous = imposes.tous || isempty(imposes.imposes);
+        affiner = double(imposes.affiner);
+        imposes = imposes.imposes;
+    end
     imposes = sort(double(imposes(:)));
     solveur = lower(char(solveur));
     nx = numel(T.x0);
@@ -1032,7 +1043,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         end
     end
     [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, V(T.journal), ...
-                                                x, imposes, iImpose);
+                                                x, imposes, iImpose, tous);
     T = figerBornes(T, V, x);
     avant = passagesZero(T, V, Z, x, t);
     arret = Z(1) ~= 0;
@@ -1202,10 +1213,19 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         if any(T.satures)
             xNouveau(T.satures) = x(T.satures);
         end
+        if affiner > 1
+            % l'affinage part du pas tel que le solveur l'a fait : l'état
+            % de départ et sa dérivée, les sorties et les états discrets
+            % d'avant le pas
+            affinage = struct('t', t, 'x', x, 'f', k1, 'V', V, 'Z', Z, 'touche', touche);
+        end
         t = tNouveau;
         x = xNouveau;
         if ~isempty(T.bornes)
             x = borner(T, x);
+        end
+        if affiner > 1
+            affinage.xFin = x;
         end
         touche = (abs(prochain - t) <= toleranceTemps(t)).';
         [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, 0, true, touche);
@@ -1224,8 +1244,12 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                 M.H.valide = false;
             end
         end
+        if affiner > 1
+            [temps, releveV, etats, n] = affinerPas(T, affinage, t, x, V, affiner, temps, ...
+                                                    releveV, etats, n);
+        end
         [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, ...
-                                                    V(T.journal), x, imposes, iImpose);
+                                                    V(T.journal), x, imposes, iImpose, tous);
         arret = Z(1) ~= 0;
         T = figerBornes(T, V, x);
         avant = passagesZero(T, V, Z, x, t);
@@ -1259,12 +1283,13 @@ end
 % capacité double quand elle est pleine — un relevé qui grandirait d'une
 % colonne à la fois se recopierait à chaque pas.
 function [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, valeurs, ...
-                                                     x, imposes, iImpose)
+                                                     x, imposes, iImpose, tous)
     if ~isempty(imposes)
-        if iImpose > numel(imposes) || abs(imposes(iImpose) - t) > toleranceTemps(t)
+        if iImpose <= numel(imposes) && abs(imposes(iImpose) - t) <= toleranceTemps(t)
+            iImpose = iImpose + 1;
+        elseif ~tous
             return
         end
-        iImpose = iImpose + 1;
     end
     if n == numel(temps)
         temps = [temps, zeros(1, n)];
@@ -1275,6 +1300,40 @@ function [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t
     temps(n) = t;
     releveV(:, n) = valeurs;
     etats(:, n) = x;
+end
+
+% Le Refine de Simulink : entre deux pas majeurs, AFFINER - 1 instants de
+% plus, où l'état est interpolé — par Hermite, de l'état et de sa dérivée
+% aux deux bouts ; en ligne droite si l'état a été remis au bout — et où
+% les blocs calculent comme à un pas mineur : les états discrets et les
+% blocs des seuls pas majeurs y tiennent la valeur du début du pas.
+function [temps, releveV, etats, n] = affinerPas(T, A, t, x, V, affiner, temps, releveV, ...
+                                                 etats, n)
+    h = t - A.t;
+    nx = numel(x);
+    hermite = nx > 0 && isequal(x, A.xFin);
+    if hermite
+        fFin = derivees(T, V, x, t);
+        hermite = all(isfinite(fFin)) && all(isfinite(A.f));
+    end
+    for j = 1:affiner - 1
+        s = j / affiner;
+        tau = A.t + s * h;
+        if nx == 0
+            xs = x;
+        elseif hermite
+            xs = (2 * s ^ 3 - 3 * s ^ 2 + 1) * A.x + (s ^ 3 - 2 * s ^ 2 + s) * h * A.f + ...
+                 (3 * s ^ 2 - 2 * s ^ 3) * A.xFin + (s ^ 3 - s ^ 2) * h * fFin;
+        else
+            xs = (1 - s) * A.x + s * A.xFin;
+        end
+        if ~isempty(T.bornes)
+            xs = borner(T, xs);
+        end
+        [Vs, ~] = passe(T, T.listeMineure, A.V, A.Z, xs, tau, 0, false, A.touche);
+        [temps, releveV, etats, n] = noter(temps, releveV, etats, n, tau, Vs(T.journal), xs, ...
+                                           [], 1, true);
+    end
 end
 
 function tol = toleranceTemps(t)

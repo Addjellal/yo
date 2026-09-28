@@ -2376,7 +2376,8 @@ end
                                               QStringLiteral("Solver"),
                                               QStringLiteral("AlgebraicLoopMsg")}),
                          "les reglages touches ressortent, et eux seuls, dans l'ordre des volets");
-                verifier(boite.volets()->count() == 2, "deux volets : solveur et diagnostics");
+                verifier(boite.volets()->count() == 3,
+                         "trois volets : solveur, import/export des donnees, diagnostics");
             }
             {
                 // Le pas variable : le type change la liste des solveurs et
@@ -2482,6 +2483,68 @@ end
                 verifier(methode && !methode->isEnabled() &&
                              boite.champ(QStringLiteral("MaxOrder"))->isEnabled(),
                          "daessc choisi, son ordre maximal se regle, la methode d'odeN non");
+            }
+            {
+                // Le volet des donnees : un nom ne se regle que son
+                // interrupteur a « on » ; les options de sortie ne valent
+                // qu'a pas variable, le facteur d'affinage pour
+                // RefineOutputTimes, les instants pour les deux autres.
+                QMap<QString, QString> valeurs;
+                valeurs.insert(QStringLiteral("SolverType"), QStringLiteral("Fixed-step"));
+                valeurs.insert(QStringLiteral("Solver"), QStringLiteral("ode4"));
+                valeurs.insert(QStringLiteral("SaveTime"), QStringLiteral("on"));
+                valeurs.insert(QStringLiteral("TimeSaveName"), QStringLiteral("tout"));
+                valeurs.insert(QStringLiteral("SaveState"), QStringLiteral("off"));
+                valeurs.insert(QStringLiteral("StateSaveName"), QStringLiteral("xout"));
+                valeurs.insert(QStringLiteral("LimitDataPoints"), QStringLiteral("off"));
+                valeurs.insert(QStringLiteral("MaxDataPoints"), QStringLiteral("1000"));
+                valeurs.insert(QStringLiteral("Decimation"), QStringLiteral("1"));
+                valeurs.insert(QStringLiteral("OutputOption"),
+                               QStringLiteral("RefineOutputTimes"));
+                valeurs.insert(QStringLiteral("Refine"), QStringLiteral("1"));
+                valeurs.insert(QStringLiteral("OutputTimes"), QStringLiteral("[]"));
+                DialogueConfiguration boite(QStringLiteral("m"), valeurs,
+                                            {QStringLiteral("ode4")}, {QStringLiteral("ode45")});
+                verifier(boite.volets()->item(1)->text() ==
+                             QStringLiteral("Import/Export des données"),
+                         "le deuxieme volet est celui des donnees, comme dans Simulink");
+                verifier(boite.changements().isEmpty(), "le volet des donnees ne change rien seul");
+                verifier(boite.champ(QStringLiteral("TimeSaveName"))->isEnabled() &&
+                             !boite.champ(QStringLiteral("StateSaveName"))->isEnabled() &&
+                             !boite.champ(QStringLiteral("MaxDataPoints"))->isEnabled(),
+                         "un nom ne se regle que son interrupteur a on");
+                verifier(!boite.liste(QStringLiteral("OutputOption"))->isEnabled() &&
+                             !boite.champ(QStringLiteral("Refine"))->isEnabled() &&
+                             !boite.champ(QStringLiteral("OutputTimes"))->isEnabled(),
+                         "a pas fixe, les options de sortie ne valent pas");
+                QComboBox* etats = boite.liste(QStringLiteral("SaveState"));
+                etats->setCurrentIndex(etats->findText(QStringLiteral("on")));
+                verifier(boite.champ(QStringLiteral("StateSaveName"))->isEnabled(),
+                         "les etats releves, leur nom se regle");
+                boite.champ(QStringLiteral("StateSaveName"))->setText(QStringLiteral("etats"));
+                boite.choixType()->setCurrentIndex(
+                    boite.choixType()->findText(QStringLiteral("Variable-step")));
+                QComboBox* options = boite.liste(QStringLiteral("OutputOption"));
+                verifier(options->isEnabled() &&
+                             boite.champ(QStringLiteral("Refine"))->isEnabled() &&
+                             !boite.champ(QStringLiteral("OutputTimes"))->isEnabled(),
+                         "a pas variable, RefineOutputTimes : le facteur d'affinage se regle");
+                options->setCurrentIndex(
+                    options->findText(QStringLiteral("SpecifiedOutputTimes")));
+                verifier(!boite.champ(QStringLiteral("Refine"))->isEnabled() &&
+                             boite.champ(QStringLiteral("OutputTimes"))->isEnabled(),
+                         "SpecifiedOutputTimes : les instants se reglent, l'affinage non");
+                boite.champ(QStringLiteral("OutputTimes"))->setText(QStringLiteral("[0.5 1]"));
+                QStringList noms;
+                for (const auto& c : boite.changements())
+                    noms << c.first + QLatin1Char('=') + c.second;
+                verifier(noms == QStringList({QStringLiteral("SolverType=Variable-step"),
+                                              QStringLiteral("Solver=ode45"),
+                                              QStringLiteral("SaveState=on"),
+                                              QStringLiteral("StateSaveName=etats"),
+                                              QStringLiteral("OutputOption=SpecifiedOutputTimes"),
+                                              QStringLiteral("OutputTimes=[0.5 1]")}),
+                         "les reglages des donnees ressortent, dans l'ordre des volets");
             }
             verifier(simulink->choixSolveur()->findText(QStringLiteral("ode45")) >= 0,
                      "la barre offre aussi les solveurs a pas variable");

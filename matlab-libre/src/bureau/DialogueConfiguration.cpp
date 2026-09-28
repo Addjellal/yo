@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QScrollArea>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -32,7 +33,8 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
     auto* colonne = new QVBoxLayout(this);
     auto* corps = new QHBoxLayout;
     volets_ = new QListWidget;
-    volets_->addItems({QStringLiteral("Solveur"), QStringLiteral("Diagnostics")});
+    volets_->addItems({QStringLiteral("Solveur"), QStringLiteral("Import/Export des données"),
+                       QStringLiteral("Diagnostics")});
     volets_->setMaximumWidth(170);
     pages_ = new QStackedWidget;
     corps->addWidget(volets_);
@@ -142,6 +144,94 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
     colonneSolveur->addStretch(1);
     pages_->addWidget(pageSolveur);
 
+    // --- Import/Export des données ---------------------------------------
+    // Ce que la simulation lit dans l'espace de travail, et ce qu'elle y
+    // relève : le volet « Data Import/Export » de Simulink.
+    auto* pageDonnees = new QWidget;
+    auto* colonneDonnees = new QVBoxLayout(pageDonnees);
+    const QStringList ouiNon = {QStringLiteral("off"), QStringLiteral("on")};
+    auto* formulaireLire = new QFormLayout;
+    auto* groupeLire = new QGroupBox(QStringLiteral("Lire dans l'espace de travail"));
+    groupeLire->setLayout(formulaireLire);
+    auto* formulaireRelever = new QFormLayout;
+    auto* groupeRelever = new QGroupBox(QStringLiteral("Relever dans l'espace de travail"));
+    groupeRelever->setLayout(formulaireRelever);
+    // Chaque interrupteur ouvre le champ qui le suit : le nom de la
+    // variable, l'expression à lire.
+    auto couple = [&](QFormLayout* formulaire, const QString& interrupteur,
+                      const QString& nom, const QString& libelle, const QString& aide,
+                      const QString& libelleNom, const QString& aideNom) {
+        nouvelleListe(interrupteur, formulaire, libelle, ouiNon, aide);
+        nouveauChamp(nom, formulaire, libelleNom, aideNom);
+        couples_.insert(interrupteur, nom);
+    };
+    couple(formulaireLire, QStringLiteral("LoadExternalInput"), QStringLiteral("ExternalInput"),
+           QStringLiteral("Entrées"),
+           QStringLiteral("Les blocs Inport du modèle lisent l'expression qui suit"),
+           QStringLiteral("    expression"),
+           QStringLiteral("« [t, u] » : le temps, puis une colonne par élément des entrées ; "
+                          "ou des variables séparées par des virgules, une par entrée"));
+    couple(formulaireLire, QStringLiteral("LoadInitialState"), QStringLiteral("InitialState"),
+           QStringLiteral("État initial"),
+           QStringLiteral("La simulation part de l'état qui suit"),
+           QStringLiteral("    expression"),
+           QStringLiteral("Les états continus, dans l'ordre des colonnes de xout — l'état "
+                          "final d'une simulation précédente s'y reprend tel quel"));
+    const QString aideNom = QStringLiteral("Le champ du résultat de SIM qui la porte");
+    couple(formulaireRelever, QStringLiteral("SaveTime"), QStringLiteral("TimeSaveName"),
+           QStringLiteral("Temps"), QStringLiteral("Les instants relevés"),
+           QStringLiteral("    nom"), aideNom);
+    couple(formulaireRelever, QStringLiteral("SaveState"), QStringLiteral("StateSaveName"),
+           QStringLiteral("États"), QStringLiteral("Les états continus, une colonne par état"),
+           QStringLiteral("    nom"), aideNom);
+    couple(formulaireRelever, QStringLiteral("SaveOutput"), QStringLiteral("OutputSaveName"),
+           QStringLiteral("Sorties"), QStringLiteral("Les signaux des blocs Outport"),
+           QStringLiteral("    nom"), aideNom);
+    couple(formulaireRelever, QStringLiteral("SaveFinalState"),
+           QStringLiteral("FinalStateName"), QStringLiteral("État final"),
+           QStringLiteral("L'état au dernier instant, pour reprendre plus tard"),
+           QStringLiteral("    nom"), aideNom);
+    couple(formulaireRelever, QStringLiteral("SignalLogging"),
+           QStringLiteral("SignalLoggingName"), QStringLiteral("Journal des signaux"),
+           QStringLiteral("Les signaux dont le port a DataLogging à « on », en Dataset"),
+           QStringLiteral("    nom"), aideNom);
+    nouvelleListe(QStringLiteral("SaveFormat"), formulaireRelever, QStringLiteral("Format"),
+                  {QStringLiteral("Array"), QStringLiteral("Structure"),
+                   QStringLiteral("StructureWithTime"), QStringLiteral("Dataset")},
+                  QStringLiteral("La forme des sorties : une matrice, une structure par "
+                                 "sortie — sans ou avec le temps —, ou un Dataset"));
+    auto* formulairePlus = new QFormLayout;
+    auto* groupePlus = new QGroupBox(QStringLiteral("Réglages supplémentaires"));
+    groupePlus->setLayout(formulairePlus);
+    couple(formulairePlus, QStringLiteral("LimitDataPoints"), QStringLiteral("MaxDataPoints"),
+           QStringLiteral("Limiter aux derniers instants"),
+           QStringLiteral("Ne garder que les derniers instants relevés"),
+           QStringLiteral("    combien"), QStringLiteral("Le nombre d'instants gardés"));
+    nouveauChamp(QStringLiteral("Decimation"), formulairePlus, QStringLiteral("Décimation"),
+                 QStringLiteral("Ne garder qu'un instant relevé sur n"));
+    nouvelleListe(QStringLiteral("OutputOption"), formulairePlus,
+                  QStringLiteral("Options de sortie"),
+                  {QStringLiteral("RefineOutputTimes"), QStringLiteral("AdditionalOutputTimes"),
+                   QStringLiteral("SpecifiedOutputTimes")},
+                  QStringLiteral("À pas variable : affiner entre les pas du solveur, y ajouter "
+                                 "des instants qu'il atteint, ou ne relever que ceux-là"));
+    nouveauChamp(QStringLiteral("Refine"), formulairePlus,
+                 QStringLiteral("Facteur d'affinage"),
+                 QStringLiteral("Refine − 1 instants de plus entre deux pas, calculés sur "
+                                "l'état interpolé"));
+    nouveauChamp(QStringLiteral("OutputTimes"), formulairePlus,
+                 QStringLiteral("Instants de sortie"),
+                 QStringLiteral("Un vecteur d'instants, ou l'expression qui le donne"));
+    colonneDonnees->addWidget(groupeLire);
+    colonneDonnees->addWidget(groupeRelever);
+    colonneDonnees->addWidget(groupePlus);
+    colonneDonnees->addStretch(1);
+    auto* defilement = new QScrollArea;
+    defilement->setWidgetResizable(true);
+    defilement->setFrameShape(QFrame::NoFrame);
+    defilement->setWidget(pageDonnees);
+    pages_->addWidget(defilement);
+
     // --- Diagnostics -----------------------------------------------------
     auto* pageDiagnostics = new QWidget;
     auto* colonneDiagnostics = new QVBoxLayout(pageDiagnostics);
@@ -164,6 +254,11 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
     volets_->setCurrentRow(0);
     connect(type_, &QComboBox::currentIndexChanged, this, [this](int) { typeChange(); });
     connect(solveur_, &QComboBox::currentIndexChanged, this, [this](int) { solveurChange(); });
+    for (const QString& interrupteur : couples_.keys())
+        connect(listes_.value(interrupteur), &QComboBox::currentIndexChanged, this,
+                [this](int) { donneesChange(); });
+    connect(listes_.value(QStringLiteral("OutputOption")), &QComboBox::currentIndexChanged,
+            this, [this](int) { donneesChange(); });
     typeChange();
     // Ce que la boîte montre en s'ouvrant est la référence des changements :
     // un réglage absent du modèle s'affiche à sa première valeur, et ne doit
@@ -206,6 +301,22 @@ void DialogueConfiguration::typeChange() {
                                QStringLiteral("AbsTol")})
         champs_.value(nom)->setEnabled(variable);
     solveurChange();
+    donneesChange();
+}
+
+// Le volet des données : un nom ne se règle que son interrupteur à « on » ;
+// les options de sortie ne valent qu'à pas variable, le facteur d'affinage
+// pour RefineOutputTimes, les instants de sortie pour les deux autres.
+void DialogueConfiguration::donneesChange() {
+    for (auto it = couples_.cbegin(); it != couples_.cend(); ++it)
+        champs_.value(it.value())
+            ->setEnabled(listes_.value(it.key())->currentText() == QLatin1String("on"));
+    const bool variable = type_->currentText() == QLatin1String("Variable-step");
+    QComboBox* options = listes_.value(QStringLiteral("OutputOption"));
+    const bool affine = options->currentText() == QLatin1String("RefineOutputTimes");
+    options->setEnabled(variable);
+    champs_.value(QStringLiteral("Refine"))->setEnabled(variable && affine);
+    champs_.value(QStringLiteral("OutputTimes"))->setEnabled(variable && !affine);
 }
 
 // Certaines options n'appartiennent qu'à un solveur : l'ordre maximal à

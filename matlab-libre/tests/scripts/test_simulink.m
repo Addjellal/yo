@@ -8763,6 +8763,136 @@ end
 fprintf('solveurs a pas variable : %d comparaisons\n', comparaisons61);
 assert(comparaisons61 > 250, 'la batterie a pas variable compare assez de modeles');
 
+%% ------------------------------------------------ 62. Import/Export des données
+% Ce que la simulation relève se règle comme dans le volet « Data
+% Import/Export » de Simulink : les champs du résultat et leurs noms, la
+% décimation, les derniers instants, et à pas variable l'affinage entre
+% deux pas (Refine) ou des instants de sortie (OutputTimes), ajoutés aux
+% pas du solveur ou seuls relevés.
+m62 = new_system('export62');
+m62 = add_block(m62, 'clock', 't');
+m62 = add_block(m62, 'trigonometricfunction', 'cos', 'Operator', 'cos');
+m62 = add_block(m62, 'integrator', 'x');
+m62 = add_block(m62, 'outport', 'y');
+m62 = add_line(add_line(add_line(m62, 't', 'cos'), 'cos', 'x'), 'x', 'y');
+m62 = set_param(m62, 'Solver', 'ode45', 'StopTime', 2, 'MaxStep', 0.1);
+r62 = sim(m62);
+assert(isfield(r62, 'tout') && isfield(r62, 'yout') && ~isfield(r62, 'xout'), ...
+       'par defaut : le temps et les sorties, pas les etats (SaveState off)');
+assert(strcmp(get_param(m62, 'OutputOption'), 'RefineOutputTimes') && ...
+       get_param(m62, 'Refine') == 1 && get_param(m62, 'Decimation') == 1 && ...
+       strcmp(get_param(m62, 'LimitDataPoints'), 'off') && ...
+       get_param(m62, 'MaxDataPoints') == 1000 && strcmp(get_param(m62, 'SaveState'), 'off'), ...
+       'les reglages d''export, a leur defaut de Simulink');
+pas62 = r62.tout;
+% Refine : trois instants de plus entre deux pas, calculés sur l'état
+% interpolé ; Refine 2 relève le milieu de chaque pas.
+r62 = sim(m62, 'Refine', 4);
+assert(numel(r62.tout) == 4 * (numel(pas62) - 1) + 1 && all(ismember(pas62, r62.tout)), ...
+       'Refine 4 : chaque pas du solveur, et trois instants entre deux');
+assert(max(abs(r62.yout - sin(r62.tout))) < 1e-4, 'les instants affines suivent la solution');
+r62 = sim(m62, 'Refine', 2);
+assert(max(abs(r62.tout(2:2:end) - (pas62(1:end - 1) + pas62(2:end)) / 2)) < 1e-12, ...
+       'Refine 2 : le milieu de chaque pas');
+% AdditionalOutputTimes : les pas, et des instants que le solveur atteint
+r62 = sim(m62, 'OutputOption', 'AdditionalOutputTimes', 'OutputTimes', '[0.25 0.5 0.77]');
+assert(all(ismember([0.25 0.5 0.77], r62.tout)) && numel(r62.tout) >= numel(pas62) && ...
+       max(abs(r62.yout - sin(r62.tout))) < 1e-4, ...
+       'AdditionalOutputTimes : les pas et les instants demandes');
+% SpecifiedOutputTimes : le début, la fin, et les instants demandés de
+% l'intervalle — une expression de l'espace de travail
+instants62 = [0.3 0.6 5];
+r62 = sim(m62, 'OutputOption', 'SpecifiedOutputTimes', 'OutputTimes', 'instants62');
+assert(isequal(r62.tout(:)', [0 0.3 0.6 2]) && max(abs(r62.yout - sin(r62.tout))) < 1e-4, ...
+       'SpecifiedOutputTimes : le debut, les instants de l''intervalle, la fin');
+% À pas fixe, OutputOption ne vaut pas : chaque pas est relevé.
+r62 = sim(m62, 'Solver', 'ode4', 'FixedStep', 0.1, 'OutputOption', ...
+          'SpecifiedOutputTimes', 'OutputTimes', [0.3 0.6]);
+assert(numel(r62.tout) == 21, 'a pas fixe, chaque pas est releve');
+% Decimation, LimitDataPoints et MaxDataPoints
+r62 = sim(m62, 'Solver', 'ode4', 'FixedStep', 0.1, 'Decimation', 3);
+assert(max(abs(r62.tout(:)' - (0:0.3:1.8))) < 1e-12 && numel(r62.yout) == 7, ...
+       'Decimation 3 : un instant sur trois, le premier compris');
+r62 = sim(m62, 'Solver', 'ode4', 'FixedStep', 0.1, 'LimitDataPoints', 'on', ...
+          'MaxDataPoints', 4);
+assert(max(abs(r62.tout(:)' - (1.7:0.1:2))) < 1e-12 && numel(r62.yout) == 4, ...
+       'MaxDataPoints 4 : les quatre derniers instants');
+assert(numel(r62.temps) == 21, 'RESULTAT.temps garde tous les instants');
+r62 = sim(m62, 'Solver', 'ode4', 'FixedStep', 0.1, 'Decimation', 2, 'SaveFormat', 'Dataset');
+assert(numel(r62.yout{1}.Values.Time) == 11 && numel(r62.yout{1}.Values.Data) == 11, ...
+       'la decimation vaut pour chaque forme de yout, Dataset compris');
+r62 = sim(m62, 'Solver', 'ode4', 'FixedStep', 0.1, 'Decimation', 2, 'SaveFormat', ...
+          'StructureWithTime');
+assert(numel(r62.yout.time) == 11 && numel(r62.yout.signals(1).values) == 11, ...
+       'et pour la structure avec le temps');
+% Les champs et leurs noms
+r62 = sim(m62, 'SaveState', 'on', 'StateSaveName', 'etats62', 'TimeSaveName', 'instants', ...
+          'SaveOutput', 'off');
+assert(isfield(r62, 'etats62') && isfield(r62, 'instants') && ~isfield(r62, 'tout') && ...
+       ~isfield(r62, 'yout') && isequal(size(r62.etats62), [numel(r62.instants), 1]), ...
+       'SaveState, StateSaveName, TimeSaveName et SaveOutput');
+evalin('base', 'clear instants62b sorties62b');
+sim(m62, 'ReturnWorkspaceOutputs', 'off', 'TimeSaveName', 'instants62b', ...
+    'OutputSaveName', 'sorties62b', 'Solver', 'ode4', 'FixedStep', 0.5);
+assert(isequal(evalin('base', 'instants62b(:)'''), 0:0.5:2) && ...
+       numel(evalin('base', 'sorties62b')) == 5, ...
+       'sans sortie, ReturnWorkspaceOutputs off : le temps et les sorties sous leurs noms');
+evalin('base', 'clear instants62b sorties62b');
+% SIMSET porte les mêmes réglages sous leurs noms anciens.
+r62 = sim(m62, 2, simset('Solver', 'ode45', 'MaxStep', 0.1, 'Refine', 2));
+assert(numel(r62.tout) == 2 * (numel(pas62) - 1) + 1, 'simset Refine');
+r62 = sim(m62, [0 0.5 1], simset('Solver', 'ode45', 'MaxStep', 0.1, 'OutputPoints', 'all'));
+assert(all(ismember([0 0.5 1], r62.tout)) && numel(r62.tout) > 3, ...
+       'OutputPoints all : les instants donnes et chaque pas');
+r62 = sim(m62, [0 0.5 1], simset('Solver', 'ode45', 'MaxStep', 0.1));
+assert(isequal(r62.tout(:)', [0 0.5 1]), 'OutputPoints specified : les instants donnes seuls');
+r62 = sim(m62, 2, simset('Solver', 'ode4', 'FixedStep', 0.1, 'Decimation', 4, ...
+                         'MaxDataPoints', 3));
+assert(max(abs(r62.tout(:)' - [1.2 1.6 2])) < 1e-12, 'simset Decimation et MaxDataPoints');
+[t62, x62, y62] = sim(m62, 2, simset('Solver', 'ode4', 'FixedStep', 0.5, 'Decimation', 2));
+assert(isequal(t62(:)', [0 1 2]) && isequal(size(x62), [3 1]) && isequal(size(y62), [3 1]), ...
+       '[T,X,Y] = SIM(...) : les etats toujours, decimes eux aussi');
+% Les valeurs refusées, en disant pourquoi
+refus62 = {
+    @() set_param(m62, 'Refine', 0), 'Simulink:Config:InvalidValue', 'Refine'
+    @() set_param(m62, 'Decimation', 1.5), 'Simulink:Config:InvalidValue', 'Decimation'
+    @() set_param(m62, 'OutputOption', 'Tout'), 'Simulink:Config:InvalidValue', 'OutputOption'
+    @() set_param(m62, 'StateSaveName', '2etats'), 'Simulink:Config:InvalidValue', ...
+        'StateSaveName'
+    @() sim(m62, 'OutputOption', 'SpecifiedOutputTimes', 'OutputTimes', '[1 2; 3 4]'), ...
+        'Simulink:Config:InvalidValue', 'export62'
+    @() sim(m62, 'OutputOption', 'SpecifiedOutputTimes', 'OutputTimes', '''texte'''), ...
+        'Simulink:Commands:ParametreNonNumerique', 'OutputTimes'
+    @() simset('OutputPoints', 'quelques'), 'Simulink:Config:InvalidValue', 'OutputPoints'
+    @() simset('Trace', 'minstep'), 'Simulink:Commands:SimsetInconnue', 'Trace'
+    };
+for kE = 1:size(refus62, 1)
+    vu = '';
+    message = '';
+    try
+        refus62{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, refus62{kE, 2}) && ~isempty(strfind(message, refus62{kE, 3})), ...
+           sprintf('export, cas %d : %s attendu, %s rendu (%s)', kE, refus62{kE, 2}, vu, ...
+                   message));
+end
+% Les réglages d'export voyagent dans le .slx.
+dossier62 = fullfile(tempdir(), 'export62');
+if ~exist(dossier62, 'dir')
+    mkdir(dossier62);
+end
+m62 = set_param(m62, 'OutputOption', 'AdditionalOutputTimes', 'OutputTimes', '[0.25 0.5]', ...
+                'Decimation', 2, 'SaveState', 'on', 'Refine', 3);
+relu62 = load_system(save_system(m62, fullfile(dossier62, 'export62.slx')));
+assert(strcmp(get_param(relu62, 'OutputOption'), 'AdditionalOutputTimes') && ...
+       strcmp(get_param(relu62, 'OutputTimes'), '[0.25 0.5]') && ...
+       get_param(relu62, 'Decimation') == 2 && strcmp(get_param(relu62, 'SaveState'), 'on') && ...
+       get_param(relu62, 'Refine') == 3, 'les reglages d''export voyagent dans le .slx');
+fprintf('import et export des donnees : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

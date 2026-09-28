@@ -944,7 +944,7 @@ void FenetreSimulink::construireBarre() {
     aConfiguration_->setShortcut(QKeySequence(QStringLiteral("Ctrl+E")));
     aConfiguration_->setToolTip(QStringLiteral(
         "Paramètres de configuration (Ctrl+E) : temps, solveur, pas, tolérances, "
-        "diagnostics"));
+        "import et export des données, diagnostics"));
     connect(aConfiguration_, &QAction::triggered, this,
             &FenetreSimulink::ouvrirConfiguration);
     // Ctrl+U : sous le masque d'un sous-système, comme dans Simulink — le

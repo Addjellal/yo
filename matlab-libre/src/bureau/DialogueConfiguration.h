@@ -2,8 +2,11 @@
 //
 // Simulink règle une simulation dans une boîte à volets, qu'ouvre Ctrl+E :
 // le temps de début et de fin, le type de solveur et le solveur lui-même,
-// son pas ou ses tolérances, et les diagnostics — que faire d'une boucle
-// algébrique, d'une entrée laissée en l'air. C'est cette boîte.
+// son pas ou ses tolérances ; ce que la simulation lit et relève dans
+// l'espace de travail — les entrées, l'état initial, le temps, les états,
+// les sorties, leur décimation, les instants relevés à pas variable — ; et
+// les diagnostics — que faire d'une boucle algébrique, d'une entrée
+// laissée en l'air. C'est cette boîte.
 //
 // Elle ne change rien elle-même. Ce qu'on y règle ressort en couples
 // nom-valeur, que l'éditeur traduit en un seul SET_PARAM sur le modèle :
@@ -44,6 +47,7 @@ public:
 private:
     void typeChange();
     void solveurChange();
+    void donneesChange();
     QString valeurDe(const QString& nom) const;
 
     // Les valeurs affichées à l'ouverture, réglage par réglage.
@@ -55,6 +59,9 @@ private:
     QComboBox* solveur_;
     QMap<QString, QLineEdit*> champs_;
     QMap<QString, QComboBox*> listes_;
+    // Chaque interrupteur du volet des données et le champ qu'il ouvre :
+    // SaveTime et TimeSaveName, LimitDataPoints et MaxDataPoints...
+    QMap<QString, QString> couples_;
     // L'ordre dans lequel les changements ressortent : celui des volets.
     QStringList ordre_;
 };

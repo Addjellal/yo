@@ -20,7 +20,20 @@ function options = simset(varargin)
 %     RelTol, AbsTol  les tolérances du pas variable
 %     MaxStep, MinStep, InitialStep   les bornes du pas variable
 %     MaxOrder        l'ordre maximal d'ode15s, de 1 à 5
+%     ExtrapolationOrder, NumberNewtonIterations   les réglages d'ode14x
 %     ZeroCross       'on' ou 'off' : la détection des passages par zéro
+%     Refine          le facteur d'affinage du pas variable : Refine - 1
+%                     instants de plus entre deux pas
+%     OutputPoints    'specified' (celui par défaut) : relever les seuls
+%                     instants que donne SIM(MODELE,[T0 ... TN]) ; 'all' :
+%                     ceux-là et chaque pas du solveur
+%     Decimation      ne garder qu'un instant relevé sur Decimation
+%     MaxDataPoints   ne garder que les derniers instants relevés ; 0,
+%                     tous
+%     SaveFormat      la forme de yout : 'Array', 'Structure',
+%                     'StructureWithTime' ou 'Dataset'
+%     InitialState    l'état continu de départ
+%     FinalStateName  le champ du résultat qui porte l'état final
 %
 %   Les blocs échantillonnés et les retards se simulent avec tous les
 %   solveurs : leurs états n'avancent qu'aux pas majeurs, et les points
@@ -42,7 +55,9 @@ function options = simset(varargin)
 %
 %   Voir aussi SIMGET, SIM, SET_PARAM.
     connues = {'FixedStep', 'Solver', 'RelTol', 'AbsTol', 'MaxStep', 'MinStep', ...
-               'InitialStep', 'MaxOrder', 'ZeroCross'};
+               'InitialStep', 'MaxOrder', 'ZeroCross', 'Refine', 'OutputPoints', ...
+               'Decimation', 'MaxDataPoints', 'SaveFormat', 'InitialState', ...
+               'FinalStateName', 'ExtrapolationOrder', 'NumberNewtonIterations'};
     if ~isempty(varargin) && isstruct(varargin{1})
         options = varargin{1};
         debut = 2;
@@ -78,6 +93,20 @@ function options = simset(varargin)
                           'L''option ZeroCross vaut ''on'' ou ''off''.');
                 end
                 valeur = lower(char(valeur));
+            case 'OutputPoints'
+                if ~any(strcmpi(char(valeur), {'specified', 'all'}))
+                    error('Simulink:Config:InvalidValue', ...
+                          'L''option OutputPoints vaut ''specified'' ou ''all''.');
+                end
+                valeur = lower(char(valeur));
+            case 'MaxDataPoints'
+                % zéro : pas de limite
+                if ~(isnumeric(valeur) && isscalar(valeur) && valeur >= 0 && ...
+                     valeur == round(valeur))
+                    error('Simulink:Config:InvalidValue', ...
+                          'L''option MaxDataPoints est un entier positif, ou zero.');
+                end
+                valeur = double(valeur);
             otherwise
                 valeur = matlibre_sl_config('valider', connues{rang}, valeur);
         end

@@ -84,6 +84,31 @@ function varargout = matlibre_sl_config(action, varargin)
 %     SignalLogging        'on'       les signaux dont le port a
 %     SignalLoggingName    'logsout'  DataLogging à 'on' vont dans ce
 %                                     champ du résultat, un Dataset
+%     SaveTime             'on'       les instants relevés, dans le champ
+%     TimeSaveName         'tout'     TimeSaveName du résultat
+%     SaveState            'off'      'on' : les états continus, une
+%     StateSaveName        'xout'     colonne par état, dans StateSaveName
+%     SaveOutput           'on'       les sorties OUTPORT, dans
+%     OutputSaveName       'yout'     OutputSaveName
+%     Decimation           1          n'en garder qu'un instant sur
+%                                     Decimation
+%     LimitDataPoints      'off'      'on' : n'en garder que les
+%     MaxDataPoints        1000       MaxDataPoints derniers
+%     OutputOption         'RefineOutputTimes'  à pas variable, les
+%                                     instants relevés : les pas du
+%                                     solveur, et Refine - 1 points
+%                                     entre deux, calculés sur l'état
+%                                     interpolé (RefineOutputTimes) ; les
+%                                     pas et les instants OutputTimes,
+%                                     que le solveur atteint
+%                                     (AdditionalOutputTimes) ; le début,
+%                                     la fin et les instants OutputTimes
+%                                     seuls (SpecifiedOutputTimes). Un
+%                                     solveur à pas fixe relève chacun de
+%                                     ses pas.
+%     Refine               1          le facteur d'affinage
+%     OutputTimes          '[]'       les instants demandés : un vecteur,
+%                                     ou l'expression qui le donne
 %
 %   Le solveur et son type vont ensemble, comme dans Simulink : poser
 %   Solver sur ode45 fait le type Variable-step ; poser SolverType sur
@@ -138,7 +163,11 @@ function d = defauts()
                'SaveFormat', 'Array', 'LoadInitialState', 'off', ...
                'InitialState', 'xInitial', 'SaveFinalState', 'off', ...
                'FinalStateName', 'xFinal', 'SignalLogging', 'on', ...
-               'SignalLoggingName', 'logsout');
+               'SignalLoggingName', 'logsout', 'SaveTime', 'on', 'TimeSaveName', 'tout', ...
+               'SaveState', 'off', 'StateSaveName', 'xout', 'SaveOutput', 'on', ...
+               'OutputSaveName', 'yout', 'Decimation', 1, 'LimitDataPoints', 'off', ...
+               'MaxDataPoints', 1000, 'OutputOption', 'RefineOutputTimes', 'Refine', 1, ...
+               'OutputTimes', '[]');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -224,13 +253,15 @@ function v = valider(nom, v)
         case 'SolverType'
             v = choix(nom, v, {'Fixed-step', 'Variable-step'});
         case {'LoadExternalInput', 'ReturnWorkspaceOutputs', 'LoadInitialState', ...
-              'SaveFinalState', 'SignalLogging'}
+              'SaveFinalState', 'SignalLogging', 'SaveTime', 'SaveState', 'SaveOutput', ...
+              'LimitDataPoints'}
             v = choix(nom, v, {'off', 'on'});
         case 'SimulationMode'
             v = choix(nom, v, {'normal', 'accelerator', 'rapid-accelerator', ...
                                'software-in-the-loop (sil)', ...
                                'processor-in-the-loop (pil)', 'external'});
-        case {'ReturnWorkspaceOutputsName', 'FinalStateName', 'SignalLoggingName'}
+        case {'ReturnWorkspaceOutputsName', 'FinalStateName', 'SignalLoggingName', ...
+              'TimeSaveName', 'StateSaveName', 'OutputSaveName'}
             v = char(v);
             if ~isvarname(v)
                 error('Simulink:Config:InvalidValue', ...
@@ -282,8 +313,20 @@ function v = valider(nom, v)
             v = choix(nom, v, {'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'ode8'});
         case 'SaveFormat'
             v = choix(nom, v, {'Array', 'Structure', 'StructureWithTime', 'Dataset'});
-        case 'NumberNewtonIterations'
+        case {'NumberNewtonIterations', 'Decimation', 'Refine', 'MaxDataPoints'}
             v = entier(nom, v, 1, Inf);
+        case 'OutputOption'
+            v = choix(nom, v, {'RefineOutputTimes', 'AdditionalOutputTimes', ...
+                               'SpecifiedOutputTimes'});
+        case 'OutputTimes'
+            if isstring(v)
+                v = char(v);
+            end
+            if ~(ischar(v) || ((isnumeric(v) || islogical(v)) && (isvector(v) || isempty(v))))
+                error('Simulink:Config:InvalidValue', ...
+                      ['Le reglage OutputTimes est un vecteur d''instants, ou l''expression ' ...
+                       'qui le donne.']);
+            end
         case ''
             error('Simulink:Commands:ParamUnknown', ...
                   'Le modele n''a pas de reglage nomme ''%s''.', char(nom));

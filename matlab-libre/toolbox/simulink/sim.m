@@ -107,15 +107,31 @@ function varargout = sim(modele, varargin)
 %   champ FinalStateName ('xFinal') du résultat. Ensemble, ils reprennent
 %   une simulation là où la précédente s'est arrêtée.
 %
+%   Ce qui est relevé se règle comme dans le volet « Data Import/Export »
+%   de Simulink. SaveTime, SaveState et SaveOutput disent si le résultat
+%   porte les instants, les états continus et les sorties OUTPORT, et
+%   TimeSaveName ('tout'), StateSaveName ('xout') et OutputSaveName
+%   ('yout') sous quel nom ; les états n'y sont que si SaveState vaut
+%   'on'. Decimation n'en garde qu'un instant sur n, et LimitDataPoints
+%   ('on') les MaxDataPoints derniers. À pas variable, OutputOption
+%   choisit les instants : RefineOutputTimes relève chaque pas du
+%   solveur, et Refine - 1 points entre deux, où le modèle est calculé
+%   sur l'état interpolé ; AdditionalOutputTimes y ajoute les instants
+%   OutputTimes, que le solveur atteint exactement ;
+%   SpecifiedOutputTimes ne relève que le début, la fin et les instants
+%   OutputTimes. SIMSET porte les mêmes réglages sous leurs noms anciens :
+%   Refine, OutputPoints ('all' : les instants donnés et chaque pas),
+%   Decimation, MaxDataPoints.
+%
 %   Le résultat porte plusieurs formes. RESULTAT.temps et
 %   RESULTAT.signaux.<nom> pour l'accès direct — un signal vecteur y est
 %   une matrice à une ligne par instant, un signal matrice un tableau
 %   m x n x N, et la deuxième sortie d'un bloc s'appelle <nom>_port2.
 %   RESULTAT.time et RESULTAT.signals(k).values pour la « structure with
-%   time » de Simulink ; RESULTAT.tout, RESULTAT.xout et RESULTAT.yout
-%   pour les instants, les états continus et les sorties OUTPORT.
-%   [T,X,Y] = SIM(...) rend ces trois derniers, comme la forme ancienne
-%   de Simulink.
+%   time » de Simulink ; RESULTAT.tout et RESULTAT.yout pour les
+%   instants et les sorties OUTPORT, et RESULTAT.xout pour les états
+%   continus si SaveState vaut 'on'. [T,X,Y] = SIM(...) rend ces trois
+%   derniers, états compris, comme la forme ancienne de Simulink.
 %
 %   Exemple :
 %      m = new_system('rampe');
@@ -174,7 +190,8 @@ function varargout = sim(modele, varargin)
     % InitFcn d'abord : les variables qu'il pose servent aux réglages et
     % aux blocs, comme dans Simulink.
     matlibre_sl_rappel(modele, 'InitFcn');
-    [config, imposes, externe] = lireArguments(matlibre_sl_config('lire', modele), varargin);
+    [config, imposes, externe, tousLesPas] = lireArguments(matlibre_sl_config('lire', modele), ...
+                                                           varargin);
     nomModele = char(modele.nom);
     tDebut = nombre(config.StartTime, nomModele, 'StartTime');
     tFinal = nombre(config.StopTime, nomModele, 'StopTime');
@@ -183,6 +200,7 @@ function varargout = sim(modele, varargin)
               'La duree doit etre un nombre positif : l''instant final precede le debut.');
     end
     variable = strcmpi(matlibre_sl_config('type', config.Solver), 'Variable-step');
+    sortie = instantsDeSortie(config, variable, imposes, tousLesPas, tDebut, tFinal, nomModele);
     solveur = lower(char(config.Solver));
     if strcmp(solveur, 'oden')
         % odeN : la formule que choisit ODENIntegrationMethod, à pas fixe,
@@ -245,7 +263,7 @@ function varargout = sim(modele, varargin)
     % StartFcn quand la simulation commence, StopFcn quand elle s'achève —
     % sur une erreur aussi.
     matlibre_sl_rappel(modele, 'StartFcn');
-    deroulement = {c, config, variable, solveur, tDebut, tFinal, pas, imposes, nomModele};
+    deroulement = {c, config, variable, solveur, tDebut, tFinal, pas, sortie, nomModele};
     try
         [T, J, instants] = derouler(deroulement{:}, false);
         resultat = assembler(c, T, J, instants(:));
@@ -279,14 +297,23 @@ function varargout = sim(modele, varargin)
         end
         resultat.(char(config.FinalStateName)) = xFinal;
     end
+    % Un instant sur Decimation, les MaxDataPoints derniers : ce que
+    % l'export garde des instants, des états et des sorties.
+    resultat = decimer(resultat, config);
+    if nargout > 1
+        varargout = {resultat.tout, resultat.xout, resultat.yout};
+        return
+    end
+    [resultat, exportes] = nommer(resultat, config);
     if nargout == 0
         % Sans sortie, comme dans Simulink : le résultat va dans OUT — ou
         % dans tout et yout si ReturnWorkspaceOutputs vaut 'off'.
         if strcmpi(config.ReturnWorkspaceOutputs, 'on')
             assignin('base', char(config.ReturnWorkspaceOutputsName), resultat);
         else
-            assignin('base', 'tout', resultat.tout);
-            assignin('base', 'yout', resultat.yout);
+            for k = 1:numel(exportes)
+                assignin('base', exportes{k}, resultat.(exportes{k}));
+            end
             if strcmpi(config.SaveFinalState, 'on')
                 assignin('base', char(config.FinalStateName), xFinal);
             end
@@ -294,10 +321,121 @@ function varargout = sim(modele, varargin)
                 assignin('base', char(config.SignalLoggingName), journalSignaux);
             end
         end
-    elseif nargout == 1
-        varargout{1} = resultat;
     else
-        varargout = {resultat.tout, resultat.xout, resultat.yout};
+        varargout{1} = resultat;
+    end
+end
+
+% Les instants relevés à pas variable : ceux que SIM(MODELE,[T0 ... TN])
+% impose — seuls, ou avec chaque pas si OutputPoints vaut 'all' —, sinon
+% ceux que règlent OutputOption, Refine et OutputTimes. Un solveur à pas
+% fixe relève chacun de ses pas, comme dans Simulink où OutputOption ne
+% vaut que pour le pas variable.
+function s = instantsDeSortie(config, variable, imposes, tousLesPas, tDebut, tFinal, nomModele)
+    s = struct('imposes', imposes, 'tous', tousLesPas || isempty(imposes), 'affiner', 1);
+    if ~variable
+        return
+    end
+    if ~isempty(imposes)
+        if tousLesPas
+            s.affiner = double(config.Refine);
+        end
+        return
+    end
+    switch char(config.OutputOption)
+        case 'RefineOutputTimes'
+            s.affiner = double(config.Refine);
+        case 'AdditionalOutputTimes'
+            s.imposes = instantsDemandes(config.OutputTimes, tDebut, tFinal, nomModele);
+        case 'SpecifiedOutputTimes'
+            bornes = tDebut;
+            if isfinite(tFinal)
+                bornes = [tDebut, tFinal];
+            end
+            s.imposes = unique([bornes, instantsDemandes(config.OutputTimes, tDebut, tFinal, ...
+                                                         nomModele)]);
+            s.tous = false;
+    end
+end
+
+% OutputTimes, évalué : les instants de l'intervalle simulé, triés.
+function t = instantsDemandes(v, tDebut, tFinal, nomModele)
+    if ischar(v) || isstring(v)
+        v = matlibre_sl_expression(char(v), nomModele, 'OutputTimes');
+    end
+    if ~((isnumeric(v) || islogical(v)) && isreal(v) && (isvector(v) || isempty(v))) || ...
+       any(isnan(double(v(:))))
+        error('Simulink:Config:InvalidValue', ...
+              ['Le reglage OutputTimes du modele ''%s'' est un vecteur d''instants, ou ' ...
+               'l''expression qui le donne.'], nomModele);
+    end
+    t = unique(double(v(:)).');
+    t = t(t >= tDebut & t <= tFinal);
+end
+
+% Decimation et MaxDataPoints : les instants gardés de tout, xout et
+% yout, sous chacune de ses formes. Le journal des signaux et les blocs To
+% Workspace ont leurs propres réglages ; RESULTAT.temps et
+% RESULTAT.signaux gardent tout.
+function resultat = decimer(resultat, config)
+    N = numel(resultat.tout);
+    garde = 1:double(config.Decimation):N;
+    if strcmpi(config.LimitDataPoints, 'on') && numel(garde) > double(config.MaxDataPoints)
+        garde = garde(end - double(config.MaxDataPoints) + 1:end);
+    end
+    if numel(garde) == N
+        return
+    end
+    resultat.tout = resultat.tout(garde);
+    resultat.xout = resultat.xout(garde, :);
+    y = resultat.yout;
+    if isnumeric(y) || islogical(y)
+        resultat.yout = y(garde, :);
+    elseif isstruct(y)
+        if ~isempty(y.time)
+            y.time = y.time(garde);
+        end
+        for k = 1:numel(y.signals)
+            y.signals(k).values = instantsGardes(y.signals(k).values, garde, N);
+        end
+        resultat.yout = y;
+    else
+        decime = Simulink.SimulationData.Dataset(y.Name);
+        for k = 1:y.numElements
+            s = y.getElement(k);
+            v = s.Values;
+            s.Values = timeseries(instantsGardes(v.Data, garde, N), v.Time(garde), ...
+                                  'Name', v.Name);
+            decime = addElement(decime, s);
+        end
+        resultat.yout = decime;
+    end
+end
+
+% Les instants gardés d'un relevé : ses lignes, ou ses pages s'il est m x
+% n x N.
+function v = instantsGardes(v, garde, N)
+    if ndims(v) == 3 || (size(v, 1) ~= N && size(v, ndims(v)) == N)
+        v = v(:, :, garde);
+    else
+        v = v(garde, :);
+    end
+end
+
+% SaveTime, SaveState et SaveOutput : les champs que porte le résultat, et
+% leurs noms. EXPORTES les nomme, pour l'espace de travail.
+function [resultat, exportes] = nommer(resultat, config)
+    releves = {resultat.tout, resultat.xout, resultat.yout};
+    resultat = rmfield(resultat, {'tout', 'xout', 'yout'});
+    reglages = {'SaveTime', 'TimeSaveName'; 'SaveState', 'StateSaveName'; ...
+                'SaveOutput', 'OutputSaveName'};
+    exportes = {};
+    for k = 1:3
+        if strcmpi(config.(reglages{k, 1}), 'on')
+            nom = char(config.(reglages{k, 2}));
+            resultat.(nom) = releves{k};
+            exportes{end + 1} = nom; %#ok<AGROW>
+        end
     end
 end
 
@@ -305,7 +443,7 @@ end
 % pas fixe, à pas variable, ou sans fin. En mode diagnostic, le
 % simulateur note chaque bloc qu'il calcule.
 function [T, J, instants] = derouler(c, config, variable, solveur, tDebut, tFinal, pas, ...
-                                     imposes, nomModele, diagnostic)
+                                     sortie, nomModele, diagnostic)
     T = matlibre_sl_executer('preparer', c);
     T.diagnostic = diagnostic;
     T.reglagesSolveur = struct('ExtrapolationOrder', config.ExtrapolationOrder, ...
@@ -314,7 +452,7 @@ function [T, J, instants] = derouler(c, config, variable, solveur, tDebut, tFina
     if variable
         reglages = reglagesVariables(config, nomModele);
         J = matlibre_sl_executer('simulerVariable', T, tDebut, tFinal, solveur, ...
-                                 reglages, imposes);
+                                 reglages, sortie);
         instants = J.temps;
     elseif isinf(tFinal)
         [instants, J] = sansFin(T, tDebut, pas, solveur);
@@ -348,10 +486,12 @@ end
 % Les arguments après le modèle : la forme ancienne (instant final, pas
 % ou options), ou les réglages par nom. Ils l'emportent sur ceux du
 % modèle, qu'ils ne changent pas. IMPOSES porte les instants donnés un à
-% un, au-delà de deux : à pas variable, ce sont les seuls relevés.
-function [config, imposes, externe] = lireArguments(config, args)
+% un, au-delà de deux : à pas variable, ce sont les seuls relevés — sauf
+% si l'option OutputPoints de SIMSET vaut 'all' (TOUSLESPAS).
+function [config, imposes, externe, tousLesPas] = lireArguments(config, args)
     imposes = [];
     externe = [];
+    tousLesPas = false;
     if isempty(args)
         return
     end
@@ -408,6 +548,35 @@ function [config, imposes, externe] = lireArguments(config, args)
                 if ~isempty(choisi)
                     config = poser(config, nom{1}, choisi);
                 end
+            end
+            for nom = {'Refine', 'Decimation', 'SaveFormat', 'ExtrapolationOrder', ...
+                       'NumberNewtonIterations'}
+                choisi = simget(troisieme, nom{1});
+                if ~isempty(choisi)
+                    config = poser(config, nom{1}, choisi);
+                end
+            end
+            limite = simget(troisieme, 'MaxDataPoints');
+            if ~isempty(limite)
+                config.LimitDataPoints = 'off';   % zéro : tous les instants
+                if limite > 0
+                    config = poser(config, 'MaxDataPoints', limite);
+                    config.LimitDataPoints = 'on';
+                end
+            end
+            points = simget(troisieme, 'OutputPoints');
+            if ~isempty(points)
+                tousLesPas = strcmpi(char(points), 'all');
+            end
+            etat = simget(troisieme, 'InitialState');
+            if ~isempty(etat)
+                config = poser(config, 'InitialState', etat);
+                config.LoadInitialState = 'on';
+            end
+            nomFinal = simget(troisieme, 'FinalStateName');
+            if ~isempty(nomFinal)
+                config = poser(config, 'FinalStateName', nomFinal);
+                config.SaveFinalState = 'on';
             end
             detection = simget(troisieme, 'ZeroCross');
             if ~isempty(detection)
