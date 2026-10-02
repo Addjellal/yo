@@ -117,7 +117,13 @@ static PlanColonne planifier(const Valeur& v, Format format) {
             int l = (int)formater("%.0f", v.re[k]).size();
             largeurMax = std::max(largeurMax, l);
         }
-        p.largeur = std::max(largeurMax + 3, 6);
+        // Les entiers et les logiques se serrent, comme dans MATLAB : trois
+        // espaces devant le plus large, « 1   0   1 ». Les doubles entiers
+        // gardent leurs six colonnes au moins.
+        if (classeEntiere(v.classe) || v.classe == Classe::Logique)
+            p.largeur = largeurMax + 3;
+        else
+            p.largeur = std::max(largeurMax + 3, 6);
         return p;
     }
     // Facteur commun quand les valeurs sont toutes très grandes ou très petites.
@@ -142,16 +148,169 @@ static std::string cellule(double x, const PlanColonne& p, Format format) {
     return formater("%.*f", p.decimales, x / p.facteur);
 }
 
-static std::string indenter(const std::string& texte, int n) {
-    std::string espaces(n, ' ');
-    std::istringstream in(texte);
-    std::string ligne, sortie;
-    while (std::getline(in, ligne)) sortie += espaces + ligne + "\n";
-    return sortie;
+// --- en-têtes et résumés, comme dans la fenêtre de commande de MATLAB ------
+
+// Le « × » que MATLAB écrit entre les dimensions : « 2×3 cell array ».
+static std::string dimsFois(const Dims& d) {
+    std::string s;
+    for (std::size_t i = 0; i < d.size(); ++i) {
+        if (i) s += "\xC3\x97";
+        s += std::to_string(d[i]);
+    }
+    return s;
 }
 
-static std::string rendreStructure(const Valeur& v, int format, bool compact, int largeur);
-static std::string rendreCellule(const Valeur& v, int format, bool compact, int largeur);
+// La largeur d'un texte UTF-8 à l'écran : un caractère par point de code.
+static std::size_t largeurEcran(const std::string& s) {
+    std::size_t n = 0;
+    for (unsigned char c : s)
+        if ((c & 0xC0) != 0x80) ++n;
+    return n;
+}
+
+static bool estZeroParZero(const Valeur& v) {
+    return v.dims.size() == 2 && v.dims[0] == 0 && v.dims[1] == 0;
+}
+
+static bool estMembre(const Valeur& v) {
+    return v.classe == Classe::Objet && v.st &&
+           v.st->champs.count(Interpreteur::champMembre) > 0;
+}
+
+// Un champ caché — l'identifiant d'une carte, le membre d'une énumération
+// — ne se montre pas.
+static bool estCache(const std::string& nom) {
+    return nom.empty() || nom[0] == '\x01' || nom.compare(0, 2, "__") == 0;
+}
+
+// Le nom d'une classe sans son paquet : « Simulink.Bus » s'annonce « Bus ».
+static std::string nomSansPaquet(const std::string& classe) {
+    std::size_t p = classe.rfind('.');
+    return p == std::string::npos ? classe : classe.substr(p + 1);
+}
+
+// L'en-tête d'un tableau : « 1×3 int8 row vector », « 3×1 single column
+// vector », « 2×2 uint8 matrix », « 2×3 char array », « 0×3 empty double
+// matrix ». MATLAB le met à tout tableau qui n'est pas de double, et aux
+// tableaux vides.
+static std::string enteteTableau(const Valeur& v) {
+    std::string t = dimsFois(v.dims) + (v.estVide() ? " empty " : " ") + v.classeNom();
+    if (!v.estNumerique() || v.dims.size() != 2) return t + " array";
+    if (v.dims[0] == 1) return t + " row vector";
+    if (v.dims[1] == 1) return t + " column vector";
+    return t + " matrix";
+}
+
+// L'indice d'une page d'un tableau à plus de deux dimensions : « ,2,1 ».
+static std::string etiquettePage(const Dims& dims, std::size_t p) {
+    std::string etiquette;
+    for (std::size_t d = 2; d < dims.size(); ++d) {
+        etiquette += formater(",%zu", p % (std::size_t)dims[d] + 1);
+        p /= (std::size_t)dims[d];
+    }
+    return etiquette;
+}
+
+// Un élément numérique, logique ou complexe, écrit comme un scalaire.
+static std::string texteElement(const Valeur& e, std::size_t k, int format) {
+    const bool simple = e.classe == Classe::Simple;
+    std::string t = rendreScalaire(e.re[k], format, simple);
+    if (e.estComplexe()) {
+        double im = e.im[k];
+        t += (im < 0 ? " - " : " + ") + rendreScalaire(std::fabs(im), format, simple) + "i";
+    }
+    return t;
+}
+
+// Un vecteur ligne court se montre en entier, entre crochets : « [1 2 3] ».
+static bool estLigneCourte(const Valeur& e, std::size_t plafond) {
+    return (e.estNumerique() || e.classe == Classe::Logique) && !e.estCreux() && !e.estVide() &&
+           e.dims.size() == 2 && e.nlignes() == 1 &&
+           (e.nelem() == 1 || (e.estReel() && e.nelem() <= plafond));
+}
+
+static std::string texteLigne(const Valeur& e, int format) {
+    std::string t = "[";
+    for (std::size_t k = 0; k < e.nelem(); ++k) {
+        if (k) t += " ";
+        t += texteElement(e, k, format);
+    }
+    return t + "]";
+}
+
+// Une case d'un tableau de cellules, comme MATLAB l'écrit entre ses
+// accolades : un nombre entre crochets, calé à droite — « {[  1]} » —, un
+// texte entre apostrophes, calé à gauche — « {'Egg'   } » —, et pour le
+// reste ses dimensions et sa classe — « {2×3 double} », « {1×1 cell} ».
+struct CaseCellule {
+    std::string texte;
+    bool nombre = false;  // calé à droite dans ses crochets
+    bool valeur = true;   // la valeur elle-même, pas son résumé
+};
+
+static CaseCellule caseDeCellule(const Valeur& e, int format) {
+    CaseCellule c;
+    if (estMembre(e) && e.nelem() == 1) {
+        c.texte = "[" + e.champ(Interpreteur::champMembre).versTexte() + "]";
+        c.nombre = true;
+    } else if (estLigneCourte(e, 9)) {
+        c.texte = texteLigne(e, format);
+        c.nombre = true;
+    } else if (e.estTexte() && e.dims.size() == 2 && e.nlignes() == 1 && e.ncolonnes() > 0) {
+        c.texte = "'" + e.versTexte() + "'";
+    } else if (e.estChaine() && e.estScalaire()) {
+        c.texte = "[\"" + (e.chaines.empty() ? std::string() : e.chaines[0]) + "\"]";
+    } else if (e.estFonction()) {
+        c.texte = e.fn ? e.fn->texte : std::string("@()");
+    } else {
+        c.texte = dimsFois(e.dims) + " " + e.classeNom();
+        c.valeur = false;
+    }
+    return c;
+}
+
+// Un champ de structure ou une propriété d'objet, résumé sur une ligne
+// comme dans MATLAB : sa valeur quand elle est courte, sinon ses
+// dimensions et sa classe — entre accolades pour une cellule.
+static std::string resumeChamp(const Valeur& e, int format) {
+    if (estMembre(e) && e.nelem() == 1) return e.champ(Interpreteur::champMembre).versTexte();
+    if (e.estCreux()) return "[" + dimsFois(e.dims) + " double]";
+    if (estLigneCourte(e, 12)) return e.nelem() == 1 ? texteElement(e, 0, format) : texteLigne(e, format);
+    switch (e.classe) {
+        case Classe::Caractere:
+            if (e.dims.size() == 2 && e.nlignes() == 1 && e.ncolonnes() > 0)
+                return "'" + e.versTexte() + "'";
+            if (estZeroParZero(e)) return "''";
+            break;
+        case Classe::Chaine:
+            if (e.estScalaire())
+                return "\"" + (e.chaines.empty() ? std::string() : e.chaines[0]) + "\"";
+            break;
+        case Classe::Fonction: return e.fn ? e.fn->texte : std::string("@()");
+        case Classe::Cellule: {
+            if (estZeroParZero(e)) return "{}";
+            // une ligne de quelques valeurs courtes : « {'a'  'bb'} »
+            if (e.dims.size() == 2 && e.nlignes() == 1 && e.nelem() <= 10) {
+                std::string t = "{";
+                bool courte = true;
+                for (std::size_t k = 0; k < e.nelem() && courte; ++k) {
+                    CaseCellule c = caseDeCellule(e.cellules[k], format);
+                    courte = c.valeur;
+                    if (k) t += "  ";
+                    t += c.texte;
+                }
+                t += "}";
+                if (courte && largeurEcran(t) <= 60) return t;
+            }
+            return "{" + dimsFois(e.dims) + " cell}";
+        }
+        case Classe::Double:
+            if (estZeroParZero(e)) return "[]";
+            break;
+        default: break;
+    }
+    return "[" + dimsFois(e.dims) + " " + e.classeNom() + "]";
+}
 
 static void ecrireNumerique(std::ostream& os, const Valeur& v, Format format,
                             int largeurEcran) {
@@ -210,15 +369,28 @@ static void ecrireTexte(std::ostream& os, const Valeur& v) {
     }
 }
 
+// Un tableau de chaînes : chaque colonne à la largeur de sa plus longue
+// chaîne, quatre espaces entre elles, comme dans MATLAB.
 static void ecrireChaines(std::ostream& os, const Valeur& v) {
     int l = v.nlignes(), c = v.ncolonnes();
+    auto texte = [&](std::size_t k) {
+        return "\"" + (k < v.chaines.size() ? v.chaines[k] : std::string()) + "\"";
+    };
+    std::vector<std::size_t> larges((std::size_t)c, 0);
+    for (int j = 0; j < c; ++j)
+        for (int i = 0; i < l; ++i)
+            larges[(std::size_t)j] =
+                std::max(larges[(std::size_t)j],
+                         largeurEcran(texte((std::size_t)i + (std::size_t)j * l)));
     for (int i = 0; i < l; ++i) {
         if ((i & 1023) == 0) verifierInterruption();
+        std::string ligne;
         for (int j = 0; j < c; ++j) {
-            std::size_t k = (std::size_t)i + (std::size_t)j * l;
-            os << "    \"" << (k < v.chaines.size() ? v.chaines[k] : std::string()) << "\"";
+            std::string t = texte((std::size_t)i + (std::size_t)j * l);
+            ligne += "    " + t;
+            if (j + 1 < c) ligne += std::string(larges[(std::size_t)j] - largeurEcran(t), ' ');
         }
-        os << "\n";
+        os << ligne << "\n";
     }
 }
 
@@ -229,36 +401,88 @@ std::string descriptionCourte(const Valeur& v) {
     return d + " " + v.classeNom();
 }
 
-static std::string rendreCellule(const Valeur& v, int format, bool compact, int largeur) {
-    verifierInterruption();
-    if (v.estVide()) return "  {}\n";
-    int l = v.nlignes(), c = v.ncolonnes();
-    std::string sortie = "  {\n";
+// Une page d'un tableau de cellules : chaque case entre accolades, les
+// cases d'une colonne à la même largeur, quatre espaces entre les
+// colonnes, et des paquets de colonnes quand la fenêtre est trop étroite,
+// comme pour les nombres.
+static void ecrireCasesPage(std::ostream& os, const Valeur& v, std::size_t debut, int l, int c,
+                            int format, int largeur) {
+    std::vector<CaseCellule> cases((std::size_t)l * (std::size_t)c);
+    std::vector<std::size_t> larges((std::size_t)c, 0);
     for (int j = 0; j < c; ++j) {
+        verifierInterruption();
         for (int i = 0; i < l; ++i) {
-            std::size_t k = (std::size_t)i + (std::size_t)j * l;
-            const Valeur& e = v.cellules[k];
-            std::string entete = formater("[%d,%d] = ", i + 1, j + 1);
-            if (e.estScalaire() && (e.estNumerique() || e.classe == Classe::Logique)) {
-                sortie += "    " + entete +
-                          rendreScalaire(e.re.empty() ? 0 : e.re[0], format,
-                                         e.classe == Classe::Simple) +
-                          "\n";
-            } else if (e.estTexte() && e.nlignes() <= 1) {
-                sortie += "    " + entete + "'" + e.versTexte() + "'\n";
-            } else if (e.estChaine() && e.estScalaire()) {
-                sortie += "    " + entete + "\"" + (e.chaines.empty() ? "" : e.chaines[0]) +
-                          "\"\n";
-            } else if (e.estVide()) {
-                sortie += "    " + entete + "[]\n";
-            } else {
-                sortie += "    " + entete + "\n";
-                sortie += indenter(rendreValeur(e, format, compact, largeur - 6), 4);
-            }
+            std::size_t k = (std::size_t)i + (std::size_t)j * (std::size_t)l;
+            cases[k] = caseDeCellule(v.cellules[debut + k], format);
+            larges[(std::size_t)j] = std::max(larges[(std::size_t)j], largeurEcran(cases[k].texte));
         }
     }
-    sortie += "  }\n";
-    return sortie;
+    std::vector<std::pair<int, int>> paquets;
+    int premiere = 0;
+    std::size_t occupe = 0;
+    for (int j = 0; j < c; ++j) {
+        std::size_t colonne = larges[(std::size_t)j] + 6;
+        if (j > premiere && occupe + colonne > (std::size_t)std::max(largeur, 20)) {
+            paquets.emplace_back(premiere, j);
+            premiere = j;
+            occupe = 0;
+        }
+        occupe += colonne;
+    }
+    paquets.emplace_back(premiere, c);
+    std::string ligne;
+    for (const auto& paquet : paquets) {
+        if (paquets.size() > 1) {
+            if (paquet.second - paquet.first == 1)
+                os << formater("  Column %d\n\n", paquet.first + 1);
+            else
+                os << formater("  Columns %d through %d\n\n", paquet.first + 1, paquet.second);
+        }
+        for (int i = 0; i < l; ++i) {
+            if ((i & 1023) == 0) verifierInterruption();
+            ligne.clear();
+            for (int j = paquet.first; j < paquet.second; ++j) {
+                const CaseCellule& e = cases[(std::size_t)i + (std::size_t)j * (std::size_t)l];
+                std::string marge(larges[(std::size_t)j] - largeurEcran(e.texte), ' ');
+                ligne += "    {";
+                ligne += e.nombre ? "[" + marge + e.texte.substr(1) : e.texte + marge;
+                ligne += "}";
+            }
+            ligne += '\n';
+            os.write(ligne.data(), (std::streamsize)ligne.size());
+        }
+        if (paquet.second < c) os << "\n";
+    }
+}
+
+// Un tableau de cellules, comme MATLAB : l'en-tête « 2×2 cell array »,
+// puis les cases ; au-delà de deux dimensions, page par page, chacune
+// nommée d'après la variable — « C(:,:,2) = ».
+static void ecrireCellule(std::ostream& os, const Valeur& v, int format, bool compact,
+                          int largeur, const std::string& nom, bool entete) {
+    verifierInterruption();
+    if (v.estVide()) {
+        if (entete) os << "  " << enteteTableau(v) << "\n";
+        return;
+    }
+    if (entete) {
+        os << "  " << enteteTableau(v) << "\n";
+        if (!compact) os << "\n";
+    }
+    int l = v.dims[0], c = v.dims.size() > 1 ? v.dims[1] : 1;
+    std::size_t taillePage = (std::size_t)l * (std::size_t)c;
+    if (v.dims.size() <= 2) {
+        ecrireCasesPage(os, v, 0, l, c, format, largeur);
+        return;
+    }
+    std::size_t pages = v.nelem() / std::max<std::size_t>(taillePage, 1);
+    for (std::size_t p = 0; p < pages; ++p) {
+        os << (nom.empty() ? std::string("ans") : nom) << "(:,:" << etiquettePage(v.dims, p)
+           << ") =\n";
+        if (!compact) os << "\n";
+        ecrireCasesPage(os, v, p * taillePage, l, c, format, largeur);
+        if (p + 1 < pages && !compact) os << "\n";
+    }
 }
 
 // Une énumération : ses membres, par leur nom, rangés comme le tableau.
@@ -267,8 +491,7 @@ static std::string rendreEnumeration(const Valeur& v) {
     for (std::size_t k = 0; k < v.nelem(); ++k)
         noms.push_back(v.champ(Interpreteur::champMembre, k).versTexte());
     if (noms.size() == 1) return "  " + v.nomObjet + " enumeration\n\n    " + noms[0] + "\n";
-    std::string sortie = formater("  %s %s enumeration array\n", texteDims(v.dims).c_str(),
-                                  v.nomObjet.c_str());
+    std::string sortie = "  " + dimsFois(v.dims) + " " + v.nomObjet + " enumeration array\n";
     if (noms.empty()) return sortie;
     sortie += "\n";
     std::size_t large = 0;
@@ -286,110 +509,130 @@ static std::string rendreEnumeration(const Valeur& v) {
     return sortie;
 }
 
-static bool estMembre(const Valeur& v) {
-    return v.classe == Classe::Objet && v.st &&
-           v.st->champs.count(Interpreteur::champMembre) > 0;
-}
-
-static std::string rendreStructure(const Valeur& v, int format, bool compact, int largeur) {
+// Une structure ou un objet, comme MATLAB : l'en-tête « struct with
+// fields: » ou « Point with properties: », puis un champ par ligne, les
+// noms calés à droite pour aligner les deux-points. Un tableau de
+// structures ne montre que ses champs. « disp » d'une structure omet
+// l'en-tête ; celui d'un objet le garde.
+static void ecrireStructure(std::ostream& os, const Valeur& v, int format, bool compact,
+                            bool entete) {
     verifierInterruption();
-    if (estMembre(v)) return rendreEnumeration(v);
-    std::string sortie;
+    if (estMembre(v)) {
+        os << rendreEnumeration(v);
+        return;
+    }
+    const bool objet = v.classe == Classe::Objet;
+    const std::string classe = objet ? nomSansPaquet(v.nomObjet) : std::string("struct");
+    const char* genre = objet ? "properties" : "fields";
+    std::vector<std::string> noms;
+    for (const auto& nom : v.champs())
+        if (!estCache(nom)) noms.push_back(nom);
     if (v.nelem() != 1) {
-        sortie += formater("  %s struct array with fields:\n\n", texteDims(v.dims).c_str());
-        for (const auto& nom : v.champs()) sortie += "    " + nom + "\n";
-        return sortie;
-    }
-    for (const auto& nom : v.champs()) {
-        Valeur e = v.champ(nom, 0);
-        std::string entete = "    " + nom + ": ";
-        if (e.estScalaire() && (e.estNumerique() || e.classe == Classe::Logique)) {
-            sortie += entete +
-                      rendreScalaire(e.re.empty() ? 0 : e.re[0], format,
-                                     e.classe == Classe::Simple) + "\n";
-        } else if (e.estTexte() && e.nlignes() <= 1) {
-            sortie += entete + "'" + e.versTexte() + "'\n";
-        } else if (e.estChaine() && e.estScalaire()) {
-            sortie += entete + "\"" + (e.chaines.empty() ? "" : e.chaines[0]) + "\"\n";
-        } else if (estMembre(e) && e.nelem() == 1) {
-            sortie += entete + e.champ(Interpreteur::champMembre).versTexte() + "\n";
-        } else if (e.estVide()) {
-            sortie += entete + "[]\n";
-        } else if (e.classe == Classe::Fonction) {
-            sortie += entete + (e.fn ? e.fn->texte : "@()") + "\n";
-        } else if (e.nelem() <= 12 && e.estNumerique() && e.dims.size() == 2 &&
-                   e.nlignes() == 1) {
-            std::string ligne = "[";
-            for (std::size_t k = 0; k < e.re.size(); ++k) {
-                if (k) ligne += " ";
-                ligne += rendreScalaire(e.re[k], format, e.classe == Classe::Simple);
-            }
-            ligne += "]";
-            sortie += entete + ligne + "\n";
-        } else {
-            sortie += entete + "[" + texteDims(e.dims) + " " + e.classeNom() + "]\n";
+        os << "  " << dimsFois(v.dims) << (v.estVide() ? " empty " : " ") << classe
+           << " array with ";
+        if (noms.empty()) {
+            os << "no " << genre << ".\n";
+            return;
         }
+        os << genre << ":\n";
+        if (!compact) os << "\n";
+        for (const auto& nom : noms) os << "    " << nom << "\n";
+        return;
     }
-    return sortie;
+    if (noms.empty()) {
+        if (entete || objet) os << "  " << classe << " with no " << genre << ".\n";
+        return;
+    }
+    if (entete || objet) {
+        os << "  " << classe << " with " << genre << ":\n";
+        if (!compact) os << "\n";
+    }
+    std::size_t large = 0;
+    for (const auto& nom : noms) large = std::max(large, nom.size());
+    for (const auto& nom : noms)
+        os << "    " << std::string(large - nom.size(), ' ') << nom << ": "
+           << resumeChamp(v.champ(nom, 0), format) << "\n";
 }
 
-void ecrireValeur(std::ostream& os, const Valeur& v, int format, bool compact,
-                  int largeur) {
+void ecrireValeur(std::ostream& os, const Valeur& v, int format, bool compact, int largeur,
+                  const std::string& nom) {
     Format f = (Format)format;
+    const bool entete = !nom.empty();
     if (v.estCreux()) { os << rendreCreux(v); return; }
     switch (v.classe) {
         case Classe::Fonction:
             os << "    " << (v.fn ? v.fn->texte : std::string("@()")) << "\n";
             return;
-        case Classe::Cellule: os << rendreCellule(v, format, compact, largeur); return;
+        case Classe::Cellule: ecrireCellule(os, v, format, compact, largeur, nom, entete); return;
         case Classe::Structure:
-        case Classe::Objet: os << rendreStructure(v, format, compact, largeur); return;
+        case Classe::Objet: ecrireStructure(os, v, format, compact, entete); return;
         case Classe::Caractere:
-            if (v.estVide()) os << "  ''\n";
-            else ecrireTexte(os, v);
-            return;
         case Classe::Chaine:
-            if (v.estVide()) os << "  0x0 empty string array\n";
+            if (v.estVide() || entete) {
+                os << "  " << enteteTableau(v) << "\n";
+                if (v.estVide()) return;
+                if (!compact) os << "\n";
+            }
+            if (v.classe == Classe::Caractere) ecrireTexte(os, v);
             else ecrireChaines(os, v);
             return;
         default: break;
     }
     if (v.estVide()) {
-        os << formater("  %s empty %s matrix\n", texteDims(v.dims).c_str(), v.classeNom());
+        os << "  " << enteteTableau(v) << "\n";
         return;
     }
+    // un tableau qui n'est pas de double dit sa classe : « int8 »,
+    // « 1×3 logical array »
+    if (entete && v.classe != Classe::Double) {
+        os << "  " << (v.estScalaire() ? std::string(v.classeNom()) : enteteTableau(v)) << "\n";
+        if (!compact) os << "\n";
+    }
     if (v.dims.size() > 2) {
-        // Affichage page par page, comme MATLAB.
+        // Affichage page par page, chacune nommée d'après la variable,
+        // comme MATLAB : « x(:,:,2) = ».
         int l = v.dims[0], c = v.dims[1];
         std::size_t pageTaille = (std::size_t)l * c;
         std::size_t pages = v.nelem() / std::max<std::size_t>(pageTaille, 1);
         for (std::size_t p = 0; p < pages; ++p) {
             verifierInterruption();
-            Dims reste(v.dims.begin() + 2, v.dims.end());
-            std::string etiquette;
-            std::size_t r = p;
-            for (std::size_t d = 0; d < reste.size(); ++d) {
-                etiquette += formater(",%zu", r % (std::size_t)reste[d] + 1);
-                r /= (std::size_t)reste[d];
-            }
-            os << formater("ans(:,:%s) =\n\n", etiquette.c_str());
+            os << (nom.empty() ? std::string("ans") : nom) << "(:,:" << etiquettePage(v.dims, p)
+               << ") =\n";
+            if (!compact) os << "\n";
             Valeur page = Valeur::matrice(l, c);
             page.classe = v.classe;
             for (std::size_t k = 0; k < pageTaille; ++k) page.re[k] = v.re[p * pageTaille + k];
+            if (v.estComplexe()) {
+                page.im.assign(pageTaille, 0.0);
+                for (std::size_t k = 0; k < pageTaille; ++k)
+                    page.im[k] = v.im[p * pageTaille + k];
+            }
             ecrireNumerique(os, page, f, largeur);
-            os << "\n";
+            if (!compact && p + 1 < pages) os << "\n";
         }
         return;
     }
     ecrireNumerique(os, v, f, largeur);
 }
 
-// La forme en chaîne reste, pour « evalc », les cellules imbriquées et
-// tout ce qui a besoin du texte plutôt que de l'écran.
-std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur) {
+// La forme en chaîne reste, pour « evalc » et tout ce qui a besoin du
+// texte plutôt que de l'écran.
+std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur,
+                         const std::string& nom) {
     std::ostringstream os;
-    ecrireValeur(os, v, format, compact, largeur);
+    ecrireValeur(os, v, format, compact, largeur, nom);
     return os.str();
+}
+
+// Une carte (containers.Map) se montre par ses propriétés, comme dans
+// MATLAB : le nombre de clés et les types des clés et des valeurs.
+void ecrireCarte(std::ostream& os, Interpreteur& it, const Valeur& v, bool compact) {
+    os << "  Map with properties:\n";
+    if (!compact) os << "\n";
+    os << "        Count: "
+       << rendreScalaire(it.lireProprieteObjet(v, "Count").scal(), (int)it.format) << "\n";
+    os << "      KeyType: " << it.lireProprieteObjet(v, "KeyType").versTexte() << "\n";
+    os << "    ValueType: " << it.lireProprieteObjet(v, "ValueType").versTexte() << "\n";
 }
 
 void afficherResultat(Interpreteur& it, const std::string& nom, const Valeur& v) {
@@ -413,32 +656,28 @@ void afficherResultat(Interpreteur& it, const std::string& nom, const Valeur& v)
     }
     int format = (int)it.format;
     bool compact = it.formatCompact;
-    // Cas court : « x = 5 » sur une seule ligne.
+    // Cas court : « x = 5 » sur une seule ligne — un double, un texte, une
+    // chaîne, une poignée, [] et {}. Un scalaire d'une autre classe dit sa
+    // classe au-dessus de sa valeur, comme dans MATLAB (« int8 »,
+    // « logical »).
     bool court = false;
     std::string valeurCourte;
-    if (v.estScalaire() && (v.estNumerique() || v.classe == Classe::Logique) &&
-        !v.estComplexe()) {
+    if (v.estScalaire() && v.classe == Classe::Double && !v.estCreux()) {
         court = true;
-        valeurCourte = rendreScalaire(v.re[0], format, v.classe == Classe::Simple);
-    } else if (v.estScalaire() && v.estComplexe()) {
-        court = true;
-        double re = v.re[0], im = v.im[0];
-        const bool simple = v.classe == Classe::Simple;
-        valeurCourte = rendreScalaire(re, format, simple) + (im < 0 ? " - " : " + ") +
-                       rendreScalaire(std::fabs(im), format, simple) + "i";
+        valeurCourte = texteElement(v, 0, format);
     } else if (v.classe == Classe::Fonction) {
         court = true;
         valeurCourte = v.fn ? v.fn->texte : "@()";
-    } else if (v.estTexte() && v.nlignes() == 1) {
+    } else if (v.estTexte() && v.dims.size() == 2 && v.nlignes() == 1 && v.ncolonnes() > 0) {
         court = true;
         valeurCourte = "'" + v.versTexte() + "'";
     } else if (v.estChaine() && v.estScalaire()) {
         court = true;
         valeurCourte = "\"" + (v.chaines.empty() ? std::string() : v.chaines[0]) + "\"";
-    } else if (v.estVide() && v.classe == Classe::Double) {
+    } else if (estZeroParZero(v) && v.classe == Classe::Double && !v.estCreux()) {
         court = true;
         valeurCourte = "[]";
-    } else if (v.estVide() && v.classe == Classe::Cellule) {
+    } else if (estZeroParZero(v) && v.classe == Classe::Cellule) {
         court = true;
         valeurCourte = "{}";
     }
@@ -447,9 +686,15 @@ void afficherResultat(Interpreteur& it, const std::string& nom, const Valeur& v)
         if (!compact) os << "\n";
         return;
     }
-    os << nom << " =\n";
-    if (!compact) os << "\n";
-    ecrireValeur(os, v, format, compact, 80);
+    // Un tableau de doubles à plus de deux dimensions commence par sa
+    // première page, « x(:,:,1) = », sans « x = » au-dessus : il n'a pas
+    // d'en-tête à montrer.
+    if (!(v.classe == Classe::Double && v.dims.size() > 2 && !v.estCreux())) {
+        os << nom << " =\n";
+        if (!compact) os << "\n";
+    }
+    if (it.estCarte(v)) ecrireCarte(os, it, v, compact);
+    else ecrireValeur(os, v, format, compact, 80, nom);
     if (!compact) os << "\n";
 }
 

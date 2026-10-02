@@ -303,9 +303,16 @@ FONCTION(fnDisp) {
         os << (v.chaines.empty() ? "" : v.chaines[0]) << "\n";
         return {};
     }
+    if (it.estCarte(v)) {
+        ecrireCarte(os, it, v, it.formatCompact);
+        return {};
+    }
     if (v.estScalaire() && (v.estNumerique() || v.classe == Classe::Logique) &&
-        !v.estComplexe()) {
-        os << "     "
+        !v.estComplexe() && !v.estCreux()) {
+        // les entiers et les logiques se serrent : « disp(true) » écrit
+        // « 1 » après trois espaces, comme MATLAB
+        const bool serre = classeEntiere(v.classe) || v.classe == Classe::Logique;
+        os << (serre ? "   " : "     ")
            << rendreScalaire(v.re[0], (int)it.format, v.classe == Classe::Simple) << "\n";
         return {};
     }

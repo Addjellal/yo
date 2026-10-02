@@ -49,7 +49,7 @@ fichier est produit par mesure, non écrit à la main.
   macOS et Windows, paquets `.tar.gz`, `.deb` et `.zip`, gestion des
   toolboxes depuis le langage, intégration continue sur les trois
   systèmes.
-- **Des tests** : 57 vérifications C++ sur le cœur, 22 suites écrites
+- **Des tests** : 78 vérifications C++ sur le cœur, 22 suites écrites
   dans le langage — dont une qui contrôle un résultat exact par toolbox,
   une les types de données, une le calcul parallèle, une qui compile puis
   exécute le C produit pour le comparer à l'interpréteur, une qui exécute
@@ -100,7 +100,15 @@ totalité.
    démarre en `format long` : `pi` s'écrit `3.141592653589793`, et un
    `single` `3.1415927` — sept décimales, tout ce qu'il porte. MATLAB
    démarre en `format short`. C'est le seul écart d'affichage, et
-   `format short` le rétablit ; `format` seul revient à `long`. La
+   `format short` le rétablit ; `format` seul revient à `long`. Le reste
+   s'affiche comme dans la fenêtre de commande de MATLAB : une cellule
+   sous son en-tête « 2×2 cell array », ses cases entre accolades —
+   `{[  1]}`, `{'Egg'   }`, `{2×3 double}` — ; une structure sous
+   « struct with fields: », les noms calés à droite ; un objet sous
+   « Bus with properties: » ; une `containers.Map` par `Count`, `KeyType`
+   et `ValueType` ; un tableau d'une autre classe que double sous son
+   en-tête — « 1×3 int8 row vector », « 2×2 logical array », « 2×3 char
+   array » — et un scalaire logique ou entier sous sa classe. La
    fonction `float`, synonyme de `single`, est également propre à
    MatLibre : MATLAB ne connaît que `single`.
 3. **Les fichiers MAT vont dans les deux sens, sauf les objets.** `save`

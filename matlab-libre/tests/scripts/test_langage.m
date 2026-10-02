@@ -1115,6 +1115,36 @@ assert(persoUn() == 1 && persoDeux() == 2, 'clear f vide les sous-fonctions de f
 rmpath(dossierPersistant);
 rmdir(dossierPersistant, 's');
 
+%% ------------------------------------------- l'affichage de MATLAB
+% Les cellules, les structures, les objets et les tableaux d'une autre
+% classe que double s'affichent comme dans la fenêtre de commande de
+% MATLAB : un en-tête qui dit la forme et la classe, les cases d'une
+% cellule entre accolades, les noms des champs calés à droite.
+celluleAffichee = {1, 'deux'; [1 2 3], {2}};
+texteAffiche = evalc('celluleAffichee');
+assert(~isempty(strfind(texteAffiche, 'cell array')) && ...
+       ~isempty(strfind(texteAffiche, sprintf('    {[    1]}    {''deux''  }\n'))) && ...
+       isempty(strfind(texteAffiche, '[1,1]')), 'une cellule, comme MATLAB');
+assert(strcmp(evalc('disp({''Carrot''; ''Egg''})'), ...
+              sprintf('    {''Carrot''}\n    {''Egg''   }\n')), 'disp d''une cellule');
+structureAffichee = struct('a', 1, 'beta', 'x');
+assert(strcmp(evalc('structureAffichee'), ...
+              sprintf('structureAffichee =\n\n  struct with fields:\n\n       a: 1\n    beta: ''x''\n\n')), ...
+       'une structure : l''en-tete et les noms cales a droite');
+logiqueAffiche = true;
+assert(strcmp(evalc('logiqueAffiche'), sprintf('logiqueAffiche =\n\n  logical\n\n   1\n\n')), ...
+       'un logique dit sa classe');
+carteAffichee = containers.Map({'a', 'b'}, {1, 2});
+texteAffiche = evalc('carteAffichee');
+assert(~isempty(strfind(texteAffiche, 'Map with properties:')) && ...
+       ~isempty(strfind(texteAffiche, '        Count: 2')) && ...
+       isempty(strfind(texteAffiche, '__id')), 'une carte montre ses proprietes');
+elementAffiche = Simulink.BusElement;
+texteAffiche = evalc('elementAffiche');
+assert(~isempty(strfind(texteAffiche, 'BusElement with properties:')) && ...
+       ~isempty(strfind(texteAffiche, sprintf('              Name: ''a''\n'))), ...
+       'un objet : « X with properties: », les proprietes alignees');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

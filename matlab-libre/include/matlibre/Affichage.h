@@ -20,9 +20,18 @@ void afficherResultat(Interpreteur& it, const std::string& nom, const Valeur& v)
 // dix millions d'éléments s'y écrit en cent soixante mégaoctets avant
 // qu'un seul caractère paraisse, et l'interruption ne rendait la main
 // qu'après. Tout ce qui affiche à l'écran passe donc par la forme en flux.
+//
+// « nom » est celui de la variable qu'on affiche : il met les en-têtes de
+// MATLAB — « 2×2 cell array », « struct with fields: », « 1×3 int8 row
+// vector » — et nomme les pages d'un tableau à trois dimensions,
+// « x(:,:,2) = ». Sans nom, c'est la forme de « disp », sans en-tête.
 void ecrireValeur(std::ostream& os, const Valeur& v, int format, bool compact,
-                  int largeur = 80);
-std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur = 80);
+                  int largeur = 80, const std::string& nom = std::string());
+std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur = 80,
+                         const std::string& nom = std::string());
+// Une carte (containers.Map), par ses propriétés : Count, KeyType,
+// ValueType.
+void ecrireCarte(std::ostream& os, Interpreteur& it, const Valeur& v, bool compact);
 // Un scalaire, mis en forme. « simple » dit que la valeur est un
 // « single » : elle ne porte que sept décimales sûres, et MATLAB n'en
 // montre pas davantage — « format long » rend 3.1415927, non

@@ -173,6 +173,65 @@ void testAffichage() {
     std::string sortie = sortieDe("disp([1 2])");
     verifier(sortie.find("1") != std::string::npos && sortie.find("2") != std::string::npos,
              "disp d'un vecteur");
+    // les en-têtes et les formes de la fenêtre de commande de MATLAB
+    const std::string x = "\xC3\x97";
+    verifier(sortieDe("C = {1, 'deux'; [1 2 3], {2}}") ==
+                 "C =\n\n  2" + x + "2 cell array\n\n    {[    1]}    {'deux'  }\n"
+                 "    {[1 2 3]}    {1" + x + "1 cell}\n\n",
+             "une cellule : nombres a droite dans leurs crochets, textes a gauche");
+    verifier(sortieDe("D = {'Carrot'; 'Egg'}") ==
+                 "D =\n\n  2" + x + "1 cell array\n\n    {'Carrot'}\n    {'Egg'   }\n\n",
+             "les cases d'une colonne a la meme largeur");
+    verifier(sortieDe("disp({1, 'a'})") == "    {[1]}    {'a'}\n", "disp d'une cellule, sans en-tete");
+    verifier(sortieDe("E = cell(1, 0)") == "E =\n\n  1" + x + "0 empty cell array\n\n",
+             "une cellule vide");
+    verifier(sortieDe("s.a = 1; s.beta = 'x'; s") ==
+                 "s =\n\n  struct with fields:\n\n       a: 1\n    beta: 'x'\n\n",
+             "une structure : l'en-tete, les noms cales a droite");
+    verifier(sortieDe("s.c = {'a', 'bb'}; s.t = struct('u', 1); s.w = zeros(3); disp(s)") ==
+                 "    c: {'a'  'bb'}\n    t: [1" + x + "1 struct]\n    w: [3" + x +
+                 "3 double]\n",
+             "les champs resumes, et disp sans en-tete");
+    verifier(sortieDe("q = struct()") == "q =\n\n  struct with no fields.\n\n",
+             "une structure sans champ");
+    verifier(sortieDe("t = struct('a', {1, 2})") ==
+                 "t =\n\n  1" + x + "2 struct array with fields:\n\n    a\n\n",
+             "un tableau de structures");
+    verifier(sortieDe("u = uint8(7)") == "u =\n\n  uint8\n\n   7\n\n",
+             "un entier dit sa classe");
+    verifier(sortieDe("v = true") == "v =\n\n  logical\n\n   1\n\n",
+             "un logique dit sa classe");
+    verifier(sortieDe("disp(true)") == "   1\n", "disp d'un logique");
+    verifier(sortieDe("a = int8([1 2 3])") ==
+                 "a =\n\n  1" + x + "3 int8 row vector\n\n   1   2   3\n\n",
+             "un vecteur d'entiers, serre");
+    verifier(sortieDe("c = [true; false]") ==
+                 "c =\n\n  2" + x + "1 logical array\n\n   1\n   0\n\n",
+             "un tableau logique");
+    verifier(sortieDe("d = ['abc'; 'def']") ==
+                 "d =\n\n  2" + x + "3 char array\n\n    'abc'\n    'def'\n\n",
+             "une matrice de caracteres");
+    verifier(sortieDe("e = [\"a\" \"bb\"; \"ccc\" \"d\"]") ==
+                 "e =\n\n  2" + x + "2 string array\n\n    \"a\"      \"bb\"\n"
+                 "    \"ccc\"    \"d\"\n\n",
+             "un tableau de chaines, en colonnes");
+    verifier(sortieDe("z = zeros(0, 3)") == "z =\n\n  0" + x + "3 empty double matrix\n\n",
+             "un tableau vide dit ses dimensions");
+    verifier(sortieDe("w = []") == "w = []\n\n", "[] tient sur une ligne");
+    verifier(sortieDe("M = containers.Map({'a', 'b'}, {1, 2})") ==
+                 "M =\n\n  Map with properties:\n\n        Count: 2\n      KeyType: char\n"
+                 "    ValueType: any\n\n",
+             "une carte montre ses proprietes, pas son identifiant");
+    sortie = sortieDe("x = ones(2, 2, 2)");
+    verifier(sortie.rfind("x(:,:,1) =\n\n", 0) == 0 && sortie.find("x(:,:,2) =") != std::string::npos,
+             "les pages d'un tableau a trois dimensions portent le nom de la variable");
+    sortie = sortieDe("F = cell(1, 1, 2)");
+    verifier(sortie.find("  1" + x + "1" + x + "2 cell array") != std::string::npos &&
+                 sortie.find("F(:,:,2) =") != std::string::npos,
+             "une cellule a trois dimensions, page par page");
+    verifier(sortieDe("format compact\nC = {1, 'a'}") ==
+                 "C =\n  1" + x + "2 cell array\n    {[1]}    {'a'}\n",
+             "format compact : sans lignes blanches");
 }
 
 void testSignal() {
