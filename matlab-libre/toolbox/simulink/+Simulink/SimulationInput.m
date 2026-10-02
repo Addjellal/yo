@@ -186,10 +186,12 @@ classdef SimulationInput
             obj.ExternalInput = u;
         end
         function obj = setInitialState(obj, x0)
-            if ~(isnumeric(x0) || ischar(x0) || isstring(x0))
+            if ~(isnumeric(x0) || ischar(x0) || isstring(x0) || ...
+                 isa(x0, 'Simulink.op.ModelOperatingPoint'))
                 error('Simulink:Simulation:InvalidInitialState', ...
                       ['L''etat initial est un vecteur — les etats continus, dans l''ordre ' ...
-                       'de xout —, ou le nom d''une variable qui le porte.']);
+                       'de xout —, un etat de fonctionnement, ou le nom d''une variable qui ' ...
+                       'le porte.']);
             end
             obj.InitialState = x0;
         end

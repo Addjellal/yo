@@ -9770,6 +9770,136 @@ end
 assert(strcmp(vu72, 'Simulink:Config:InvalidValue'), 'ParameterOverflowMsg : none, warning ou error');
 fprintf('diagnostics des parametres : ok\n');
 
+%% ------------------------------------------- 73. L'état de fonctionnement
+% SaveOperatingPoint, comme dans Simulink : l'état final est l'état de
+% fonctionnement complet, un Simulink.op.ModelOperatingPoint — états
+% continus et discrets, sorties tenues, tampons des retards, générateurs
+% aléatoires —, et la simulation qui le charge reprend à son instant. À
+% pas fixe, la reprise rend exactement la simulation d'une traite ; les
+% états continus seuls (xFinal sans SaveOperatingPoint) n'y suffisent pas
+% dès qu'un bloc discret tient un état. Il ne se charge que dans le modèle
+% d'où il vient, tel qu'il était.
+m73 = new_system('reprise73');
+m73 = add_block(m73, 'step', 's', 'Time', 0.3);
+m73 = add_block(m73, 'transferfcn', 'tf', 'Numerator', 1, 'Denominator', [1 1]);
+m73 = add_block(m73, 'unitdelay', 'z', 'SampleTime', 0.1, 'InitialCondition', 0.5);
+m73 = add_block(m73, 'discreteintegrator', 'di', 'SampleTime', 0.05);
+m73 = add_block(m73, 'transportdelay', 'td', 'DelayTime', 0.25);
+m73 = add_block(m73, 'randomnumber', 'bruit', 'SampleTime', 0.1, 'Seed', 7);
+m73 = add_block(m73, 'sum', 'som', 'Signs', '++++');
+m73 = add_block(m73, 'outport', 'y');
+m73 = add_line(m73, 's', 'tf');
+m73 = add_line(add_line(add_line(m73, 'tf', 'z'), 'tf', 'td'), 'tf', 'di');
+m73 = add_line(add_line(m73, 'z', 'som', 1), 'td', 'som', 2);
+m73 = add_line(add_line(m73, 'di', 'som', 3), 'bruit', 'som', 4);
+m73 = add_line(m73, 'som', 'y');
+fixe73 = {'Solver', 'ode4', 'FixedStep', 0.01};
+assert(strcmp(get_param(m73, 'SaveOperatingPoint'), 'off'), 'SaveOperatingPoint, off par defaut');
+entier73 = sim(m73, fixe73{:}, 'StopTime', 2);
+a73 = sim(m73, fixe73{:}, 'StopTime', 1, 'SaveFinalState', 'on', 'SaveOperatingPoint', 'on');
+op73 = a73.xFinal;
+assert(isa(op73, 'Simulink.op.ModelOperatingPoint') && strcmp(op73.modelName, 'reprise73') && ...
+       op73.snapshotTime == 1 && op73.startTime == 0, ...
+       'l''etat final est l''etat de fonctionnement, pris a la fin');
+assert(~isempty(strfind(evalc('disp(op73)'), 'ModelOperatingPoint with properties')) && ...
+       ~isempty(strfind(evalc('disp(op73)'), 'snapshotTime: 1')), 'il s''affiche comme dans Simulink');
+b73 = sim(m73, fixe73{:}, 'StopTime', 2, 'LoadInitialState', 'on', 'InitialState', op73);
+garde73 = entier73.tout >= 1 - 1e-12;
+assert(abs(b73.tout(1) - 1) < 1e-12 && isequal(b73.yout, entier73.yout(garde73)) && ...
+       max(abs(b73.tout - entier73.tout(garde73))) < 1e-12, ...
+       'a pas fixe, la reprise rend exactement la simulation d''une traite');
+b73bis = sim(m73, fixe73{:}, 'StopTime', 2, 'LoadInitialState', 'on', 'InitialState', op73);
+assert(isequal(b73bis.yout, b73.yout), 'un etat de fonctionnement se reprend autant qu''on veut');
+% les états continus seuls ne suffisent pas : le retard unitaire repart
+% de sa condition initiale
+x73 = sim(m73, fixe73{:}, 'StopTime', 1, 'SaveFinalState', 'on');
+assert(isnumeric(x73.xFinal), 'sans SaveOperatingPoint, xFinal porte les etats continus');
+c73 = sim(m73, fixe73{:}, 'StartTime', 1, 'StopTime', 2, 'LoadInitialState', 'on', ...
+          'InitialState', x73.xFinal);
+assert(~isequal(c73.yout, entier73.yout(garde73)), ...
+       'les etats continus seuls ne reprennent pas les blocs discrets');
+% par son nom dans l'espace de travail, et par un SimulationInput
+assignin('base', 'op73base', op73);
+d73 = sim(m73, fixe73{:}, 'StopTime', 2, 'LoadInitialState', 'on', 'InitialState', 'op73base');
+assert(isequal(d73.yout, b73.yout), 'l''etat de fonctionnement par son nom');
+evalin('base', 'clear op73base');
+reprise73 = m73;   % SIM(IN) trouve le modele sous son nom
+in73 = Simulink.SimulationInput('reprise73');
+in73 = in73.setModelParameter('Solver', 'ode4', 'FixedStep', '0.01', 'StopTime', '2');
+in73 = in73.setInitialState(op73);
+e73 = sim(in73);
+assert(isequal(e73.yout, b73.yout), 'l''etat de fonctionnement dans un SimulationInput');
+% à pas variable : la reprise suit la simulation d'une traite, le solveur
+% repartant de son premier pas
+variable73 = {'Solver', 'ode45', 'RelTol', 1e-8, 'AbsTol', 1e-10, 'MaxStep', 0.01};
+entierV73 = sim(m73, variable73{:}, 'StopTime', 2);
+aV73 = sim(m73, variable73{:}, 'StopTime', 1, 'SaveFinalState', 'on', 'SaveOperatingPoint', 'on');
+bV73 = sim(m73, variable73{:}, 'StopTime', 2, 'LoadInitialState', 'on', ...
+           'InitialState', aV73.xFinal);
+assert(abs(bV73.tout(1) - 1) < 1e-12 && abs(bV73.tout(end) - 2) < 1e-12 && ...
+       abs(bV73.yout(end) - entierV73.yout(end)) < 1e-6, ...
+       'a pas variable, la reprise rejoint la simulation d''une traite');
+% un diagramme Stateflow reprend dans son état, son horloge comprise
+graphe73 = sfchart('clignoteur73');
+graphe73 = sfstate(graphe73, 'eteint', @(c) setfield(c, 'lampe', 0));
+graphe73 = sfstate(graphe73, 'allume', @(c) setfield(c, 'lampe', 1));
+graphe73 = sftransition(graphe73, 'eteint', 'allume', @(c, u) sfafter(c, 0.5, 'sec'));
+graphe73 = sftransition(graphe73, 'allume', 'eteint', @(c, u) sfafter(c, 0.5, 'sec'));
+clignote73 = new_system('clignote73');
+clignote73 = add_block(clignote73, 'chart', 'lampe', 'Chart', graphe73, 'Inputs', 0, ...
+                       'Outputs', {'lampe'}, 'InitialContext', struct('lampe', 0), ...
+                       'SampleTime', 0.1);
+clignote73 = add_line(add_block(clignote73, 'outport', 'y'), 'lampe', 'y');
+discret73 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1};
+toutG73 = sim(clignote73, discret73{:}, 'StopTime', 2);
+aG73 = sim(clignote73, discret73{:}, 'StopTime', 0.7, 'SaveFinalState', 'on', ...
+           'SaveOperatingPoint', 'on');
+bG73 = sim(clignote73, discret73{:}, 'StopTime', 2, 'LoadInitialState', 'on', ...
+           'InitialState', aG73.xFinal);
+assert(isequal(bG73.yout, toutG73.yout(toutG73.tout >= 0.7 - 1e-9)) && ...
+       numel(unique(bG73.yout)) == 2, 'un diagramme reprend dans son etat, a son heure');
+% ce qui ne se charge pas
+decale73 = sim(m73, fixe73{:}, 'StopTime', 1.03, 'SaveFinalState', 'on', ...
+               'SaveOperatingPoint', 'on');
+decale73 = decale73.xFinal;   % pris a t = 1,03 : pas un pas de 0,05
+autre73 = new_system('autre73');
+autre73 = add_line(add_block(add_block(autre73, 'constant', 'c'), 'outport', 'y'), 'c', 'y');
+refus73 = {
+    @() sim(autre73, 'LoadInitialState', 'on', 'InitialState', op73), ...
+        'Simulink:SimInput:OperatingPointModelMismatch', 'reprise73'
+    @() sim(add_block(m73, 'gain', 'neuf'), fixe73{:}, 'StopTime', 2, ...
+            'LoadInitialState', 'on', 'InitialState', op73), ...
+        'Simulink:SimInput:OperatingPointModelMismatch', 'reprise73'
+    @() sim(m73, fixe73{:}, 'StopTime', 1, 'LoadInitialState', 'on', 'InitialState', op73), ...
+        'Simulink:SimInput:OperatingPointStopTime', 'StopTime'
+    @() sim(m73, fixe73{:}, 'StartTime', 0.5, 'StopTime', 2, 'LoadInitialState', 'on', ...
+            'InitialState', op73), 'Simulink:SimInput:OperatingPointStartTime', 'StartTime'
+    @() sim(m73, 'Solver', 'ode4', 'FixedStep', 0.05, 'StopTime', 2, 'LoadInitialState', 'on', ...
+            'InitialState', decale73), 'Simulink:SimInput:OperatingPointStep', 'reprise73'
+    @() sim(m73, fixe73{:}, 'StopTime', 2, 'LoadInitialState', 'on', ...
+            'InitialState', Simulink.op.ModelOperatingPoint()), ...
+        'Simulink:SimInput:InvalidOperatingPoint', 'reprise73'
+    @() sim(m73, variable73{:}, 'StopTime', 2, 'LoadInitialState', 'on', 'InitialState', op73), ...
+        'Simulink:SimInput:OperatingPointSolver', 'reprise73'
+    @() set_param(m73, 'SaveOperatingPoint', 'oui'), 'Simulink:Config:InvalidValue', ...
+        'SaveOperatingPoint'
+    };
+for q = 1:size(refus73, 1)
+    vu73 = '';
+    message73 = '';
+    try
+        refus73{q, 1}();
+    catch err
+        vu73 = err.identifier;
+        message73 = err.message;
+    end
+    assert(strcmp(vu73, refus73{q, 2}) && ~isempty(strfind(message73, refus73{q, 3})), ...
+           sprintf('etat de fonctionnement, refus %d : %s', q, vu73));
+end
+f73 = sim(m73, fixe73{:}, 'StopTime', 1, 'SaveOperatingPoint', 'on');
+assert(~isfield(f73, 'xFinal'), 'SaveOperatingPoint sans SaveFinalState : pas d''etat final');
+fprintf('etat de fonctionnement : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

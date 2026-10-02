@@ -203,7 +203,8 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
            QStringLiteral("La simulation part de l'état qui suit"),
            QStringLiteral("    expression"),
            QStringLiteral("Les états continus, dans l'ordre des colonnes de xout — l'état "
-                          "final d'une simulation précédente s'y reprend tel quel"));
+                          "final d'une simulation précédente s'y reprend tel quel —, ou un "
+                          "état de fonctionnement complet, d'où la simulation reprend"));
     const QString aideNom = QStringLiteral("Le champ du résultat de SIM qui la porte");
     couple(formulaireRelever, QStringLiteral("SaveTime"), QStringLiteral("TimeSaveName"),
            QStringLiteral("Temps"), QStringLiteral("Les instants relevés"),
@@ -218,6 +219,10 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
            QStringLiteral("FinalStateName"), QStringLiteral("État final"),
            QStringLiteral("L'état au dernier instant, pour reprendre plus tard"),
            QStringLiteral("    nom"), aideNom);
+    nouvelleListe(QStringLiteral("SaveOperatingPoint"), formulaireRelever,
+                  QStringLiteral("    état de fonctionnement complet"), ouiNon,
+                  QStringLiteral("L'état final porte tout — états discrets, tampons des "
+                                 "retards, diagrammes — : la simulation y reprend exactement"));
     couple(formulaireRelever, QStringLiteral("SignalLogging"),
            QStringLiteral("SignalLoggingName"), QStringLiteral("Journal des signaux"),
            QStringLiteral("Les signaux dont le port a DataLogging à « on », en Dataset"),
@@ -410,6 +415,9 @@ void DialogueConfiguration::donneesChange() {
     for (auto it = couples_.cbegin(); it != couples_.cend(); ++it)
         champs_.value(it.value())
             ->setEnabled(listes_.value(it.key())->currentText() == QLatin1String("on"));
+    listes_.value(QStringLiteral("SaveOperatingPoint"))
+        ->setEnabled(listes_.value(QStringLiteral("SaveFinalState"))->currentText() ==
+                     QLatin1String("on"));
     const bool variable = type_->currentText() == QLatin1String("Variable-step");
     QComboBox* options = listes_.value(QStringLiteral("OutputOption"));
     const bool affine = options->currentText() == QLatin1String("RefineOutputTimes");

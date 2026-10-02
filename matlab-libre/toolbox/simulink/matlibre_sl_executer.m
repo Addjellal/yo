@@ -982,9 +982,15 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     % Simulink.
     tous = isempty(imposes);
     affiner = 1;
+    % la reprise d'un état de fonctionnement : ses états, ses sorties, ses
+    % tampons ; le solveur repart de son premier pas
+    reprise = [];
     if isstruct(imposes)
         tous = imposes.tous || isempty(imposes.imposes);
         affiner = double(imposes.affiner);
+        if isfield(imposes, 'depart')
+            reprise = imposes.depart.reprise;
+        end
         imposes = imposes.imposes;
     end
     imposes = sort(double(imposes(:)));
@@ -1022,7 +1028,11 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     M.dfdt = [];
 
     % Les tampons des retards, hors de Z : ils grandissent au besoin.
-    T.tampons = nouveauxTampons(T);
+    if isempty(reprise)
+        T.tampons = nouveauxTampons(T);
+    else
+        T.tampons = reprise.tampons;
+    end
 
     duree = tFinal - tDebut;
     if ischar(reglages.MaxStep)
@@ -1075,7 +1085,13 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     x = T.xDepart;
     Z = T.Z0;
     touche = (abs(prochain - t) <= toleranceTemps(t)).';
-    [V, Z] = passe(T, T.listeTout, T.V0, Z, x, t, 0, true, touche);
+    if isempty(reprise)
+        [V, Z] = passe(T, T.listeTout, T.V0, Z, x, t, 0, true, touche);
+    else
+        x = reprise.x;
+        Z = reprise.Z;
+        [V, Z] = passe(T, T.listeMajeure, reprise.V, Z, x, t, 0, true, touche);
+    end
     if T.aRemettre
         [x, Z, refaire] = remettre(T, V, Z, x, t);
         if refaire
@@ -1391,6 +1407,8 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     end
     J = struct('temps', temps(1:n), 'releve', releveV(:, 1:n), 'etats', etats(:, 1:n), ...
                'dernier', n, 'arret', arret, 'V', V, 'Z', Z, 'x', x);
+    J.tampons = T.tampons;
+    J.t = t;
 end
 
 % Un instant relevé : tous, ou seulement les instants imposés. La

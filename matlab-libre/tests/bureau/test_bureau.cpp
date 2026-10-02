@@ -2513,6 +2513,13 @@ end
                              !boite.champ(QStringLiteral("StateSaveName"))->isEnabled() &&
                              !boite.champ(QStringLiteral("MaxDataPoints"))->isEnabled(),
                          "un nom ne se regle que son interrupteur a on");
+                QComboBox* etatFinal = boite.liste(QStringLiteral("SaveFinalState"));
+                verifier(!boite.liste(QStringLiteral("SaveOperatingPoint"))->isEnabled(),
+                         "l'etat de fonctionnement ne se regle que l'etat final releve");
+                etatFinal->setCurrentIndex(etatFinal->findText(QStringLiteral("on")));
+                verifier(boite.liste(QStringLiteral("SaveOperatingPoint"))->isEnabled(),
+                         "l'etat final releve, l'etat de fonctionnement se regle");
+                etatFinal->setCurrentIndex(etatFinal->findText(QStringLiteral("off")));
                 verifier(!boite.liste(QStringLiteral("OutputOption"))->isEnabled() &&
                              !boite.champ(QStringLiteral("Refine"))->isEnabled() &&
                              !boite.champ(QStringLiteral("OutputTimes"))->isEnabled(),

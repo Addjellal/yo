@@ -115,7 +115,15 @@ function varargout = sim(modele, varargin)
 %   qui le donne) posent l'état continu de départ, dans l'ordre des
 %   colonnes de xout ; SaveFinalState ('on') range l'état final dans le
 %   champ FinalStateName ('xFinal') du résultat. Ensemble, ils reprennent
-%   une simulation là où la précédente s'est arrêtée.
+%   une simulation là où la précédente s'est arrêtée — ses états
+%   continus. Avec SaveOperatingPoint ('on'), l'état final est l'état de
+%   fonctionnement complet, un Simulink.op.ModelOperatingPoint : états
+%   continus et discrets, sorties tenues, tampons des retards, diagrammes
+%   Stateflow. Donné à InitialState, il fait reprendre la simulation à son
+%   instant, snapshotTime, jusqu'à StopTime : à pas fixe, exactement comme
+%   la simulation d'une traite ; à pas variable, le solveur repart de son
+%   premier pas. Il ne se charge que dans le modèle d'où il vient, tel
+%   qu'il était.
 %
 %   Ce qui est relevé se règle comme dans le volet « Data Import/Export »
 %   de Simulink. SaveTime, SaveState et SaveOutput disent si le résultat
@@ -205,6 +213,16 @@ function varargout = sim(modele, varargin)
     nomModele = char(modele.nom);
     tDebut = nombre(config.StartTime, nomModele, 'StartTime');
     tFinal = nombre(config.StopTime, nomModele, 'StopTime');
+    % L'état de fonctionnement complet d'une simulation précédente : la
+    % simulation reprend à son instant ; le compte des pas part du début
+    % de celle d'où il vient.
+    depart = [];
+    if strcmpi(config.LoadInitialState, 'on')
+        depart = etatDeFonctionnement(config.InitialState, nomModele, tDebut, tFinal);
+        if ~isempty(depart)
+            tDebut = depart.startTime;
+        end
+    end
     if ~isscalar(tFinal) || ~(tFinal >= tDebut)
         error('Simulink:SolverConfig:StopTimeBeforeStartTime', ...
               'La duree doit etre un nombre positif : l''instant final precede le debut.');
@@ -244,8 +262,11 @@ function varargout = sim(modele, varargin)
     end
     c = matlibre_sl_compiler(modele, options);
     pas = c.pas;
-    if strcmpi(config.LoadInitialState, 'on')
+    if strcmpi(config.LoadInitialState, 'on') && isempty(depart)
         c.xDepart = etatInitial(config.InitialState, c, nomModele);
+    end
+    if ~isempty(depart)
+        sortie.depart = preparerReprise(depart, c, variable, tDebut, pas);
     end
     % Les solveurs automatiques choisissent selon qu'il y a des états
     % continus ou non, comme dans Simulink.
@@ -304,11 +325,16 @@ function varargout = sim(modele, varargin)
     end
     matlibre_sl_rappel(modele, 'StopFcn');
     % L'état final, pour reprendre plus tard là où l'on s'arrête : les
-    % états continus au dernier instant, dans l'ordre des colonnes de xout.
+    % états continus au dernier instant, dans l'ordre des colonnes de xout
+    % — ou, avec SaveOperatingPoint, l'état de fonctionnement complet.
     if strcmpi(config.SaveFinalState, 'on')
-        xFinal = zeros(1, size(resultat.xout, 2));
-        if ~isempty(resultat.xout)
-            xFinal = resultat.xout(end, :);
+        if strcmpi(config.SaveOperatingPoint, 'on')
+            xFinal = prendreEtat(c, T, J, instants, tDebut, pas, variable);
+        else
+            xFinal = zeros(1, size(resultat.xout, 2));
+            if ~isempty(resultat.xout)
+                xFinal = resultat.xout(end, :);
+            end
         end
         resultat.(char(config.FinalStateName)) = xFinal;
     end
@@ -472,17 +498,169 @@ function [T, J, instants] = derouler(c, config, variable, solveur, tDebut, tFina
                        'infini', find(strcmp(niveaux, config.SignalInfNanChecking)) - 1, ...
                        'plage', find(strcmp(niveaux, config.SignalRangeChecking)) - 1);
     T.alertes = containers.Map('KeyType', 'char', 'ValueType', 'logical');
+    % la reprise d'un état de fonctionnement : les diagrammes et les
+    % sous-systèmes itérés retrouvent le leur
+    depart = [];
+    if isfield(sortie, 'depart')
+        depart = sortie.depart;
+        versCarte(depart.graphes, T.graphes);
+        versCarte(depart.iterateurs, T.iterateurs);
+    end
     if variable
         reglages = reglagesVariables(config, nomModele);
-        J = matlibre_sl_executer('simulerVariable', T, tDebut, tFinal, solveur, ...
+        debut = tDebut;
+        if ~isempty(depart)
+            debut = depart.t;
+        end
+        J = matlibre_sl_executer('simulerVariable', T, debut, tFinal, solveur, ...
                                  reglages, sortie);
         instants = J.temps;
     elseif isinf(tFinal)
-        [instants, J] = sansFin(T, tDebut, pas, solveur);
+        [instants, J] = sansFin(T, tDebut, pas, solveur, depart);
     else
         instants = tDebut:pas:tFinal;
-        J = matlibre_sl_executer('simuler', T, instants, solveur);
+        if isempty(depart)
+            J = matlibre_sl_executer('simuler', T, instants, solveur);
+        else
+            instants = instants(depart.i0 + 1:end);
+            J = matlibre_sl_executer('simuler', T, instants, solveur, depart.reprise);
+        end
         instants = instants(1:J.dernier);
+    end
+end
+
+% L'état de fonctionnement que donne InitialState, s'il en est un — [] pour
+% un vecteur d'états continus. Il doit venir de ce modèle, porter un état,
+% et laisser du temps à simuler après son instant.
+function op = etatDeFonctionnement(v, nomModele, tDebut, tFinal)
+    op = [];
+    if ischar(v) || isstring(v)
+        nom = strtrim(char(v));
+        % un nom de variable de l'espace de travail qui porte l'état
+        if ~isvarname(nom) || evalin('base', sprintf('exist(''%s'', ''var'')', nom)) ~= 1
+            return   % une expression numérique : ETATINITIAL la lit
+        end
+        v = evalin('base', nom);
+    end
+    if ~isa(v, 'Simulink.op.ModelOperatingPoint')
+        return
+    end
+    op = v;
+    if ~isstruct(op.Etat) || ~isfield(op.Etat, 'V')
+        error('Simulink:SimInput:InvalidOperatingPoint', ...
+              ['L''etat de fonctionnement donne a ''%s'' est vide : il vient de SIM, ' ...
+               'SaveFinalState et SaveOperatingPoint a ''on''.'], nomModele);
+    end
+    if ~strcmp(op.modelName, nomModele)
+        error('Simulink:SimInput:OperatingPointModelMismatch', ...
+              ['L''etat de fonctionnement a ete pris sur le modele ''%s'' : il ne se ' ...
+               'charge pas dans ''%s''.'], op.modelName, nomModele);
+    end
+    if tDebut ~= 0 && abs(tDebut - op.snapshotTime) > 1e-9 * max(1, abs(op.snapshotTime))
+        error('Simulink:SimInput:OperatingPointStartTime', ...
+              ['La simulation de ''%s'' reprend a l''instant de son etat de ' ...
+               'fonctionnement, t = %g : StartTime (%g) ne peut pas en donner un autre.'], ...
+              nomModele, op.snapshotTime, tDebut);
+    end
+    if ~(tFinal > op.snapshotTime + 1e-9 * max(1, abs(op.snapshotTime)))
+        error('Simulink:SimInput:OperatingPointStopTime', ...
+              ['La simulation de ''%s'' reprend a t = %g, l''instant de son etat de ' ...
+               'fonctionnement : StopTime (%g) doit venir apres.'], nomModele, ...
+              op.snapshotTime, tFinal);
+    end
+end
+
+% Ce que la reprise lit, vérifié contre le modèle compilé : les mêmes
+% blocs, dans le même ordre, avec autant d'états ; à pas fixe, l'instant
+% de l'état doit tomber sur un pas, compté depuis le début d'origine.
+function d = preparerReprise(op, c, variable, tDebut, pas)
+    E = op.Etat;
+    signature = signatureDe(c);
+    if ~isequal(signature.chemins, E.signature.chemins) || ...
+       ~isequal(signature.types, E.signature.types)
+        n = min(numel(signature.chemins), numel(E.signature.chemins));
+        k = find(~strcmp(signature.chemins(1:n), E.signature.chemins(1:n)) | ...
+                 ~strcmp(signature.types(1:n), E.signature.types(1:n)), 1);
+        if isempty(k)
+            k = n + 1;
+        end
+        if k <= numel(signature.chemins)
+            qui = signature.chemins{k};
+        else
+            qui = E.signature.chemins{k};
+        end
+        error('Simulink:SimInput:OperatingPointModelMismatch', ...
+              ['L''etat de fonctionnement ne va plus au modele ''%s'' : ses blocs ont ' ...
+               'change depuis qu''il a ete pris, a commencer par ''%s''.'], c.nom, qui);
+    end
+    genres = {'fixe', 'variable'};
+    if E.variable ~= variable
+        error('Simulink:SimInput:OperatingPointSolver', ...
+              ['L''etat de fonctionnement de ''%s'' a ete pris a pas %s : il se reprend ' ...
+               'avec un solveur a pas %s.'], c.nom, genres{E.variable + 1}, ...
+              genres{E.variable + 1});
+    end
+    if ~variable && abs(E.pas - pas) > 1e-12 * max(1, abs(pas))
+        error('Simulink:SimInput:OperatingPointStep', ...
+              ['L''etat de fonctionnement de ''%s'' a ete pris au pas fixe %g : il se ' ...
+               'reprend a ce pas, et non a %g.'], c.nom, E.pas, pas);
+    end
+    if ~isequal(signature.tailles, E.signature.tailles)
+        error('Simulink:SimInput:OperatingPointModelMismatch', ...
+              ['L''etat de fonctionnement ne va plus au modele ''%s'' : ses blocs ne ' ...
+               'portent plus autant d''etats ni de signaux qu''alors.'], c.nom);
+    end
+    d = struct('t', op.snapshotTime, 'i0', 0, 'graphes', {E.graphes}, ...
+               'iterateurs', {E.iterateurs});
+    if ~variable
+        i0 = round((op.snapshotTime - tDebut) / pas);
+        if abs(tDebut + i0 * pas - op.snapshotTime) > 1e-9 * max(1, abs(op.snapshotTime))
+            error('Simulink:SimInput:OperatingPointStep', ...
+                  ['L''etat de fonctionnement de ''%s'' a ete pris a t = %g, qui ne tombe ' ...
+                   'pas sur un pas du solveur a pas fixe (%g depuis t = %g).'], c.nom, ...
+                  op.snapshotTime, pas, tDebut);
+        end
+        d.i0 = i0;
+    end
+    d.reprise = struct('V', E.V, 'Z', E.Z, 'x', E.x, 'i0', d.i0, 'avancer', false, ...
+                       'premier', false);
+    d.reprise.tampons = containers.Map('KeyType', 'double', 'ValueType', 'any');
+    versCarte(E.tampons, d.reprise.tampons);
+end
+
+% L'état de fonctionnement au dernier instant : ce que les blocs tiennent
+% — états continus et discrets, sorties —, les tampons des retards,
+% l'état des diagrammes et des sous-systèmes itérés, copiés pour qu'une
+% reprise ne touche pas à ceux d'une autre.
+function op = prendreEtat(c, T, J, instants, tDebut, pas, variable)
+    tampons = {{}, {}};
+    if isfield(J, 'tampons') && isa(J.tampons, 'containers.Map')
+        tampons = versCellules(J.tampons);
+    end
+    etat = struct('V', J.V, 'Z', J.Z, 'x', J.x, 'tampons', {tampons}, ...
+                  'graphes', {versCellules(T.graphes)}, ...
+                  'iterateurs', {versCellules(T.iterateurs)}, ...
+                  'signature', signatureDe(c), 'variable', variable, 'pas', pas);
+    fin = instants(end);
+    if isfield(J, 't')
+        fin = J.t;   % à pas variable, le dernier instant n'est pas toujours relevé
+    end
+    op = Simulink.op.ModelOperatingPoint(c.nom, fin, tDebut, etat);
+end
+
+function s = signatureDe(c)
+    s = struct('chemins', {c.chemins}, 'types', {c.types}, ...
+               'tailles', [c.nV, 1 + sum(cellfun(@numel, c.z0)), numel(c.x0)]);
+end
+
+% Une carte, en deux listes : ses clés et ses valeurs.
+function L = versCellules(carte)
+    L = {keys(carte), values(carte)};
+end
+
+function versCarte(L, carte)
+    for q = 1:numel(L{1})
+        carte(L{1}{q}) = L{2}{q};
     end
 end
 
@@ -724,12 +902,19 @@ end
 
 % Une simulation sans instant final : elle avance par tranches jusqu'à ce
 % qu'un bloc Stop Simulation l'arrête.
-function [instants, J] = sansFin(T, tDebut, pas, solveur)
+function [instants, J] = sansFin(T, tDebut, pas, solveur, depart)
     tranche = 4096;
     releve = zeros(numel(T.journal), 0);
     etats = zeros(numel(T.x0), 0);
     reprise = [];
     fait = 0;
+    if nargin >= 5 && ~isempty(depart)
+        % la reprise d'un état de fonctionnement, à son pas
+        fait = depart.i0;
+        reprise = depart.reprise;
+        reprise.avancer = true;
+    end
+    debut = fait;
     while true
         morceau = tDebut + (fait + (0:tranche - 1)) * pas;
         if isempty(reprise)
@@ -740,7 +925,7 @@ function [instants, J] = sansFin(T, tDebut, pas, solveur)
         releve = [releve, J.releve]; %#ok<AGROW>
         etats = [etats, J.etats]; %#ok<AGROW>
         if J.arret
-            instants = tDebut + (0:fait + J.dernier - 1) * pas;
+            instants = tDebut + (debut:fait + J.dernier - 1) * pas;
             break
         end
         fait = fait + tranche;
