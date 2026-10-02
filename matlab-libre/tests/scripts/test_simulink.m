@@ -9314,6 +9314,332 @@ end
 assert(isequal(matlibre_sl_types('surcharge'), [0 1]), 'la surcharge se leve apres la simulation');
 fprintf('data type override : ok\n');
 
+%% ---------------------------------------------- 67. Journal des oscilloscopes
+% Un Scope dont DataLogging vaut 'on' journalise ses entrées, comme dans
+% Simulink : dans ScopeData — ou le nom qu'on lui donne —, un Dataset par
+% défaut, une structure avec ou sans le temps, ou une matrice [t, u1,
+% u2...] ; aux instants de sa période, décimé ou limité aux derniers
+% instants si on le demande. Les noms anciens SaveToWorkspace, SaveName,
+% DataFormat... valent aussi.
+m67 = new_system('oscillo67');
+m67 = add_block(m67, 'clock', 't');
+m67 = add_block(m67, 'gain', 'g', 'Gain', 2);
+m67 = add_block(m67, 'scope', 'sc', 'NumInputPorts', 2);
+m67 = add_line(add_line(add_line(m67, 't', 'g'), 't', 'sc', 1), 'g', 'sc', 2);
+reglage67 = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 1};
+assert(strcmp(get_param(m67, 'sc', 'DataLogging'), 'off') && ...
+       strcmp(get_param(m67, 'sc', 'DataLoggingVariableName'), 'ScopeData') && ...
+       strcmp(get_param(m67, 'sc', 'DataLoggingSaveFormat'), 'Dataset'), ...
+       'le Scope ne journalise pas d''office ; ScopeData, en Dataset');
+evalin('base', 'clear ScopeData');
+r67 = sim(m67, reglage67{:});
+assert(~isfield(r67, 'ScopeData') && ~evalin('base', 'exist(''ScopeData'', ''var'')'), ...
+       'DataLogging off : pas de journal');
+m67 = set_param(m67, 'sc', 'DataLogging', 'on');
+r67 = sim(m67, reglage67{:});
+ds67 = r67.ScopeData;
+assert(isa(ds67, 'Simulink.SimulationData.Dataset') && ds67.numElements == 2 && ...
+       max(abs(ds67{2}.Values.Data(:) - 2 * (0:0.1:1)')) < 1e-12 && ...
+       numel(ds67{1}.Values.Time) == 11 && ...
+       isa(evalin('base', 'ScopeData'), 'Simulink.SimulationData.Dataset'), ...
+       'Dataset : un element par entree, dans le resultat et l''espace de travail');
+r67 = sim(set_param(m67, 'sc', 'DataLoggingSaveFormat', 'StructureWithTime', ...
+                    'DataLoggingVariableName', 'donnees67'), reglage67{:});
+assert(isequal(size(r67.donnees67.time), [11 1]) && numel(r67.donnees67.signals) == 2 && ...
+       max(abs(r67.donnees67.signals(2).values - 2 * r67.donnees67.time)) < 1e-12 && ...
+       strcmp(r67.donnees67.blockName, 'oscillo67/sc'), ...
+       'StructureWithTime : time et signals(k).values');
+m67 = set_param(m67, 'sc', 'DataLoggingSaveFormat', 'Array', ...
+                'DataLoggingVariableName', 'tableau67', 'DataLoggingDecimateData', 'on', ...
+                'DataLoggingDecimation', 5);
+r67 = sim(m67, reglage67{:});
+assert(isequal(size(r67.tableau67), [3 3]) && max(abs(r67.tableau67(:, 1)' - [0 0.5 1])) < 1e-12 && ...
+       max(abs(r67.tableau67(:, 3) - 2 * r67.tableau67(:, 1))) < 1e-12, ...
+       'Array decime : [t, u1, u2], un instant sur cinq');
+r67 = sim(set_param(m67, 'sc', 'DataLoggingDecimateData', 'off', ...
+                    'DataLoggingLimitDataPoints', 'on', 'DataLoggingMaxPoints', 3), reglage67{:});
+assert(max(abs(r67.tableau67(:, 1)' - [0.8 0.9 1])) < 1e-12, 'les trois derniers instants');
+% la période du Scope, et les noms anciens
+m67 = new_system('ancien67');
+m67 = add_block(m67, 'clock', 't');
+m67 = add_block(m67, 'scope', 'sc', 'SaveToWorkspace', 'on', 'SaveName', 'vieux67', ...
+                'DataFormat', 'Array', 'SampleTime', 0.2);
+m67 = add_line(m67, 't', 'sc');
+r67 = sim(m67, reglage67{:});
+assert(max(abs(r67.vieux67(:, 1)' - (0:0.2:1))) < 1e-12 && ...
+       strcmp(get_param(m67, 'sc', 'DataLogging'), 'on'), ...
+       'SaveToWorkspace, SaveName, DataFormat ; une periode de 0,2 s');
+% un entier garde sa classe
+m67 = new_system('entier67');
+m67 = add_block(m67, 'constant', 'c', 'Value', 'int8(7)');
+m67 = add_block(m67, 'scope', 'sc', 'DataLogging', 'on', 'DataLoggingSaveFormat', ...
+                'StructureWithTime');
+m67 = add_line(m67, 'c', 'sc');
+r67 = sim(m67, reglage67{:});
+assert(isa(r67.ScopeData.signals(1).values, 'int8'), 'un signal int8 se journalise en int8');
+evalin('base', 'clear ScopeData donnees67 tableau67 vieux67');
+fprintf('journal des oscilloscopes : ok\n');
+
+%% ------------------------------------------- 68. Passages par zéro adaptatifs
+% ZeroCrossAlgorithm 'Adaptive', comme dans Simulink : un bloc qui bascule
+% sans cesse — x' = -signe(x) quand x atteint zéro — n'est plus localisé,
+% jusqu'au pas qui ne bascule pas ; la simulation va à son terme sans le
+% diagnostic des passages par zéro de suite. Un passage isolé reste
+% localisé exactement. ZcThreshold ignore les traversées de sa bande.
+m68 = new_system('adaptatif68');
+m68 = add_block(m68, 'integrator', 'x', 'InitialCondition', 1);
+m68 = add_block(m68, 'sign', 's');
+m68 = add_block(m68, 'gain', 'g', 'Gain', -1);
+m68 = add_block(m68, 'outport', 'y');
+m68 = add_line(add_line(add_line(add_line(m68, 'x', 's'), 's', 'g'), 'g', 'x'), 'x', 'y');
+assert(strcmp(get_param(m68, 'ZeroCrossAlgorithm'), 'Nonadaptive') && ...
+       strcmp(get_param(m68, 'ZcThreshold'), 'auto'), 'Nonadaptive et auto, par defaut');
+vu68 = '';
+try
+    sim(m68, 'Solver', 'ode45', 'StopTime', 1.5, 'MaxConsecutiveZCs', 20);
+catch err
+    vu68 = err.identifier;
+end
+assert(strcmp(vu68, 'Simulink:Engine:SolverConsecutiveZCNum'), ...
+       'Nonadaptive : le modele qui bascule s''arrete sur le diagnostic');
+lastwarn('');
+r68 = sim(m68, 'Solver', 'ode45', 'StopTime', 1.5, 'MaxConsecutiveZCs', 20, ...
+          'ZeroCrossAlgorithm', 'Adaptive');
+[~, id68] = lastwarn();
+assert(isempty(id68) && abs(r68.tout(end) - 1.5) < 1e-12 && ...
+       max(abs(r68.yout(r68.tout > 1.05))) < 0.05, ...
+       'Adaptive : la simulation va a son terme, x reste pres de zero');
+iZero68 = find(abs(r68.tout - 1) < 1e-9, 1);
+assert(~isempty(iZero68) && abs(r68.yout(iZero68)) < 1e-9, ...
+       'le premier passage par zero, isole, reste localise exactement a t = 1');
+% un passage isolé : le même instant que sans l'algorithme adaptatif
+m68 = new_system('isole68');
+m68 = add_block(m68, 'sine', 's');
+m68 = add_block(m68, 'abs', 'a');
+m68 = add_block(m68, 'integrator', 'x');
+m68 = add_block(m68, 'outport', 'y');
+m68 = add_line(add_line(add_line(m68, 's', 'a'), 'a', 'x'), 'x', 'y');
+r1 = sim(m68, 'Solver', 'ode45', 'StopTime', 7, 'RelTol', 1e-8);
+r2 = sim(m68, 'Solver', 'ode45', 'StopTime', 7, 'RelTol', 1e-8, 'ZeroCrossAlgorithm', 'Adaptive');
+assert(abs(r1.yout(end) - r2.yout(end)) < 1e-9 && abs(r2.yout(end) - (4 + 1 - cos(7))) < 1e-5, ...
+       'Adaptive : l''integrale de |sin| est la meme, ses passages localises');
+vu68 = '';
+try
+    set_param(m68, 'ZeroCrossAlgorithm', 'Parfois');
+catch err
+    vu68 = err.identifier;
+end
+assert(strcmp(vu68, 'Simulink:Config:InvalidValue'), 'ZeroCrossAlgorithm : deux valeurs seulement');
+fprintf('passages par zero adaptatifs : ok\n');
+
+%% ------------------------------------------------------- 69. Simulink.AliasType
+% Un Simulink.AliasType donne un autre nom à un type : rangé dans l'espace
+% de travail, il se pose sur un bloc par ce nom, et vaut son type de base —
+% un type intégré, une virgule fixe, un Simulink.NumericType ou un autre
+% alias. Une chaîne d'alias qui revient sur elle-même est refusée.
+Vitesse69 = Simulink.AliasType('int16');
+assert(strcmp(Vitesse69.BaseType, 'int16') && strcmp(Simulink.AliasType().BaseType, 'double'), ...
+       'BaseType : le type de base, double par defaut');
+m69 = new_system('alias69');
+m69 = add_block(m69, 'constant', 'c', 'Value', 300, 'OutDataTypeStr', 'Vitesse69');
+m69 = add_block(m69, 'outport', 'y');
+m69 = add_line(m69, 'c', 'y');
+reglage69 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1};
+r69 = sim(m69, reglage69{:});
+assert(isa(r69.yout, 'int16') && all(r69.yout == 300), 'un alias de int16 vaut int16');
+Rapide69 = Simulink.AliasType('Vitesse69');
+r69 = sim(set_param(m69, 'c', 'OutDataTypeStr', 'Rapide69'), reglage69{:});
+assert(isa(r69.yout, 'int16'), 'un alias d''alias vaut le type au bout de la chaine');
+Fixe69 = Simulink.AliasType('fixdt(1,16,4)');
+r69 = sim(set_param(m69, 'c', 'OutDataTypeStr', 'Fixe69', 'Value', 3.3), reglage69{:});
+assert(abs(double(r69.yout(1)) - 3.3125) < 1e-12, ...
+       'un alias de virgule fixe : 3,3 arrondi au seizieme le plus proche par defaut');
+Boucle69a = Simulink.AliasType('Boucle69b');
+Boucle69b = Simulink.AliasType('Boucle69a');
+vu69 = '';
+message69 = '';
+try
+    sim(set_param(m69, 'c', 'OutDataTypeStr', 'Boucle69a'), reglage69{:});
+catch err
+    vu69 = err.identifier;
+    message69 = err.message;
+end
+assert(strcmp(vu69, 'Simulink:DataType:UnknownDataType') && ...
+       ~isempty(strfind(message69, 'alias69/c')), ...
+       'une chaine d''alias qui boucle est un type inconnu, refuse en nommant le bloc');
+vu69 = '';
+try
+    Simulink.AliasType(16);
+catch err
+    vu69 = err.identifier;
+end
+assert(strcmp(vu69, 'Simulink:DataType:AliasBaseType'), 'le type de base est un nom');
+clear Vitesse69 Rapide69 Fixe69 Boucle69a Boucle69b
+fprintf('alias de types : ok\n');
+
+%% ------------------------------------------------- 70. Transitions de cadence
+% Un bloc discret qui lit un bloc discret d'une autre cadence : permis en
+% monotâche — SingleTaskRateTransMsg peut le dire —, illégal en multitâche
+% (EnableMultiTasking) sans Rate Transition entre eux, ou un Zero-Order
+% Hold du rapide au lent, comme dans Simulink. MultiTaskRateTransMsg en
+% fait une erreur ou un avertissement qui nomme les deux blocs ;
+% AutoInsertRateTranBlk pose les Rate Transition qui manquent, et le modèle
+% simule comme si on les avait posés. Les blocs virtuels se traversent.
+m70 = new_system('cadences70');
+m70 = add_block(m70, 'sine', 'lent', 'SampleTime', 0.2);
+m70 = add_block(m70, 'gain', 'rapide', 'Gain', 2, 'SampleTime', 0.1);
+m70 = add_block(m70, 'outport', 'y');
+m70 = add_line(add_line(m70, 'lent', 'rapide'), 'rapide', 'y');
+reglage70 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 1};
+assert(strcmp(get_param(m70, 'EnableMultiTasking'), 'off') && ...
+       strcmp(get_param(m70, 'MultiTaskRateTransMsg'), 'error') && ...
+       strcmp(get_param(m70, 'SingleTaskRateTransMsg'), 'none') && ...
+       strcmp(get_param(m70, 'AutoInsertRateTranBlk'), 'off'), ...
+       'monotache, et les diagnostics de cadence a leur defaut de Simulink');
+lastwarn('');
+direct70 = sim(m70, reglage70{:});
+[~, id70] = lastwarn();
+assert(isempty(id70), 'en monotache, la transition est permise sans rien dire');
+vu70 = '';
+message70 = '';
+try
+    sim(m70, reglage70{:}, 'EnableMultiTasking', 'on');
+catch err
+    vu70 = err.identifier;
+    message70 = err.message;
+end
+assert(strcmp(vu70, 'Simulink:SampleTime:IllegalRateTransition') && ...
+       ~isempty(strfind(message70, 'cadences70/lent')) && ...
+       ~isempty(strfind(message70, 'cadences70/rapide')), ...
+       'en multitache : la transition illegale, qui nomme les deux blocs');
+lastwarn('');
+sim(m70, reglage70{:}, 'EnableMultiTasking', 'on', 'MultiTaskRateTransMsg', 'warning');
+[~, id70] = lastwarn();
+assert(strcmp(id70, 'Simulink:SampleTime:IllegalRateTransition'), ...
+       'MultiTaskRateTransMsg warning : l''avertissement');
+vu70 = '';
+try
+    sim(m70, reglage70{:}, 'SingleTaskRateTransMsg', 'error');
+catch err
+    vu70 = err.identifier;
+end
+assert(strcmp(vu70, 'Simulink:SampleTime:IllegalRateTransition'), ...
+       'SingleTaskRateTransMsg error : l''erreur en monotache aussi');
+% AutoInsertRateTranBlk : comme un Rate Transition posé à la main
+auto70 = sim(m70, reglage70{:}, 'EnableMultiTasking', 'on', 'AutoInsertRateTranBlk', 'on');
+main70 = new_system('main70');
+main70 = add_block(main70, 'sine', 'lent', 'SampleTime', 0.2);
+main70 = add_block(main70, 'ratetransition', 'rt', 'OutPortSampleTime', 0.1);
+main70 = add_block(main70, 'gain', 'rapide', 'Gain', 2, 'SampleTime', 0.1);
+main70 = add_block(main70, 'outport', 'y');
+main70 = add_line(add_line(add_line(main70, 'lent', 'rt'), 'rt', 'rapide'), 'rapide', 'y');
+posee70 = sim(main70, reglage70{:}, 'EnableMultiTasking', 'on');
+assert(isequal(auto70.yout, posee70.yout) && ~isequal(auto70.yout, direct70.yout), ...
+       'AutoInsertRateTranBlk : le Rate Transition pose simule comme celui qu''on pose');
+% un Zero-Order Hold du rapide au lent ; un Mux se traverse
+zoh70 = new_system('bloqueur70');
+zoh70 = add_block(zoh70, 'sine', 'rapide', 'SampleTime', 0.1);
+zoh70 = add_block(zoh70, 'zoh', 'z', 'SampleTime', 0.2);
+zoh70 = add_block(zoh70, 'outport', 'y');
+zoh70 = add_line(add_line(zoh70, 'rapide', 'z'), 'z', 'y');
+r70 = sim(zoh70, reglage70{:}, 'EnableMultiTasking', 'on');
+assert(numel(r70.yout) == 11, 'un Zero-Order Hold passe du rapide au lent en multitache');
+mux70 = new_system('mux70');
+mux70 = add_block(mux70, 'sine', 'lent', 'SampleTime', 0.2);
+mux70 = add_block(mux70, 'constant', 'c', 'Value', 1);
+mux70 = add_block(mux70, 'mux', 'm', 'Inputs', 2);
+mux70 = add_block(mux70, 'gain', 'rapide', 'Gain', 2, 'SampleTime', 0.1);
+mux70 = add_block(mux70, 'outport', 'y');
+mux70 = add_line(add_line(mux70, 'lent', 'm', 1), 'c', 'm', 2);
+mux70 = add_line(add_line(mux70, 'm', 'rapide'), 'rapide', 'y');
+message70 = '';
+try
+    sim(mux70, reglage70{:}, 'EnableMultiTasking', 'on');
+catch err
+    message70 = err.message;
+end
+assert(~isempty(strfind(message70, 'mux70/lent')) && ~isempty(strfind(message70, 'mux70/rapide')), ...
+       'a travers un Mux, la transition est entre les blocs qui calculent');
+% dans un sous-système, AutoInsertRateTranBlk pose le Rate Transition dedans
+interne70 = new_system('interne70');
+interne70 = add_block(interne70, 'inport', 'e', 'Port', 1);
+interne70 = add_block(interne70, 'gain', 'rapide', 'Gain', 2, 'SampleTime', 0.1);
+interne70 = add_block(interne70, 'outport', 's', 'Port', 1);
+interne70 = add_line(add_line(interne70, 'e', 'rapide'), 'rapide', 's');
+sous70 = new_system('sous70');
+sous70 = add_block(sous70, 'sine', 'lent', 'SampleTime', 0.2);
+sous70 = add_block(sous70, 'subsystem', 'sys', 'Model', interne70);
+sous70 = add_block(sous70, 'outport', 'y');
+sous70 = add_line(add_line(sous70, 'lent', 'sys/1'), 'sys', 'y');
+r70 = sim(sous70, reglage70{:}, 'EnableMultiTasking', 'on', 'AutoInsertRateTranBlk', 'on');
+assert(isequal(r70.yout, posee70.yout), ...
+       'dans un sous-systeme, le Rate Transition se pose sur l''entree du bloc qui lit');
+vu70 = '';
+try
+    set_param(m70, 'MultiTaskRateTransMsg', 'none');
+catch err
+    vu70 = err.identifier;
+end
+assert(strcmp(vu70, 'Simulink:Config:InvalidValue'), 'MultiTaskRateTransMsg : warning ou error');
+fprintf('transitions de cadence : ok\n');
+
+%% ------------------------------------------ 71. Noms des éléments d'un bus typé
+% Un signal nommé qui entre dans un Bus Creator typé sous un autre nom que
+% celui de son élément : BusObjectLabelMismatch en décide, comme dans
+% Simulink — un avertissement d'office, rien, ou l'arrêt —, en nommant le
+% bloc, le signal et l'élément. Un signal sans nom prend celui de
+% l'élément.
+clear elements71
+elements71(1) = Simulink.BusElement;
+elements71(1).Name = 'vitesse';
+elements71(2) = Simulink.BusElement;
+elements71(2).Name = 'position';
+Mesures71 = Simulink.Bus;
+Mesures71.Elements = elements71;
+assignin('base', 'Mesures71', Mesures71);
+m71 = new_system('noms71');
+m71 = add_block(m71, 'constant', 'v', 'Value', 3);
+m71 = add_block(m71, 'constant', 'p', 'Value', 4);
+m71 = add_block(m71, 'buscreator', 'bc', 'Inputs', '2', 'OutDataTypeStr', 'Bus: Mesures71');
+m71 = add_block(m71, 'busselector', 'bs', 'OutputSignals', 'position');
+m71 = add_block(m71, 'outport', 'y');
+m71 = add_line(add_line(m71, 'v/1', 'bc/1'), 'p/1', 'bc/2');
+m71 = add_line(add_line(m71, 'bc/1', 'bs/1'), 'bs/1', 'y/1');
+reglage71 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1};
+assert(strcmp(get_param(m71, 'BusObjectLabelMismatch'), 'warning'), ...
+       'BusObjectLabelMismatch, a warning par defaut');
+lastwarn('');
+r71 = sim(m71, reglage71{:});
+[~, id71] = lastwarn();
+assert(isempty(id71) && all(r71.yout == 4), 'des signaux sans nom prennent ceux des elements');
+pv71 = get_param(m71, 'v', 'PortHandles');
+m71 = set_param(m71, pv71.Outport(1), 'Name', 'vitesse');
+lastwarn('');
+sim(m71, reglage71{:});
+[~, id71] = lastwarn();
+assert(isempty(id71), 'un signal nomme comme son element ne dit rien');
+m71 = set_param(m71, pv71.Outport(1), 'Name', 'vitese');
+lastwarn('');
+r71 = sim(m71, reglage71{:});
+[message71, id71] = lastwarn();
+assert(strcmp(id71, 'Simulink:Bus:ElementNameMismatch') && ...
+       ~isempty(strfind(message71, 'noms71/bc')) && ~isempty(strfind(message71, 'vitese')) && ...
+       ~isempty(strfind(message71, 'vitesse')) && all(r71.yout == 4), ...
+       'un signal mal nomme : l''avertissement, et la simulation continue');
+vu71 = '';
+try
+    sim(m71, reglage71{:}, 'BusObjectLabelMismatch', 'error');
+catch err
+    vu71 = err.identifier;
+end
+assert(strcmp(vu71, 'Simulink:Bus:ElementNameMismatch'), 'BusObjectLabelMismatch error : l''arret');
+lastwarn('');
+sim(m71, reglage71{:}, 'BusObjectLabelMismatch', 'none');
+[~, id71] = lastwarn();
+assert(isempty(id71), 'BusObjectLabelMismatch none : rien');
+evalin('base', 'clear Mesures71');
+fprintf('noms des elements d''un bus : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

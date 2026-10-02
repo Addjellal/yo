@@ -58,6 +58,27 @@ function varargout = matlibre_sl_config(action, varargin)
 %     NumberNewtonIterations  1       les itérations de Newton d'ode14x
 %                                     et d'ode1be à chaque pas
 %     ZeroCrossControl     'UseLocalSettings'  détection des passages par zéro
+%     ZeroCrossAlgorithm   'Nonadaptive'  'Adaptive' : un bloc qui bascule
+%                                     sans cesse n'est plus localisé,
+%                                     jusqu'au pas qui ne bascule pas
+%     ZcThreshold          'auto'     la bande autour de zéro où
+%                                     l'algorithme adaptatif ignore une
+%                                     traversée
+%     EnableMultiTasking   'off'      'on', à pas fixe : chaque cadence est
+%                                     une tâche, et un bloc discret ne lit
+%                                     un bloc d'une autre cadence qu'à
+%                                     travers un Rate Transition — ou un
+%                                     Zero-Order Hold, du rapide au lent
+%     AutoInsertRateTranBlk 'off'     'on' : les Rate Transition qui
+%                                     manquent se posent d'eux-mêmes
+%     MultiTaskRateTransMsg 'error'   une transition illégale en
+%                                     multitâche : warning ou error
+%     SingleTaskRateTransMsg 'none'   une transition sans Rate Transition
+%                                     en monotâche : none, warning, error
+%     BusObjectLabelMismatch 'warning'  un signal nommé qui entre dans un
+%                                     Bus Creator typé sous un autre nom
+%                                     que son élément : none, warning,
+%                                     error
 %     AlgebraicLoopMsg     'warning'  boucle algébrique : none, warning, error
 %     UnconnectedInputMsg  'warning'  entrée non reliée : none, warning, error
 %     UnconnectedOutputMsg 'none'     sortie non reliée : none, warning, error
@@ -212,7 +233,11 @@ function d = defauts()
                'MaxConsecutiveZCsMsg', 'error', 'SignalInfNanChecking', 'none', ...
                'IntegerOverflowMsg', 'warning', 'IntegerSaturationMsg', 'warning', ...
                'SignalRangeChecking', 'none', 'DataTypeOverride', 'UseLocalSettings', ...
-               'DataTypeOverrideAppliesTo', 'AllNumericTypes');
+               'DataTypeOverrideAppliesTo', 'AllNumericTypes', ...
+               'ZeroCrossAlgorithm', 'Nonadaptive', 'ZcThreshold', 'auto', ...
+               'EnableMultiTasking', 'off', 'AutoInsertRateTranBlk', 'off', ...
+               'MultiTaskRateTransMsg', 'error', 'SingleTaskRateTransMsg', 'none', ...
+               'BusObjectLabelMismatch', 'warning');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -344,7 +369,7 @@ function v = valider(nom, v)
             end
         case {'AlgebraicLoopMsg', 'UnconnectedInputMsg', 'UnconnectedOutputMsg', ...
               'MaxConsecutiveZCsMsg', 'SignalInfNanChecking', 'IntegerOverflowMsg', ...
-              'IntegerSaturationMsg', 'SignalRangeChecking'}
+              'IntegerSaturationMsg', 'SignalRangeChecking', 'BusObjectLabelMismatch'}
             v = choix(nom, v, {'none', 'warning', 'error'});
         case 'MinStepSizeMsg'
             v = choix(nom, v, {'warning', 'error'});
@@ -354,6 +379,16 @@ function v = valider(nom, v)
             v = choix(nom, v, {'AllNumericTypes', 'Floating-point', 'Fixed-point'});
         case 'ZeroCrossControl'
             v = choix(nom, v, {'UseLocalSettings', 'EnableAll', 'DisableAll'});
+        case 'ZeroCrossAlgorithm'
+            v = choix(nom, v, {'Nonadaptive', 'Adaptive'});
+        case {'EnableMultiTasking', 'AutoInsertRateTranBlk'}
+            v = choix(nom, v, {'off', 'on'});
+        case 'MultiTaskRateTransMsg'
+            v = choix(nom, v, {'warning', 'error'});
+        case 'SingleTaskRateTransMsg'
+            v = choix(nom, v, {'none', 'warning', 'error'});
+        case 'ZcThreshold'
+            v = nombre(nom, v, true);
         case {'StartTime', 'StopTime', 'FixedStep', 'RelTol'}
             v = nombre(nom, v, false);
         case {'MaxStep', 'MinStep', 'InitialStep', 'AbsTol'}

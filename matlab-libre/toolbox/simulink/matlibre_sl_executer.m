@@ -1109,6 +1109,16 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     end
     avertiZC = false;
     sansZC = false;
+    % ZeroCrossAlgorithm 'Adaptive' : un bloc qui bascule sans cesse n'est
+    % plus localisé, jusqu'au pas qui ne bascule pas ; une traversée dans
+    % la bande de ZcThreshold ne compte pas.
+    adaptatif = isfield(reglages, 'ZeroCrossAlgorithm') && ...
+                strcmp(reglages.ZeroCrossAlgorithm, 'Adaptive');
+    seuilZC = 0;
+    if adaptatif && ~ischar(reglages.ZcThreshold)
+        seuilZC = double(reglages.ZcThreshold);
+    end
+    desactive = false;
     while ~arret && (isinf(tFinal) || t < tFinal - toleranceTemps(tFinal))
         % Les états discrets avancent aux instants qui viennent de tomber.
         k1 = zeros(nx, 1);
@@ -1251,7 +1261,16 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         if ~isempty(avant) && ~ignorerZC
             [Vc, ~] = passe(T, T.listeMineure, V, Z, xNouveau, tNouveau, 0, false, touche);
             apres = passagesZero(T, Vc, Z, xNouveau, tNouveau);
-            if any(sign(avant) .* sign(apres) < 0)
+            change = sign(avant) .* sign(apres) < 0;
+            if adaptatif
+                change = change & ~(abs(avant) <= seuilZC & abs(apres) <= seuilZC);
+                if ~any(change)
+                    desactive = false;   % le pas n'a pas basculé : on localise de nouveau
+                elseif desactive
+                    change(:) = false;   % il bascule encore : le pas le franchit
+                end
+            end
+            if any(change)
                 [gauche, droite, V, Z] = localiser(T, M, V, Z, x, k1, t, h, atol, rtol, ...
                                                    avant, touche, discret);
                 if gauche > 0
@@ -1270,6 +1289,10 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                 end
                 if h <= 1e3 * toleranceTemps(t)
                     consecutifs = consecutifs + 1;
+                    if adaptatif && consecutifs >= 3
+                        desactive = true;
+                        consecutifs = 0;
+                    end
                     if consecutifs > maxZC
                         texte = sprintf(['Plus de %d passages par zero consecutifs a t = %g : ' ...
                                          'le modele bascule sans avancer (comportement de ' ...

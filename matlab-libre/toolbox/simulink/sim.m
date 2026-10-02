@@ -22,7 +22,10 @@ function varargout = sim(modele, varargin)
 %   Simulink, que SET_PARAM(MODELE,'Solver','ode4') pose sur le modèle et
 %   que GET_PARAM relit : StartTime, StopTime, Solver, FixedStep, RelTol,
 %   AbsTol, MaxStep, MinStep, InitialStep, MaxOrder, ExtrapolationOrder,
-%   NumberNewtonIterations, ZeroCrossControl, MaxConsecutiveZCs,
+%   NumberNewtonIterations, ZeroCrossControl, ZeroCrossAlgorithm
+%   ('Nonadaptive' ; 'Adaptive' cesse de localiser les passages par zéro
+%   d'un bloc qui bascule sans cesse, et ignore ceux de la bande
+%   ZcThreshold), MaxConsecutiveZCs,
 %   MaxConsecutiveMinStep, et les diagnostics AlgebraicLoopMsg,
 %   UnconnectedInputMsg, UnconnectedOutputMsg, MaxConsecutiveZCsMsg,
 %   SignalInfNanChecking — une sortie de bloc Inf ou NaN —,
@@ -279,6 +282,7 @@ function varargout = sim(modele, varargin)
         [T, J, instants] = derouler(deroulement{:}, false);
         resultat = assembler(c, T, J, instants(:));
         resultat = deposer(c, T, J, instants(:), resultat);
+        resultat = oscilloscopes(c, T, J, instants(:), resultat);
         % Le journal des signaux : ceux dont le port a DataLogging à 'on'.
         journalSignaux = [];
         if strcmpi(config.SignalLogging, 'on')
@@ -670,6 +674,17 @@ function r = reglagesVariables(config, nomModele)
     r.MaxConsecutiveMinStep = double(config.MaxConsecutiveMinStep);
     r.MaxConsecutiveZCs = double(config.MaxConsecutiveZCs);
     r.MaxConsecutiveZCsMsg = char(config.MaxConsecutiveZCsMsg);
+    r.ZeroCrossAlgorithm = char(config.ZeroCrossAlgorithm);
+    r.ZcThreshold = config.ZcThreshold;
+    if ~(ischar(r.ZcThreshold) && strcmpi(r.ZcThreshold, 'auto'))
+        r.ZcThreshold = nombre(r.ZcThreshold, nomModele, 'ZcThreshold');
+        if ~(isscalar(r.ZcThreshold) && isreal(r.ZcThreshold) && r.ZcThreshold >= 0 && ...
+             isfinite(r.ZcThreshold))
+            error('Simulink:Config:InvalidValue', ...
+                  ['Le reglage ZcThreshold du modele ''%s'' est un nombre positif, ou ' ...
+                   '''auto''.'], nomModele);
+        end
+    end
     if ~ischar(r.MinStep) && ~ischar(r.MaxStep) && r.MinStep > r.MaxStep
         error('Simulink:Config:InvalidValue', ...
               ['Le pas minimal %g du modele ''%s'' depasse son pas maximal %g.'], ...
@@ -929,6 +944,106 @@ function resultat = deposer(c, T, J, instants, resultat)
         % dans sa sortie de simulation
         if isvarname(char(p.VariableName)) && ~isfield(resultat, char(p.VariableName))
             resultat.(char(p.VariableName)) = valeur;
+        end
+    end
+end
+
+% Les Scope dont DataLogging vaut 'on' journalisent leurs entrées, comme
+% dans Simulink : dans la variable DataLoggingVariableName ('ScopeData') de
+% l'espace de travail de base, et dans le résultat sous ce nom ; un
+% Dataset — un élément par entrée —, une structure avec ou sans le temps,
+% ou une matrice [t, u1, u2...]. Aux seuls instants de sa période s'il en
+% a une, un sur DataLoggingDecimation si DataLoggingDecimateData le
+% demande, les DataLoggingMaxPoints derniers si DataLoggingLimitDataPoints.
+function resultat = oscilloscopes(c, T, J, instants, resultat)
+    for k = find(strcmp(c.types, 'scope'))
+        p = c.p{k};
+        if ~strcmp(p.DataLogging, 'on')
+            continue
+        end
+        N = numel(instants);
+        garde = 1:N;
+        if c.cadence(k) > 0 && isfinite(c.cadence(k))
+            phase = (instants - c.decalage(k)) / c.cadence(k);
+            garde = find(abs(phase - round(phase)) < 1e-9 * max(1, abs(phase)) & ...
+                         instants >= c.decalage(k) - 1e-12).';
+        end
+        if strcmp(p.DataLoggingDecimateData, 'on')
+            garde = garde(1:max(1, round(double(p.DataLoggingDecimation))):end);
+        end
+        if strcmp(p.DataLoggingLimitDataPoints, 'on') && ...
+           numel(garde) > double(p.DataLoggingMaxPoints)
+            garde = garde(end - double(p.DataLoggingMaxPoints) + 1:end);
+        end
+        temps = instants(garde);
+        entrees = {};
+        dims = {};
+        for q = 1:numel(T.releves)
+            R = T.releves(q);
+            if R.bloc ~= k
+                continue
+            end
+            brut = J.releve(R.lignes, garde);
+            v = forme(brut, R.dims, numel(garde));
+            source = 0;
+            if R.port <= numel(c.entrees{k})
+                source = c.entrees{k}(R.port);
+            end
+            if source > 0 && c.typePort(source) > 2
+                v = matlibre_sl_types('convertir', c.typePort(source), v);
+            end
+            entrees{R.port} = v; %#ok<AGROW>
+            dims{R.port} = R.dims; %#ok<AGROW>
+        end
+        switch p.DataLoggingSaveFormat
+            case 'Dataset'
+                valeur = Simulink.SimulationData.Dataset(char(p.DataLoggingVariableName));
+                for j = 1:numel(entrees)
+                    s = Simulink.SimulationData.Signal;
+                    s.Name = '';
+                    s.BlockPath = c.chemins{k};
+                    s.PortType = 'inport';
+                    s.PortIndex = j;
+                    s.Values = timeseries(entrees{j}, temps);
+                    valeur = addElement(valeur, s);
+                end
+            case 'Array'
+                valeur = temps;
+                for j = 1:numel(entrees)
+                    d = dims{j};
+                    if numel(d) >= 2 && d(1) > 1 && d(2) > 1
+                        error('Simulink:blocks:ScopeArrayMatrix', ...
+                              ['Le Scope ''%s'' journalise en Array une matrice sur son ' ...
+                               'entree %d : prenez Dataset ou StructureWithTime.'], ...
+                              c.chemins{k}, j);
+                    end
+                    valeur = [valeur, double(entrees{j})]; %#ok<AGROW>
+                end
+            otherwise
+                signaux = struct('values', {}, 'dimensions', {}, 'label', {}, 'title', {}, ...
+                                 'plotStyle', {});
+                for j = 1:numel(entrees)
+                    signaux(j).values = entrees{j};
+                    signaux(j).dimensions = dimensionsSimulink(dims{j});
+                    signaux(j).label = '';
+                    signaux(j).title = '';
+                    signaux(j).plotStyle = zeros(1, prod(dims{j}));
+                end
+                t = temps;
+                if strcmp(p.DataLoggingSaveFormat, 'Structure')
+                    t = [];
+                end
+                valeur = struct('time', t, 'signals', signaux, 'blockName', c.chemins{k});
+        end
+        nom = char(p.DataLoggingVariableName);
+        if ~isvarname(nom)
+            error('Simulink:blocks:ScopeLoggingName', ...
+                  ['Le Scope ''%s'' journalise dans ''%s'', qui n''est pas un nom de ' ...
+                   'variable.'], c.chemins{k}, nom);
+        end
+        assignin('base', nom, valeur);
+        if ~isfield(resultat, nom)
+            resultat.(nom) = valeur;
         end
     end
 end

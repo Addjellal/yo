@@ -392,8 +392,9 @@ function code = codeDe(nom)
 end
 
 % Un type à virgule fixe écrit : 'fixdt(1,16,8)', 'sfix16_En8', ou le nom
-% d'une variable de l'espace de travail qui porte un Simulink.NumericType ;
-% -1 pour ce qui n'en est pas un, -2 pour une échelle qui n'est pas dite.
+% d'une variable de l'espace de travail qui porte un Simulink.NumericType
+% ou un Simulink.AliasType ; -1 pour ce qui n'en est pas un, -2 pour une
+% échelle qui n'est pas dite.
 function code = codeFixeDe(nom)
     code = -1;
     T = [];
@@ -407,11 +408,35 @@ function code = codeFixeDe(nom)
         v = evalin('base', nom);
         if isa(v, 'embedded.numerictype')
             T = v;
+        elseif isa(v, 'Simulink.AliasType')
+            code = codeAlias(v);
+            return
         end
     end
     if ~isempty(T)
         code = codeDuType(T);
     end
+end
+
+% Un Simulink.AliasType vaut son type de base, qui peut être lui-même un
+% alias ; une chaîne d'alias qui revient sur elle-même n'est pas un type.
+function code = codeAlias(v)
+    persistent profondeur
+    if isempty(profondeur)
+        profondeur = 0;
+    end
+    if profondeur > 32
+        code = -1;
+        return
+    end
+    profondeur = profondeur + 1;
+    try
+        code = codeDe(char(v.BaseType));
+    catch err
+        profondeur = profondeur - 1;
+        rethrow(err);
+    end
+    profondeur = profondeur - 1;
 end
 
 function t = typeFixe(p, chemin)
@@ -450,7 +475,8 @@ function t = typeFixe(p, chemin)
               ['Le type ''%s'' du bloc ''%s'' est inconnu : les types sont double, single, ' ...
                'int8, uint8, int16, uint16, int32, uint32, boolean, les types a virgule ' ...
                'fixe (fixdt(1,16,8), sfix16_En8), les types enumeres (''Enum: Couleur''), ' ...
-               'ou ''Inherit: ...''.'], char(p.OutDataTypeStr), chemin);
+               'le nom d''un Simulink.NumericType ou d''un Simulink.AliasType, ou ' ...
+               '''Inherit: ...''.'], char(p.OutDataTypeStr), chemin);
     end
 end
 

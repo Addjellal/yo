@@ -58,6 +58,12 @@ function c = matlibre_sl_compiler(modele, options)
     end
     try
         c = compiler(modele, options);
+        if ~isempty(c.aInserer)
+            % AutoInsertRateTranBlk : les Rate Transition que Simulink
+            % insère, posés dans le modèle, qui se compile de nouveau
+            options.transitionsPosees = true;
+            c = compiler(insererTransitions(modele, c.aInserer), options);
+        end
     catch err
         matlibre_sl_types('surcharge', surchargeAvant);
         [k, bloc, chemin] = enCours('lire');
@@ -354,6 +360,7 @@ function c = compiler(modele, options)
         c.pas = pas;
     end
     c = periodes(c, pas);
+    c = transitionsDeCadence(c, config, silencieux, champ(options, 'transitionsPosees', false));
 
     % --- 9. ce que le calcul lira : paramètres et états ---------------------
     c = abaisser(c, pas, tDebut);
@@ -3259,6 +3266,139 @@ function P = plageDeSortie(type, p, chemin)
     end
 end
 
+% Les transitions de cadence, comme Simulink les voit : la sortie d'un bloc
+% discret lue par un bloc discret d'une autre période ou d'un autre
+% décalage, sans Rate Transition entre eux — un Zero-Order Hold plus lent
+% que sa source en tient lieu. En multitâche (EnableMultiTasking, à pas
+% fixe), MultiTaskRateTransMsg en décide, et AutoInsertRateTranBlk y pose
+% des Rate Transition (AINSERER) ; en monotâche, SingleTaskRateTransMsg.
+% Les blocs virtuels — Mux, Demux, bus, Goto, From — se traversent : la
+% transition est entre les blocs qui calculent. Ceux d'un sous-système
+% conditionnel suivent sa garde, et ne comptent pas.
+function c = transitionsDeCadence(c, config, silencieux, posees)
+    c.aInserer = struct('chemin', {}, 'port', {}, 'periode', {}, 'decalage', {});
+    if ~isfield(config, 'EnableMultiTasking')
+        return
+    end
+    multitache = strcmp(config.EnableMultiTasking, 'on') && ~c.variable;
+    if multitache
+        niveau = 1 + strcmp(config.MultiTaskRateTransMsg, 'error');
+        auto = strcmp(config.AutoInsertRateTranBlk, 'on') && ~posees;
+    else
+        niveau = find(strcmp({'none', 'warning', 'error'}, config.SingleTaskRateTransMsg)) - 1;
+        auto = false;
+    end
+    if niveau == 0 && ~auto
+        return
+    end
+    virtuels = {'mux', 'demux', 'buscreator', 'busselector', 'from', 'goto', 'bustovector'};
+    discret = c.cadence > 0 & isfinite(c.cadence);
+    for k = 1:c.n
+        if ~discret(k) || c.garde(k) > 0 || ...
+           any(strcmp(c.types{k}, [virtuels, {'ratetransition'}]))
+            continue
+        end
+        for j = 1:numel(c.entrees{k})
+            if c.entrees{k}(j) == 0
+                continue
+            end
+            % les blocs qui calculent derrière cette entrée
+            pile = c.proprio(c.entrees{k}(j));
+            vus = [];
+            sources = [];
+            while ~isempty(pile)
+                s = pile(end);
+                pile(end) = [];
+                if any(vus == s)
+                    continue
+                end
+                vus(end + 1) = s; %#ok<AGROW>
+                if any(strcmp(c.types{s}, virtuels))
+                    e = c.entrees{s};
+                    pile = [pile, c.proprio(e(e > 0))]; %#ok<AGROW>
+                else
+                    sources(end + 1) = s; %#ok<AGROW>
+                end
+            end
+            for s = sources
+                tolerance = 1e-9 * c.cadence(k);
+                if ~discret(s) || c.garde(s) > 0 || ...
+                   (abs(c.cadence(s) - c.cadence(k)) <= tolerance && ...
+                    abs(c.decalage(s) - c.decalage(k)) <= tolerance)
+                    continue
+                end
+                if strcmp(c.types{k}, 'zoh') && c.cadence(k) > c.cadence(s)
+                    continue   % un bloqueur plus lent que sa source : du rapide au lent
+                end
+                if auto
+                    c.aInserer(end + 1) = struct('chemin', c.noms{k}, 'port', j, ...
+                                                 'periode', c.cadence(k), ...
+                                                 'decalage', c.decalage(k));
+                    break
+                end
+                if multitache
+                    reglage = ['en multitache, il y faut un bloc Rate Transition — ' ...
+                               'AutoInsertRateTranBlk (''on'') le pose ; ' ...
+                               'MultiTaskRateTransMsg regle ce diagnostic'];
+                else
+                    reglage = ['il y faut un bloc Rate Transition ; SingleTaskRateTransMsg ' ...
+                               'regle ce diagnostic'];
+                end
+                texte = sprintf(['Transition de cadence illegale entre la sortie de ''%s'' ' ...
+                                 '(periode %g) et l''entree %d de ''%s'' (periode %g) : %s.'], ...
+                                c.chemins{s}, c.cadence(s), j, c.chemins{k}, c.cadence(k), ...
+                                reglage);
+                if niveau == 2
+                    error('Simulink:SampleTime:IllegalRateTransition', '%s', texte);
+                elseif niveau == 1 && ~silencieux
+                    warning('Simulink:SampleTime:IllegalRateTransition', '%s', texte);
+                end
+            end
+        end
+    end
+end
+
+% Les Rate Transition qu'insère AutoInsertRateTranBlk : chacun sur l'entrée
+% du bloc qui lit, dans le système où ce bloc se trouve, à la période de ce
+% bloc.
+function modele = insererTransitions(modele, liste)
+    for q = 1:numel(liste)
+        modele = insererTransition(modele, strsplit(liste(q).chemin, '/'), liste(q), q);
+    end
+end
+
+function modele = insererTransition(modele, parties, T, rang)
+    noms = cellfun(@(b) char(b.nom), modele.blocs, 'UniformOutput', false);
+    if numel(parties) > 1
+        i = find(strcmp(noms, parties{1}), 1);
+        if isempty(i) || ~isfield(modele.blocs{i}.parametres, 'Model')
+            return
+        end
+        b = modele.blocs{i};
+        b.parametres.Model = insererTransition(b.parametres.Model, parties(2:end), T, rang);
+        modele.blocs{i} = b;
+        return
+    end
+    kb = find(strcmp(noms, parties{1}), 1);
+    liens = matlibre_sl_liens(modele);
+    l = find(liens(:, 2) == kb & liens(:, 3) == T.port, 1);
+    if isempty(kb) || isempty(l)
+        return
+    end
+    source = noms{liens(l, 1)};
+    ps = liens(l, 4);
+    nom = sprintf('RateTransitionAuto%d', rang);
+    while any(strcmp(noms, nom))
+        nom = [nom '_']; %#ok<AGROW>
+    end
+    modele = add_block(modele, 'ratetransition', nom, 'OutPortSampleTime', ...
+                       [T.periode, T.decalage]);
+    modele = delete_line(modele, sprintf('%s/%d', source, ps), ...
+                         sprintf('%s/%d', parties{1}, T.port));
+    modele = add_line(modele, sprintf('%s/%d', source, ps), [nom '/1']);
+    modele = add_line(modele, [nom '/1'], sprintf('%s/%d', parties{1}, T.port));
+end
+
 function [periode, decalage] = lirePeriode(v)
     v = double(v);
     periode = v(1);
@@ -4942,6 +5082,7 @@ function verifierTypesBus(c)
                                'et elle est de largeur %d.'], c.chemins{k}, nomType, j, ...
                               attendue(j).nom, mat2str(attendue(j).dims), largeur);
                     end
+                    verifierNomElement(c, k, j, source, attendue(j).nom, nomType);
                 end
             otherwise   % une sortie, un port de sous-système
                 source = c.entrees{k}(1);
@@ -4952,6 +5093,39 @@ function verifierTypesBus(c)
                 matlibre_sl_bus('accorder', vu, objet, c.chemins{k}, nomType);
         end
     end
+end
+
+% BusObjectLabelMismatch, comme dans Simulink : un signal nommé qui entre
+% dans un Bus Creator typé sous un autre nom que celui de son élément —
+% rien, un avertissement, ou l'arrêt, en nommant le bloc, le signal et
+% l'élément. Un signal sans nom prend celui de l'élément.
+function verifierNomElement(c, k, j, source, attendu, nomType)
+    niveau = 1;
+    if isstruct(c.config) && isfield(c.config, 'BusObjectLabelMismatch')
+        niveau = find(strcmp({'none', 'warning', 'error'}, c.config.BusObjectLabelMismatch)) - 1;
+    end
+    if niveau == 0 || source == 0
+        return
+    end
+    s = c.proprio(source);
+    q = source - c.portDebut(s) + 1;
+    nom = '';
+    reglages = c.signaux{s};
+    for i = 1:numel(reglages)
+        if reglages(i).Port == q
+            nom = char(reglages(i).Name);
+        end
+    end
+    if isempty(nom) || strcmp(nom, attendu)
+        return
+    end
+    texte = sprintf(['Le signal ''%s'' qui entre en %d dans ''%s'' ne porte pas le nom de ' ...
+                     'l''element ''%s'' du type de bus ''%s''. BusObjectLabelMismatch regle ' ...
+                     'ce diagnostic.'], nom, j, c.chemins{k}, attendu, nomType);
+    if niveau == 2
+        error('Simulink:Bus:ElementNameMismatch', '%s', texte);
+    end
+    warning('Simulink:Bus:ElementNameMismatch', '%s', texte);
 end
 
 function noms = nomsDuBus(entrees, n)

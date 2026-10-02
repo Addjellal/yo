@@ -276,7 +276,15 @@ function modele = add_block(modele, type, nom, varargin)
 %
 %   Sorties :
 %     outport      Port, InitialOutput, OutputWhenDisabled (held, reset)
-%     scope        NumInputPorts ; display ; terminator
+%     scope        NumInputPorts ; DataLogging ('on' : ses entrées se
+%                  journalisent), DataLoggingVariableName ('ScopeData'),
+%                  DataLoggingSaveFormat (Dataset, StructureWithTime,
+%                  Structure, Array), DataLoggingLimitDataPoints et
+%                  DataLoggingMaxPoints (les derniers instants),
+%                  DataLoggingDecimateData et DataLoggingDecimation (un
+%                  instant sur n), SampleTime ; les noms anciens
+%                  SaveToWorkspace, SaveName, DataFormat, LimitDataPoints,
+%                  MaxDataPoints valent aussi ; display ; terminator
 %     toworkspace  VariableName, SaveFormat : Array, Structure With Time,
 %                  Structure
 %     tofile       Filename, MatrixName, Decimation — [temps ; signal] dans

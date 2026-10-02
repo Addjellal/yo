@@ -141,6 +141,24 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                   {QStringLiteral("UseLocalSettings"), QStringLiteral("EnableAll"),
                    QStringLiteral("DisableAll")},
                   QStringLiteral("La détection des instants où un signal change de signe"));
+    nouvelleListe(QStringLiteral("ZeroCrossAlgorithm"), formulaireOptions,
+                  QStringLiteral("Algorithme des passages par zéro"),
+                  {QStringLiteral("Nonadaptive"), QStringLiteral("Adaptive")},
+                  QStringLiteral("À pas variable — Adaptive : un bloc qui bascule sans cesse "
+                                 "n'est plus localisé, jusqu'au pas qui ne bascule pas"));
+    nouveauChamp(QStringLiteral("ZcThreshold"), formulaireOptions,
+                 QStringLiteral("Seuil des passages par zéro"),
+                 QStringLiteral("À pas variable, algorithme adaptatif : la bande autour de "
+                                "zéro où une traversée ne compte pas ; « auto » : aucune"));
+    nouvelleListe(QStringLiteral("EnableMultiTasking"), formulaireOptions,
+                  QStringLiteral("Chaque cadence, une tâche"),
+                  {QStringLiteral("off"), QStringLiteral("on")},
+                  QStringLiteral("À pas fixe : le multitâche, où un bloc discret ne lit un "
+                                 "bloc d'une autre cadence qu'à travers un Rate Transition"));
+    nouvelleListe(QStringLiteral("AutoInsertRateTranBlk"), formulaireOptions,
+                  QStringLiteral("Rate Transition automatiques"),
+                  {QStringLiteral("off"), QStringLiteral("on")},
+                  QStringLiteral("Les Rate Transition qui manquent se posent d'eux-mêmes"));
     nouveauChamp(QStringLiteral("MaxConsecutiveZCs"), formulaireOptions,
                  QStringLiteral("Passages par zéro de suite"),
                  QStringLiteral("À pas variable : combien de passages par zéro de suite, sans "
@@ -269,6 +287,25 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                   QStringLiteral("Plus de « passages par zéro de suite » sans que le temps "
                                  "avance : le modèle bascule sans fin (Zénon)"));
     colonneDiagnostics->addWidget(groupeSolveurDiag);
+    auto* groupeCadences = new QGroupBox(QStringLiteral("Cadences"));
+    auto* formulaireCadences = new QFormLayout(groupeCadences);
+    nouvelleListe(QStringLiteral("MultiTaskRateTransMsg"), formulaireCadences,
+                  QStringLiteral("une transition illégale en multitâche"),
+                  {QStringLiteral("warning"), QStringLiteral("error")},
+                  QStringLiteral("Un bloc discret lit un bloc d'une autre cadence sans Rate "
+                                 "Transition"));
+    nouvelleListe(QStringLiteral("SingleTaskRateTransMsg"), formulaireCadences,
+                  QStringLiteral("une transition sans Rate Transition en monotâche"),
+                  kNiveaux,
+                  QStringLiteral("Permise en monotâche : faut-il le dire, ou la refuser ?"));
+    colonneDiagnostics->addWidget(groupeCadences);
+    auto* groupeBus = new QGroupBox(QStringLiteral("Bus"));
+    auto* formulaireBus = new QFormLayout(groupeBus);
+    nouvelleListe(QStringLiteral("BusObjectLabelMismatch"), formulaireBus,
+                  QStringLiteral("un signal ne porte pas le nom de son élément"), kNiveaux,
+                  QStringLiteral("Un signal nommé entre dans un Bus Creator typé sous un autre "
+                                 "nom que celui de l'élément du type de bus"));
+    colonneDiagnostics->addWidget(groupeBus);
     auto* groupeDonneesDiag = new QGroupBox(QStringLiteral("Validité des données"));
     auto* formulaireDonneesDiag = new QFormLayout(groupeDonneesDiag);
     nouvelleListe(QStringLiteral("SignalInfNanChecking"), formulaireDonneesDiag,
@@ -336,8 +373,12 @@ void DialogueConfiguration::typeChange() {
     for (const QString& nom : {QStringLiteral("MaxStep"), QStringLiteral("MinStep"),
                                QStringLiteral("InitialStep"), QStringLiteral("RelTol"),
                                QStringLiteral("AbsTol"), QStringLiteral("MaxConsecutiveZCs"),
-                               QStringLiteral("MaxConsecutiveMinStep")})
+                               QStringLiteral("MaxConsecutiveMinStep"),
+                               QStringLiteral("ZcThreshold")})
         champs_.value(nom)->setEnabled(variable);
+    listes_.value(QStringLiteral("ZeroCrossAlgorithm"))->setEnabled(variable);
+    listes_.value(QStringLiteral("EnableMultiTasking"))->setEnabled(!variable);
+    listes_.value(QStringLiteral("AutoInsertRateTranBlk"))->setEnabled(!variable);
     for (const QString& nom : {QStringLiteral("MinStepSizeMsg"),
                                QStringLiteral("MaxConsecutiveZCsMsg")})
         listes_.value(nom)->setEnabled(variable);

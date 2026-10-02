@@ -2560,6 +2560,10 @@ end
                                             {QStringLiteral("ode4")}, {QStringLiteral("ode45")});
                 verifier(!boite.champ(QStringLiteral("MaxConsecutiveZCs"))->isEnabled() &&
                              !boite.liste(QStringLiteral("MaxConsecutiveZCsMsg"))->isEnabled() &&
+                             !boite.liste(QStringLiteral("ZeroCrossAlgorithm"))->isEnabled() &&
+                             boite.liste(QStringLiteral("EnableMultiTasking"))->isEnabled() &&
+                             boite.liste(QStringLiteral("MultiTaskRateTransMsg")) != nullptr &&
+                             boite.liste(QStringLiteral("BusObjectLabelMismatch")) != nullptr &&
                              boite.liste(QStringLiteral("SignalInfNanChecking"))->isEnabled() &&
                              boite.liste(QStringLiteral("SignalRangeChecking"))->isEnabled(),
                          "a pas fixe, les diagnostics du solveur ne valent pas, ceux des "
@@ -2570,7 +2574,10 @@ end
                 boite.choixType()->setCurrentIndex(
                     boite.choixType()->findText(QStringLiteral("Variable-step")));
                 verifier(boite.champ(QStringLiteral("MaxConsecutiveZCs"))->isEnabled() &&
-                             boite.liste(QStringLiteral("MaxConsecutiveZCsMsg"))->isEnabled(),
+                             boite.liste(QStringLiteral("MaxConsecutiveZCsMsg"))->isEnabled() &&
+                             boite.liste(QStringLiteral("ZeroCrossAlgorithm"))->isEnabled() &&
+                             !boite.liste(QStringLiteral("EnableMultiTasking"))->isEnabled() &&
+                             boite.champ(QStringLiteral("ZcThreshold"))->isEnabled(),
                          "a pas variable, les passages par zero de suite se reglent");
                 QComboBox* infini = boite.liste(QStringLiteral("SignalInfNanChecking"));
                 infini->setCurrentIndex(infini->findText(QStringLiteral("error")));
