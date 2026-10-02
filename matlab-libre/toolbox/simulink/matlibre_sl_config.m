@@ -79,6 +79,19 @@ function varargout = matlibre_sl_config(action, varargin)
 %                                     Bus Creator typé sous un autre nom
 %                                     que son élément : none, warning,
 %                                     error
+%     ParameterDowncastMsg 'error'    un paramètre qui porte un type,
+%                                     int32(5), rangé dans un type plus
+%                                     étroit
+%     ParameterOverflowMsg 'error'    la valeur d'un paramètre hors des
+%                                     bornes de son type entier ou à
+%                                     virgule fixe, saturée sinon
+%     ParameterUnderflowMsg 'none'    une valeur non nulle que son type
+%                                     rend nulle
+%     ParameterPrecisionLossMsg 'warning'  une valeur que son type
+%                                     arrondit ; ces quatre-là valent
+%                                     none, warning ou error, et portent
+%                                     sur la valeur d'un Constant et le
+%                                     gain d'un Gain (ParamDataTypeStr)
 %     AlgebraicLoopMsg     'warning'  boucle algébrique : none, warning, error
 %     UnconnectedInputMsg  'warning'  entrée non reliée : none, warning, error
 %     UnconnectedOutputMsg 'none'     sortie non reliée : none, warning, error
@@ -237,7 +250,9 @@ function d = defauts()
                'ZeroCrossAlgorithm', 'Nonadaptive', 'ZcThreshold', 'auto', ...
                'EnableMultiTasking', 'off', 'AutoInsertRateTranBlk', 'off', ...
                'MultiTaskRateTransMsg', 'error', 'SingleTaskRateTransMsg', 'none', ...
-               'BusObjectLabelMismatch', 'warning');
+               'BusObjectLabelMismatch', 'warning', 'ParameterDowncastMsg', 'error', ...
+               'ParameterOverflowMsg', 'error', 'ParameterUnderflowMsg', 'none', ...
+               'ParameterPrecisionLossMsg', 'warning');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -369,7 +384,9 @@ function v = valider(nom, v)
             end
         case {'AlgebraicLoopMsg', 'UnconnectedInputMsg', 'UnconnectedOutputMsg', ...
               'MaxConsecutiveZCsMsg', 'SignalInfNanChecking', 'IntegerOverflowMsg', ...
-              'IntegerSaturationMsg', 'SignalRangeChecking', 'BusObjectLabelMismatch'}
+              'IntegerSaturationMsg', 'SignalRangeChecking', 'BusObjectLabelMismatch', ...
+              'ParameterDowncastMsg', 'ParameterOverflowMsg', 'ParameterUnderflowMsg', ...
+              'ParameterPrecisionLossMsg'}
             v = choix(nom, v, {'none', 'warning', 'error'});
         case 'MinStepSizeMsg'
             v = choix(nom, v, {'warning', 'error'});

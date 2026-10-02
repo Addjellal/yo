@@ -2564,6 +2564,8 @@ end
                              boite.liste(QStringLiteral("EnableMultiTasking"))->isEnabled() &&
                              boite.liste(QStringLiteral("MultiTaskRateTransMsg")) != nullptr &&
                              boite.liste(QStringLiteral("BusObjectLabelMismatch")) != nullptr &&
+                             boite.liste(QStringLiteral("ParameterOverflowMsg"))->isEnabled() &&
+                             boite.liste(QStringLiteral("ParameterPrecisionLossMsg")) != nullptr &&
                              boite.liste(QStringLiteral("SignalInfNanChecking"))->isEnabled() &&
                              boite.liste(QStringLiteral("SignalRangeChecking"))->isEnabled(),
                          "a pas fixe, les diagnostics du solveur ne valent pas, ceux des "

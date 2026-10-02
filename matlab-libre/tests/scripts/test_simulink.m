@@ -9640,6 +9640,136 @@ assert(isempty(id71), 'BusObjectLabelMismatch none : rien');
 evalin('base', 'clear Mesures71');
 fprintf('noms des elements d''un bus : ok\n');
 
+%% ------------------------------------------- 72. Diagnostics des paramètres
+% Un paramètre rangé dans un type entier ou à virgule fixe — la valeur
+% d'un Constant, le gain d'un Gain dont ParamDataTypeStr est dit — se
+% quantifie comme dans Simulink : arrondi au plus proche, sous quatre
+% diagnostics — ParameterDowncastMsg (un paramètre typé rangé dans un type
+% plus étroit), ParameterOverflowMsg (hors des bornes, saturé si l'on ne
+% s'arrête pas), ParameterUnderflowMsg (une valeur que le type annule) et
+% ParameterPrecisionLossMsg (une valeur que le type arrondit) —, chacun
+% nommant le bloc, le paramètre et la valeur.
+m72 = new_system('parametres72');
+m72 = add_block(m72, 'constant', 'c', 'Value', 2.7, 'OutDataTypeStr', 'int8');
+m72 = add_block(m72, 'outport', 'y');
+m72 = add_line(m72, 'c', 'y');
+reglage72 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1};
+assert(strcmp(get_param(m72, 'ParameterDowncastMsg'), 'error') && ...
+       strcmp(get_param(m72, 'ParameterOverflowMsg'), 'error') && ...
+       strcmp(get_param(m72, 'ParameterUnderflowMsg'), 'none') && ...
+       strcmp(get_param(m72, 'ParameterPrecisionLossMsg'), 'warning'), ...
+       'les diagnostics des parametres a leur defaut de Simulink');
+% la perte de précision : un avertissement d'office, la valeur arrondie
+lastwarn('');
+r72 = sim(m72, reglage72{:});
+[message72, id72] = lastwarn();
+assert(strcmp(id72, 'Simulink:Parameters:ParamPrecisionLoss') && ...
+       ~isempty(strfind(message72, 'parametres72/c')) && ~isempty(strfind(message72, '2.7')) && ...
+       isa(r72.yout, 'int8') && all(r72.yout == 3), ...
+       'une valeur que le type arrondit : l''avertissement, et la valeur arrondie');
+lastwarn('');
+sim(m72, reglage72{:}, 'ParameterPrecisionLossMsg', 'none');
+[~, id72] = lastwarn();
+assert(isempty(id72), 'ParameterPrecisionLossMsg none : rien');
+vu72 = '';
+try
+    sim(m72, reglage72{:}, 'ParameterPrecisionLossMsg', 'error');
+catch err
+    vu72 = err.identifier;
+end
+assert(strcmp(vu72, 'Simulink:Parameters:ParamPrecisionLoss'), ...
+       'ParameterPrecisionLossMsg error : l''arret');
+lastwarn('');
+m72 = set_param(m72, 'c', 'Value', 3);
+sim(m72, reglage72{:});
+[~, id72] = lastwarn();
+assert(isempty(id72), 'une valeur que le type porte exactement ne dit rien');
+% le débordement : l'arrêt d'office, sinon la saturation
+m72 = set_param(m72, 'c', 'Value', [300 -5]);
+vu72 = '';
+message72 = '';
+try
+    sim(m72, reglage72{:});
+catch err
+    vu72 = err.identifier;
+    message72 = err.message;
+end
+assert(strcmp(vu72, 'Simulink:Parameters:ParamOverflow') && ...
+       ~isempty(strfind(message72, 'parametres72/c')) && ~isempty(strfind(message72, '300')) && ...
+       ~isempty(strfind(message72, 'int8')), 'une valeur hors des bornes : l''arret');
+lastwarn('');
+r72 = sim(m72, reglage72{:}, 'ParameterOverflowMsg', 'warning');
+[~, id72] = lastwarn();
+assert(strcmp(id72, 'Simulink:Parameters:ParamOverflow') && isequal(r72.yout(1, :), int8([127 -5])), ...
+       'ParameterOverflowMsg warning : l''avertissement, et la valeur saturee');
+r72 = sim(m72, reglage72{:}, 'ParameterOverflowMsg', 'none', 'DataTypeOverride', 'Double');
+assert(isa(r72.yout, 'double') && isequal(r72.yout(1, :), [300 -5]), ...
+       'sous le Data Type Override, la valeur reste ce qu''elle est');
+% une virgule fixe : la valeur que le type annule
+m72 = set_param(m72, 'c', 'Value', 0.01, 'OutDataTypeStr', 'fixdt(1,16,4)');
+lastwarn('');
+r72 = sim(m72, reglage72{:});
+[~, id72] = lastwarn();
+assert(isempty(id72) && double(r72.yout(1)) == 0, ...
+       'ParameterUnderflowMsg none, le defaut : la valeur devient 0 sans rien dire');
+lastwarn('');
+sim(m72, reglage72{:}, 'ParameterUnderflowMsg', 'warning');
+[message72, id72] = lastwarn();
+assert(strcmp(id72, 'Simulink:Parameters:ParamUnderflow') && ...
+       ~isempty(strfind(message72, 'fix16_En4')), 'ParameterUnderflowMsg warning');
+m72 = set_param(m72, 'c', 'Value', 0.5);
+lastwarn('');
+r72 = sim(m72, reglage72{:});
+[~, id72] = lastwarn();
+assert(isempty(id72) && double(r72.yout(1)) == 0.5, 'une valeur sur la grille ne dit rien');
+% le rétrécissement : un paramètre typé dans un type plus étroit
+m72 = set_param(m72, 'c', 'Value', 'int32(5)', 'OutDataTypeStr', 'int8');
+vu72 = '';
+try
+    sim(m72, reglage72{:});
+catch err
+    vu72 = err.identifier;
+end
+assert(strcmp(vu72, 'Simulink:Parameters:ParamDowncast'), ...
+       'un int32 range en int8 : le retrecissement, refuse d''office');
+r72 = sim(m72, reglage72{:}, 'ParameterDowncastMsg', 'none');
+assert(isequal(r72.yout(1), int8(5)), 'ParameterDowncastMsg none : la valeur passe');
+m72 = set_param(m72, 'c', 'Value', 'int8(5)', 'OutDataTypeStr', 'int16');
+r72 = sim(m72, reglage72{:});
+assert(isequal(r72.yout(1), int16(5)), 'un int8 range en int16 s''elargit sans rien dire');
+% le gain d'un Gain, dans son ParamDataTypeStr
+g72 = new_system('gain72');
+g72 = add_block(g72, 'constant', 'c', 'Value', 2, 'OutDataTypeStr', 'int8');
+g72 = add_block(g72, 'gain', 'k', 'Gain', 2.6, 'ParamDataTypeStr', 'int8', ...
+                'OutDataTypeStr', 'int16');
+g72 = add_block(g72, 'outport', 'y');
+g72 = add_line(add_line(g72, 'c', 'k'), 'k', 'y');
+lastwarn('');
+r72 = sim(g72, reglage72{:});
+[message72, id72] = lastwarn();
+assert(strcmp(id72, 'Simulink:Parameters:ParamPrecisionLoss') && ...
+       ~isempty(strfind(message72, 'Gain')) && ~isempty(strfind(message72, 'gain72/k')) && ...
+       isequal(r72.yout(1), int16(6)), 'le gain arrondi dans son type : 3 fois 2');
+g72 = set_param(g72, 'k', 'Gain', 1000);
+vu72 = '';
+try
+    sim(g72, reglage72{:});
+catch err
+    vu72 = err.identifier;
+end
+assert(strcmp(vu72, 'Simulink:Parameters:ParamOverflow'), 'un gain qui deborde de son type');
+g72 = set_param(g72, 'k', 'ParamDataTypeStr', 'int16');
+r72 = sim(g72, reglage72{:});
+assert(isequal(r72.yout(1), int16(2000)), 'dans un type assez large, le gain passe');
+vu72 = '';
+try
+    set_param(m72, 'ParameterOverflowMsg', 'oui');
+catch err
+    vu72 = err.identifier;
+end
+assert(strcmp(vu72, 'Simulink:Config:InvalidValue'), 'ParameterOverflowMsg : none, warning ou error');
+fprintf('diagnostics des parametres : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

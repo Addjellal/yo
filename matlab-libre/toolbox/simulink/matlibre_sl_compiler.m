@@ -299,6 +299,7 @@ function c = compiler(modele, options)
 
     % --- 6 bis. types de données ---------------------------------------------
     c.typePort = matlibre_sl_types('propager', c);
+    c = quantifierParametres(c);
     c = initialesEnumerees(c);
     % --- 6 ter. complexité : ce qui est complexe, ce qui le refuse ---------
     c.sourceComplexe = false(1, n);
@@ -5092,6 +5093,42 @@ function verifierTypesBus(c)
                 end
                 matlibre_sl_bus('accorder', vu, objet, c.chemins{k}, nomType);
         end
+    end
+end
+
+% Les paramètres rangés dans un type entier ou à virgule fixe — la valeur
+% d'un Constant dans son type de sortie, le gain d'un Gain dans son
+% ParamDataTypeStr — se quantifient comme Simulink les range, sous les
+% diagnostics des paramètres (voir MATLIBRE_SL_TYPES). Le Data Type
+% Override, qui les fait doubles, les en dispense.
+function c = quantifierParametres(c)
+    for k = 1:c.n
+        p = c.p{k};
+        switch c.types{k}
+            case 'constant'
+                if isfield(p, 'Value') && isfield(p, 'OutDataTypeStr')
+                    code = matlibre_sl_types('typeFixe', p, c.chemins{k});
+                    p.Value = matlibre_sl_types('quantifier', p.Value, code, 'Value', ...
+                                                c.chemins{k}, c.config, classeLue(p, 'Value'));
+                end
+            case 'gain'
+                if isfield(p, 'Gain') && isfield(p, 'ParamDataTypeStr')
+                    code = matlibre_sl_types('typeFixe', ...
+                                             struct('OutDataTypeStr', p.ParamDataTypeStr, ...
+                                                    'Value', p.Gain), c.chemins{k});
+                    p.Gain = matlibre_sl_types('quantifier', p.Gain, code, 'Gain', ...
+                                               c.chemins{k}, c.config, classeLue(p, 'Gain'));
+                end
+        end
+        c.p{k} = p;
+    end
+end
+
+% La classe qu'un paramètre portait avant d'être lu en double.
+function classe = classeLue(p, nom)
+    classe = 'double';
+    if isfield(p, 'Classes') && isfield(p.Classes, nom)
+        classe = p.Classes.(nom);
     end
 end
 

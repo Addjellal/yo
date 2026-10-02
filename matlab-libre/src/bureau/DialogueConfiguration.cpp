@@ -322,6 +322,23 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                   QStringLiteral("un entier déborde et sature"), kNiveaux,
                   QStringLiteral("… et s'y arrête : SaturateOnIntegerOverflow"));
     colonneDiagnostics->addWidget(groupeDonneesDiag);
+    auto* groupeParametres = new QGroupBox(QStringLiteral("Paramètres"));
+    auto* formulaireParametres = new QFormLayout(groupeParametres);
+    nouvelleListe(QStringLiteral("ParameterDowncastMsg"), formulaireParametres,
+                  QStringLiteral("un paramètre typé se rétrécit"), kNiveaux,
+                  QStringLiteral("Un paramètre qui porte un type — int32(5) — rangé dans un "
+                                 "type plus étroit"));
+    nouvelleListe(QStringLiteral("ParameterOverflowMsg"), formulaireParametres,
+                  QStringLiteral("un paramètre déborde de son type"), kNiveaux,
+                  QStringLiteral("La valeur d'un paramètre hors des bornes de son type entier "
+                                 "ou à virgule fixe : saturée si l'on ne s'arrête pas"));
+    nouvelleListe(QStringLiteral("ParameterUnderflowMsg"), formulaireParametres,
+                  QStringLiteral("un paramètre s'annule"), kNiveaux,
+                  QStringLiteral("Une valeur non nulle trop petite pour son type devient 0"));
+    nouvelleListe(QStringLiteral("ParameterPrecisionLossMsg"), formulaireParametres,
+                  QStringLiteral("un paramètre perd en précision"), kNiveaux,
+                  QStringLiteral("Une valeur que son type ne porte pas exactement est arrondie"));
+    colonneDiagnostics->addWidget(groupeParametres);
     colonneDiagnostics->addStretch(1);
     pages_->addWidget(pageDiagnostics);
 

@@ -97,6 +97,10 @@ function varargout = matlibre_sl_types(action, varargin)
             varargout{1} = codeDeValeur(varargin{1});
         case 'parametreGain'
             varargout{1} = codeParametreGain(varargin{:});
+        case 'typeFixe'
+            varargout{1} = typeFixe(varargin{:});
+        case 'quantifier'
+            varargout{1} = quantifier(varargin{:});
         case 'enum'
             varargout{1} = '';
             if varargin{1} > 200
@@ -859,30 +863,104 @@ function verifier(c, k, tE, t)
                        '%s : convertissez le signal (Data Type Conversion).'], ch, ...
                       nomDe(attendu), nomDe(tE(1)));
             end
-        case 'constant'
-            attendu = typeFixe(p, ch);
-            if attendu > 100 && attendu <= 200
-                T = typeNumerique(attendu);
-                [bas, haut] = matlibre_fixe_bornes(T);
-                v = (double(p.Value(:)) - T.Bias) / T.Slope;
-                if any(v < bas - 0.5 | v >= haut + 0.5)
-                    error('Simulink:Parameters:ParamOverflow', ...
-                          ['La valeur %s de ''%s'' deborde le type %s, qui va de %g a %g.'], ...
-                          mat2str(p.Value, 6), ch, nomDe(attendu), bas * T.Slope + T.Bias, ...
-                          haut * T.Slope + T.Bias);
-                end
-            end
-            if attendu >= 4 && attendu <= 9
-                bornes = [-128 127; 0 255; -32768 32767; 0 65535; -2147483648 2147483647; ...
-                          0 4294967295];
-                b = bornes(attendu - 3, :);
-                v = double(p.Value(:));
-                if any(v < b(1) | v > b(2))
-                    error('Simulink:Parameters:ParamOverflow', ...
-                          ['La valeur %s de ''%s'' deborde le type %s, qui va de %d a %d.'], ...
-                          mat2str(p.Value, 6), ch, nomDe(attendu), b(1), b(2));
-                end
-            end
+    end
+end
+
+% Un paramètre rangé dans un type entier ou à virgule fixe, comme Simulink
+% le range en compilant : arrondi au plus proche sur la grille du type, et
+% les quatre diagnostics des paramètres de la configuration —
+% ParameterDowncastMsg (un paramètre qui porte déjà un type, int32(5),
+% rangé dans un type plus étroit), ParameterOverflowMsg (une valeur hors
+% des bornes du type, saturée si l'on ne s'arrête pas),
+% ParameterUnderflowMsg (une valeur non nulle qui devient nulle) et
+% ParameterPrecisionLossMsg (une valeur qui ne s'écrit pas exactement).
+% Un double, un single, un booléen, une énumération ne se quantifient pas.
+% CLASSE est la classe que le paramètre portait avant d'être lu en double
+% (« int32(5) »).
+function q = quantifier(valeur, code, nom, chemin, config, classe)
+    q = valeur;
+    if ~isnumeric(valeur) || ~isreal(valeur) || isempty(valeur) || ...
+       ~((code >= 4 && code <= 9) || (code > 100 && code <= 200))
+        return
+    end
+    nomType = nomDe(code);
+    v = double(valeur);
+    if code <= 9
+        bornes = [-128 127; 0 255; -32768 32767; 0 65535; -2147483648 2147483647; ...
+                  0 4294967295];
+        bas = bornes(code - 3, 1);
+        haut = bornes(code - 3, 2);
+        pente = 1;
+        biais = 0;
+    else
+        T = typeNumerique(code);
+        [bas, haut] = matlibre_fixe_bornes(T);
+        pente = T.Slope;
+        biais = T.Bias;
+    end
+    if nargin < 6
+        classe = class(valeur);
+    end
+    entiers = {'int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64'};
+    if strcmp(classe, 'single') || ...
+       (any(strcmp(classe, entiers)) && ...
+        (double(intmin(classe)) < bas * pente + biais || double(intmax(classe)) > haut * pente + biais))
+        signalerParametre(config, 'ParameterDowncastMsg', 2, 'Simulink:Parameters:ParamDowncast', ...
+            sprintf(['Le parametre %s de ''%s'' est de type %s, et le bloc le range en %s, plus ' ...
+                     'etroit : la conversion le retrecit (downcast). ParameterDowncastMsg regle ' ...
+                     'ce diagnostic.'], nom, chemin, classe, nomType));
+    end
+    n = round((v - biais) / pente);
+    hors = n < bas | n > haut;
+    if any(hors(:))
+        signalerParametre(config, 'ParameterOverflowMsg', 2, 'Simulink:Parameters:ParamOverflow', ...
+            sprintf(['La valeur %s du parametre %s de ''%s'' deborde le type %s, qui va de %g a ' ...
+                     '%g : elle est saturee. ParameterOverflowMsg regle ce diagnostic.'], ...
+                    texteParametre(v(hors)), nom, chemin, nomType, bas * pente + biais, ...
+                    haut * pente + biais));
+        n = min(max(n, bas), haut);
+    end
+    r = n * pente + biais;
+    nul = ~hors & v ~= 0 & r == 0;
+    if any(nul(:))
+        signalerParametre(config, 'ParameterUnderflowMsg', 0, 'Simulink:Parameters:ParamUnderflow', ...
+            sprintf(['La valeur %s du parametre %s de ''%s'' est trop petite pour le type %s : ' ...
+                     'elle devient 0. ParameterUnderflowMsg regle ce diagnostic.'], ...
+                    texteParametre(v(nul)), nom, chemin, nomType));
+    end
+    perdu = ~hors & ~nul & abs(r - v) > 8 * eps(max(abs(r), abs(v)));
+    if any(perdu(:))
+        signalerParametre(config, 'ParameterPrecisionLossMsg', 1, ...
+            'Simulink:Parameters:ParamPrecisionLoss', ...
+            sprintf(['La valeur %s du parametre %s de ''%s'' ne s''ecrit pas exactement en %s : ' ...
+                     'elle devient %s. ParameterPrecisionLossMsg regle ce diagnostic.'], ...
+                    texteParametre(v(perdu)), nom, chemin, nomType, texteParametre(r(perdu))));
+    end
+    q = reshape(r, size(valeur));
+end
+
+% Le niveau d'un diagnostic des paramètres : none, warning ou error.
+function signalerParametre(config, champ, defaut, identifiant, texte)
+    niveau = defaut;
+    if isstruct(config) && isfield(config, champ)
+        niveau = find(strcmp({'none', 'warning', 'error'}, config.(champ))) - 1;
+    end
+    if niveau == 2
+        error(identifiant, '%s', texte);
+    elseif niveau == 1
+        warning(identifiant, '%s', texte);
+    end
+end
+
+function t = texteParametre(v)
+    v = v(:)';
+    if numel(v) == 1
+        t = num2str(v, 10);
+    elseif numel(v) <= 8
+        t = mat2str(v, 10);
+    else
+        t = [mat2str(v(1:8), 10) '...'];
+        t = strrep(t, ']...', ' ...]');
     end
 end
 
