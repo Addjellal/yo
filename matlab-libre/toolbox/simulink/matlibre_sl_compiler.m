@@ -3266,6 +3266,27 @@ function c = periodes(c, pas, verifier)
                    '(Zero-Order Hold, Rate Transition).'], c.chemins{k});
         end
     end
+    % Une source aléatoire de période 0, un bloc discret par nature qui
+    % hérite d'un signal continu : ils calculent aux pas majeurs et tiennent
+    % leur sortie entre eux. Sans cela, la dérivée du début d'un pas voyait
+    % la valeur d'avant la mise à jour, et les étages du solveur la
+    % suivante : à pas variable, le solveur réduisait son pas sans fin.
+    for k = find(ismember(c.types, {'randomnumber', 'uniformrandomnumber', ...
+                                    'discreteintegrator', 'discretetransferfcn', ...
+                                    'discretefilter', 'discretestatespace', 'delay'}))
+        if c.cadence(k) == 0
+            c.majeurSeul(k) = true;
+        end
+    end
+    % de même un bloc de la bibliothèque que MatLibre écrit en MATLAB
+    % Function à mémoire — une transmittance discrète, une détection de
+    % front — : sa mémoire avance d'un pas majeur au suivant
+    for k = find(strcmp(c.types, 'matlabfunction'))
+        if c.cadence(k) == 0 && isfield(c.p{k}, 'Bibliotheque') && ...
+           c.fonctions{k}.persistante
+            c.majeurSeul(k) = true;
+        end
+    end
     % Le Rate Transition : vers une période plus lente, il tient l'entrée à
     % ses instants ; vers une plus rapide, il la retarde d'une période de
     % l'entrée, ce qui rend le transfert déterministe.

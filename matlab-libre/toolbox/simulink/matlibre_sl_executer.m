@@ -258,6 +258,10 @@ function T = preparer(c)
         end
     end
     T.revient = false(1, n);
+    % l'instant d'où reprend un état de fonctionnement : les blocs MATLAB
+    % Function y ont déjà calculé — leur sortie et leur mémoire sont celles
+    % de l'état —, et ne le refont pas
+    T.tReprise = NaN;
     T.initiale = cell(1, n);
     for k = 1:n
         enCours(k);
@@ -2830,6 +2834,9 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         y = T.objets{k}(V(eA(e + 1):eB(e + 1)));
                         V(a:b) = double(y(:));
                     case 101   % MATLAB function : ses arguments, ses sorties
+                        if t == T.tReprise
+                            continue
+                        end
                         if T.instant(k)
                             matlibre_sl_instant(t, T.periodes(k));
                         end

@@ -119,7 +119,8 @@ function varargout = sim(modele, varargin)
 %   continus. Avec SaveOperatingPoint ('on'), l'état final est l'état de
 %   fonctionnement complet, un Simulink.op.ModelOperatingPoint : états
 %   continus et discrets, sorties tenues, tampons des retards, diagrammes
-%   Stateflow. Donné à InitialState, il fait reprendre la simulation à son
+%   Stateflow, mémoire persistante des blocs MATLAB Function. Donné à
+%   InitialState, il fait reprendre la simulation à son
 %   instant, snapshotTime, jusqu'à StopTime : à pas fixe, exactement comme
 %   la simulation d'une traite ; à pas variable, le solveur repart de son
 %   premier pas. Il ne se charge que dans le modèle d'où il vient, tel
@@ -505,6 +506,13 @@ function [T, J, instants] = derouler(c, config, variable, solveur, tDebut, tFina
         depart = sortie.depart;
         versCarte(depart.graphes, T.graphes);
         versCarte(depart.iterateurs, T.iterateurs);
+        % la mémoire persistante des blocs MATLAB Function, que la
+        % compilation vient de remettre à zéro ; à l'instant de la reprise,
+        % ils ne calculent pas une seconde fois
+        for q = 1:size(depart.persistantes, 2)
+            matlibre_persistantes(depart.persistantes{1, q}, depart.persistantes{2, q});
+        end
+        T.tReprise = depart.t;
     end
     if variable
         reglages = reglagesVariables(config, nomModele);
@@ -611,7 +619,10 @@ function d = preparerReprise(op, c, variable, tDebut, pas)
                'portent plus autant d''etats ni de signaux qu''alors.'], c.nom);
     end
     d = struct('t', op.snapshotTime, 'i0', 0, 'graphes', {E.graphes}, ...
-               'iterateurs', {E.iterateurs});
+               'iterateurs', {E.iterateurs}, 'persistantes', {cell(2, 0)});
+    if isfield(E, 'persistantes')
+        d.persistantes = E.persistantes;
+    end
     if ~variable
         i0 = round((op.snapshotTime - tDebut) / pas);
         if abs(tDebut + i0 * pas - op.snapshotTime) > 1e-9 * max(1, abs(op.snapshotTime))
@@ -640,12 +651,41 @@ function op = prendreEtat(c, T, J, instants, tDebut, pas, variable)
     etat = struct('V', J.V, 'Z', J.Z, 'x', J.x, 'tampons', {tampons}, ...
                   'graphes', {versCellules(T.graphes)}, ...
                   'iterateurs', {versCellules(T.iterateurs)}, ...
+                  'persistantes', {persistantesDuModele(T)}, ...
                   'signature', signatureDe(c), 'variable', variable, 'pas', pas);
     fin = instants(end);
     if isfield(J, 't')
         fin = J.t;   % à pas variable, le dernier instant n'est pas toujours relevé
     end
     op = Simulink.op.ModelOperatingPoint(c.nom, fin, tDebut, etat);
+end
+
+% La mémoire persistante des blocs MATLAB Function du modèle — ceux des
+% sous-systèmes itérés compris —, fonction par fonction : une cellule 2 x n,
+% le nom de la fonction, puis ses variables (MATLIBRE_PERSISTANTES).
+function L = persistantesDuModele(T)
+    L = cell(2, 0);
+    noms = fonctionsDuModele(T);
+    for q = 1:numel(noms)
+        L(:, end + 1) = {noms{q}; matlibre_persistantes(noms{q})}; %#ok<AGROW>
+    end
+end
+
+function noms = fonctionsDuModele(T)
+    noms = {};
+    for k = 1:numel(T.types)
+        switch T.types{k}
+            case 'matlabfunction'
+                if isa(T.objets{k}, 'function_handle')
+                    noms{end + 1} = regexprep(func2str(T.objets{k}), '^@', ''); %#ok<AGROW>
+                end
+            case 'iterateur'
+                if isstruct(T.objets{k}) && isfield(T.objets{k}, 'T')
+                    noms = [noms, fonctionsDuModele(T.objets{k}.T)]; %#ok<AGROW>
+                end
+        end
+    end
+    noms = unique(noms);
 end
 
 function s = signatureDe(c)

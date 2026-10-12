@@ -13,9 +13,11 @@ function varargout = matlibre_sl_fonction(action, varargin)
 %   sorties.
 %
 %   H = MATLIBRE_SL_FONCTION('installer',SCRIPT,CHEMIN) écrit le texte
-%   dans un fichier de fonction, sous un nom tiré du texte, dans un
-%   dossier de la session mis sur le chemin, et rend la poignée de la
-%   fonction. Ses variables persistantes sont remises à zéro.
+%   dans un fichier de fonction, sous un nom tiré du texte — et du chemin
+%   du bloc quand la fonction a des variables persistantes : deux blocs
+%   au même texte ne partagent pas leur mémoire, comme dans Simulink —,
+%   dans un dossier de la session mis sur le chemin, et rend la poignée
+%   de la fonction. Ses variables persistantes sont remises à zéro.
 %
 %   [TAILLES,X0,TS] = MATLIBRE_SL_FONCTION('sfonction',F,PARAMETRES,
 %   CHEMIN) interroge une S-fonction de niveau 1, [sys,x0,str,ts] =
@@ -103,6 +105,9 @@ function h = installer(script, chemin)
     script = char(script);
     empreinte = 0;
     codes = double(script);
+    if ~isempty(regexp(script, '(^|\n)\s*persistent\s', 'once'))
+        codes = double([char(chemin) char(10) script]);
+    end
     for k = 1:numel(codes)
         empreinte = mod(empreinte * 131 + codes(k), 2147483647);
     end

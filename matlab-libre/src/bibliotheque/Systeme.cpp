@@ -496,6 +496,52 @@ FONCTION(fnClear) {
     return {};
 }
 
+// Les variables persistantes d'une fonction et de ses sous-fonctions, pour
+// l'état de fonctionnement d'une simulation : MATLIBRE_PERSISTANTES(F) rend
+// une cellule 2 x n, leurs clés et leurs valeurs ; MATLIBRE_PERSISTANTES(F,
+// L) efface celles que F porte et remet celles de L.
+FONCTION(fnPersistantes) {
+    INUTILISE
+    exigerArguments(args, 1, 2, "matlibre_persistantes");
+    const std::string nom = args[0].versTexte();
+    const std::string prefixe = nom + "::";
+    const std::string sousFonctions = nom + ">";
+    auto siens = [&](const std::string& cle) {
+        return cle.compare(0, prefixe.size(), prefixe) == 0 ||
+               cle.compare(0, sousFonctions.size(), sousFonctions) == 0;
+    };
+    if (args.size() == 1) {
+        std::vector<std::string> cles;
+        for (const auto& p : it.persistantes)
+            if (siens(p.first)) cles.push_back(p.first);
+        Valeur r = Valeur::celluleDims({2, (int)cles.size()});
+        for (std::size_t k = 0; k < cles.size(); ++k) {
+            r.cellules[2 * k] = Valeur::texte(cles[k]);
+            r.cellules[2 * k + 1] = it.persistantes[cles[k]];
+        }
+        return {r};
+    }
+    const Valeur& liste = args[1];
+    if (liste.classe != Classe::Cellule || (!liste.estVide() && liste.nlignes() != 2))
+        erreur("MATLAB:matlibre_persistantes:InvalidInput",
+               "Le second argument est une cellule 2 x n : les cles, puis les valeurs.");
+    for (int k = 0; k < (liste.estVide() ? 0 : liste.ncolonnes()); ++k)
+        if (!siens(liste.cellules[2 * (std::size_t)k].versTexte()))
+            erreur("MATLAB:matlibre_persistantes:InvalidInput",
+                   "La cle '" + liste.cellules[2 * (std::size_t)k].versTexte() +
+                       "' n'est pas une variable persistante de '" + nom + "'.");
+    for (auto p = it.persistantes.begin(); p != it.persistantes.end();) {
+        if (siens(p->first))
+            p = it.persistantes.erase(p);
+        else
+            ++p;
+    }
+    for (int k = 0; k < (liste.estVide() ? 0 : liste.ncolonnes()); ++k)
+        it.persistantes[liste.cellules[2 * (std::size_t)k].versTexte()] =
+            liste.cellules[2 * (std::size_t)k + 1];
+    return {};
+}
+
 FONCTION(fnClc) {
     INUTILISE
     // Une interface graphique n'interprete pas les sequences ANSI : elle
@@ -1120,6 +1166,9 @@ void enregistrerSysteme(Interpreteur& it) {
     it.enregistrer("who", fnWho, "systeme", "who  Liste les variables.");
     it.enregistrer("whos", fnWhos, "systeme", "whos  Liste detaillee des variables.");
     it.enregistrer("clear", fnClear, "systeme", "clear  Efface des variables.");
+    it.enregistrer("matlibre_persistantes", fnPersistantes, "systeme",
+                   "matlibre_persistantes  Lit ou remet les variables persistantes d'une "
+                   "fonction.");
     it.enregistrer("clc", fnClc, "systeme", "clc  Efface l'ecran.");
     it.enregistrer("more", fnMore, "systeme", "more  Pagination (sans effet).");
     it.enregistrer("diary", fnDiary, "systeme", "diary  Journalise la session.");

@@ -10270,6 +10270,121 @@ assert(strcmp(vu77, 'Simulink:blocks:ForEachSubsystemContinuousStates'), ...
        'un etat continu dans un For Each : refuse en le nommant');
 fprintf('sous-systeme For Each : ok\n');
 
+%% --------------------- 78. La mémoire des blocs MATLAB Function, et la reprise
+% Deux blocs au même code — deux Detect Rise Positive, que MatLibre
+% compile en MATLAB Function — ne partagent pas leur mémoire : chaque bloc
+% a ses variables persistantes, comme dans Simulink. L'état de
+% fonctionnement les porte, et la reprise les retrouve. Une batterie de
+% modèles tirés au hasard le vérifie : simulés d'une traite, puis pris à
+% un instant et repris de là, ils rendent à pas fixe exactement la même
+% chose.
+deux78 = new_system('deuxFronts78');
+deux78 = add_block(deux78, 'pulsegenerator', 'p1', 'Period', 1, 'PulseWidth', 50);
+deux78 = add_block(deux78, 'pulsegenerator', 'p2', 'Period', 1, 'PulseWidth', 50, 'PhaseDelay', 0.3);
+deux78 = add_block(deux78, 'detectrisepositive', 'd1');
+deux78 = add_block(deux78, 'detectrisepositive', 'd2');
+deux78 = add_block(deux78, 'outport', 'y1');
+deux78 = add_block(deux78, 'outport', 'y2');
+deux78 = add_line(add_line(deux78, 'p1', 'd1'), 'd1', 'y1');
+deux78 = add_line(add_line(deux78, 'p2', 'd2'), 'd2', 'y2');
+discret78 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 2};
+r78 = sim(deux78, discret78{:});
+assert(isequal(r78.tout(double(r78.yout(:, 1)) == 1), [0; 1; 2]) && ...
+       isequal(abs(r78.tout(double(r78.yout(:, 2)) == 1) - [0.3; 1.3]) < 1e-9, [true; true]), ...
+       'deux Detect Rise Positive au meme code ont chacun leur memoire');
+% un bloc MATLAB Function à variable persistante : la reprise la retrouve
+compte78 = new_system('compte78');
+compte78 = add_block(compte78, 'constant', 'u', 'Value', 2, 'SampleTime', 0.1);
+compte78 = add_block(compte78, 'matlabfunction', 'f', 'Script', ...
+                     sprintf(['function y = fcn(u)\npersistent somme\nif isempty(somme)\n' ...
+                              '    somme = 0;\nend\nsomme = somme + u;\ny = somme;\n']));
+compte78 = add_block(compte78, 'outport', 'y');
+compte78 = add_line(add_line(compte78, 'u', 'f'), 'f', 'y');
+entier78 = sim(compte78, discret78{:});
+a78 = sim(compte78, discret78{:}, 'StopTime', 1, 'SaveFinalState', 'on', 'SaveOperatingPoint', 'on');
+b78 = sim(compte78, discret78{:}, 'LoadInitialState', 'on', 'InitialState', a78.xFinal);
+assert(isequal(b78.yout, entier78.yout(entier78.tout >= 1 - 1e-9)) && b78.yout(end) == 42, ...
+       'la variable persistante d''un bloc MATLAB Function reprend ou elle etait');
+b78bis = sim(compte78, discret78{:}, 'LoadInitialState', 'on', 'InitialState', a78.xFinal);
+assert(isequal(b78bis.yout, b78.yout), 'et se reprend autant qu''on veut');
+% une source aléatoire de période 0 tient sa valeur entre deux pas
+% majeurs : le solveur à pas variable ne piétine pas, même à tolérance
+% serrée (la batterie l'a trouvé : il réduisait son pas sans fin)
+bruit78 = new_system('bruit78');
+bruit78 = add_block(bruit78, 'randomnumber', 'b', 'SampleTime', 0);
+bruit78 = add_block(bruit78, 'zeropole', 'h');
+bruit78 = add_block(bruit78, 'outport', 'y');
+bruit78 = add_line(add_line(bruit78, 'b', 'h'), 'h', 'y');
+r78 = sim(bruit78, 'Solver', 'ode45', 'RelTol', 1e-8, 'AbsTol', 1e-10, 'MaxStep', 0.05, ...
+          'StopTime', 0.5);
+assert(abs(r78.tout(end) - 0.5) < 1e-12 && numel(r78.tout) < 2000, ...
+       'une source aleatoire de periode 0 ne fait pas pietiner le solveur');
+% la batterie de reprise
+rng(78);
+catalogue78 = matlibre_sl_catalogue();
+exclus78 = {'subsystem', 'modelreference', 'iterateur', 'enableport', 'triggerport', ...
+            'actionport', 'if', 'switchcase', 'goto', 'from', 'datastorememory', ...
+            'datastoreread', 'datastorewrite', 'chart', 'sfunction', 'msfunction', ...
+            'fromfile', 'fromspreadsheet', 'signaleditor', 'fromworkspace', 'variantsource', ...
+            'variantsink', 'busselector', 'busassignment', 'inport', 'foriterator', ...
+            'whileiterator', 'merge', 'functioncallgenerator', 'tofile', ...
+            'algebraicconstraint', 'garde'};
+sources78 = {};
+blocs78 = {};
+for kT = 1:numel(catalogue78)
+    entree = catalogue78(kT);
+    if any(strcmp(entree.famille, {'Interne', 'Simscape'})) || any(strcmp(entree.type, exclus78))
+        continue
+    end
+    [ne, ns] = matlibre_sl_ports(struct('type', entree.type, 'nom', 'b', ...
+                                        'parametres', struct()), entree.type);
+    if isnan(ne) || isnan(ns) || ns == 0
+        continue
+    end
+    if ne == 0
+        sources78{end + 1} = entree.type; %#ok<SAGROW>
+    else
+        blocs78{end + 1} = entree.type; %#ok<SAGROW>
+    end
+end
+stats78 = [0 0];   % reprises justes, modèles refusés
+for n = 1:40
+    types78 = [sources78(randi(numel(sources78))), ...
+               blocs78(randi(numel(blocs78), 1, randi([2 5])))];
+    nom78 = sprintf('reprise78_%d', n);
+    try
+        [m, texte78] = aleaBatir(nom78, types78, catalogue78);
+    catch
+        continue
+    end
+    coupe78 = 0.5 + 0.4 * randi(2);
+    reglage78 = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 2};
+    try
+        entier = [];
+        avant = [];
+        apres = [];
+        evalc('entier = sim(m, reglage78{:});');
+        evalc(['avant = sim(m, reglage78{:}, ''StopTime'', coupe78, ''SaveFinalState'', ' ...
+               '''on'', ''SaveOperatingPoint'', ''on'');']);
+        evalc(['apres = sim(m, reglage78{:}, ''LoadInitialState'', ''on'', ' ...
+               '''InitialState'', avant.xFinal);']);
+    catch err
+        assert(strncmp(err.identifier, 'Simulink:', 9) && ...
+               isempty(strfind(err.identifier, 'OperatingPoint')), ...
+               sprintf('%s : %s%s : %s', nom78, strjoin(types78, ' -> '), texte78, err.message));
+        stats78(2) = stats78(2) + 1;
+        continue
+    end
+    garde78 = entier.tout >= coupe78 - 1e-9;
+    assert(isequal(size(apres.yout), size(entier.yout(garde78, :))) && ...
+           aleaMemesValeurs(apres.yout, entier.yout(garde78, :)), ...
+           sprintf('%s : %s%s, coupe %g : la reprise differe', nom78, strjoin(types78, ' -> '), ...
+                   texte78, coupe78));
+    stats78(1) = stats78(1) + 1;
+end
+assert(stats78(1) >= 10, 'la batterie de reprise simule assez de modeles');
+fprintf('memoire des blocs et batterie de reprise : %d reprises exactes, %d refus\n', stats78);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

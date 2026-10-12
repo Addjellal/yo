@@ -4,7 +4,8 @@ classdef ModelOperatingPoint
 %   valent 'on' : l'instant où la simulation s'arrête et tout ce qu'il
 %   faut pour la reprendre là exactement — les états continus, les états
 %   discrets, les sorties tenues, les tampons des retards, l'état des
-%   diagrammes Stateflow et des sous-systèmes itérés.
+%   diagrammes Stateflow et des sous-systèmes itérés, la mémoire
+%   persistante des blocs MATLAB Function.
 %
 %   Donné à InitialState, LoadInitialState à 'on', il fait reprendre la
 %   simulation à son instant, snapshotTime : à pas fixe, la reprise rend
