@@ -216,7 +216,7 @@ function modele = deplier(modele, k)
     % période à ses blocs, emboîtés compris.
     periode = periodeImposee(bloc, chemin);
     types = cellfun(@(b) b.type, interne.blocs, 'UniformOutput', false);
-    iterateurs = find(ismember(types, {'foriterator', 'whileiterator'}));
+    iterateurs = find(ismember(types, {'foriterator', 'whileiterator', 'foreach'}));
     if ~isempty(iterateurs)
         modele.blocs{k} = sousSystemeItere(bloc, interne, iterateurs, g, chemin);
         return

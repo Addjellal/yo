@@ -612,6 +612,8 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
             controles = {'foriterator', 'For Iterator'};
         case 'whileiteratorsubsystem'
             controles = {'whileiterator', 'While Iterator'};
+        case 'foreachsubsystem'
+            controles = {'foreach', 'For Each'};
         case 'variantsubsystem'
             % deux variantes qui laissent passer leur entrée, V == 1 et
             % V == 2, entre In1 et Out1 — sans lien, comme dans Simulink
@@ -636,6 +638,11 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
     gabarit = add_line(gabarit, 'In1', 'Out1');
     for k = 1:size(controles, 1)
         gabarit = add_block(gabarit, controles{k, 1}, controles{k, 2});
+    end
+    if strcmp(cle, 'foreachsubsystem')
+        % comme dans la bibliothèque de Simulink : In1 découpé élément par
+        % élément
+        gabarit = set_param(gabarit, 'For Each', 'InputPartition', {'on'});
     end
     if strcmp(cle, 'function-callsubsystem')
         gabarit = set_param(gabarit, 'function', 'TriggerType', 'function-call');

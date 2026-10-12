@@ -1772,7 +1772,7 @@ function x = codeDe(type)
                 'subsystem', 99; ...
                 'if', 110; 'switchcase', 111; 'merge', 112; 'garde', 113; ...
                 'enableport', 114; 'triggerport', 115; 'actionport', 116; ...
-                'resetport', 114; 'gototagvisibility', 114; ...
+                'resetport', 114; 'gototagvisibility', 114; 'foreach', 114; ...
                 'fcn', 100; 'matlabfunction', 101; 'interpretedmatlabfunction', 102; ...
                 'sfunction', 103; 'chart', 104; 'msfunction', 109; ...
                 'buscreator', 62; 'busselector', 63; 'datatypeconversion', 34; ...
@@ -2483,12 +2483,16 @@ function s = regleDims(c, k, dE, complet, forcer)
             if ~complet
                 return
             end
-            [~, ci, ~, sorties] = interieurIterateur(c, k, dE);
+            [~, ci, ~, sorties, ~, chaque] = interieurIterateur(c, k, dE);
             s = cell(1, numel(sorties));
             for j = 1:numel(sorties)
                 s{j} = ci.inDims{sorties(j)}{1};
+                if ~isempty(chaque)
+                    s{j} = dimsConcatenees(s{j}, chaque.N, chaque.concat(j));
+                end
             end
-        case {'enableport', 'triggerport', 'actionport', 'resetport', 'gototagvisibility'}
+        case {'enableport', 'triggerport', 'actionport', 'resetport', 'gototagvisibility', ...
+              'foreach'}
             s = {};
         case 'pulsegenerator'
             s = {accorder({dimsDe(p.Amplitude), dimsDe(p.Period), dimsDe(p.PulseWidth), ...
@@ -3122,7 +3126,8 @@ function c = periodes(c, pas, verifier)
                 % entre deux, il garde son état, comme dans Simulink.
                 c.cadence(k) = 0;
                 c.majeurSeul(k) = true;
-            case {'enableport', 'triggerport', 'actionport', 'resetport', 'gototagvisibility'}
+            case {'enableport', 'triggerport', 'actionport', 'resetport', 'gototagvisibility', ...
+                  'foreach'}
                 c.cadence(k) = Inf;   % hors d'un sous-système : sans effet
             case {'sfunction', 'msfunction'}
                 ts = c.fonctions{k}.ts;
@@ -3968,13 +3973,21 @@ function c = abaisser(c, pas, tDebut)
                         dE{j} = c.dims{entrees(j)};
                     end
                 end
-                [~, ci, lesEntrees, lesSorties, iter] = interieurIterateur(c, k, dE);
+                [~, ci, lesEntrees, lesSorties, iter, chaque] = interieurIterateur(c, k, dE);
                 q = ci.p{iter};
                 O = struct('T', matlibre_sl_executer('preparer', ci), 'entrees', lesEntrees, ...
                            'sorties', lesSorties, 'iter', iter, ...
                            'pour', strcmp(ci.types{iter}, 'foriterator'), ...
-                           'remise', strcmp(q.ResetStates, 'reset'));
-                if O.pour
+                           'remise', isfield(q, 'ResetStates') && strcmp(q.ResetStates, 'reset'));
+                if ~isempty(chaque)
+                    % For Each : une tranche par tour, chacune avec ses états
+                    O.chaque = chaque;
+                    O.chaque.formes = cell(1, numel(lesSorties));
+                    for j = 1:numel(lesSorties)
+                        O.chaque.formes{j} = ci.inDims{lesSorties(j)}{1};
+                    end
+                    O.chaque.dimsEntrees = dE;
+                elseif O.pour
                     O.externe = strcmp(q.IterationSource, 'external');
                     O.N = double(q.IterationLimit);
                     O.zero = strcmp(q.IndexMode, 'Zero-based');
@@ -4704,21 +4717,28 @@ end
 % Le modèle d'un sous-système itéré se compile à part, ses INPORT à la
 % forme des signaux qui y entrent. Ses blocs calculent tous à chaque
 % itération : ils ne portent pas de période à eux, et pas d'état continu.
-function [interne, ci, entrees, sorties, iter] = interieurIterateur(c, k, dE)
+function [interne, ci, entrees, sorties, iter, chaque] = interieurIterateur(c, k, dE)
     interne = matlibre_sl_modele(c.p{k}.Model);
     interne.nom = c.chemins{k};
     types = cell(1, numel(interne.blocs));
     for j = 1:numel(interne.blocs)
         types{j} = matlibre_sl_catalogue('type', interne.blocs{j}.type).type;
+    end
+    pourChaque = find(strcmp(types, 'foreach'), 1);
+    genre = 'itere';
+    if ~isempty(pourChaque)
+        genre = 'For Each';
+    end
+    for j = 1:numel(interne.blocs)
         P = interne.blocs{j}.parametres;
         for champ = fieldnames(P).'
             if any(strcmpi(champ{1}, {'SampleTime', 'tsamp', 'samptime', 'st'})) && ...
                isnumeric(P.(champ{1})) && ~isempty(P.(champ{1})) && P.(champ{1})(1) > 0
                 error('Simulink:blocks:IteratorSubsystemSampleTime', ...
                       ['Le bloc ''%s/%s'' porte la periode %g, mais il est dans un ' ...
-                       'sous-systeme itere : ses blocs calculent a chaque iteration, et ' ...
+                       'sous-systeme %s : ses blocs calculent a chaque iteration, et ' ...
                        'heritent leur periode (-1).'], c.chemins{k}, interne.blocs{j}.nom, ...
-                      P.(champ{1})(1));
+                      P.(champ{1})(1), genre);
             end
         end
     end
@@ -4733,17 +4753,32 @@ function [interne, ci, entrees, sorties, iter] = interieurIterateur(c, k, dE)
     end
     [~, ordre] = sort(ports);
     rangs = rangs(ordre);
+    chaque = [];
+    if ~isempty(pourChaque)
+        chaque = tranches(interne.blocs{pourChaque}.parametres, dE, numel(rangs), ...
+                          sum(strcmp(types, 'outport')), [c.chemins{k} '/' ...
+                          char(interne.blocs{pourChaque}.nom)]);
+    end
     for j = 1:numel(rangs)
         d = [1 1];
         if j <= numel(dE) && ~isempty(dE{j})
             d = dE{j};
+        end
+        if ~isempty(chaque) && chaque.decoupe(j)
+            % le dedans voit une tranche
+            d(chaque.dim(j)) = chaque.largeur(j);
         end
         interne.blocs{rangs(j)}.parametres.Value = zeros(d);
         interne.blocs{rangs(j)}.parametres.PortDimensions = -1;
     end
     options = struct('pas', 1, 'silencieux', true, 'variable', false, 'config', c.config);
     ci = matlibre_sl_compiler(interne, options);
-    if ~isempty(ci.x0)
+    if ~isempty(ci.x0) && ~isempty(chaque)
+        continu = find(ci.xA > 0, 1);
+        error('Simulink:blocks:ForEachSubsystemContinuousStates', ...
+              ['Le bloc ''%s'' a des etats continus, dans un sous-systeme For Each : ' ...
+               'MatLibre n''y simule que des blocs discrets.'], ci.chemins{continu});
+    elseif ~isempty(ci.x0)
         continu = find(ci.xA > 0, 1);
         error('Simulink:blocks:IteratorSubsystemContinuousStates', ...
               ['Le bloc ''%s'' a des etats continus, mais il est dans un sous-systeme ' ...
@@ -4759,7 +4794,116 @@ function [interne, ci, entrees, sorties, iter] = interieurIterateur(c, k, dE)
     end
     [~, ordre] = sort(ports);
     sorties = sorties(ordre);
-    iter = find(ismember(ci.types, {'foriterator', 'whileiterator'}), 1);
+    iter = find(ismember(ci.types, {'foriterator', 'whileiterator', 'foreach'}), 1);
+end
+
+% Le découpage d'un For Each, comme dans Simulink : pour chaque entrée,
+% découpée ou non (InputPartition), la dimension (InputPartitionDimension,
+% 1 par défaut) et la largeur (InputPartitionWidth, 1) de ses tranches ;
+% pour chaque sortie, la dimension où ses tranches se concatènent
+% (OutputConcatenationDimension, 1). Les entrées découpées doivent donner
+% autant de tranches. Un vecteur se découpe le long de ses éléments.
+function t = tranches(p, dE, nE, nS, chemin)
+    t = struct('decoupe', false(1, nE), 'dim', ones(1, nE), 'largeur', ones(1, nE), ...
+               'concat', ones(1, nS), 'N', 0);
+    decoupe = listeForEach(champ(p, 'InputPartition', {}), nE, 'off');
+    dims = listeForEach(champ(p, 'InputPartitionDimension', {}), nE, 1);
+    largeurs = listeForEach(champ(p, 'InputPartitionWidth', {}), nE, 1);
+    decalages = listeForEach(champ(p, 'InputPartitionOffset', {}), nE, 0);
+    concat = listeForEach(champ(p, 'OutputConcatenationDimension', {}), nS, 1);
+    for j = 1:nE
+        t.decoupe(j) = strcmpi(char(decoupe{j}), 'on') || isequal(decoupe{j}, true) || ...
+                       isequal(decoupe{j}, 1);
+        t.dim(j) = nombreForEach(dims{j});
+        t.largeur(j) = nombreForEach(largeurs{j});
+        if nombreForEach(decalages{j}) ~= 0
+            error('Simulink:blocks:ForEachPartitionOffset', ...
+                  ['Le For Each ''%s'' decale les tranches de son entree %d ' ...
+                   '(InputPartitionOffset) : MatLibre ne les decoupe que depuis le debut.'], ...
+                  chemin, j);
+        end
+    end
+    for j = 1:nS
+        t.concat(j) = nombreForEach(concat{j});
+    end
+    if ~any(t.decoupe)
+        error('Simulink:blocks:ForEachNoPartition', ...
+              ['Le For Each ''%s'' ne decoupe aucune de ses entrees : posez ' ...
+               'InputPartition a ''on'' pour l''une d''elles au moins.'], chemin);
+    end
+    N = [];
+    for j = find(t.decoupe)
+        d = [1 1];
+        if j <= numel(dE) && ~isempty(dE{j})
+            d = dE{j};
+        end
+        if numel(d) == 2 && d(2) == 1
+            t.dim(j) = 1;   % un vecteur : le long de ses éléments
+        end
+        if t.dim(j) < 1 || t.dim(j) > numel(d) || t.dim(j) ~= round(t.dim(j))
+            error('Simulink:blocks:ForEachPartitionDimension', ...
+                  ['Le For Each ''%s'' decoupe son entree %d selon la dimension %g, qu''un ' ...
+                   'signal de dimensions %s n''a pas.'], chemin, j, t.dim(j), mat2str(d));
+        end
+        w = t.largeur(j);
+        if w < 1 || w ~= round(w) || mod(d(t.dim(j)), w) ~= 0
+            error('Simulink:blocks:ForEachPartitionWidth', ...
+                  ['Le For Each ''%s'' decoupe son entree %d en tranches de %g, et sa ' ...
+                   'dimension %d en compte %d : la largeur doit la diviser.'], chemin, j, w, ...
+                  t.dim(j), d(t.dim(j)));
+        end
+        n = d(t.dim(j)) / w;
+        if ~isempty(N) && n ~= N
+            error('Simulink:blocks:ForEachPartitionMismatch', ...
+                  ['Le For Each ''%s'' tire %d tranches de son entree %d, et %d de la ' ...
+                   'precedente : ses entrees decoupees doivent en donner autant.'], ...
+                  chemin, n, j, N);
+        end
+        N = n;
+    end
+    t.N = N;
+end
+
+function L = listeForEach(v, n, defaut)
+    if ischar(v) || isstring(v)
+        texte = strtrim(char(v));
+        if ~isempty(texte) && texte(1) == '{'
+            v = eval(texte);
+        elseif ~isempty(texte)
+            v = {texte};
+        else
+            v = {};
+        end
+    end
+    if isnumeric(v) || islogical(v)
+        v = num2cell(v);
+    end
+    L = repmat({defaut}, 1, n);
+    for j = 1:min(n, numel(v))
+        L{j} = v{j};
+    end
+end
+
+function x = nombreForEach(v)
+    if ischar(v) || isstring(v)
+        x = str2double(char(v));
+    else
+        x = double(v);
+    end
+end
+
+% Les dimensions d'une sortie de For Each : N tranches de dimensions D
+% concaténées selon DIM ; des scalaires ou des vecteurs font un vecteur.
+function s = dimsConcatenees(d, N, dim)
+    if numel(d) == 2 && d(2) == 1
+        s = [d(1) * N, 1];
+        return
+    end
+    s = d;
+    if dim > numel(s)
+        s(end + 1:dim) = 1;
+    end
+    s(dim) = s(dim) * N;
 end
 
 % === blocs de code ============================================================

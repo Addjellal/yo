@@ -282,7 +282,8 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nSorties = nEntrees;
         case 'subsystem'
             [nEntrees, nSorties] = bornesSousSysteme(p);
-        case {'enableport', 'triggerport', 'actionport', 'resetport', 'gototagvisibility'}
+        case {'enableport', 'triggerport', 'actionport', 'resetport', 'gototagvisibility', ...
+              'foreach'}
             nEntrees = 0;
             nSorties = 0;
         case 'if'

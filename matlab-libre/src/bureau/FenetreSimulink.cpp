@@ -311,6 +311,8 @@ const BlocBibliotheque blocs[] = {
     {"Sous-systèmes", "Atomic Subsystem",
      "Calcule d'un bloc ; SystemSampleTime impose sa période à ses blocs", ""},
     {"Sous-systèmes", "For Iterator Subsystem", "Calcule N fois par pas", ""},
+    {"Sous-systèmes", "For Each Subsystem",
+     "Calcule une fois par tranche de son entrée, chacune avec ses états", ""},
     {"Sous-systèmes", "Variant Subsystem",
      "Ne calcule que la variante dont la condition est vraie", ""},
     {"Sous-systèmes", "While Iterator Subsystem", "Calcule tant qu'une condition est vraie",

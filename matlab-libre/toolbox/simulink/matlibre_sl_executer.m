@@ -408,7 +408,8 @@ function T = preparer(c)
     rien = ismember(c.types, {'outport', 'scope', 'display', 'toworkspace', ...
                               'terminator', 'goto', 'ground', 'enableport', ...
                               'triggerport', 'actionport', 'resetport', ...
-                              'gototagvisibility', 'datatypeduplicate', 'xygraph', 'tofile', ...
+                              'gototagvisibility', 'datatypeduplicate', 'foreach', ...
+                              'xygraph', 'tofile', ...
                               'datastorememory'});
     liste = [];
     numero = 0;
@@ -3115,6 +3116,10 @@ function V = iterer(T, k, V, e, t)
         V = poserSorties(T, k, V, etat.sorties);
         return
     end
+    if isfield(O, 'chaque')
+        V = pourChaqueTranche(T, k, V, e, t, O, etat);
+        return
+    end
     if O.remise
         etat.Z = Ti.Z0;
     end
@@ -3190,6 +3195,62 @@ function V = iterer(T, k, V, e, t)
     end
     V = poserSorties(T, k, V, sorties);
     T.iterateurs(k) = struct('V', Vi, 'Z', Zi, 't', t, 'sorties', {sorties});
+end
+
+% Un sous-système For Each : son modèle calcule une fois par tranche de
+% ses entrées découpées — les autres entrent entières —, chaque tranche
+% avec ses états, et ses sorties sont les tranches concaténées.
+function V = pourChaqueTranche(T, k, V, e, t, O, etat)
+    Ti = O.T;
+    C = O.chaque;
+    N = C.N;
+    if ~isfield(etat, 'Vs')
+        etat.Vs = repmat({Ti.V0}, 1, N);
+        etat.Zs = repmat({Ti.Z0}, 1, N);
+    end
+    touche = true(1, size(Ti.groupes, 1));
+    valeurs = cell(1, numel(O.entrees));
+    for j = 1:numel(O.entrees)
+        valeurs{j} = V(T.eA(e + j):T.eB(e + j));
+        if C.decoupe(j)
+            valeurs{j} = reshape(valeurs{j}, C.dimsEntrees{j});
+        end
+    end
+    morceaux = cell(numel(O.sorties), N);
+    for i = 1:N
+        for j = 1:numel(O.entrees)
+            u = valeurs{j};
+            if C.decoupe(j)
+                indices = repmat({':'}, 1, ndims(u));
+                w = C.largeur(j);
+                indices{C.dim(j)} = (i - 1) * w + (1:w);
+                u = u(indices{:});
+            end
+            q = Ti.pA(O.entrees(j));
+            largeur = Ti.oB(O.entrees(j)) - Ti.oA(O.entrees(j)) + 1;
+            Ti.P(q:q + largeur - 1) = u(:) + zeros(largeur, 1);
+        end
+        [Vi, Zi] = unTour(Ti, etat.Vs{i}, etat.Zs{i}, t, touche);
+        etat.Vs{i} = Vi;
+        etat.Zs{i} = Zi;
+        for j = 1:numel(O.sorties)
+            o = O.sorties(j);
+            morceaux{j, i} = reshape(Vi(Ti.eA(Ti.eD(o) + 1):Ti.eB(Ti.eD(o) + 1)), C.formes{j});
+        end
+    end
+    sorties = cell(1, numel(O.sorties));
+    for j = 1:numel(O.sorties)
+        d = C.formes{j};
+        dim = C.concat(j);
+        if numel(d) == 2 && d(2) == 1
+            dim = 1;   % des scalaires ou des vecteurs : un vecteur
+        end
+        y = cat(dim, morceaux{j, :});
+        sorties{j} = y(:);
+    end
+    V = poserSorties(T, k, V, sorties);
+    T.iterateurs(k) = struct('V', Ti.V0, 'Z', Ti.Z0, 't', t, 'sorties', {sorties}, ...
+                             'Vs', {etat.Vs}, 'Zs', {etat.Zs});
 end
 
 % Une itération : la passe des sorties, les remises, les mises à jour.

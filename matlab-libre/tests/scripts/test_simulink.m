@@ -10167,6 +10167,109 @@ assert(strcmp(getfield(matlibre_sl_catalogue('type', ...
            'Discrete-time'), 'le Discrete PID Controller (2DOF) de la bibliotheque est discret');
 fprintf('PID a deux degres de liberte : ok\n');
 
+%% --------------------------------------------- 77. Le sous-système For Each
+% Le For Each Subsystem de Simulink : son modèle calcule une fois par
+% tranche de ses entrées découpées (InputPartition, sa dimension, sa
+% largeur), chaque tranche avec ses propres états ; les entrées non
+% découpées entrent entières, et les sorties sont les tranches concaténées
+% (OutputConcatenationDimension). Les découpages impossibles sont refusés
+% en nommant le bloc.
+dedans77 = new_system('cumul77');
+dedans77 = add_block(dedans77, 'inport', 'In1', 'Port', 1);
+dedans77 = add_block(dedans77, 'sum', 'paire', 'Signs', '+');
+dedans77 = add_block(dedans77, 'sum', 'acc', 'Signs', '++');
+dedans77 = add_block(dedans77, 'unitdelay', 'z');
+dedans77 = add_block(dedans77, 'outport', 'Out1', 'Port', 1);
+dedans77 = add_block(dedans77, 'foreach', 'For Each', 'InputPartition', {'on'}, ...
+                     'InputPartitionWidth', {2});
+dedans77 = add_line(add_line(dedans77, 'In1', 'paire'), 'paire', 'acc/1');
+dedans77 = add_line(add_line(dedans77, 'z', 'acc/2'), 'acc', 'z');
+dedans77 = add_line(dedans77, 'acc', 'Out1');
+m77 = new_system('chaque77');
+m77 = add_block(m77, 'constant', 'u', 'Value', [1 2 3 4], 'SampleTime', 1);
+m77 = add_block(m77, 'subsystem', 'fe', 'Model', dedans77);
+m77 = add_block(m77, 'outport', 'y');
+m77 = add_line(add_line(m77, 'u', 'fe'), 'fe', 'y');
+discret77 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 3};
+r77 = sim(m77, discret77{:});
+assert(isequal(size(r77.yout), [4 2]) && isequal(r77.yout(:, 1), [3; 6; 9; 12]) && ...
+       isequal(r77.yout(:, 2), [7; 14; 21; 28]), ...
+       'des tranches de deux, sommees puis cumulees, chacune avec son etat');
+% l'état de fonctionnement porte les états de chaque tranche
+a77 = sim(m77, discret77{:}, 'StopTime', 1, 'SaveFinalState', 'on', 'SaveOperatingPoint', 'on');
+b77 = sim(m77, discret77{:}, 'LoadInitialState', 'on', 'InitialState', a77.xFinal);
+assert(isequal(b77.yout, r77.yout(2:end, :)), 'un For Each reprend ses tranches et leurs etats');
+% une matrice découpée par colonnes, concaténée par colonnes ; une entrée
+% entière
+colonnes77 = new_system('colonnes77');
+colonnes77 = add_block(colonnes77, 'inport', 'In1', 'Port', 1);
+colonnes77 = add_block(colonnes77, 'inport', 'In2', 'Port', 2);
+colonnes77 = add_block(colonnes77, 'gain', 'g', 'Gain', 2);
+colonnes77 = add_block(colonnes77, 'sum', 's', 'Signs', '++');
+colonnes77 = add_block(colonnes77, 'outport', 'Out1', 'Port', 1);
+colonnes77 = add_block(colonnes77, 'foreach', 'For Each', 'InputPartition', {'on', 'off'}, ...
+                       'InputPartitionDimension', {2, 1}, 'OutputConcatenationDimension', {2});
+colonnes77 = add_line(add_line(colonnes77, 'In1', 'g'), 'g', 's/1');
+colonnes77 = add_line(add_line(colonnes77, 'In2', 's/2'), 's', 'Out1');
+c77 = new_system('matrice77');
+c77 = add_block(c77, 'constant', 'u', 'Value', [1 2 3; 4 5 6]);
+c77 = add_block(c77, 'constant', 'decalage', 'Value', 10);
+c77 = add_block(c77, 'subsystem', 'fe', 'Model', colonnes77);
+c77 = add_block(c77, 'outport', 'y');
+c77 = add_line(add_line(add_line(c77, 'u', 'fe/1'), 'decalage', 'fe/2'), 'fe', 'y');
+r77 = sim(c77, discret77{:});
+assert(isequal(reshape(r77.yout(end, :), 2, 3), 2 * [1 2 3; 4 5 6] + 10), ...
+       'des colonnes doublees, l''entree entiere ajoutee, concatenees par colonnes');
+% le For Each Subsystem de la bibliothèque découpe In1 élément par élément
+biblio77 = new_system('biblio77');
+biblio77 = add_block(biblio77, 'constant', 'u', 'Value', [5 6 7]);
+biblio77 = add_block(biblio77, 'simulink/Ports & Subsystems/For Each Subsystem', 'fe');
+biblio77 = add_block(biblio77, 'outport', 'y');
+biblio77 = add_line(add_line(biblio77, 'u', 'fe'), 'fe', 'y');
+r77 = sim(biblio77, discret77{:});
+assert(isequal(r77.yout(end, :), [5 6 7]), 'le For Each Subsystem de la bibliotheque');
+% ce qui ne se découpe pas
+refus77 = {
+    {'InputPartition', {'off'}}, 'Simulink:blocks:ForEachNoPartition'
+    {'InputPartition', {'on'}, 'InputPartitionWidth', {3}}, 'Simulink:blocks:ForEachPartitionWidth'
+    {'InputPartition', {'on'}, 'InputPartitionOffset', {1}}, ...
+        'Simulink:blocks:ForEachPartitionOffset'
+    };
+for q = 1:size(refus77, 1)
+    fautif77 = set_param(dedans77, 'For Each', refus77{q, 1}{:});
+    vu77 = '';
+    message77 = '';
+    try
+        sim(set_param(m77, 'fe', 'Model', fautif77), discret77{:});
+    catch err
+        vu77 = err.identifier;
+        message77 = err.message;
+    end
+    assert(strcmp(vu77, refus77{q, 2}) && ~isempty(strfind(message77, 'chaque77/fe/For Each')), ...
+           sprintf('For Each, refus %d : %s', q, vu77));
+end
+deux77 = add_block(set_param(colonnes77, 'For Each', 'InputPartition', {'on', 'on'}), ...
+                   'terminator', 't');
+vu77 = '';
+try
+    sim(set_param(c77, 'fe', 'Model', deux77), discret77{:});
+catch err
+    vu77 = err.identifier;
+end
+assert(strcmp(vu77, 'Simulink:blocks:ForEachPartitionMismatch'), ...
+       'deux entrees decoupees en nombres de tranches differents');
+continu77 = add_block(dedans77, 'integrator', 'x');
+continu77 = add_line(continu77, 'paire', 'x');
+vu77 = '';
+try
+    sim(set_param(m77, 'fe', 'Model', continu77), 'Solver', 'ode4', 'FixedStep', 1, 'StopTime', 2);
+catch err
+    vu77 = err.identifier;
+end
+assert(strcmp(vu77, 'Simulink:blocks:ForEachSubsystemContinuousStates'), ...
+       'un etat continu dans un For Each : refuse en le nommant');
+fprintf('sous-systeme For Each : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
