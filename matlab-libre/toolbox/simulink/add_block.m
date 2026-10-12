@@ -683,6 +683,8 @@ function avance = prereglages(designation)
             avance = {'Operator', 'signedSqrt', {'Operator'}};
         case 'reciprocalsqrt'
             avance = {'Operator', 'rSqrt', {'Operator'}};
+        case 'discretepidcontroller(2dof)'
+            avance = {'TimeDomain', 'Discrete-time', {'TimeDomain'}};
         case 'discretepidcontroller'
             avance = {'TimeDomain', 'Discrete-time', {'TimeDomain'}};
         case 'delay'

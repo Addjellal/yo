@@ -28,14 +28,25 @@ function modele = matlibre_sl_bibliotheque(modele)
 %   Voir aussi MATLIBRE_SL_APLATIR, ADD_BLOCK.
     for j = 1:numel(modele.blocs)
         bloc = modele.blocs{j};
-        if ~strcmp(bloc.type, 'pidcontroller')
+        if ~any(strcmp(bloc.type, {'pidcontroller', 'pidcontroller2dof'}))
             continue
         end
-        p = parametresPID(bloc);
-        if ~pidAvance(p)
+        deux = strcmp(bloc.type, 'pidcontroller2dof');
+        chemin = char(bloc.nom);
+        if isfield(modele, 'nom') && ~isempty(modele.nom)
+            chemin = [char(modele.nom) '/' chemin];
+        end
+        p = parametresPID(bloc, bloc.type, chemin);
+        if deux
+            % à deux degrés de liberté : déplié dès qu'il est continu ; le
+            % discret se compile en une fonction, comme celui à un degré
+            if ~strcmpi(char(p.TimeDomain), 'Continuous-time')
+                continue
+            end
+        elseif ~pidAvance(p)
             continue
         end
-        interne = pidContinu(p);
+        interne = pidContinu(p, deux);
         garde = bloc.parametres;
         bloc.type = 'subsystem';
         bloc.parametres = struct('Model', interne);
@@ -47,8 +58,8 @@ function modele = matlibre_sl_bibliotheque(modele)
 end
 
 % Les paramètres du PID sous leur nom canonique, avec les défauts.
-function p = parametresPID(bloc)
-    entree = matlibre_sl_catalogue('type', 'pidcontroller');
+function p = parametresPID(bloc, type, chemin)
+    entree = matlibre_sl_catalogue('type', type);
     p = struct();
     for i = 1:size(entree.params, 1)
         p.(entree.params{i, 1}) = entree.params{i, 2};
@@ -60,6 +71,33 @@ function p = parametresPID(bloc)
             p.(canon) = bloc.parametres.(ecrits{i});
         end
     end
+    for i = 1:size(entree.params, 1)
+        if iscell(entree.params{i, 3})
+            nom = entree.params{i, 1};
+            p.(nom) = choixAdmis(p.(nom), entree.params{i, 3}, chemin, nom);
+        end
+    end
+end
+
+% Un choix se compare sans la casse ni les espaces ; hors de la liste, il
+% est refusé en nommant le bloc, comme la compilation le ferait.
+function v = choixAdmis(v, admis, chemin, nom)
+    if isnumeric(v) && isscalar(v)
+        v = num2str(v);
+    end
+    if ~(ischar(v) || isstring(v))
+        v = '?';
+    end
+    cle = lower(regexprep(char(v), '\s', ''));
+    for i = 1:numel(admis)
+        if strcmp(cle, lower(regexprep(admis{i}, '\s', '')))
+            v = admis{i};
+            return
+        end
+    end
+    error('Simulink:Parameters:InvalidValue', ...
+          ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'' ; les valeurs admises ' ...
+           'sont : %s.'], nom, chemin, char(v), strjoin(admis, ', '));
 end
 
 function oui = pidAvance(p)
@@ -82,7 +120,7 @@ end
 % Le PID continu en blocs élémentaires : u, puis Reset, I0 et D0 ; la
 % somme des parties proportionnelle, intégrale et dérivée ; la saturation,
 % et le retour qui empêche l'intégrale de s'emballer.
-function m = pidContinu(p)
+function m = pidContinu(p, deux)
     type = upper(char(p.Controller));
     aP = any(type == 'P');
     aI = any(type == 'I');
@@ -103,8 +141,35 @@ function m = pidContinu(p)
         gainD = [texte(p.P) '*' gainD];
     end
     m = new_system('PID');
-    m = add_block(m, 'inport', 'u', 'Port', 1);
-    rang = 1;
+    % ce que lit chaque partie : l'écart u, ou à deux degrés de liberté,
+    % b r - y, r - y et c r - y
+    sources = struct('P', 'u', 'I', 'u', 'D', 'u');
+    if deux
+        m = add_block(m, 'inport', 'Ref', 'Port', 1);
+        m = add_block(m, 'inport', 'Mesure', 'Port', 2);
+        rang = 2;
+        poids = struct('P', p.b, 'I', 1, 'D', p.c);
+        presentes = struct('P', aP, 'I', aI, 'D', aD);
+        for partie = {'P', 'I', 'D'}
+            q = partie{1};
+            if ~presentes.(q)
+                continue
+            end
+            ecart = ['Ecart ' q];
+            m = add_block(m, 'sum', ecart, 'Signs', '+-');
+            if strcmp(q, 'I')
+                m = add_line(m, 'Ref', ecart, 1);
+            else
+                m = add_block(m, 'gain', ['Poids ' q], 'Gain', poids.(q));
+                m = add_line(add_line(m, 'Ref', ['Poids ' q]), ['Poids ' q], ecart, 1);
+            end
+            m = add_line(m, 'Mesure', ecart, 2);
+            sources.(q) = ecart;
+        end
+    else
+        m = add_block(m, 'inport', 'u', 'Port', 1);
+        rang = 1;
+    end
     if ~strcmpi(remise, 'none')
         rang = rang + 1;
         m = add_block(m, 'inport', 'Reset', 'Port', rang);
@@ -120,13 +185,13 @@ function m = pidContinu(p)
     parties = {};
     if aP
         m = add_block(m, 'gain', 'Gain P', 'Gain', p.P);
-        m = add_line(m, 'u', 'Gain P');
+        m = add_line(m, sources.P, 'Gain P');
         parties{end + 1} = 'Gain P';
     end
     reglagesIntegrateur = {'ExternalReset', remise};
     if aI
         m = add_block(m, 'gain', 'Gain I', 'Gain', gainI);
-        m = add_line(m, 'u', 'Gain I');
+        m = add_line(m, sources.I, 'Gain I');
         ci = {'InitialCondition', p.InitialConditionForIntegrator};
         if externe
             ci = {'InitialConditionSource', 'external'};
@@ -166,7 +231,7 @@ function m = pidContinu(p)
             ci = {'InitialConditionSource', 'external'};
         end
         m = add_block(m, 'integrator', 'Filtre', reglagesIntegrateur{:}, ci{:});
-        m = add_line(add_line(m, 'u', 'Gain D'), 'Gain D', 'Somme D', 1);
+        m = add_line(add_line(m, sources.D, 'Gain D'), 'Gain D', 'Somme D', 1);
         m = add_line(add_line(m, 'Filtre', 'Somme D', 2), 'Somme D', 'Coefficient N');
         m = add_line(m, 'Coefficient N', 'Filtre', 1);
         port = 2;
@@ -181,7 +246,7 @@ function m = pidContinu(p)
     elseif aD
         m = add_block(m, 'gain', 'Gain D', 'Gain', gainD);
         m = add_block(m, 'derivative', 'Derivee');
-        m = add_line(add_line(m, 'u', 'Gain D'), 'Gain D', 'Derivee');
+        m = add_line(add_line(m, sources.D, 'Gain D'), 'Gain D', 'Derivee');
         parties{end + 1} = 'Derivee';
     end
     % la somme des parties ; une seule partie passe telle quelle, car une

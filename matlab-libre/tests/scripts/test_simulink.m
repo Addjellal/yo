@@ -10122,6 +10122,51 @@ assert(isa(r75.yout, 'int8') && all(r75.yout == 7), ...
        'Data Type Conversion Inherited arrondit vers le bas (Floor) par defaut');
 fprintf('attributs des signaux : ok\n');
 
+%% ------------------------------- 76. Le PID à deux degrés de liberté
+% PID Controller (2DOF), comme dans Simulink : deux entrées, la consigne r
+% et la mesure y ; la partie proportionnelle lit b r - y, l'intégrale
+% r - y, la dérivée filtrée c r - y. Avec b = c = 1, c'est le PID d'un
+% degré sur l'écart ; continu ou discret, borné, à remise.
+for domaine = {'Continuous-time', 'Discrete-time'}
+    solveur76 = {'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 4};
+    for poids = {[1 1], [0.5 0], [0 2]}
+        b76 = poids{1}(1);
+        c76 = poids{1}(2);
+        deux76 = sim(boucle76('deux76', b76, c76, domaine{1}, true), solveur76{:});
+        trois76 = sim(boucle76('trois76', b76, c76, domaine{1}, false), solveur76{:});
+        assert(max(abs(deux76.yout - trois76.yout)) < 1e-9, ...
+               sprintf('%s, b = %g, c = %g : le PID 2DOF est P (b r - y) + I (r - y) + D (c r - y)', ...
+                       domaine{1}, b76, c76));
+    end
+end
+% la consigne pondérée change la réponse, pas le rejet : b = 0 adoucit
+% la montée
+doux76 = sim(boucle76('doux76', 0, 0, 'Continuous-time', true), solveur76{:});
+vif76 = sim(boucle76('vif76', 1, 1, 'Continuous-time', true), solveur76{:});
+assert(max(abs(diff(doux76.yout))) < max(abs(diff(vif76.yout))), ...
+       'b = c = 0 : la consigne n''entre que par l''integrale, la montee est douce');
+% borné, à remise : quatre entrées, la sortie dans ses bornes
+borne76 = new_system('borne76');
+borne76 = add_block(borne76, 'step', 'r', 'Time', 0.5, 'After', 10);
+borne76 = add_block(borne76, 'constant', 'y', 'Value', 0);
+borne76 = add_block(borne76, 'step', 'remise', 'Time', 2);
+borne76 = add_block(borne76, 'pidcontroller2dof', 'pid', 'P', 5, 'I', 3, 'D', 0, ...
+                    'LimitOutput', 'on', 'UpperSaturationLimit', 2, ...
+                    'LowerSaturationLimit', -2, 'AntiWindupMode', 'clamping', ...
+                    'ExternalReset', 'rising');
+borne76 = add_block(borne76, 'outport', 'u');
+borne76 = add_line(add_line(borne76, 'r', 'pid/1'), 'y', 'pid/2');
+borne76 = add_line(add_line(borne76, 'remise', 'pid/3'), 'pid', 'u');
+r76 = sim(borne76, 'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 3);
+assert(all(abs(r76.yout) <= 2 + 1e-12) && abs(r76.yout(end) - 2) < 1e-12, ...
+       'le PID 2DOF borne sa sortie');
+assert(strcmp(getfield(matlibre_sl_catalogue('type', ...
+           'simulink/Discrete/Discrete PID Controller (2DOF)'), 'type'), 'pidcontroller2dof') && ...
+       strcmp(get_param(add_block(new_system('d76'), ...
+           'simulink/Discrete/Discrete PID Controller (2DOF)', 'p'), 'p', 'TimeDomain'), ...
+           'Discrete-time'), 'le Discrete PID Controller (2DOF) de la bibliotheque est discret');
+fprintf('PID a deux degres de liberte : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -10579,4 +10624,42 @@ function m = batterieSinus(type)
         m = add_block(m, 'outport', sprintf('o%d', j));
         m = add_line(m, sprintf('b/%d', j), sprintf('o%d/1', j));
     end
+end
+
+% la boucle de référence : trois PID d'un degré, un par partie
+function m = boucle76(nom, b, c, domaine, deux)
+    m = new_system(nom);
+    m = add_block(m, 'step', 'r', 'Time', 0.5);
+    m = add_block(m, 'transferfcn', 'procede', 'Numerator', 1, 'Denominator', [1 2 1]);
+    m = add_block(m, 'outport', 'y');
+    reglages = {'P', 2, 'I', 1.5, 'D', 0.3, 'N', 20, 'TimeDomain', domaine};
+    if strcmp(domaine, 'Discrete-time')
+        reglages = [reglages, {'SampleTime', 0.01}];
+    end
+    if deux
+        m = add_block(m, 'pidcontroller2dof', 'pid', reglages{:}, 'b', b, 'c', c);
+        m = add_line(add_line(m, 'r', 'pid/1'), 'procede', 'pid/2');
+        m = add_line(m, 'pid', 'procede');
+    else
+        % P (b r - y) + I (r - y) + D (c r - y) : trois PID d'un degré
+        m = add_block(m, 'gain', 'b', 'Gain', b);
+        m = add_block(m, 'gain', 'c', 'Gain', c);
+        m = add_block(m, 'sum', 'eP', 'Signs', '+-');
+        m = add_block(m, 'sum', 'eI', 'Signs', '+-');
+        m = add_block(m, 'sum', 'eD', 'Signs', '+-');
+        m = add_block(m, 'pidcontroller', 'pP', reglages{:}, 'Controller', 'P');
+        m = add_block(m, 'pidcontroller', 'pI', reglages{:}, 'Controller', 'I');
+        m = add_block(m, 'pidcontroller', 'pD', reglages{:}, 'Controller', 'PD', 'P', 0);
+        m = add_block(m, 'sum', 'u', 'Signs', '+++');
+        m = add_line(add_line(m, 'r', 'b'), 'r', 'c');
+        m = add_line(add_line(m, 'b', 'eP', 1), 'r', 'eI', 1);
+        m = add_line(m, 'c', 'eD', 1);
+        for e = {'eP', 'eI', 'eD'}
+            m = add_line(m, 'procede', [e{1} '/2']);
+        end
+        m = add_line(add_line(add_line(m, 'eP', 'pP'), 'eI', 'pI'), 'eD', 'pD');
+        m = add_line(add_line(add_line(m, 'pP', 'u', 1), 'pI', 'u', 2), 'pD', 'u', 3);
+        m = add_line(m, 'u', 'procede');
+    end
+    m = add_line(m, 'procede', 'y');
 end

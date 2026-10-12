@@ -244,6 +244,9 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             % u, puis l'entrée de remise, puis les conditions initiales I0
             % et D0 des parties qui en ont
             nEntrees = pidEntrees(p);
+        case 'pidcontroller2dof'
+            % la consigne et la mesure, puis comme un PID
+            nEntrees = pidEntrees(p) + 1;
         case 'prelookup'
             if ~strcmpi(char(lire(p, 'OutputSelection', 'Index and fraction')), 'Index only')
                 nSorties = 2;

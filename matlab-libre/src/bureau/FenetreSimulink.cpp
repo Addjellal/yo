@@ -257,6 +257,8 @@ const BlocBibliotheque blocs[] = {
      "'A', 0.5, 'B', 1, 'C', 1, 'D', 0, 'SampleTime', 0.1"},
     {"Discret", "discretefilter", "Un filtre en puissances de z^-1",
      "'Numerator', 1, 'Denominator', [1 -0.5], 'SampleTime', 0.1"},
+    {"Continu", "PID Controller (2DOF)",
+     "Un PID à deux degrés de liberté : consigne et mesure, poids b et c", ""},
     {"Discret", "delay", "Resettable Delay : se remet par l'entrée R, repart de x0",
      "'ExternalReset', 'Rising', 'InitialConditionSource', 'Input port', 'SampleTime', 0.1"},
     {"Discret", "delay", "Enabled Delay : tient sa sortie tant que enable est nul",

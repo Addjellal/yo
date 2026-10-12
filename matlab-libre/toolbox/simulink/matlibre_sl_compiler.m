@@ -814,6 +814,11 @@ function [type, p] = normaliser(type, p, chemin)
                 p = struct('Script', scriptPIDDiscret(p, chemin), 'SampleTime', p.SampleTime);
                 type = 'matlabfunction';
             end
+        case 'pidcontroller2dof'
+            % le continu est déplié en blocs (MATLIBRE_SL_BIBLIOTHEQUE)
+            p.DeuxDegres = true;
+            p = struct('Script', scriptPIDDiscret(p, chemin), 'SampleTime', p.SampleTime);
+            type = 'matlabfunction';
         case 'signalspecification'
             % un passage qui vérifie ses dimensions et son type
             p = struct('ConversionOutput', 'Signal copy', 'NombreDePorts', 1, ...
@@ -1232,7 +1237,17 @@ function script = scriptPIDDiscret(p, chemin)
     mD = find(strcmp(p.FilterMethod, methodes));
     remise = find(strcmp(p.ExternalReset, {'rising', 'falling', 'either', 'level'}));
     externe = strcmp(p.InitialConditionSource, 'external');
+    deux = isfield(p, 'DeuxDegres') && p.DeuxDegres;
     entrees = {'u'};
+    ecarts = {'eP = e;', 'eD = e;'};
+    if deux
+        % à deux degrés de liberté : la consigne ref et la mesure yy ; b ref -
+        % yy dans la partie proportionnelle, ref - yy dans l'intégrale, c ref
+        % - yy dans la dérivée
+        entrees = {'ref', 'yy'};
+        ecarts = {sprintf('eP = %s .* double(ref) - double(yy);', texteValeur(p.b)), ...
+                  sprintf('eD = %s .* double(ref) - double(yy);', texteValeur(p.c))};
+    end
     if ~isempty(remise)
         entrees{end + 1} = 'r';
     end
@@ -1257,14 +1272,18 @@ function script = scriptPIDDiscret(p, chemin)
     if borne
         anti = find(strcmp(p.AntiWindupMode, {'none', 'back-calculation', 'clamping'})) - 1;
     end
+    debut = 'e = double(u);';
+    if deux
+        debut = 'e = double(ref) - double(yy);';
+    end
     L = {sprintf('function y = fcn(%s)', strjoin(entrees, ', ')), ...
          'persistent s f dAvant xAvant eAvant rAvant tAvant', ...
-         '[t, Ts] = matlibre_sl_instant();', 'e = double(u);', ...
+         '[t, Ts] = matlibre_sl_instant();', debut, ecarts{:}, ...
          'if isempty(s)', ...
          sprintf('    s = zeros(size(e)) + %s;', ciI), ...
          sprintf('    f = zeros(size(e)) + %s;', ciD), ...
          '    dAvant = zeros(size(e));', '    xAvant = zeros(size(e));', ...
-         '    eAvant = e;', '    rAvant = [];', '    tAvant = t;', 'end', ...
+         '    eAvant = eD;', '    rAvant = [];', '    tAvant = t;', 'end', ...
          'if ~(Ts > 0 && isfinite(Ts))', '    Ts = t - tAvant;', 'end', 'tAvant = t;'};
     if ~isempty(remise)
         conditions = {'(ra < 0 & rr >= 0) | (ra == 0 & rr > 0)', ...
@@ -1283,7 +1302,7 @@ function script = scriptPIDDiscret(p, chemin)
     end
     % les trois parties
     if aP
-        L{end + 1} = sprintf('yP = %s .* e;', texteValeur(P));
+        L{end + 1} = sprintf('yP = %s .* eP;', texteValeur(P));
     else
         L{end + 1} = 'yP = zeros(size(e));';
     end
@@ -1304,16 +1323,16 @@ function script = scriptPIDDiscret(p, chemin)
         DN = {texteValeur(D), texteValeur(N)};
         switch mD
             case 1
-                L{end + 1} = sprintf('yD = %s .* (%s .* e - f);', DN{2}, DN{1});
+                L{end + 1} = sprintf('yD = %s .* (%s .* eD - f);', DN{2}, DN{1});
             case 2
-                L{end + 1} = sprintf('yD = %s .* (%s .* e - f) ./ (1 + %s .* Ts);', ...
+                L{end + 1} = sprintf('yD = %s .* (%s .* eD - f) ./ (1 + %s .* Ts);', ...
                                      DN{2}, DN{1}, DN{2});
             otherwise
-                L{end + 1} = sprintf(['yD = %s .* (%s .* e - f - Ts / 2 .* dAvant) ./ ' ...
+                L{end + 1} = sprintf(['yD = %s .* (%s .* eD - f - Ts / 2 .* dAvant) ./ ' ...
                                       '(1 + %s .* Ts / 2);'], DN{2}, DN{1}, DN{2});
         end
     elseif aD
-        L = [L, {'if Ts > 0', sprintf('    yD = %s .* (e - eAvant) ./ Ts;', texteValeur(D)), ...
+        L = [L, {'if Ts > 0', sprintf('    yD = %s .* (eD - eAvant) ./ Ts;', texteValeur(D)), ...
                  'else', '    yD = zeros(size(e));', 'end'}];
     else
         L{end + 1} = 'yD = zeros(size(e));';
@@ -1358,7 +1377,7 @@ function script = scriptPIDDiscret(p, chemin)
                 L{end + 1} = 'f = f + Ts .* yD;';
         end
     end
-    L = [L, {'eAvant = e;', 'y = yb;'}];
+    L = [L, {'eAvant = eD;', 'y = yb;'}];
     script = [strjoin(L, sprintf('\n')), sprintf('\n')];
 end
 
