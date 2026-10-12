@@ -752,12 +752,13 @@ function pe = portDeDestination(bloc, pe)
     interne = bloc.parametres.Model;
     types = cellfun(@(b) b.type, interne.blocs, 'UniformOutput', false);
     ordre = {};
-    for candidat = {'enableport', 'triggerport', 'actionport'}
+    for candidat = {'enableport', 'triggerport', 'actionport', 'resetport'}
         if any(strcmp(types, candidat{1}))
             ordre{end + 1} = candidat{1}; %#ok<AGROW>
         end
     end
-    voulu = struct('enable', 'enableport', 'trigger', 'triggerport', 'ifaction', 'actionport');
+    voulu = struct('enable', 'enableport', 'trigger', 'triggerport', 'ifaction', 'actionport', ...
+                   'reset', 'resetport');
     if ~isfield(voulu, pe)
         pe = [];
         return
@@ -1086,8 +1087,9 @@ function nom = portDeControleEcrit(bloc, port)
     end
     ordre = {};
     noms = {};
-    paires = {'enableport', 'enable'; 'triggerport', 'trigger'; 'actionport', 'ifaction'};
-    for k = 1:3
+    paires = {'enableport', 'enable'; 'triggerport', 'trigger'; 'actionport', 'ifaction'; ...
+              'resetport', 'reset'};
+    for k = 1:4
         if any(strcmp(types, paires{k, 1}))
             ordre{end + 1} = paires{k, 1}; %#ok<AGROW>
             noms{end + 1} = paires{k, 2}; %#ok<AGROW>

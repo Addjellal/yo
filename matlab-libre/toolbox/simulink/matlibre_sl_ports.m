@@ -256,13 +256,16 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             end
         case 'scope'
             nEntrees = entier(lire(p, 'NumInputPorts', 1));
+            if strcmpi(char(lire(p, 'Floating', 'off')), 'on')
+                nEntrees = 0;   % un Floating Scope n'a pas d'entrée
+            end
             nSorties = 0;
         case 'signalconversion'
             nEntrees = entier(lire(p, 'NombreDePorts', 1));
             nSorties = nEntrees;
         case 'subsystem'
             [nEntrees, nSorties] = bornesSousSysteme(p);
-        case {'enableport', 'triggerport', 'actionport'}
+        case {'enableport', 'triggerport', 'actionport', 'resetport', 'gototagvisibility'}
             nEntrees = 0;
             nSorties = 0;
         case 'if'
@@ -287,7 +290,8 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = entier(lire(p, 'Inputs', 2));
         case 'garde'
             nEntrees = (lire(p, 'Enable', 0) ~= 0) + ~strcmpi(char(lire(p, 'Trigger', 'none')), ...
-                                                             'none') + (lire(p, 'Action', 0) ~= 0);
+                                                             'none') + (lire(p, 'Action', 0) ~= 0) + ...
+                       ~strcmpi(char(lire(p, 'ResetPort', 'none')), 'none');
         case 'chart'
             nEntrees = entier(lire(p, 'Inputs', 1));
             sorties = lire(p, 'Outputs', {'etat'});
@@ -499,9 +503,9 @@ function [nEntrees, nSorties] = bornesSousSysteme(p)
     end
     for k = 1:numel(modele.blocs)
         switch typeCanonique(modele.blocs{k}.type)
-            case {'inport', 'enableport', 'triggerport', 'actionport'}
+            case {'inport', 'enableport', 'triggerport', 'actionport', 'resetport'}
                 % Les ports de contrôle viennent après les entrées : Enable,
-                % puis Trigger ; ou Action Port.
+                % puis Trigger ; ou Action Port ; et Reset.
                 nEntrees = nEntrees + 1;
             case 'outport'
                 nSorties = nSorties + 1;

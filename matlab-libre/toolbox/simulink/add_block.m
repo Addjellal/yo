@@ -399,10 +399,13 @@ function modele = add_block(modele, type, nom, varargin)
 %                  'Enabled Subsystem', 'Triggered Subsystem', 'Enabled
 %                  and Triggered Subsystem', 'If Action Subsystem',
 %                  'Switch Case Action Subsystem', 'Function-Call
-%                  Subsystem', 'For Iterator Subsystem' et 'While Iterator
-%                  Subsystem' en donnent un qui porte déjà In1, Out1 et
-%                  son port de contrôle ou son itérateur, comme dans la
-%                  bibliothèque de Simulink. Variant ('on') en fait un
+%                  Subsystem', 'Resettable Subsystem', 'For Iterator
+%                  Subsystem' et 'While Iterator Subsystem' en donnent un
+%                  qui porte déjà In1, Out1 et son port de contrôle ou son
+%                  itérateur, comme dans la bibliothèque de Simulink ;
+%                  'Atomic Subsystem', un sous-système atomique
+%                  (TreatAsAtomicUnit 'on'), dont SystemSampleTime impose
+%                  la période aux blocs qui l'héritent. Variant ('on') en fait un
 %                  sous-système à variantes : ses variantes, des
 %                  sous-systèmes posés dedans sans lien, portent chacune
 %                  sa condition VariantControl — 'Mode == 1', le nom
@@ -601,6 +604,10 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
             controles = {'actionport', 'Action Port'};
         case 'function-callsubsystem'
             controles = {'triggerport', 'function'};
+        case 'resettablesubsystem'
+            controles = {'resetport', 'Reset'};
+        case 'atomicsubsystem'
+            controles = cell(0, 2);
         case 'foriteratorsubsystem'
             controles = {'foriterator', 'For Iterator'};
         case 'whileiteratorsubsystem'
@@ -655,6 +662,10 @@ function avance = prereglages(designation)
     switch lower(regexprep(texte, '\s', ''))
         case 'divide'
             avance = {'Inputs', '*/', {'Inputs'}};
+        case 'atomicsubsystem'
+            avance = {'TreatAsAtomicUnit', 'on', {'TreatAsAtomicUnit'}};
+        case 'floatingscope'
+            avance = {'Floating', 'on', {'Floating'}};
         case 'productofelements'
             avance = {'Inputs', '*', {'Inputs'}};
         case 'subtract'

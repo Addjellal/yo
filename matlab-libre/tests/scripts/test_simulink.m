@@ -9900,6 +9900,157 @@ f73 = sim(m73, fixe73{:}, 'StopTime', 1, 'SaveOperatingPoint', 'on');
 assert(~isfield(f73, 'xFinal'), 'SaveOperatingPoint sans SaveFinalState : pas d''etat final');
 fprintf('etat de fonctionnement : ok\n');
 
+%% -------------------------- 74. Sous-systèmes remettables, atomiques, étiquettes
+% Le Resettable Subsystem de Simulink : un port Reset, et au front — ou au
+% niveau — de son signal, tous les états du dedans reviennent à leurs
+% conditions initiales, continus comme discrets. L'Atomic Subsystem :
+% SystemSampleTime impose sa période aux blocs qui l'héritent, et refuse
+% en les nommant ceux qui en ont une autre, ou qui sont continus. Le Goto
+% Tag Visibility ouvre la portée d'un Goto « scoped » à son système. Le
+% Floating Scope n'a pas d'entrée.
+interne74 = new_system('compteur74');
+interne74 = add_block(interne74, 'inport', 'In1', 'Port', 1);
+interne74 = add_block(interne74, 'discreteintegrator', 'somme', 'SampleTime', 0.1);
+interne74 = add_block(interne74, 'unitdelay', 'retard', 'SampleTime', 0.1, 'InitialCondition', -1);
+interne74 = add_block(interne74, 'outport', 'Out1', 'Port', 1);
+interne74 = add_block(interne74, 'outport', 'Out2', 'Port', 2);
+interne74 = add_block(interne74, 'resetport', 'Reset', 'ResetTriggerType', 'rising');
+interne74 = add_line(add_line(interne74, 'In1', 'somme'), 'somme', 'Out1');
+interne74 = add_line(add_line(interne74, 'In1', 'retard'), 'retard', 'Out2');
+m74 = new_system('remise74');
+m74 = add_block(m74, 'constant', 'un', 'Value', 1);
+m74 = add_block(m74, 'pulsegenerator', 'horloge', 'Period', 1, 'PulseWidth', 50);
+m74 = add_block(m74, 'subsystem', 'sous', 'Model', interne74);
+m74 = add_block(m74, 'outport', 'y');
+m74 = add_block(m74, 'outport', 'y2');
+m74 = add_line(add_line(m74, 'un', 'sous/1'), 'horloge', 'sous/Reset');
+m74 = add_line(add_line(m74, 'sous/1', 'y'), 'sous/2', 'y2');
+reglage74 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 2.5};
+r74 = sim(m74, reglage74{:});
+a74 = @(r, t) r.yout(abs(r.tout - t) < 1e-9, :);
+assert(all(abs(a74(r74, 0.9) - [0.9 1]) < 1e-12), 'avant le front, la somme monte');
+assert(all(abs(a74(r74, 1) - [0 -1]) < 1e-12) && all(abs(a74(r74, 1.5) - [0.5 1]) < 1e-12) && ...
+       all(abs(a74(r74, 2) - [0 -1]) < 1e-12), ...
+       'au front montant du Reset, les etats du dedans reviennent a leurs conditions initiales');
+% au front descendant, puis dans les deux sens
+interne74 = set_param(interne74, 'Reset', 'ResetTriggerType', 'falling');
+r74 = sim(set_param(m74, 'sous', 'Model', interne74), reglage74{:});
+assert(abs(a74(r74, 0.5) * [1; 0]) < 1e-12 && abs(a74(r74, 1.4) * [1; 0] - 0.9) < 1e-12 && ...
+       abs(a74(r74, 1.5) * [1; 0]) < 1e-12, 'Reset falling : au front descendant');
+interne74 = set_param(interne74, 'Reset', 'ResetTriggerType', 'either');
+r74 = sim(set_param(m74, 'sous', 'Model', interne74), reglage74{:});
+assert(abs(a74(r74, 0.5) * [1; 0]) < 1e-12 && abs(a74(r74, 1) * [1; 0]) < 1e-12 && ...
+       abs(a74(r74, 1.4) * [1; 0] - 0.4) < 1e-12, 'Reset either : aux deux fronts');
+% au niveau : tant que le signal n'est pas nul, et quand il retombe
+interne74 = set_param(interne74, 'Reset', 'ResetTriggerType', 'level hold');
+r74 = sim(set_param(m74, 'sous', 'Model', interne74), reglage74{:});
+assert(abs(a74(r74, 0.4) * [1; 0]) < 1e-12 && abs(a74(r74, 0.9) * [1; 0] - 0.5) < 1e-12, ...
+       'Reset level hold : remis tant que le signal est haut');
+interne74 = set_param(interne74, 'Reset', 'ResetTriggerType', 'level');
+r74 = sim(set_param(m74, 'sous', 'Model', interne74), reglage74{:});
+assert(abs(a74(r74, 0.4) * [1; 0]) < 1e-12 && abs(a74(r74, 0.9) * [1; 0] - 0.4) < 1e-12, ...
+       'Reset level : remis tant que le signal est haut, et quand il retombe');
+% un intégrateur continu se remet aussi
+continu74 = new_system('continu74');
+continu74 = add_block(continu74, 'inport', 'In1', 'Port', 1);
+continu74 = add_block(continu74, 'integrator', 'x', 'InitialCondition', 2);
+continu74 = add_block(continu74, 'outport', 'Out1', 'Port', 1);
+continu74 = add_block(continu74, 'resetport', 'Reset');
+continu74 = add_line(add_line(continu74, 'In1', 'x'), 'x', 'Out1');
+c74 = new_system('remiseContinue74');
+c74 = add_block(c74, 'constant', 'un', 'Value', 1);
+c74 = add_block(c74, 'step', 'front', 'Time', 1);
+c74 = add_block(c74, 'subsystem', 'sous', 'Model', continu74);
+c74 = add_block(c74, 'outport', 'y');
+c74 = add_line(add_line(add_line(c74, 'un', 'sous/1'), 'front', 'sous/Reset'), 'sous', 'y');
+r74 = sim(c74, 'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 2);
+assert(abs(a74(r74, 0.99) - 2.99) < 1e-9 && abs(a74(r74, 1) - 2) < 1e-9 && ...
+       abs(a74(r74, 2) - 3) < 1e-9, 'l''etat continu revient a sa condition initiale au front');
+% le sous-système de la bibliothèque arrive garni de son port Reset, et
+% se relit d'un .slx
+biblio74 = add_block(new_system('biblio74'), 'simulink/Ports & Subsystems/Resettable Subsystem', ...
+                     'r');
+garni74 = matlibre_sl_modele(get_param(biblio74, 'r', 'Model'));
+assert(any(cellfun(@(b) strcmp(b.type, 'resetport'), garni74.blocs)), ...
+       'le Resettable Subsystem porte son port Reset');
+fichier74 = save_system(m74, fullfile(tempdir(), 'remise74.slx'));
+relu74 = load_system(fichier74);
+r74 = sim(m74, reglage74{:});
+assert(isequal(sim(relu74, reglage74{:}).yout, r74.yout), 'un sous-systeme remettable se relit du .slx');
+delete(fichier74);
+% le sous-système atomique et sa période
+dedans74 = new_system('atome74');
+dedans74 = add_block(dedans74, 'inport', 'In1', 'Port', 1);
+dedans74 = add_block(dedans74, 'unitdelay', 'z');
+dedans74 = add_block(dedans74, 'outport', 'Out1', 'Port', 1);
+dedans74 = add_line(add_line(dedans74, 'In1', 'z'), 'z', 'Out1');
+t74 = new_system('atomique74');
+t74 = add_block(t74, 'clock', 'horloge');
+t74 = add_block(t74, 'simulink/Ports & Subsystems/Atomic Subsystem', 'a', 'Model', dedans74, ...
+                'SystemSampleTime', 0.5);
+t74 = add_block(t74, 'outport', 'y');
+t74 = add_line(add_line(t74, 'horloge', 'a'), 'a', 'y');
+assert(strcmp(get_param(t74, 'a', 'TreatAsAtomicUnit'), 'on'), ...
+       'l''Atomic Subsystem de la bibliotheque est atomique');
+r74 = sim(t74, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 2);
+assert(abs(a74(r74, 0.7) - 0) < 1e-12 && abs(a74(r74, 1.2) - 0.5) < 1e-12 && ...
+       abs(a74(r74, 1.9) - 1) < 1e-12, ...
+       'SystemSampleTime : le retard du dedans tient sa valeur une demi-seconde');
+refus74 = {
+    set_param(dedans74, 'z', 'SampleTime', 0.2), ...
+        'Simulink:SampleTime:AtomicSubsystemSampleTimeMismatch', 'atomique74/a/z'
+    add_line(add_block(add_block(new_system('atome74'), 'inport', 'In1', 'Port', 1), ...
+                       'integrator', 'x'), 'In1', 'x'), ...
+        'Simulink:SampleTime:AtomicSubsystemContinuousBlock', 'atomique74/a/x'
+    };
+for q = 1:size(refus74, 1)
+    vu74 = '';
+    message74 = '';
+    try
+        sim(set_param(t74, 'a', 'Model', refus74{q, 1}), 'Solver', 'ode4', 'FixedStep', 0.1, ...
+            'StopTime', 1);
+    catch err
+        vu74 = err.identifier;
+        message74 = err.message;
+    end
+    assert(strcmp(vu74, refus74{q, 2}) && ~isempty(strfind(message74, refus74{q, 3})), ...
+           sprintf('sous-systeme atomique, refus %d : %s', q, vu74));
+end
+% le Goto Tag Visibility
+b74 = new_system('B74');
+b74 = add_block(b74, 'constant', 'c', 'Value', 5);
+b74 = add_block(b74, 'goto', 'g', 'GotoTag', 'X', 'TagVisibility', 'scoped');
+b74 = add_line(b74, 'c', 'g');
+dessus74 = new_system('A74');
+dessus74 = add_block(dessus74, 'subsystem', 'B', 'Model', b74);
+dessus74 = add_block(dessus74, 'from', 'f', 'GotoTag', 'X');
+dessus74 = add_block(dessus74, 'outport', 'o', 'Port', 1);
+dessus74 = add_line(dessus74, 'f', 'o');
+g74 = new_system('etiquette74');
+g74 = add_block(g74, 'subsystem', 'A', 'Model', dessus74);
+g74 = add_block(g74, 'outport', 'y');
+g74 = add_line(g74, 'A', 'y');
+vu74 = '';
+try
+    sim(g74, 'Solver', 'FixedStepDiscrete', 'StopTime', 1);
+catch err
+    vu74 = err.identifier;
+end
+assert(strcmp(vu74, 'Simulink:Engine:GotoTagMissing'), ...
+       'sans Goto Tag Visibility, un Goto scoped ne se voit pas de plus haut');
+dessus74 = add_block(dessus74, 'simulink/Signal Routing/Goto Tag Visibility', 'v', ...
+                     'GotoTag', 'X');
+r74 = sim(set_param(g74, 'A', 'Model', dessus74), 'Solver', 'FixedStepDiscrete', 'StopTime', 1);
+assert(all(r74.yout == 5), 'le Goto Tag Visibility ouvre la portee a son systeme');
+% le Floating Scope, sans entrée
+f74 = add_block(t74, 'simulink/Sinks/Floating Scope', 'flottant');
+assert(strcmp(get_param(f74, 'flottant', 'Floating'), 'on'), 'un Floating Scope flotte');
+sim(f74, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 1);
+assert(strcmp(getfield(matlibre_sl_catalogue('type', ...
+           'simulink/Continuous/Second-Order Integrator'), 'type'), 'secondorderintegrator'), ...
+       'le Second-Order Integrator sous son nom de bibliotheque');
+fprintf('sous-systemes remettables et atomiques : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

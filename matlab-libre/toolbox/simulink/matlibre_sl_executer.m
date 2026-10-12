@@ -290,9 +290,13 @@ function T = preparer(c)
         end
     end
     T.remises = [];
+    T.remisesPort = [];
     for k = find(strcmp(c.types, 'garde'))
         if c.seg{k}(4) ~= 0
             T.remises(end + 1) = k;
+        end
+        if numel(c.seg{k}) >= 6 && c.seg{k}(6) ~= 0
+            T.remisesPort(end + 1) = k;
         end
     end
     % Les intégrateurs à remise externe ou à condition initiale externe :
@@ -325,7 +329,7 @@ function T = preparer(c)
             T.reinit(end + 1) = k;
         end
     end
-    T.aRemettre = ~isempty(T.remises) || ~isempty(T.reinit);
+    T.aRemettre = ~isempty(T.remises) || ~isempty(T.reinit) || ~isempty(T.remisesPort);
     T.h = c.pas;
     T.tDebut = c.tDebut;
     T.fixe = ~(isfield(c, 'variable') && c.variable);
@@ -403,7 +407,8 @@ function T = preparer(c)
     % font que recevoir un signal, et la masse — n'y sont pas.
     rien = ismember(c.types, {'outport', 'scope', 'display', 'toworkspace', ...
                               'terminator', 'goto', 'ground', 'enableport', ...
-                              'triggerport', 'actionport', 'xygraph', 'tofile', ...
+                              'triggerport', 'actionport', 'resetport', ...
+                              'gototagvisibility', 'xygraph', 'tofile', ...
                               'datastorememory'});
     liste = [];
     numero = 0;
@@ -3546,6 +3551,56 @@ function [x, Z, refaire] = remettre(T, V, Z, x, t)
             refaire = true;
         end
     end
+    % Le port Reset d'un sous-système remettable : au front ou au niveau de
+    % son signal, tous les états du dedans reviennent à leurs conditions
+    % initiales — continus, discrets, diagrammes, itérations —, et la passe
+    % se refait.
+    for g = T.remisesPort
+        if V(T.oA(g)) == 0
+            continue   % un sous-système qui ne calcule pas ne se remet pas
+        end
+        p = T.pA(g);
+        z = T.zA(g);
+        e = T.eD(g);
+        rang = (T.P(p) ~= 0) + (T.P(p + 1) > 0) + (T.P(p + 2) ~= 0) + 1;
+        u = V(T.eA(e + rang):T.eB(e + rang));
+        debut = z + 2 + T.P(p + 4);
+        avant = Z(debut:debut + numel(u) - 1);
+        amorcee = Z(z) ~= 0;
+        monte = (avant < 0 & u >= 0) | (avant == 0 & u > 0);
+        descend = (avant > 0 & u <= 0) | (avant == 0 & u < 0);
+        switch T.P(p + 5)
+            case 1
+                remis = amorcee && any(monte);
+            case 2
+                remis = amorcee && any(descend);
+            case 3
+                remis = amorcee && any(monte | descend);
+            case 4   % level : non nul, ou qui vient de retomber à zéro
+                remis = any(u ~= 0) || (amorcee && any(avant ~= 0 & u == 0));
+            otherwise   % level hold : tant qu'il est non nul
+                remis = any(u ~= 0);
+        end
+        if ~remis
+            continue
+        end
+        for k = T.sousGarde{g}
+            if T.xA(k) > 0
+                x(T.xA(k):T.xB(k)) = T.x0(T.xA(k):T.xB(k));
+            end
+            if T.zN(k) > 0
+                plage = T.zA(k):T.zA(k) + T.zN(k) - 1;
+                Z(plage) = T.Z0(plage);
+            end
+            if isKey(T.graphes, k)
+                remove(T.graphes, k);
+            end
+            if isKey(T.iterateurs, k)
+                remove(T.iterateurs, k);
+            end
+        end
+        refaire = true;
+    end
 end
 
 % Le Variable Transport Delay : la valeur d'entrée dont la date de sortie
@@ -4960,13 +5015,18 @@ function Z = majs(T, V, Z, t, touche, x)
                     Z(z:z + w - 1) = Z(z + w:z + 2 * w - 1);
                     Z(z + w:z + 2 * w - 1) = u;
                 end
-            case 113   % garde : ce qu'elle était, et le signal du front
+            case 113   % garde : ce qu'elle était, le signal du front, celui du Reset
                 Z(z) = 1;
                 Z(z + 1) = V(a);
                 largeur = T.P(p + 4);
                 if largeur > 0
                     rang = 1 + (T.P(p) ~= 0);
                     Z(z + 2:z + 1 + largeur) = V(T.eA(e + rang):T.eB(e + rang));
+                end
+                if T.P(p + 5) ~= 0
+                    rang = (T.P(p) ~= 0) + (T.P(p + 1) > 0) + (T.P(p + 2) ~= 0) + 1;
+                    debut = z + 2 + largeur;
+                    Z(debut:debut + T.P(p + 6) - 1) = V(T.eA(e + rang):T.eB(e + rang));
                 end
         end
     end

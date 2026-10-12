@@ -1746,6 +1746,7 @@ function x = codeDe(type)
                 'subsystem', 99; ...
                 'if', 110; 'switchcase', 111; 'merge', 112; 'garde', 113; ...
                 'enableport', 114; 'triggerport', 115; 'actionport', 116; ...
+                'resetport', 114; 'gototagvisibility', 114; ...
                 'fcn', 100; 'matlabfunction', 101; 'interpretedmatlabfunction', 102; ...
                 'sfunction', 103; 'chart', 104; 'msfunction', 109; ...
                 'buscreator', 62; 'busselector', 63; 'datatypeconversion', 34; ...
@@ -1772,6 +1773,26 @@ end
 % portée suit TagVisibility : « local », le même système ; « global »,
 % tout le modèle ; « scoped », le système du Goto et ceux qu'il contient.
 % Le From lit donc, sans lien visible, le port qui alimente le Goto.
+% Le système d'où une étiquette « scoped » se voit : celui du Goto Tag
+% Visibility de même étiquette le plus proche, au-dessus du Goto ou à
+% côté ; à défaut, celui du Goto lui-même.
+function racine = racineVisible(c, etiquette, systemeGoto)
+    racine = systemeGoto;
+    meilleure = -1;
+    for v = find(strcmp(c.types, 'gototagvisibility'))
+        if ~strcmp(char(c.p{v}.GotoTag), etiquette)
+            continue
+        end
+        systeme = parent(c.noms{v});
+        dessous = isempty(systeme) || strcmp(systemeGoto, systeme) || ...
+                  strncmp(systemeGoto, [systeme '/'], numel(systeme) + 1);
+        if dessous && numel(systeme) > meilleure
+            racine = systeme;
+            meilleure = numel(systeme);
+        end
+    end
+end
+
 function c = resoudreGoto(c)
     gotos = find(strcmp(c.types, 'goto'));
     froms = find(strcmp(c.types, 'from'));
@@ -1788,7 +1809,8 @@ function c = resoudreGoto(c)
                 case 'global'
                     visible = true;
                 case 'scoped'
-                    visible = strncmp(systemeFrom, systemeGoto, numel(systemeGoto));
+                    racine = racineVisible(c, etiquette, systemeGoto);
+                    visible = strncmp(systemeFrom, racine, numel(racine));
                 otherwise
                     visible = strcmp(systemeFrom, systemeGoto);
             end
@@ -2394,7 +2416,7 @@ function s = regleDims(c, k, dE, complet, forcer)
             for j = 1:numel(sorties)
                 s{j} = ci.inDims{sorties(j)}{1};
             end
-        case {'enableport', 'triggerport', 'actionport'}
+        case {'enableport', 'triggerport', 'actionport', 'resetport', 'gototagvisibility'}
             s = {};
         case 'pulsegenerator'
             s = {accorder({dimsDe(p.Amplitude), dimsDe(p.Period), dimsDe(p.PulseWidth), ...
@@ -3028,7 +3050,7 @@ function c = periodes(c, pas, verifier)
                 % entre deux, il garde son état, comme dans Simulink.
                 c.cadence(k) = 0;
                 c.majeurSeul(k) = true;
-            case {'enableport', 'triggerport', 'actionport'}
+            case {'enableport', 'triggerport', 'actionport', 'resetport', 'gototagvisibility'}
                 c.cadence(k) = Inf;   % hors d'un sous-système : sans effet
             case {'sfunction', 'msfunction'}
                 ts = c.fonctions{k}.ts;
@@ -4230,18 +4252,30 @@ function c = abaisser(c, pas, tDebut)
                        champ(p, 'Genre', 0); champ(p, 'MinInclus', 1); champ(p, 'MaxInclus', 1); ...
                        numel(bas); bas(:); numel(haut); haut(:)];
             % --- sous-systèmes conditionnels ---
-            case 'garde'                  % [enable; front; action; remise; largeur du front]
-                % Z : [amorcée; active au pas d'avant; front d'avant]
+            case 'garde'                  % [enable; front; action; remise; largeur du front;
+                                          %  remise par le port Reset; sa largeur]
+                % Z : [amorcée; active au pas d'avant; front d'avant; Reset d'avant]
                 fronts = struct('none', 0, 'rising', 1, 'falling', 2, 'either', 3, ...
                                 'function_call', 4);
                 largeurFront = 0;
                 if ~strcmp(p.Trigger, 'none')
                     largeurFront = largeurEntree(c, k, 1 + (p.Enable ~= 0));
                 end
+                modesRemise = {'none', 'rising', 'falling', 'either', 'level', 'level hold'};
+                modeRemise = 0;
+                largeurRemise = 0;
+                if isfield(p, 'ResetPort')
+                    modeRemise = find(strcmp(modesRemise, p.ResetPort)) - 1;
+                end
+                if modeRemise > 0
+                    largeurRemise = largeurEntree(c, k, (p.Enable ~= 0) + ...
+                                                  ~strcmp(p.Trigger, 'none') + ...
+                                                  (p.Action ~= 0) + 1);
+                end
                 seg = [p.Enable ~= 0; fronts.(strrep(p.Trigger, '-', '_')); p.Action ~= 0; ...
                        p.Reset ~= 0; ...
-                       largeurFront];
-                z0 = [0; 0; zeros(largeurFront, 1)];
+                       largeurFront; modeRemise; largeurRemise];
+                z0 = [0; 0; zeros(largeurFront, 1); zeros(largeurRemise, 1)];
             case 'if'                     % [entrées; conditions; sinon]
                 [c.objets{k}, nCond] = conditionsSi(p, c.nIn(k), ch, c, k);
                 seg = [c.nIn(k); nCond; strcmpi(p.ShowElse, 'on')];

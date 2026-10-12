@@ -212,6 +212,9 @@ function modele = deplier(modele, k)
     if isfield(bloc, 'garde')
         gardeParent = bloc.garde;
     end
+    % Un sous-système atomique dont SystemSampleTime est dit impose sa
+    % période à ses blocs, emboîtés compris.
+    periode = periodeImposee(bloc, chemin);
     types = cellfun(@(b) b.type, interne.blocs, 'UniformOutput', false);
     iterateurs = find(ismember(types, {'foriterator', 'whileiterator'}));
     if ~isempty(iterateurs)
@@ -258,6 +261,9 @@ function modele = deplier(modele, k)
         % Un bloc intérieur calcule sous la garde du sous-système, s'il est
         % conditionnel, sinon sous celle qui gardait le sous-système.
         enfant.garde = gardeParent;
+        if ~isempty(periode)
+            enfant = imposerPeriode(enfant, periode, chemin);
+        end
         if g > 0 && ~any(j == controles.tous)
             enfant.garde = n + g;
         end
@@ -314,12 +320,15 @@ function modele = deplier(modele, k)
         garde.parametres = parametresDeGarde(interne, controles);
         garde.garde = gardeParent;
         modele.blocs{n + g} = garde;
-        if controles.enable > 0 && controles.trigger > 0
-            declencheur = modele.blocs{n + controles.trigger};
-            declencheur.type = 'signalconversion';
-            declencheur.parametres = struct();
-            modele.blocs{n + controles.trigger} = declencheur;
-            modele.liens = [modele.liens; n + controles.trigger, n + g, 2, 1];
+        % les autres ports de contrôle — le Trigger après l'Enable, le
+        % Reset après eux — deviennent les passe-plats de leur signal, que
+        % la garde lit à leur rang
+        for rang = 2:numel(controles.ordre)
+            autre = modele.blocs{n + controles.ordre(rang)};
+            autre.type = 'signalconversion';
+            autre.parametres = struct();
+            modele.blocs{n + controles.ordre(rang)} = autre;
+            modele.liens = [modele.liens; n + controles.ordre(rang), n + g, rang, 1];
         end
     end
     typesEntrees = cell(1, numel(entrees));
@@ -565,8 +574,10 @@ end
 % devient la garde, 0 s'il n'y en a pas. CONTROLES.ordre les range comme
 % les entrées de contrôle du bloc : Enable, puis Trigger ; ou Action.
 function [controles, g] = portsDeControle(interne, chemin)
-    controles = struct('enable', 0, 'trigger', 0, 'action', 0, 'ordre', [], 'tous', []);
-    noms = {'enableport', 'enable'; 'triggerport', 'trigger'; 'actionport', 'action'};
+    controles = struct('enable', 0, 'trigger', 0, 'action', 0, 'reset', 0, 'ordre', [], ...
+                       'tous', []);
+    noms = {'enableport', 'enable'; 'triggerport', 'trigger'; 'actionport', 'action'; ...
+            'resetport', 'reset'};
     for i = 1:size(noms, 1)
         trouves = find(cellfun(@(b) strcmp(b.type, noms{i, 1}), interne.blocs));
         if numel(trouves) > 1
@@ -587,7 +598,12 @@ function [controles, g] = portsDeControle(interne, chemin)
                'Trigger : un sous-systeme d''action n''a que son Action Port.'], ...
               chemin);
     end
-    controles.ordre = [controles.enable, controles.trigger, controles.action];
+    if controles.action > 0 && controles.reset > 0
+        error('Simulink:blocks:ActionPortWithReset', ...
+              ['Le sous-systeme ''%s'' porte un Action Port avec un port Reset : un ' ...
+               'sous-systeme d''action n''a que son Action Port.'], chemin);
+    end
+    controles.ordre = [controles.enable, controles.trigger, controles.action, controles.reset];
     controles.ordre = controles.ordre(controles.ordre > 0);
     controles.tous = controles.ordre;
     g = 0;
@@ -600,7 +616,15 @@ end
 % remettre les états à zéro quand le sous-système reprend.
 function p = parametresDeGarde(interne, controles)
     p = struct('Enable', double(controles.enable > 0), 'Trigger', 'none', ...
-               'Action', double(controles.action > 0), 'Reset', 0, 'ZeroCross', 'on');
+               'Action', double(controles.action > 0), 'Reset', 0, 'ZeroCross', 'on', ...
+               'ResetPort', 'none');
+    if controles.reset > 0
+        p.ResetPort = 'rising';
+        q = interne.blocs{controles.reset}.parametres;
+        if isfield(q, 'ResetTriggerType')
+            p.ResetPort = lower(char(q.ResetTriggerType));
+        end
+    end
     if controles.enable > 0
         q = interne.blocs{controles.enable}.parametres;
         if isfield(q, 'StatesWhenEnabling') && strcmpi(char(q.StatesWhenEnabling), 'reset')
@@ -625,6 +649,86 @@ function p = parametresDeGarde(interne, controles)
         if isfield(q, 'InitializeStates') && strcmpi(char(q.InitializeStates), 'reset')
             p.Reset = 1;
         end
+    end
+end
+
+% La période qu'impose un sous-système atomique (TreatAsAtomicUnit 'on')
+% dont SystemSampleTime n'est pas -1, ou celle qu'il tient de celui qui le
+% contient ; [] s'il n'en impose pas.
+function ts = periodeImposee(bloc, chemin)
+    ts = [];
+    if isfield(bloc, 'periodeImposee')
+        ts = bloc.periodeImposee;
+    end
+    p = bloc.parametres;
+    atomique = strcmpi(char(lireParametre(p, 'TreatAsAtomicUnit', 'off')), 'on');
+    if ~atomique
+        return
+    end
+    v = lireParametre(p, 'SystemSampleTime', -1);
+    if ischar(v) || isstring(v)
+        v = matlibre_sl_expression(char(v), chemin, 'SystemSampleTime');
+    end
+    v = double(v);
+    if isempty(v) || ~isnumeric(v) || ~all(isfinite(v(1))) || v(1) == -1
+        return
+    end
+    if v(1) <= 0
+        error('Simulink:SampleTime:InvalidSystemSampleTime', ...
+              ['La periode du sous-systeme atomique ''%s'' (SystemSampleTime) est -1, ' ...
+               'qu''il herite, ou une periode discrete positive : pas %g.'], chemin, v(1));
+    end
+    ts = v(1);
+end
+
+% Un bloc dans un sous-système atomique qui impose sa période : il en
+% hérite si la sienne est héritée (-1), et la sienne doit être la même
+% sinon — une constante (Inf) mise à part. Un bloc continu y est refusé.
+function enfant = imposerPeriode(enfant, ts, chemin)
+    nom = [chemin '/' regexprep(char(enfant.nom), '^.*/', '')];
+    if any(strcmp(enfant.type, {'subsystem', 'modelreference'}))
+        enfant.periodeImposee = ts;
+        return
+    end
+    try
+        entree = matlibre_sl_catalogue('type', enfant.type);
+    catch
+        return
+    end
+    aPeriode = ~isempty(entree.params) && any(strcmp(entree.params(:, 1), 'SampleTime'));
+    if ~aPeriode
+        if strcmp(entree.famille, 'Continu')
+            error('Simulink:SampleTime:AtomicSubsystemContinuousBlock', ...
+                  ['Le bloc continu ''%s'' est dans le sous-systeme atomique ''%s'', qui ' ...
+                   'impose la periode discrete %g (SystemSampleTime) : un bloc continu ' ...
+                   'n''y a pas sa place.'], nom, chemin, ts);
+        end
+        return
+    end
+    v = lireParametre(enfant.parametres, 'SampleTime', -1);
+    if ischar(v) || isstring(v)
+        try
+            v = matlibre_sl_expression(char(v), chemin, 'SampleTime');
+        catch
+            return   % la compilation dira ce qui ne va pas
+        end
+    end
+    v = double(v);
+    if isempty(v) || v(1) == -1
+        champ = 'SampleTime';
+        for f = fieldnames(enfant.parametres).'
+            if strcmpi(f{1}, 'SampleTime')
+                champ = f{1};
+            end
+        end
+        enfant.parametres.(champ) = ts;
+    elseif isinf(v(1)) || abs(v(1) - ts) <= 1e-12 * max(1, ts)
+        return
+    else
+        error('Simulink:SampleTime:AtomicSubsystemSampleTimeMismatch', ...
+              ['Le bloc ''%s'' a la periode %g, et le sous-systeme atomique ''%s'' qui le ' ...
+               'contient impose %g (SystemSampleTime) : ses blocs heritent de sa periode ' ...
+               '(-1) ou ont la meme.'], nom, v(1), chemin, ts);
     end
 end
 

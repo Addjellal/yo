@@ -13,8 +13,8 @@ function modele = add_line(modele, source, destination, entree, sortie)
 %   Scope. Un bloc dont le nom lui-même se termine par « /n » l'emporte
 %   sur cette lecture. Les ports de contrôle d'un sous-système
 %   conditionnel se désignent par leur nom : 'sous/Enable',
-%   'sous/Trigger', 'sous/Ifaction' ; ce sont ses entrées qui suivent
-%   celles de ses blocs INPORT. Le port d'état d'un intégrateur
+%   'sous/Trigger', 'sous/Ifaction', 'sous/Reset' ; ce sont ses entrées
+%   qui suivent celles de ses blocs INPORT. Le port d'état d'un intégrateur
 %   (ShowStatePort à 'on') se désigne de même, 'integrateur/State' : c'est
 %   sa dernière sortie.
 %
@@ -233,7 +233,7 @@ function [k, port] = designer(modele, texte, role)
             return
         end
     end
-    jetons = regexp(texte, '^(.*)/(Enable|Trigger|Ifaction)$', 'tokens', 'once', ...
+    jetons = regexp(texte, '^(.*)/(Enable|Trigger|Ifaction|Reset)$', 'tokens', 'once', ...
                     'ignorecase');
     if ~isempty(jetons) && strcmp(role, 'destination')
         k = chercher(modele, jetons{1});
@@ -292,12 +292,13 @@ function port = portDeControle(bloc, nom, texte)
         types = cellfun(@(b) typeCanonique(b.type), interne.blocs, 'UniformOutput', false);
     end
     ordre = {};
-    for candidat = {'enableport', 'triggerport', 'actionport'}
+    for candidat = {'enableport', 'triggerport', 'actionport', 'resetport'}
         if any(strcmp(types, candidat{1}))
             ordre{end + 1} = candidat{1}; %#ok<AGROW>
         end
     end
-    voulu = struct('enable', 'enableport', 'trigger', 'triggerport', 'ifaction', 'actionport');
+    voulu = struct('enable', 'enableport', 'trigger', 'triggerport', 'ifaction', 'actionport', ...
+                   'reset', 'resetport');
     rang = find(strcmp(ordre, voulu.(lower(nom))), 1);
     if isempty(rang)
         error('Simulink:Commands:AddLineInvalidPort', ...
