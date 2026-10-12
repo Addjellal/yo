@@ -746,6 +746,13 @@ function [type, p] = normaliser(type, p, chemin)
         case 'bustovector'
             p = struct('Script', sprintf('function y = fcn(u)\ny = u(:);\n'), 'SampleTime', -1);
             type = 'matlabfunction';
+        case 'datatypeconversioninherited'
+            % la conversion de sa première entrée dans le type de la seconde
+            p = struct('OutDataTypeStr', 'Inherit: Inherit via back propagation', ...
+                       'ConvertRealWorld', p.ConvertRealWorld, 'RndMeth', p.RndMeth, ...
+                       'SaturateOnIntegerOverflow', p.SaturateOnIntegerOverflow, ...
+                       'SampleTime', -1, 'TypeDeReference', 2);
+            type = 'datatypeconversion';
         case {'simulinkpsconverter', 'pssimulinkconverter'}
             % un signal physique est un double : le convertisseur y ramène
             % son entrée, comme dans Simscape
@@ -1755,6 +1762,7 @@ function x = codeDe(type)
                 'wraptozero', 35; 'intervaltest', 36; 'saturationdynamic', 37; ...
                 'deadzonedynamic', 38; 'manualswitch', 39; ...
                 'ic', 57; 'width', 58; 'datastoreread', 59; 'datastorewrite', 69; ...
+                'probe', 122; 'datatypeduplicate', 94; ...
                 'secondorderintegrator', 77; 'variabletransportdelay', 78; ...
                 'algebraicconstraint', 79; 'busassignment', 121; ...
                 'discretederivative', 87; 'tappeddelay', 88; 'difference', 89; ...
@@ -1773,6 +1781,44 @@ end
 % portée suit TagVisibility : « local », le même système ; « global »,
 % tout le modèle ; « scoped », le système du Goto et ceux qu'il contient.
 % Le From lit donc, sans lien visible, le port qui alimente le Goto.
+% Ce qu'un Probe mesure de son entrée, comme dans Simulink : sa largeur,
+% sa période et son décalage — [0 0] pour un signal continu, [Inf 0] pour
+% une constante —, sa complexité et ses dimensions, celles que ses
+% réglages demandent, dans cet ordre.
+function v = sonde(c, k, p)
+    largeur = 1;
+    periode = [Inf 0];
+    complexe = 0;
+    dims = [1 1];
+    s = c.entrees{k}(1);
+    if s > 0
+        largeur = c.largeur(s);
+        b = c.proprio(s);
+        periode = [max(c.cadence(b), 0), c.decalage(b)];
+        if isinf(c.cadence(b))
+            periode = [Inf 0];
+        end
+        complexe = double(isfield(c, 'complexePort') && c.complexePort(s));
+        dims = c.dims{s};
+        if numel(dims) < 2
+            dims = [dims 1];
+        end
+    end
+    v = zeros(0, 1);
+    if strcmp(p.ProbeWidth, 'on')
+        v = [v; largeur];
+    end
+    if strcmp(p.ProbeSampleTime, 'on')
+        v = [v; periode(:)];
+    end
+    if strcmp(p.ProbeComplexSignal, 'on')
+        v = [v; complexe];
+    end
+    if strcmp(p.ProbeSignalDimensions, 'on')
+        v = [v; dims(:)];
+    end
+end
+
 % Le système d'où une étiquette « scoped » se voit : celui du Goto Tag
 % Visibility de même étiquette le plus proche, au-dessus du Goto ou à
 % côté ; à défaut, celui du Goto lui-même.
@@ -2134,7 +2180,7 @@ function d = transmissionDirecte(c, k)
             % une longueur donnée par une entrée peut valoir zéro
             d = strcmp(c.types{k}, 'delay') && ...
                 (p.DelayLength == 0 || strcmp(p.DelayLengthSource, 'Input port'));
-        case {'secondorderintegrator', 'width', 'foriterator', 'whileiterator'}
+        case {'secondorderintegrator', 'width', 'probe', 'foriterator', 'whileiterator'}
             d = false;
         case 'tappeddelay'
             d = strcmp(p.includeCurrent, 'on');
@@ -2397,6 +2443,13 @@ function s = regleDims(c, k, dE, complet, forcer)
         case {'clock', 'digitalclock', 'ground', 'repeatingsequence', ...
               'counterfreerunning', 'counterlimited', 'repeatingsequencestair', 'width'}
             s = {[1 1]};
+        case 'probe'
+            % la largeur, la période [Ts, décalage], la complexité, les
+            % dimensions : celles que ses réglages demandent
+            formes = {[1 1], [1 2], [1 1], [1 max(2, numel(dE{1}))]};
+            choisies = strcmp({p.ProbeWidth, p.ProbeSampleTime, p.ProbeComplexSignal, ...
+                               p.ProbeSignalDimensions}, 'on');
+            s = formes(choisies);
         case 'chirp'
             s = {accorder({dimsDe(p.f1), dimsDe(p.T), dimsDe(p.f2)}, c, k, ...
                           {'f1', 'T', 'f2'})};
@@ -3018,7 +3071,7 @@ function c = periodes(c, pas, verifier)
                 if p.SampleTime(1) > 0
                     [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
                 end
-            case {'datastorememory', 'width'}
+            case {'datastorememory', 'width', 'probe'}
                 c.cadence(k) = Inf;
             case 'iterateur'
                 % Un sous-système itéré calcule aux pas majeurs, ou aux
@@ -3861,6 +3914,8 @@ function c = abaisser(c, pas, tDebut)
                 z0 = 0;
             case 'width'
                 seg = largeurEntree(c, k, 1);
+            case 'probe'                  % ses sorties, des constantes
+                seg = sonde(c, k, p);
             case {'datastoreread', 'datastorewrite'}   % [mémoire; largeur]
                 m = c.memoire(k);
                 largeur = numel(c.p{m}.InitialValue);

@@ -572,6 +572,9 @@ function s = regle(c, k, tE, t)
             if r == 0
                 r = commun(tE(1:min(1, end)));
             end
+            if isfield(p, 'TypeDeReference') && numel(tE) >= 2
+                r = tE(2);   % Data Type Conversion Inherited : le type de la référence
+            end
             if isfield(p, 'TypeVerifie')
                 % Signal Specification : le type annoncé doit être celui de
                 % l'entrée, qu'il ne convertit pas
@@ -847,6 +850,15 @@ function verifier(c, k, tE, t)
                     end
                 end
             end
+        case 'datatypeduplicate'
+            connus = find(tE > 0);
+            autre = connus(tE(connus) ~= tE(connus(1:min(1, end))));
+            if ~isempty(autre)
+                error('Simulink:DataType:DataTypeDuplicateMismatch', ...
+                      ['Les entrees du Data Type Duplicate ''%s'' doivent etre d''un meme ' ...
+                       'type : l''entree %d est de type %s, l''entree %d de type %s.'], ch, ...
+                      connus(1), nomDe(tE(connus(1))), autre(1), nomDe(tE(autre(1))));
+            end
         case 'merge'
             if any(tE ~= tE(1))
                 [~, j] = max(tE ~= tE(1));
@@ -1008,7 +1020,7 @@ function admis = entreesEnumAdmises(c, k, nE)
               'ratetransition', 'outport', 'terminator', 'scope', 'display', 'toworkspace', ...
               'manualswitch', 'relational', 'comparetoconstant', 'switchcase', 'width', ...
               'goto', 'from', 'multiportswitch', 'buscreator', 'busselector', 'busassignment', ...
-              'chart'}
+              'chart', 'probe', 'datatypeduplicate'}
             admis(:) = true;
         case 'delay'
             admis(1) = true;   % le signal retardé ; longueur, activation, remise sont numériques
@@ -1202,7 +1214,7 @@ function admis = entreesComplexesAdmises(c, k, nE)
               'concatenate', 'selector', 'reshape', 'merge', 'signalconversion', ...
               'datatypeconversion', 'ic', 'zoh', 'memory', 'ratetransition', 'tappeddelay', ...
               'difference', 'outport', 'terminator', 'scope', 'display', 'toworkspace', ...
-              'manualswitch', 'dotproduct', 'width'}
+              'manualswitch', 'dotproduct', 'width', 'probe', 'datatypeduplicate'}
             admis(:) = true;
         case 'delay'
             admis(1) = true;   % le signal retardé ; longueur, activation, remise sont réelles

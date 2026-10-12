@@ -254,6 +254,20 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             if strcmp(char(lire(p, 'Formula', 'sin(2*pi*u)')), 'sin(2*pi*u) and cos(2*pi*u)')
                 nSorties = 2;
             end
+        case 'probe'
+            nSorties = sum(strcmpi({char(lire(p, 'ProbeWidth', 'on')), ...
+                                    char(lire(p, 'ProbeSampleTime', 'on')), ...
+                                    char(lire(p, 'ProbeComplexSignal', 'on')), ...
+                                    char(lire(p, 'ProbeSignalDimensions', 'off'))}, 'on'));
+        case 'datatypeduplicate'
+            nEntrees = entier(lire(p, 'NumInputPorts', 2));
+            nSorties = 0;
+        case 'datatypeconversioninherited'
+            nEntrees = 2;
+        case 'datatypeconversion'
+            % abaissé d'un Data Type Conversion Inherited : l'entrée de
+            % référence en plus
+            nEntrees = 1 + (isfield(p, 'TypeDeReference') && ~isempty(p.TypeDeReference));
         case 'scope'
             nEntrees = entier(lire(p, 'NumInputPorts', 1));
             if strcmpi(char(lire(p, 'Floating', 'off')), 'on')

@@ -10051,6 +10051,77 @@ assert(strcmp(getfield(matlibre_sl_catalogue('type', ...
        'le Second-Order Integrator sous son nom de bibliotheque');
 fprintf('sous-systemes remettables et atomiques : ok\n');
 
+%% ----------------------------------------- 75. Attributs des signaux
+% Le Probe mesure son entrée comme dans Simulink : sa largeur, sa période
+% [Ts, décalage], sa complexité et ses dimensions, celles que ses réglages
+% demandent. Le Data Type Duplicate exige que ses entrées soient d'un même
+% type, et le dit en nommant les deux. Le Data Type Conversion Inherited
+% convertit sa première entrée dans le type de la seconde.
+m75 = new_system('sonde75');
+m75 = add_block(m75, 'constant', 'c', 'Value', [1 2 3; 4 5 6], 'SampleTime', 0.5);
+m75 = add_block(m75, 'probe', 'p', 'ProbeSignalDimensions', 'on');
+m75 = add_block(m75, 'outport', 'largeur', 'Port', 1);
+m75 = add_block(m75, 'outport', 'periode', 'Port', 2);
+m75 = add_block(m75, 'outport', 'complexe', 'Port', 3);
+m75 = add_block(m75, 'outport', 'dims', 'Port', 4);
+m75 = add_line(m75, 'c', 'p');
+m75 = add_line(add_line(m75, 'p/1', 'largeur/1'), 'p/2', 'periode/1');
+m75 = add_line(add_line(m75, 'p/3', 'complexe/1'), 'p/4', 'dims/1');
+r75 = sim(m75, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.5, 'StopTime', 1, ...
+          'SaveFormat', 'Structure');
+assert(isequal(r75.yout.signals(1).values(end, :), 6) && ...
+       isequal(r75.yout.signals(2).values(end, :), [0.5 0]) && ...
+       isequal(r75.yout.signals(3).values(end, :), 0) && ...
+       isequal(r75.yout.signals(4).values(end, :), [2 3]), ...
+       'le Probe : largeur 6, periode [0,5 0], reel, dimensions [2 3]');
+continu75 = new_system('sondeContinue75');
+continu75 = add_block(continu75, 'sine', 's');
+continu75 = add_block(continu75, 'gain', 'g', 'Gain', 1i);
+continu75 = add_block(continu75, 'probe', 'p', 'ProbeWidth', 'off');
+continu75 = add_block(continu75, 'outport', 'periode', 'Port', 1);
+continu75 = add_block(continu75, 'outport', 'complexe', 'Port', 2);
+continu75 = add_line(add_line(continu75, 's', 'g'), 'g', 'p');
+continu75 = add_line(add_line(continu75, 'p/1', 'periode/1'), 'p/2', 'complexe/1');
+r75 = sim(continu75, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.5, 'SaveFormat', 'Structure');
+assert(isequal(r75.yout.signals(1).values(end, :), [0 0]) && ...
+       r75.yout.signals(2).values(end) == 1 && isreal(r75.yout.signals(2).values), ...
+       'un signal continu et complexe : periode [0 0], complexe 1, en reel');
+% le Data Type Duplicate
+d75 = new_system('doublon75');
+d75 = add_block(d75, 'constant', 'a', 'Value', 1, 'OutDataTypeStr', 'int16');
+d75 = add_block(d75, 'constant', 'b', 'Value', 2, 'OutDataTypeStr', 'int16');
+d75 = add_block(d75, 'datatypeduplicate', 'meme');
+d75 = add_line(add_line(d75, 'a', 'meme/1'), 'b', 'meme/2');
+sim(d75, 'Solver', 'FixedStepDiscrete', 'StopTime', 1);
+vu75 = '';
+message75 = '';
+try
+    sim(set_param(d75, 'b', 'OutDataTypeStr', 'int8'), 'Solver', 'FixedStepDiscrete', 'StopTime', 1);
+catch err
+    vu75 = err.identifier;
+    message75 = err.message;
+end
+assert(strcmp(vu75, 'Simulink:DataType:DataTypeDuplicateMismatch') && ...
+       ~isempty(strfind(message75, 'doublon75/meme')) && ~isempty(strfind(message75, 'int8')) && ...
+       ~isempty(strfind(message75, 'int16')), ...
+       'deux types differents au Data Type Duplicate : refuses en les nommant');
+% le Data Type Conversion Inherited
+h75 = new_system('herite75');
+h75 = add_block(h75, 'constant', 'u', 'Value', 300.7);
+h75 = add_block(h75, 'constant', 'ref', 'Value', 0, 'OutDataTypeStr', 'uint8');
+h75 = add_block(h75, 'simulink/Signal Attributes/Data Type Conversion Inherited', 'conv', ...
+                'SaturateOnIntegerOverflow', 'on');
+h75 = add_block(h75, 'outport', 'y');
+h75 = add_line(add_line(add_line(h75, 'u', 'conv/1'), 'ref', 'conv/2'), 'conv', 'y');
+r75 = sim(h75, 'Solver', 'FixedStepDiscrete', 'StopTime', 1);
+assert(isa(r75.yout, 'uint8') && all(r75.yout == 255), ...
+       'Data Type Conversion Inherited : le type de la reference, sature');
+h75 = set_param(set_param(h75, 'u', 'Value', 7.9), 'ref', 'OutDataTypeStr', 'int8');
+r75 = sim(h75, 'Solver', 'FixedStepDiscrete', 'StopTime', 1);
+assert(isa(r75.yout, 'int8') && all(r75.yout == 7), ...
+       'Data Type Conversion Inherited arrondit vers le bas (Floor) par defaut');
+fprintf('attributs des signaux : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

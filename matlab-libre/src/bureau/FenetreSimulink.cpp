@@ -191,6 +191,8 @@ const BlocBibliotheque blocs[] = {
     {"Aiguillage", "busassignment", "Remplace des éléments d'un bus par leur nom",
      "'AssignedSignals', 'signal1'"},
     {"Aiguillage", "reshape", "Change les dimensions du signal", ""},
+    {"Aiguillage", "probe", "Mesure son entrée : largeur, période, complexité", ""},
+    {"Aiguillage", "datatypeduplicate", "Exige que ses entrées soient d'un même type", ""},
     {"Aiguillage", "goto", "Envoie son entrée aux blocs From de même étiquette",
      "'GotoTag', 'A'"},
     {"Aiguillage", "from", "Rend le signal du Goto de même étiquette", "'GotoTag', 'A'"},

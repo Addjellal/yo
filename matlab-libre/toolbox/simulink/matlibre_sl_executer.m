@@ -408,7 +408,7 @@ function T = preparer(c)
     rien = ismember(c.types, {'outport', 'scope', 'display', 'toworkspace', ...
                               'terminator', 'goto', 'ground', 'enableport', ...
                               'triggerport', 'actionport', 'resetport', ...
-                              'gototagvisibility', 'xygraph', 'tofile', ...
+                              'gototagvisibility', 'datatypeduplicate', 'xygraph', 'tofile', ...
                               'datastorememory'});
     liste = [];
     numero = 0;
@@ -2853,6 +2853,14 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                 end
             case 12
                 switch code(k)
+                    case 122   % probe : ses mesures, une sortie après l'autre
+                        q0 = p;
+                        for j = 1:T.nOut(k)
+                            aj = T.poA(T.pd(k) + j - 1);
+                            bj = T.poB(T.pd(k) + j - 1);
+                            V(aj:bj) = T.P(q0:q0 + bj - aj);
+                            q0 = q0 + bj - aj + 1;
+                        end
                     case 121   % bus assignment : le bus, et les éléments remplacés
                         V(a:b) = V(eA(e + 1):eB(e + 1));
                         for q = 1:T.P(p)
