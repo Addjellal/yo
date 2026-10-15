@@ -90,6 +90,19 @@ function modele = add_block(modele, type, nom, varargin)
 %     sinewavefunction Amplitude, Bias, Frequency, Phase — A sin(F u + P) + B,
 %                  l'entrée tenant lieu de temps (SineType 'Time based')
 %     permutedimensions Order ; squeeze — comme PERMUTE et SQUEEZE
+%     transpose, hermitiantranspose, creatediagonalmatrix, extractdiagonal,
+%                  matrixsquare (u' * u), crossproduct (deux entrées) — la
+%                  bibliothèque Matrix Operations
+%     identitymatrix OutputDimensions, OutDataTypeStr, SampleTime, ou
+%                  InheritOutputPortAttributes 'on' : celles de l'entrée
+%     expandscalar ElementValue, OutputDimensions, OutDataTypeStr, SampleTime
+%     ishermitian, issymmetric, istriangular Mode — un booléen
+%     permutematrix mode (Columns, Rows), ZeroOneIdxMode, errmode (Clip
+%                  index, Clip and warn, Generate error), checkDims — deux
+%                  entrées : A et les indices P
+%     submatrix    RowSpan, RowIdx, RowIndex, RowOffset, RowEndIdx,
+%                  RowEndIndex, RowEndOffset, et de même Col... — des lignes
+%                  et des colonnes contiguës
 %     algebraicconstraint Constraint ('f(z) = 0', 'f(z) = z'), InitialGuess —
 %                  sa sortie z revient à son entrée par une boucle
 %                  algébrique, que la méthode de Newton résout

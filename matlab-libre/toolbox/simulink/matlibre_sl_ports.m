@@ -50,6 +50,13 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 0;
         case {'saturationdynamic', 'deadzonedynamic'}
             nEntrees = 3;   % up, u, lo
+        case {'crossproduct', 'permutematrix'}
+            nEntrees = 2;   % les deux vecteurs ; A et les indices P
+        case 'expandscalar'
+            nEntrees = 0;
+        case 'identitymatrix'
+            % une entrée quand elle donne les dimensions, la période et le type
+            nEntrees = double(strcmpi(char(lire(p, 'InheritOutputPortAttributes', 'off')), 'on'));
         case 'fromfile'
             nEntrees = 0;
         case 'assignment'

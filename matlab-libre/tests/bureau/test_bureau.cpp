@@ -1603,6 +1603,13 @@ int main(int argc, char** argv) {
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'constant', 'v', 'Value', [1 2]), "
                         "'v', 'demux');\n");
+                // Un produit vectoriel veut deux vecteurs à trois éléments.
+                if (QLatin1String(b->type) == QLatin1String("crossproduct"))
+                    essaiTous += QStringLiteral(
+                        "m = add_line(add_block(m, 'constant', 'a', 'Value', [1 2 3]), "
+                        "'a', 'crossproduct/1'); "
+                        "m = add_line(add_block(m, 'constant', 'b', 'Value', [4 5 6]), "
+                        "'b', 'crossproduct/2');\n");
                 // Un bloc de Simscape vit dans un réseau : essaiReseauPhysique
                 // donne à chacun de ses ports une charge de son domaine,
                 // reliée à la référence de ce domaine, un Solver

@@ -667,6 +667,33 @@ function [type, p] = normaliser(type, p, chemin)
         case 'squeeze'
             p = struct('Script', sprintf('function y = fcn(u)\ny = squeeze(u);\n'), 'SampleTime', -1);
             type = 'matlabfunction';
+        case {'transpose', 'hermitiantranspose', 'creatediagonalmatrix', 'extractdiagonal', ...
+              'matrixsquare', 'crossproduct', 'ishermitian', 'issymmetric', 'istriangular', ...
+              'permutematrix', 'submatrix'}
+            p = struct('Script', scriptMatrice(type, p, chemin), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'identitymatrix'
+            if strcmpi(p.InheritOutputPortAttributes, 'on')
+                % les dimensions, la période et le type de l'entrée
+                p = struct('Script', scriptMatrice(type, p, chemin), 'SampleTime', -1);
+                type = 'matlabfunction';
+            else
+                d = dimensionsDonnees(p.OutputDimensions, chemin, true);
+                p = struct('Value', eye(d(1), d(2)), 'SampleTime', p.SampleTime, ...
+                           'OutDataTypeStr', p.OutDataTypeStr);
+                type = 'constant';
+            end
+        case 'expandscalar'
+            v = p.ElementValue;
+            if ~((isnumeric(v) || islogical(v)) && isscalar(v))
+                error('Simulink:Parameters:InvalidValue', ...
+                      ['La valeur ElementValue de ''%s'' doit etre un scalaire : le bloc en ' ...
+                       'remplit chaque element de sa sortie.'], chemin);
+            end
+            d = dimensionsDonnees(p.OutputDimensions, chemin, false);
+            p = struct('Value', repmat(v, d), 'SampleTime', p.SampleTime, ...
+                       'OutDataTypeStr', p.OutDataTypeStr);
+            type = 'constant';
         case 'lookuptabledynamic'
             p = struct('Script', scriptTableDynamique(p, chemin), 'SampleTime', p.SampleTime);
             type = 'matlabfunction';
@@ -1132,6 +1159,196 @@ end
 
 % Repeating Sequence Interpolated : la table (TimeValues, OutValues) lue au
 % temps pris modulo la dernière date, par la méthode LookUpMeth.
+% Les dimensions OutputDimensions d'Identity Matrix et d'Expand Scalar :
+% un entier positif — une matrice carrée M x M pour l'identité, un vecteur
+% de M éléments pour l'expansion —, ou [M N].
+function d = dimensionsDonnees(v, chemin, carree)
+    v = double(v);
+    if isempty(v) || numel(v) > 2 || any(~isfinite(v(:))) || any(v(:) < 1) || ...
+       any(v(:) ~= round(v(:)))
+        error('Simulink:Parameters:InvalidValue', ...
+              ['Les dimensions OutputDimensions de ''%s'' valent %s : un entier positif, ou ' ...
+               '[M N] deux entiers positifs.'], chemin, mat2str(v));
+    end
+    if isscalar(v) && carree
+        d = [v v];
+    elseif isscalar(v)
+        d = [v 1];
+    else
+        d = v(:).';
+    end
+end
+
+% Le code d'un bloc de la bibliothèque Matrix Operations, écrit en MATLAB
+% Function. Ses erreurs nomment le bloc.
+function script = scriptMatrice(type, p, chemin)
+    ch = litteralChemin(chemin);
+    switch type
+        case 'transpose'
+            corps = 'y = u.'';\n';
+        case 'hermitiantranspose'
+            corps = 'y = u'';\n';
+        case 'creatediagonalmatrix'
+            corps = ['if min(size(u)) > 1\n' ...
+                     '    error(''Simulink:blocks:CreateDiagonalMatrixInput'', [''L''''entree ' ...
+                     'de ''''%s'''' est une matrice %dx%d : Create Diagonal Matrix attend un ' ...
+                     'vecteur, dont il range les elements sur la diagonale.''], ' ch ', ' ...
+                     'size(u, 1), size(u, 2));\nend\ny = diag(u(:));\n'];
+        case 'extractdiagonal'
+            corps = ['n = min(size(u));\n' ...
+                     'y = reshape(u(1 + (0:n - 1) * (size(u, 1) + 1)), n, 1);\n'];
+        case 'matrixsquare'
+            corps = ['if isinteger(u)\n    y = cast(double(u)'' * double(u), class(u));\n' ...
+                     'else\n    y = u'' * u;\nend\n'];
+        case 'crossproduct'
+            script = sprintf(['function y = fcn(a, b)\nif numel(a) ~= 3 || numel(b) ~= 3\n' ...
+                              '    error(''Simulink:blocks:CrossProductInputSize'', [''Le ' ...
+                              'bloc ''''%%s'''' fait le produit vectoriel de deux vecteurs a ' ...
+                              'trois elements ; il en recoit %%d et %%d.''], %s, numel(a), ' ...
+                              'numel(b));\nend\ny = reshape(cross(a(:), b(:)), size(a));\n'], ...
+                             ch);
+            return
+        case 'identitymatrix'
+            corps = ['y = u;\ny(:) = 0;\nn = min(size(u));\n' ...
+                     'y(1 + (0:n - 1) * (size(u, 1) + 1)) = 1;\n'];
+        case {'ishermitian', 'issymmetric'}
+            if strcmp(type, 'ishermitian')
+                operation = 'u''';
+            else
+                operation = 'u.''';
+            end
+            if strncmp(p.Mode, 'Skew', 4)
+                % l'opposé d'un entier non signé n'existe pas
+                corps = ['if islogical(u) || (isinteger(u) && intmin(class(u)) == 0)\n' ...
+                         '    error(''Simulink:blocks:SkewModeUnsignedInput'', [''Le bloc ' ...
+                         '''''%s'''' est regle en ' p.Mode ' : il lui faut un signal signe, ' ...
+                         'et il recoit un %s.''], ' ch ', class(u));\nend\n' ...
+                         'y = size(u, 1) == size(u, 2) && isequal(u, -' operation ');\n'];
+            else
+                corps = ['y = size(u, 1) == size(u, 2) && isequal(u, ' operation ');\n'];
+            end
+        case 'istriangular'
+            if strcmp(p.Mode, 'Upper')
+                corps = 'y = istriu(double(u));\n';
+            else
+                corps = 'y = istril(double(u));\n';
+            end
+        case 'permutematrix'
+            script = scriptPermutation(p, ch);
+            return
+        case 'submatrix'
+            script = scriptSousMatrice(p, chemin, ch);
+            return
+    end
+    script = strrep(['function y = fcn(u)\n' corps], '\n', char(10));
+end
+
+% Le chemin d'un bloc écrit en littéral MATLAB : les apostrophes doublées,
+% les retours à la ligne d'un nom par char(10).
+function t = litteralChemin(chemin)
+    t = strrep(char(chemin), '''', '''''');
+    t = strrep(t, char(10), ''' char(10) ''');
+    t = ['[''' t ''']'];
+end
+
+% Permute Matrix : les lignes ou les colonnes de A dans l'ordre des indices
+% P, comptés de 1 ou de 0. Un indice hors des bornes se ramène dans les
+% bornes, avec ou sans avertissement, ou arrête la simulation — mais pas
+% quand la compilation essaie la fonction sur des entrées nulles.
+function script = scriptPermutation(p, ch)
+    lignes = strcmp(p.mode, 'Rows');
+    dim = 2 - lignes;
+    decalage = double(strcmp(p.ZeroOneIdxMode, 'Zero-based'));
+    if lignes
+        nature = 'lignes';
+        choix = 'y = A(idx, :);';
+    else
+        nature = 'colonnes';
+        choix = 'y = A(:, idx);';
+    end
+    script = sprintf(['function y = fcn(A, P)\n[~, ~, essai] = matlibre_sl_instant();\n' ...
+                      'idx = round(double(P(:))) + %d;\nn = size(A, %d);\n'], decalage, dim);
+    if strcmp(p.checkDims, 'on')
+        script = [script sprintf(['if numel(idx) ~= n\n' ...
+                  '    error(''Simulink:blocks:PermuteMatrixLength'', [''P porte %%d ' ...
+                  'indice(s), et A a %%d %s : ''''%%s'''' veut autant d''''indices que de ' ...
+                  '%s (checkDims).''], numel(idx), n, %s);\nend\n'], nature, nature, ch)];
+    end
+    switch p.errmode
+        case 'Clip and warn'
+            script = [script sprintf(['if ~essai && any(idx < 1 | idx > n)\n' ...
+                      '    warning(''Simulink:blocks:PermuteMatrixIndexClipped'', [''Un ' ...
+                      'indice de ''''%%s'''' sort de son domaine (A a %%d %s) : il est ' ...
+                      'ramene dans ses bornes.''], %s, n);\nend\n'], nature, ch)];
+        case 'Generate error'
+            script = [script sprintf(['if ~essai && any(idx < 1 | idx > n)\n' ...
+                      '    error(''Simulink:blocks:PermuteMatrixInvalidIndex'', [''Un ' ...
+                      'indice de ''''%%s'''' sort de son domaine (A a %%d %s) : %%s.''], ' ...
+                      '%s, n, mat2str(idx(idx < 1 | idx > n).'' - %d));\nend\n'], ...
+                      nature, ch, decalage)];
+    end
+    script = [script sprintf('idx = min(max(idx, 1), n);\n%s\n', choix)];
+end
+
+% Submatrix : des lignes et des colonnes contiguës de l'entrée, choisies
+% comme dans le bloc de Simulink — toutes, une seule, ou une plage dont le
+% début et la fin se disent par un indice, par un écart à la dernière ou
+% au milieu, ou sont la première, la dernière, celle du milieu.
+function script = scriptSousMatrice(p, chemin, ch)
+    lignes = selectionSousMatrice(p, 'Row', 'M', chemin);
+    colonnes = selectionSousMatrice(p, 'Col', 'N', chemin);
+    script = sprintf(['function y = fcn(u)\n[M, N] = size(u);\n' ...
+                      'milieuM = floor(M / 2) + 1;\nmilieuN = floor(N / 2) + 1;\n' ...
+                      'r = %s;\nc = %s;\n' ...
+                      'if isempty(r) || isempty(c) || any(r < 1 | r > M) || any(c < 1 | c > N)\n' ...
+                      '    error(''Simulink:blocks:SubmatrixIndex'', [''La sous-matrice que ' ...
+                      'choisit ''''%%s'''' (lignes %%s, colonnes %%s) sort de son entree, ' ...
+                      'de taille %%dx%%d, ou sa fin precede son debut.''], %s, mat2str(r), ' ...
+                      'mat2str(c), M, N);\nend\ny = u(r, c);\n'], lignes, colonnes, ch);
+end
+
+function code = selectionSousMatrice(p, prefixe, taille, chemin)
+    span = p.([prefixe 'Span']);
+    if strncmp(span, 'All', 3)
+        code = sprintf('1:%s', taille);
+        return
+    end
+    debut = bornePlage(p, prefixe, '', taille, chemin);
+    if strncmp(span, 'One', 3) || strcmp(p.([prefixe 'Idx']), 'Last')
+        code = debut;
+        return
+    end
+    fin = bornePlage(p, prefixe, 'End', taille, chemin);
+    code = sprintf('(%s):(%s)', debut, fin);
+end
+
+function code = bornePlage(p, prefixe, quoi, taille, chemin)
+    option = p.([prefixe quoi 'Idx']);
+    switch option
+        case 'First'
+            code = '1';
+        case 'Index'
+            code = sprintf('%d', entierPositif(p, [prefixe quoi 'Index'], chemin));
+        case 'Offset from last'
+            code = sprintf('%s - %d', taille, entierPositif(p, [prefixe quoi 'Offset'], chemin));
+        case 'Last'
+            code = taille;
+        case 'Offset from middle'
+            code = sprintf('milieu%s + %d', taille, ...
+                           entierPositif(p, [prefixe quoi 'Offset'], chemin));
+        otherwise   % Middle
+            code = ['milieu' taille];
+    end
+end
+
+function v = entierPositif(p, nom, chemin)
+    v = double(p.(nom));
+    if ~isscalar(v) || ~isfinite(v) || v < 1 || v ~= round(v)
+        error('Simulink:Parameters:InvalidValue', ...
+              'Le parametre %s de ''%s'' vaut %s : un entier positif.', nom, chemin, mat2str(v));
+    end
+end
+
 function script = scriptSequenceInterpolee(p, chemin)
     t = double(p.TimeValues(:));
     v = double(p.OutValues(:));
@@ -5198,9 +5415,12 @@ function s = dimsFonction(c, k, dE)
         end
     end
     sorties = cell(1, c.nOut(k));
+    matlibre_sl_instant('essai', true);
     try
         [sorties{:}] = h(u{:});
+        matlibre_sl_instant('essai', false);
     catch err
+        matlibre_sl_instant('essai', false);
         % une erreur de Simulink qui nomme déjà le bloc passe telle quelle
         if strncmp(err.identifier, 'Simulink:', 9) && ~isempty(strfind(err.message, c.chemins{k}))
             rethrow(err);
@@ -6015,8 +6235,12 @@ function oui = sourceHeritee(type, p)
             v = p.tsamp;
         case {'constant', 'enumeratedconstant', 'step', 'sine', 'digitalclock', ...
               'randomnumber', 'uniformrandomnumber', 'fromfile', 'signaleditor', ...
-              'fromspreadsheet', 'fromworkspace'}
+              'fromspreadsheet', 'fromworkspace', 'expandscalar'}
             v = p.SampleTime;
+        case 'identitymatrix'
+            if strcmpi(p.InheritOutputPortAttributes, 'off')
+                v = p.SampleTime;
+            end
         case 'pulsegenerator'
             if strcmp(p.PulseType, 'Sample based')
                 v = p.SampleTime;

@@ -10596,6 +10596,195 @@ end
 evalin('base', 'clear donnees79');
 fprintf('sources a periode -1 : %d essais\n', essais79);
 
+%% ------------------------------------ 80. La bibliothèque Matrix Operations
+% Les blocs de la bibliothèque Matrix Operations de Simulink : transposées,
+% diagonales, carré u' * u, produit vectoriel, identité, expansion d'un
+% scalaire, tests de symétrie et de triangularité, permutation des lignes
+% ou des colonnes, sous-matrice. Chacun calcule comme la fonction de
+% MATLAB qui lui répond, garde le type de son entrée, et refuse en se
+% nommant ce qu'il ne sait pas faire.
+A80 = [1 2 3; 4 5 6];
+S80 = [2 -1 0; -1 2 -1; 0 -1 2];
+blocs80 = {
+    'transpose', {}, A80, A80.'
+    'hermitiantranspose', {}, [1+2i 3; 4 5-1i], [1+2i 3; 4 5-1i]'
+    'creatediagonalmatrix', {}, [1 2 3], diag([1 2 3])
+    'extractdiagonal', {}, A80, [1; 5]
+    'matrixsquare', {}, A80, A80' * A80
+    'issymmetric', {'Mode', 'Symmetric'}, S80, true
+    'issymmetric', {'Mode', 'Symmetric'}, A80, false
+    'issymmetric', {'Mode', 'Skew-Symmetric'}, [0 1; -1 0], true
+    'ishermitian', {'Mode', 'Hermitian'}, [2 1i; -1i 3], true
+    'ishermitian', {'Mode', 'Skew-Hermitian'}, [1i 2; -2 0], true
+    'istriangular', {'Mode', 'Upper'}, triu(S80), true
+    'istriangular', {'Mode', 'Lower'}, triu(S80), false
+    'identitymatrix', {'InheritOutputPortAttributes', 'on'}, A80, eye(2, 3)
+    'submatrix', {'RowSpan', 'One row', 'RowIdx', 'Last'}, magic(4), [4 14 15 1]
+    'submatrix', {'RowSpan', 'Range of rows', 'RowIdx', 'Index', 'RowIndex', 2, ...
+                  'RowEndIdx', 'Offset from last', 'RowEndOffset', 1, ...
+                  'ColSpan', 'Range of columns', 'ColIdx', 'Middle', 'ColEndIdx', 'Last'}, ...
+        magic(4), [10 8; 6 12]
+    };
+for q = 1:size(blocs80, 1)
+    m80 = new_system('matrices80');
+    m80 = add_block(m80, 'constant', 'u', 'Value', blocs80{q, 3});
+    m80 = add_block(m80, blocs80{q, 1}, 'b', blocs80{q, 2}{:});
+    m80 = add_block(m80, 'toworkspace', 'tw', 'VariableName', 'sortie80', 'SaveFormat', 'Array');
+    m80 = add_line(add_line(m80, 'u', 'b'), 'b', 'tw');
+    r80 = [];
+    evalc('r80 = sim(m80, ''Solver'', ''FixedStepDiscrete'', ''FixedStep'', 1, ''StopTime'', 1);');
+    vu80 = evalin('base', 'sortie80');
+    if ndims(vu80) == 3
+        vu80 = vu80(:, :, end);
+    else
+        vu80 = vu80(end, :);
+    end
+    attendu = blocs80{q, 4};
+    assert(isequal(size(vu80), size(attendu)) || numel(vu80) == numel(attendu), ...
+           sprintf('%s (%d) : taille %s au lieu de %s', blocs80{q, 1}, q, mat2str(size(vu80)), ...
+                   mat2str(size(attendu))));
+    assert(isequal(double(vu80(:)), double(attendu(:))), ...
+           sprintf('%s (%d) : %s au lieu de %s', blocs80{q, 1}, q, mat2str(vu80), ...
+                   mat2str(attendu)));
+end
+% le produit vectoriel, deux entrées
+p80 = new_system('vectoriel80');
+p80 = add_block(p80, 'constant', 'a', 'Value', [1; 0; 0]);
+p80 = add_block(p80, 'constant', 'b', 'Value', [0; 1; 0]);
+p80 = add_block(p80, 'crossproduct', 'x');
+p80 = add_block(p80, 'outport', 'y');
+p80 = add_line(add_line(add_line(p80, 'a', 'x/1'), 'b', 'x/2'), 'x', 'y');
+r80 = sim(p80, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1);
+assert(isequal(r80.yout(end, :), [0 0 1]), 'Cross Product : x par y donne z');
+vu80 = '';
+message80 = '';
+try
+    sim(set_param(p80, 'a', 'Value', [1 2]), 'Solver', 'FixedStepDiscrete', 'StopTime', 1);
+catch err
+    vu80 = err.identifier;
+    message80 = err.message;
+end
+assert(strcmp(vu80, 'Simulink:blocks:CrossProductInputSize') && ...
+       ~isempty(strfind(message80, 'vectoriel80/x')), ...
+       'Cross Product refuse un vecteur qui n''a pas trois elements, en se nommant');
+% l'identité et l'expansion d'un scalaire, sources : leur type, leur période
+i80 = new_system('identite80');
+i80 = add_block(i80, 'identitymatrix', 'I', 'OutputDimensions', [2 3], 'OutDataTypeStr', 'int8', ...
+                'SampleTime', 0.5);
+i80 = add_block(i80, 'expandscalar', 'E', 'ElementValue', 7, 'OutputDimensions', 4, ...
+                'OutDataTypeStr', 'uint16');
+i80 = add_block(i80, 'toworkspace', 'ti', 'VariableName', 'identite80', 'SaveFormat', 'Array');
+i80 = add_block(i80, 'toworkspace', 'te', 'VariableName', 'expansion80', 'SaveFormat', 'Array');
+i80 = add_line(add_line(i80, 'I', 'ti'), 'E', 'te');
+evalc('sim(i80, ''Solver'', ''FixedStepDiscrete'', ''FixedStep'', 0.5, ''StopTime'', 1);');
+vi80 = evalin('base', 'identite80');
+ve80 = evalin('base', 'expansion80');
+assert(isa(vi80, 'int8') && isequal(double(vi80(:, :, end)), eye(2, 3)), ...
+       'Identity Matrix : eye(2, 3) en int8');
+assert(isa(ve80, 'uint16') && isequal(double(ve80(end, :)), [7 7 7 7]), ...
+       'Expand Scalar : quatre fois 7 en uint16');
+vu80 = '';
+try
+    sim(set_param(i80, 'I', 'OutputDimensions', [2 0]), 'Solver', 'FixedStepDiscrete', ...
+        'StopTime', 1);
+catch err
+    vu80 = err.identifier;
+end
+assert(strcmp(vu80, 'Simulink:Parameters:InvalidValue'), ...
+       'Identity Matrix refuse des dimensions qui ne sont pas des entiers positifs');
+% le type de l'entrée se garde
+t80 = new_system('types80');
+t80 = add_block(t80, 'constant', 'u', 'Value', int16([1 2; 3 4]));
+t80 = add_block(t80, 'transpose', 'T');
+t80 = add_block(t80, 'matrixsquare', 'C');
+t80 = add_block(t80, 'toworkspace', 'tt', 'VariableName', 'transposee80', 'SaveFormat', 'Array');
+t80 = add_block(t80, 'toworkspace', 'tc', 'VariableName', 'carre80', 'SaveFormat', 'Array');
+t80 = add_line(add_line(add_line(t80, 'u', 'T'), 'T', 'tt'), 'u', 'C');
+t80 = add_line(t80, 'C', 'tc');
+evalc('sim(t80, ''Solver'', ''FixedStepDiscrete'', ''FixedStep'', 1, ''StopTime'', 1);');
+vt80 = evalin('base', 'transposee80');
+vc80 = evalin('base', 'carre80');
+assert(isa(vt80, 'int16') && isequal(vt80(:, :, end), int16([1 3; 2 4])) && ...
+       isa(vc80, 'int16') && isequal(vc80(:, :, end), int16([10 14; 14 20])), ...
+       'Transpose et Matrix Square gardent le type entier de leur entree');
+% Permute Matrix : lignes, colonnes, indices de 0, hors bornes
+permutations80 = {
+    {'mode', 'Rows'}, [3 1 2], A80([2 1 2], :), ''
+    {'mode', 'Columns'}, [3 1], A80(:, [3 1]), ''
+    {'mode', 'Columns', 'ZeroOneIdxMode', 'Zero-based'}, [2 0], A80(:, [3 1]), ''
+    {'mode', 'Columns', 'errmode', 'Clip and warn'}, [9 -2], A80(:, [3 1]), ...
+        'Simulink:blocks:PermuteMatrixIndexClipped'
+    {'mode', 'Columns', 'errmode', 'Generate error'}, [9 1], [], ...
+        'Simulink:blocks:PermuteMatrixInvalidIndex'
+    {'mode', 'Rows', 'checkDims', 'on'}, [1 2 1], [], 'Simulink:blocks:PermuteMatrixLength'
+    };
+for q = 1:size(permutations80, 1)
+    m80 = new_system('permute80');
+    m80 = add_block(m80, 'constant', 'A', 'Value', A80);
+    m80 = add_block(m80, 'constant', 'P', 'Value', permutations80{q, 2});
+    m80 = add_block(m80, 'permutematrix', 'pm', permutations80{q, 1}{:});
+    m80 = add_block(m80, 'toworkspace', 'tw', 'VariableName', 'permute80', 'SaveFormat', 'Array');
+    m80 = add_line(add_line(add_line(m80, 'A', 'pm/1'), 'P', 'pm/2'), 'pm', 'tw');
+    lastwarn('');
+    vu80 = '';
+    message80 = '';
+    try
+        evalc('sim(m80, ''Solver'', ''FixedStepDiscrete'', ''FixedStep'', 1, ''StopTime'', 1);');
+    catch err
+        vu80 = err.identifier;
+        message80 = err.message;
+    end
+    [~, averti80] = lastwarn();
+    if isempty(permutations80{q, 3})
+        assert(strcmp(vu80, permutations80{q, 4}) && ~isempty(strfind(message80, 'permute80/pm')), ...
+               sprintf('Permute Matrix %d : %s', q, vu80));
+    else
+        assert(isempty(vu80), sprintf('Permute Matrix %d : %s', q, message80));
+        vu80 = evalin('base', 'permute80');
+        assert(isequal(vu80(:, :, end), permutations80{q, 3}), ...
+               sprintf('Permute Matrix %d : %s', q, mat2str(vu80(:, :, end))));
+        assert(strcmp(averti80, permutations80{q, 4}), ...
+               sprintf('Permute Matrix %d : avertissement %s', q, averti80));
+    end
+end
+% ce que les blocs refusent, en se nommant
+refus80 = {
+    'creatediagonalmatrix', {}, A80, 'Simulink:blocks:CreateDiagonalMatrixInput'
+    'issymmetric', {'Mode', 'Skew-Symmetric'}, uint8([0 1; 1 0]), ...
+        'Simulink:blocks:SkewModeUnsignedInput'
+    'submatrix', {'RowSpan', 'One row', 'RowIdx', 'Index', 'RowIndex', 5}, A80, ...
+        'Simulink:blocks:SubmatrixIndex'
+    'submatrix', {'RowSpan', 'Range of rows', 'RowIdx', 'Last', 'ColSpan', ...
+                  'Range of columns', 'ColIdx', 'Index', 'ColIndex', 3, 'ColEndIdx', 'Index', ...
+                  'ColEndIndex', 1}, A80, 'Simulink:blocks:SubmatrixIndex'
+    'submatrix', {'RowSpan', 'One row', 'RowIdx', 'Index', 'RowIndex', 0.5}, A80, ...
+        'Simulink:Parameters:InvalidValue'
+    };
+for q = 1:size(refus80, 1)
+    m80 = new_system('refus80');
+    m80 = add_block(m80, 'constant', 'u', 'Value', refus80{q, 3});
+    m80 = add_block(m80, refus80{q, 1}, 'b', refus80{q, 2}{:});
+    m80 = add_block(m80, 'terminator', 't');
+    m80 = add_line(add_line(m80, 'u', 'b'), 'b', 't');
+    vu80 = '';
+    message80 = '';
+    try
+        sim(m80, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1);
+    catch err
+        vu80 = err.identifier;
+        message80 = err.message;
+    end
+    assert(strcmp(vu80, refus80{q, 4}) && ~isempty(strfind(message80, 'refus80/b')), ...
+           sprintf('%s, refus %d : %s (%s)', refus80{q, 1}, q, vu80, message80));
+end
+% la bibliothèque les connaît par leurs chemins
+assert(strcmp(getfield(matlibre_sl_catalogue('type', ...
+           'simulink/Matrix Operations/Submatrix'), 'type'), 'submatrix') && ...
+       strcmp(getfield(matlibre_sl_catalogue('type', 'IsTriangular'), 'type'), 'istriangular'), ...
+       'les blocs de Matrix Operations se designent par leur chemin et leur nom');
+evalin('base', 'clear sortie80 identite80 expansion80 transposee80 carre80 permute80');
+fprintf('bibliotheque Matrix Operations : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

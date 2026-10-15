@@ -1239,7 +1239,12 @@ function admis = entreesComplexesAdmises(c, k, nE)
             else
                 admis(:) = any(strcmp(p.Bibliotheque, {'complextorealimag', ...
                     'complextomagnitudeangle', 'assignment', 'permutedimensions', ...
-                    'squeeze', 'discretefirfilter'}));
+                    'squeeze', 'discretefirfilter', 'transpose', 'hermitiantranspose', ...
+                    'creatediagonalmatrix', 'extractdiagonal', 'matrixsquare', ...
+                    'crossproduct', 'ishermitian', 'identitymatrix', 'submatrix'}));
+                if strcmp(p.Bibliotheque, 'permutematrix')
+                    admis(1) = true;   % la matrice A, pas les indices
+                end
             end
     end
 end
