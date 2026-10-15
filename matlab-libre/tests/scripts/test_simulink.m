@@ -10785,6 +10785,180 @@ assert(strcmp(getfield(matlibre_sl_catalogue('type', ...
 evalin('base', 'clear sortie80 identite80 expansion80 transposee80 carre80 permute80');
 fprintf('bibliotheque Matrix Operations : ok\n');
 
+%% ---------------- 81. Increment - Decrement, Descriptor State-Space, contrôles
+% Les blocs Increment - Decrement de la bibliothèque Additional Math : un
+% de plus ou de moins à la valeur ou à l'entier stocké — un entier, une
+% virgule fixe qui débordent se replient, comme dans Simulink —, et sans
+% descendre sous zéro. Le Descriptor State-Space, E dx/dt = A x + B u, même
+% quand E est singulière. Check Discrete Gradient et Check Input
+% Resolution, qui arrêtent ou avertissent en nommant le bloc et l'instant.
+increments81 = {
+    'incrementrealworld', int8([126 127 -128]), int8([127 -128 -127])
+    'decrementrealworld', int8([-127 -128 0]), int8([-128 127 -1])
+    'incrementstoredinteger', uint8([254 255]), uint8([255 0])
+    'decrementstoredinteger', uint8([1 0]), uint8([0 255])
+    'incrementrealworld', [0.5 -2], [1.5 -1]
+    'decrementtozero', [3 0.5 -2], [2 0 0]
+    'decrementtozero', uint8([0 5]), uint8([0 4])
+    'incrementstoredinteger', fi(0.5, 1, 8, 4), fi(0.5625, 1, 8, 4)
+    'incrementrealworld', fi(7.5, 1, 8, 4), fi(-7.5, 1, 8, 4)
+    'decrementstoredinteger', fi(-8, 1, 8, 4), fi(7.9375, 1, 8, 4)
+    };
+for q = 1:size(increments81, 1)
+    m81 = new_system('increment81');
+    m81 = add_block(m81, 'constant', 'u', 'Value', increments81{q, 2});
+    m81 = add_block(m81, increments81{q, 1}, 'b');
+    m81 = add_block(m81, 'toworkspace', 'tw', 'VariableName', 'sortie81', 'SaveFormat', 'Array');
+    m81 = add_line(add_line(m81, 'u', 'b'), 'b', 'tw');
+    evalc('sim(m81, ''Solver'', ''FixedStepDiscrete'', ''FixedStep'', 1, ''StopTime'', 1);');
+    vu81 = evalin('base', 'sortie81');
+    attendu = increments81{q, 3};
+    assert(strcmp(class(vu81), class(attendu)) && ...
+           isequal(double(vu81(end, :)), double(attendu(:).')), ...
+           sprintf('%s (%d) : %s au lieu de %s', increments81{q, 1}, q, mat2str(double(vu81(end, :))), ...
+                   mat2str(double(attendu))));
+end
+% Decrement Time To Zero retire sa période, jusqu'à zéro
+d81 = new_system('compteRebours81');
+d81 = add_block(d81, 'constant', 'depart', 'Value', 1);
+d81 = add_block(d81, 'sum', 's', 'Signs', '+-');
+d81 = add_block(d81, 'delay', 'z', 'InitialCondition', 0.5, 'SampleTime', 0.2);
+d81 = add_block(d81, 'decrementtimetozero', 'd');
+d81 = add_block(d81, 'outport', 'y');
+d81 = add_line(add_line(d81, 'z', 'd'), 'd', 'y');
+d81 = add_line(add_line(d81, 'depart', 's/1'), 'd', 's/2');
+d81 = add_line(d81, 's', 'z');
+r81 = sim(d81, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.2, 'StopTime', 0.4);
+assert(abs(r81.yout(1) - 0.3) < 1e-12, 'Decrement Time To Zero retire sa periode, 0,2');
+vu81 = '';
+try
+    sim(set_param(d81, 'z', 'SampleTime', -1), 'Solver', 'ode4', 'FixedStep', 0.2, 'StopTime', 0.4);
+catch err
+    vu81 = err.identifier;
+end
+assert(isempty(vu81) || strncmp(vu81, 'Simulink:', 9), 'Decrement Time To Zero : refus nomme');
+c81 = new_system('continu81');
+c81 = add_block(c81, 'sine', 'u');
+c81 = add_block(c81, 'decrementtimetozero', 'd');
+c81 = add_block(c81, 'outport', 'y');
+c81 = add_line(add_line(c81, 'u', 'd'), 'd', 'y');
+vu81 = '';
+message81 = '';
+try
+    sim(c81, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 1);
+catch err
+    vu81 = err.identifier;
+    message81 = err.message;
+end
+assert(strcmp(vu81, 'Simulink:blocks:DecrementTimeToZeroSampleTime') && ...
+       ~isempty(strfind(message81, 'continu81/d')), ...
+       'Decrement Time To Zero refuse une periode continue, en se nommant');
+vu81 = '';
+try
+    sim(add_line(add_block(add_block(new_system('booleen81'), 'constant', 'u', 'Value', true), ...
+                           'incrementrealworld', 'b'), 'u', 'b'), 'Solver', 'FixedStepDiscrete', ...
+        'StopTime', 1);
+catch err
+    vu81 = err.identifier;
+end
+assert(strcmp(vu81, 'Simulink:DataType:InputPortDataTypeMismatch'), ...
+       'un booleen ne s''incremente pas');
+% Descriptor State-Space : E inversible, puis singulière (une équation
+% algébrique), comparés à ce qu'ils valent
+regle81 = {'Solver', 'ode45', 'RelTol', 1e-8, 'AbsTol', 1e-10, 'StopTime', 2};
+e81 = new_system('descripteur81');
+e81 = add_block(e81, 'step', 'u', 'Time', 0);
+e81 = add_block(e81, 'descriptorstatespace', 'g', 'E', 2, 'A', -4, 'B', 2, 'C', 1, 'D', 0, ...
+                'InitialCondition', 1);
+e81 = add_block(e81, 'outport', 'y');
+e81 = add_line(add_line(e81, 'u', 'g'), 'g', 'y');
+r81 = sim(e81, regle81{:});
+% 2 dx/dt = -4 x + 2 : x = 1/2 + (1/2) exp(-2 t)
+assert(max(abs(r81.yout - (0.5 + 0.5 * exp(-2 * r81.tout)))) < 1e-6, ...
+       'Descriptor State-Space, E inversible : le premier ordre attendu');
+% dx1/dt = -x1 + x2, 0 = -x2 + u : x2 = u, x1 -> 1 - exp(-t) ; y = [x1; x2]
+s81 = set_param(e81, 'g', 'E', [1 0; 0 0], 'A', [-1 1; 0 -1], 'B', [0; 1], 'C', eye(2), ...
+                'D', [0; 0], 'InitialCondition', [0; 0]);
+r81 = sim(s81, regle81{:});
+assert(max(abs(r81.yout(:, 1) - (1 - exp(-r81.tout)))) < 1e-6 && ...
+       max(abs(r81.yout(:, 2) - 1)) < 1e-12, ...
+       'Descriptor State-Space, E singuliere : l''equation algebrique est tenue');
+refus81 = {
+    {'E', [1 0; 0 0], 'A', [-1 1; 0 0], 'B', [0; 1], 'C', eye(2), 'D', [0; 0], ...
+     'InitialCondition', [0; 0]}, 'Simulink:blocks:DescriptorStateSpaceIndex'
+    {'E', eye(3), 'A', -eye(2)}, 'Simulink:blocks:DescriptorStateSpaceDimension'
+    {'InitialCondition', NaN}, 'Simulink:Parameters:InvalidValue'
+    };
+for q = 1:size(refus81, 1)
+    vu81 = '';
+    message81 = '';
+    try
+        sim(set_param(e81, 'g', refus81{q, 1}{:}), regle81{:});
+    catch err
+        vu81 = err.identifier;
+        message81 = err.message;
+    end
+    assert(strcmp(vu81, refus81{q, 2}) && ~isempty(strfind(message81, 'descripteur81/g')), ...
+           sprintf('Descriptor State-Space, refus %d : %s', q, vu81));
+end
+% Check Discrete Gradient : un saut trop grand arrête, ou avertit ; la
+% sortie dit si l'assertion tient
+g81 = new_system('gradient81');
+g81 = add_block(g81, 'step', 'u', 'Time', 0.5, 'After', 3, 'SampleTime', 0.1);
+g81 = add_block(g81, 'checkdiscretegradient', 'cg', 'gradient', 2);
+g81 = add_line(g81, 'u', 'cg');
+vu81 = '';
+message81 = '';
+try
+    sim(g81, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 1);
+catch err
+    vu81 = err.identifier;
+    message81 = err.message;
+end
+assert(strcmp(vu81, 'Simulink:blocks:AssertionAssert') && ...
+       ~isempty(strfind(message81, 'gradient81/cg')) && ~isempty(strfind(message81, '0.5')), ...
+       'Check Discrete Gradient arrete au saut de 3, en nommant le bloc et l''instant');
+assignin('base', 'echecs81', 0);
+g81 = set_param(g81, 'cg', 'stopWhenAssertionFail', 'off', 'export', 'on', ...
+                'callback', 'echecs81 = echecs81 + 1;');
+g81 = add_line(add_block(g81, 'outport', 'y'), 'cg', 'y');
+lastwarn('');
+r81 = [];
+evalc('r81 = sim(g81, ''Solver'', ''FixedStepDiscrete'', ''FixedStep'', 0.1, ''StopTime'', 1);');
+[~, id81] = lastwarn();
+assert(strcmp(id81, 'Simulink:blocks:AssertionAssert') && ...
+       isequal(double(r81.yout(:).'), double(abs(r81.tout(:).' - 0.5) > 1e-9)) && ...
+       evalin('base', 'echecs81') == 1, ...
+       'sans s''arreter : l''avertissement, la sortie fausse a l''instant du saut, le rappel');
+assert(isequal(sim(set_param(g81, 'cg', 'gradient', 5), 'Solver', 'FixedStepDiscrete', ...
+                   'FixedStep', 0.1, 'StopTime', 1).yout, true(11, 1)), ...
+       'un gradient de 5 laisse passer le saut de 3');
+evalin('base', 'clear echecs81');
+% Check Input Resolution : un multiple de la résolution, ou l'une de ses
+% valeurs
+resolutions81 = {
+    0.25, [0.5 1.75], true
+    0.25, 0.3, false
+    [1 2 5], 2, true
+    [1 2 5], 3, false
+    };
+for q = 1:size(resolutions81, 1)
+    m81 = new_system('resolution81');
+    m81 = add_block(m81, 'constant', 'u', 'Value', resolutions81{q, 2});
+    m81 = add_block(m81, 'checkinputresolution', 'cr', 'resolution', resolutions81{q, 1});
+    m81 = add_line(m81, 'u', 'cr');
+    vu81 = '';
+    try
+        sim(m81, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1);
+    catch err
+        vu81 = err.identifier;
+    end
+    assert(isempty(vu81) == resolutions81{q, 3} && ...
+           (isempty(vu81) || strcmp(vu81, 'Simulink:blocks:AssertionAssert')), ...
+           sprintf('Check Input Resolution %d : %s', q, vu81));
+end
+fprintf('Increment - Decrement, Descriptor State-Space, controles : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

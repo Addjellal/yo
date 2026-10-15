@@ -204,6 +204,9 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
         case 'assertion'
             nEntrees = entier(lire(p, 'NombreEntrees', 1));
             nSorties = 0;
+        case {'checkdiscretegradient', 'checkinputresolution'}
+            % la sortie de l'assertion, quand on la demande (export)
+            nSorties = double(strcmpi(char(lire(p, 'export', 'off')), 'on'));
         case {'checkdynamicrange', 'checkdynamicgap'}
             nEntrees = 3;   % max, sig, min
             nSorties = 0;

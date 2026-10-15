@@ -672,6 +672,17 @@ function [type, p] = normaliser(type, p, chemin)
               'permutematrix', 'submatrix'}
             p = struct('Script', scriptMatrice(type, p, chemin), 'SampleTime', -1);
             type = 'matlabfunction';
+        case {'incrementrealworld', 'decrementrealworld', 'incrementstoredinteger', ...
+              'decrementstoredinteger', 'decrementtozero', 'decrementtimetozero'}
+            p = struct('Script', scriptIncrement(type, chemin), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case {'checkdiscretegradient', 'checkinputresolution'}
+            p = struct('Script', scriptControle(type, p, chemin), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'descriptorstatespace'
+            [A, B, C, D, x0] = descripteurVersEtat(p, chemin);
+            p = struct('A', A, 'B', B, 'C', C, 'D', D, 'X0', x0);
+            type = 'statespace';
         case 'identitymatrix'
             if strcmpi(p.InheritOutputPortAttributes, 'on')
                 % les dimensions, la période et le type de l'entrée
@@ -1159,6 +1170,193 @@ end
 
 % Repeating Sequence Interpolated : la table (TimeValues, OutValues) lue au
 % temps pris modulo la dernière date, par la méthode LookUpMeth.
+% Increment Real World, Decrement Real World : un de plus ou de moins à la
+% valeur ; Increment Stored Integer, Decrement Stored Integer : à l'entier
+% stocké, un pas de la virgule fixe — un aussi pour un entier ou un
+% flottant. Un entier, une virgule fixe qui débordent se replient, comme
+% dans Simulink. Decrement To Zero et Decrement Time To Zero retirent un,
+% ou la période du bloc, sans descendre sous zéro.
+function script = scriptIncrement(type, chemin)
+    ch = litteralChemin(chemin);
+    refus = ['if islogical(u)\n    error(''Simulink:DataType:InputPortDataTypeMismatch'', ' ...
+             '[''L''''entree de ''''%s'''' est un booleen : ce bloc calcule sur une valeur ' ...
+             'numerique.''], ' ch ');\nend\n'];
+    switch type
+        case {'incrementrealworld', 'decrementrealworld', 'incrementstoredinteger', ...
+              'decrementstoredinteger'}
+            sens = '1';
+            if strncmp(type, 'decrement', 9)
+                sens = '-1';
+            end
+            if strcmp(type(end - 12:end), 'storedinteger')
+                pasFixe = 'double(eps(u))';
+            else
+                pasFixe = '1';
+            end
+            corps = ['if isa(u, ''embedded.fi'')\n    T = numerictype(u);\n' ...
+                     '    lsb = double(eps(u));\n' ...
+                     '    si = floor((double(u) + ' sens ' * ' pasFixe ') / lsb + 1e-9);\n' ...
+                     '    bas = -T.Signed * 2^(T.WordLength - 1);\n' ...
+                     '    si = mod(si - bas, 2^T.WordLength) + bas;\n' ...
+                     '    y = fi(si * lsb, T);\nelseif isinteger(u)\n' ...
+                     '    bas = double(intmin(class(u)));\n' ...
+                     '    n = double(intmax(class(u))) - bas + 1;\n' ...
+                     '    y = cast(mod(double(u) + ' sens ' - bas, n) + bas, class(u));\n' ...
+                     'else\n    y = u + ' sens ';\nend\n'];
+        case 'decrementtozero'
+            corps = ['if isa(u, ''embedded.fi'')\n' ...
+                     '    y = fi(max(double(u) - 1, 0), numerictype(u));\nelse\n' ...
+                     '    y = max(u - 1, 0);\nend\n'];
+        otherwise   % decrementtimetozero
+            corps = ['[~, Ts] = matlibre_sl_instant();\nif ~(Ts > 0 && isfinite(Ts))\n' ...
+                     '    Ts = 0;\nend\nif isa(u, ''embedded.fi'')\n' ...
+                     '    y = fi(max(double(u) - Ts, 0), numerictype(u));\n' ...
+                     'elseif isinteger(u)\n    y = cast(max(double(u) - Ts, 0), class(u));\n' ...
+                     'else\n    y = max(u - Ts, cast(0, class(u)));\nend\n'];
+    end
+    script = strrep(['function y = fcn(u)\n' refus corps], '\n', char(10));
+end
+
+% Check Discrete Gradient : deux échantillons successifs diffèrent de moins
+% que gradient ; Check Input Resolution : l'entrée est un multiple de la
+% résolution — à 10e-3 près —, ou l'une des valeurs d'une résolution
+% vecteur. Comme les autres blocs de vérification, ils arrêtent la
+% simulation ou avertissent en nommant le bloc et l'instant, après avoir
+% évalué leur rappel (callback) dans l'espace de travail de base ; leur
+% sortie, quand on la demande, dit si l'assertion tient.
+function script = scriptControle(type, p, chemin)
+    ch = litteralChemin(chemin);
+    sortie = strcmpi(p.export, 'on');
+    actif = strcmpi(p.enabled, 'on');
+    if strcmp(type, 'checkdiscretegradient')
+        g = double(p.gradient);
+        if ~(isscalar(g) && isreal(g) && g > 0)
+            error('Simulink:Parameters:InvalidValue', ...
+                  'Le gradient maximal de ''%s'' doit etre un reel positif ; il vaut %s.', ...
+                  chemin, mat2str(g));
+        end
+        test = ['persistent precedent\nok = true;\nif ~isempty(precedent) && ' ...
+                'isequal(size(precedent), size(u))\n' ...
+                '    ok = all(abs(double(u(:)) - precedent(:)) < ' sprintf('%.17g', g) ');\n' ...
+                'end\nprecedent = double(u);\n'];
+    else
+        r = double(p.resolution);
+        if isempty(r) || ~isreal(r) || any(~isfinite(r(:))) || (isscalar(r) && r <= 0)
+            error('Simulink:Parameters:InvalidValue', ...
+                  ['La resolution de ''%s'' doit etre un reel positif, ou un vecteur de ' ...
+                   'valeurs permises ; elle vaut %s.'], chemin, mat2str(r));
+        end
+        if isscalar(r)
+            test = ['v = double(u(:));\nok = all(abs(mod(v, ' sprintf('%.17g', r) ...
+                    ')) < 10e-3);\n'];
+        else
+            test = ['v = double(u(:));\nr = ' mat2str(r(:), 17) ';\n' ...
+                    'if isscalar(v)\n    ok = any(v == r);\n' ...
+                    'elseif numel(v) == numel(r)\n    ok = all(v == r);\nelse\n' ...
+                    '    error(''Simulink:blocks:CheckInputResolutionSize'', [''L''''entree ' ...
+                    'de ''''%s'''' porte %d elements, et sa resolution %d : un vecteur se ' ...
+                    'compare element par element a un vecteur de meme taille.''], ' ch ', ' ...
+                    'numel(v), numel(r));\nend\n'];
+        end
+    end
+    echec = '';
+    if actif
+        rappel = strtrim(char(p.callback));
+        if ~isempty(rappel)
+            echec = ['    evalin(''base'', ' litteralChemin(rappel) ');\n'];
+        end
+        if strcmpi(p.stopWhenAssertionFail, 'on')
+            signal = 'error';
+        else
+            signal = 'warning';
+        end
+        echec = ['if ~ok && ~essai\n' echec '    ' signal '(''Simulink:blocks:AssertionAssert'', ' ...
+                 '''Assertion detectee dans ''''%s'''' a t = %g.'', ' ch ', t);\nend\n'];
+    end
+    entete = 'function fcn(u)\n';
+    fin = '';
+    if sortie
+        entete = 'function y = fcn(u)\n';
+        fin = 'y = logical(ok);\n';
+    end
+    script = strrep([entete '[t, ~, essai] = matlibre_sl_instant();\n' test echec fin], ...
+                    '\n', char(10));
+end
+
+% Le Descriptor State-Space, E dx/dt = A x + B u, y = C x + D u, ramené à une
+% représentation d'état : E inversible, A et B se divisent par E ; E
+% singulière, les équations algébriques — celles que la décomposition en
+% valeurs singulières de E sépare des différentielles — se résolvent et
+% s'éliminent, pourvu que le système soit d'indice 1. Les états sont alors
+% ceux de la partie différentielle.
+function [A, B, C, D, x0] = descripteurVersEtat(p, chemin)
+    E = double(p.E);
+    A = double(p.A);
+    B = double(p.B);
+    C = double(p.C);
+    D = double(p.D);
+    n = size(A, 1);
+    if ~isequal(size(E), [n n]) || size(A, 2) ~= n
+        error('Simulink:blocks:DescriptorStateSpaceDimension', ...
+              ['E et A de ''%s'' doivent etre carrees et de meme taille ; elles sont de ' ...
+               'tailles %s et %s.'], chemin, mat2str(size(E)), mat2str(size(A)));
+    end
+    if size(B, 1) ~= n || size(C, 2) ~= n
+        error('Simulink:blocks:DescriptorStateSpaceDimension', ...
+              ['B de ''%s'' doit avoir %d ligne(s) et C %d colonne(s), autant que A ; ' ...
+               'elles sont de tailles %s et %s.'], chemin, n, n, mat2str(size(B)), ...
+              mat2str(size(C)));
+    end
+    if isscalar(D) && D == 0
+        D = zeros(size(C, 1), size(B, 2));
+    end
+    if ~isequal(size(D), [size(C, 1), size(B, 2)])
+        error('Simulink:blocks:DescriptorStateSpaceDimension', ...
+              'D de ''%s'' doit etre de taille %s.', chemin, mat2str([size(C, 1), size(B, 2)]));
+    end
+    x0 = double(p.InitialCondition);
+    if any(~isfinite(x0(:)))
+        error('Simulink:Parameters:InvalidValue', ...
+              'La condition initiale de ''%s'' ne peut etre ni Inf ni NaN.', chemin);
+    end
+    if isscalar(x0)
+        x0 = x0 * ones(n, 1);
+    end
+    if numel(x0) ~= n
+        error('Simulink:blocks:DescriptorStateSpaceDimension', ...
+              'La condition initiale de ''%s'' porte %d valeur(s), et le systeme %d etat(s).', ...
+              chemin, numel(x0), n);
+    end
+    x0 = x0(:);
+    rang = rank(E);
+    if rang == n
+        A = E \ A;
+        B = E \ B;
+        return
+    end
+    [U, S, V] = svd(E);
+    r = 1:rang;
+    q = rang + 1:n;
+    At = U' * A * V;
+    Bt = U' * B;
+    Ct = C * V;
+    A22 = At(q, q);
+    if rcond(A22) < 1e-12
+        error('Simulink:blocks:DescriptorStateSpaceIndex', ...
+              ['Les equations algebriques de ''%s'' ne determinent pas ses variables : le ' ...
+               'systeme E dx/dt = A x + B u n''est pas d''indice 1 (la partie de A qui leur ' ...
+               'repond est singuliere).'], chemin);
+    end
+    S1 = S(r, r);
+    A = S1 \ (At(r, r) - At(r, q) * (A22 \ At(q, r)));
+    Bn = S1 \ (Bt(r, :) - At(r, q) * (A22 \ Bt(q, :)));
+    Cn = Ct(:, r) - Ct(:, q) * (A22 \ At(q, r));
+    D = D - Ct(:, q) * (A22 \ Bt(q, :));
+    B = Bn;
+    C = Cn;
+    x0 = V(:, r)' * x0;
+end
+
 % Les dimensions OutputDimensions d'Identity Matrix et d'Expand Scalar :
 % un entier positif — une matrice carrée M x M pour l'identité, un vecteur
 % de M éléments pour l'expansion —, ou [M N].
@@ -3519,6 +3717,17 @@ function c = periodes(c, pas, verifier)
             c.majeurSeul(k) = true;
         end
     end
+    % Decrement Time To Zero retire sa période : il lui en faut une, fixe.
+    for k = find(strcmp(c.types, 'matlabfunction'))
+        if isfield(c.p{k}, 'Bibliotheque') && strcmp(c.p{k}.Bibliotheque, 'decrementtimetozero') ...
+           && c.garde(k) == 0 && ~(c.cadence(k) > 0 && isfinite(c.cadence(k)))
+            error('Simulink:blocks:DecrementTimeToZeroSampleTime', ...
+                  ['Le bloc ''%s'' retire sa periode d''echantillonnage a son entree : il ne ' ...
+                   'fonctionne qu''a une periode fixe, et la sienne est ici %s. Donnez-lui ' ...
+                   'une entree echantillonnee (Zero-Order Hold, Rate Transition).'], ...
+                  c.chemins{k}, ifelse(c.cadence(k) == 0, 'continue', 'constante'));
+        end
+    end
     % Les blocs discrets par nature qui héritent leur période ne peuvent
     % hériter d'un signal continu : Simulink le refuse, et le dit.
     for k = find(ismember(c.types, {'discretederivative', 'difference', 'tappeddelay'}))
@@ -5417,7 +5626,11 @@ function s = dimsFonction(c, k, dE)
     sorties = cell(1, c.nOut(k));
     matlibre_sl_instant('essai', true);
     try
-        [sorties{:}] = h(u{:});
+        if c.nOut(k) == 0
+            h(u{:});   % une fonction sans sortie : un contrôle, un affichage
+        else
+            [sorties{:}] = h(u{:});
+        end
         matlibre_sl_instant('essai', false);
     catch err
         matlibre_sl_instant('essai', false);

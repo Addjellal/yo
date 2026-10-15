@@ -90,6 +90,12 @@ function modele = add_block(modele, type, nom, varargin)
 %     sinewavefunction Amplitude, Bias, Frequency, Phase — A sin(F u + P) + B,
 %                  l'entrée tenant lieu de temps (SineType 'Time based')
 %     permutedimensions Order ; squeeze — comme PERMUTE et SQUEEZE
+%     incrementrealworld, decrementrealworld, incrementstoredinteger,
+%                  decrementstoredinteger, decrementtozero, decrementtimetozero
+%                  — un de plus, un de moins, sans descendre sous zéro
+%     descriptorstatespace E, A, B, C, D, InitialCondition — E dx/dt = A x + B u
+%     checkdiscretegradient gradient ; checkinputresolution resolution —
+%                  enabled, callback, stopWhenAssertionFail, export
 %     transpose, hermitiantranspose, creatediagonalmatrix, extractdiagonal,
 %                  matrixsquare (u' * u), crossproduct (deux entrées) — la
 %                  bibliothèque Matrix Operations

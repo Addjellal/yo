@@ -3294,7 +3294,11 @@ function V = appelerFonction(T, k, V, p, e)
         end
     end
     sorties = cell(1, nOut);
-    [sorties{:}] = T.objets{k}(u{:});
+    if nOut == 0
+        T.objets{k}(u{:});   % une fonction sans sortie : un contrôle, un affichage
+    else
+        [sorties{:}] = T.objets{k}(u{:});
+    end
     pd = T.pd(k);
     for q = 1:nOut
         a = T.poA(pd + q - 1);
