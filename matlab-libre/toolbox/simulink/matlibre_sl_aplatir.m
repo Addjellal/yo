@@ -695,7 +695,16 @@ function enfant = imposerPeriode(enfant, ts, chemin)
     catch
         return
     end
-    aPeriode = ~isempty(entree.params) && any(strcmp(entree.params(:, 1), 'SampleTime'));
+    % la période se nomme SampleTime, ou tsamp pour un compteur ou un
+    % Repeating Sequence Stair
+    nomPeriode = '';
+    for candidat = {'SampleTime', 'tsamp'}
+        if isempty(nomPeriode) && ~isempty(entree.params) && ...
+           any(strcmp(entree.params(:, 1), candidat{1}))
+            nomPeriode = candidat{1};
+        end
+    end
+    aPeriode = ~isempty(nomPeriode);
     if ~aPeriode
         if strcmp(entree.famille, 'Continu')
             error('Simulink:SampleTime:AtomicSubsystemContinuousBlock', ...
@@ -705,19 +714,19 @@ function enfant = imposerPeriode(enfant, ts, chemin)
         end
         return
     end
-    v = lireParametre(enfant.parametres, 'SampleTime', -1);
+    v = lireParametre(enfant.parametres, nomPeriode, -1);
     if ischar(v) || isstring(v)
         try
-            v = matlibre_sl_expression(char(v), chemin, 'SampleTime');
+            v = matlibre_sl_expression(char(v), chemin, nomPeriode);
         catch
             return   % la compilation dira ce qui ne va pas
         end
     end
     v = double(v);
     if isempty(v) || v(1) == -1
-        champ = 'SampleTime';
+        champ = nomPeriode;
         for f = fieldnames(enfant.parametres).'
-            if strcmpi(f{1}, 'SampleTime')
+            if strcmpi(f{1}, nomPeriode)
                 champ = f{1};
             end
         end

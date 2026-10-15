@@ -10385,6 +10385,217 @@ end
 assert(stats78(1) >= 10, 'la batterie de reprise simule assez de modeles');
 fprintf('memoire des blocs et batterie de reprise : %d reprises exactes, %d refus\n', stats78);
 
+%% ------------------------------------- 79. Les sources à période -1
+% Un compteur, un Repeating Sequence Stair ont par défaut la période -1 :
+% comme dans Simulink, elle s'hérite en arrière, de ce qu'ils alimentent —
+% ici un retard de période 0,5 —, et le diagnostic « Source block
+% specifies -1 sample time » le signale (InheritedTsInSrcMsg, 'warning' par
+% défaut ; 'none' le tait, 'error' refuse la simulation). Une source d'un
+% sous-système conditionnel hérite de sa garde sans rien dire ; dans un
+% sous-système atomique, elle prend la période qu'il impose.
+m79 = new_system('comptes79');
+m79 = add_block(m79, 'counterlimited', 'compte', 'uplimit', 7);
+m79 = add_block(m79, 'delay', 'retard', 'SampleTime', 0.5);
+m79 = add_block(m79, 'outport', 'y1');
+m79 = add_block(m79, 'outport', 'y2');
+m79 = add_line(add_line(m79, 'compte', 'retard'), 'retard', 'y1');
+m79 = add_line(m79, 'compte', 'y2');
+assert(strcmp(get_param(m79, 'InheritedTsInSrcMsg'), 'warning'), ...
+       'InheritedTsInSrcMsg vaut warning par defaut, comme dans Simulink');
+reglage79 = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 2};
+lastwarn('');
+r79 = [];
+evalc('r79 = sim(m79, reglage79{:});');
+[texte79, id79] = lastwarn();
+assert(strcmp(id79, 'Simulink:SampleTime:SourceInheritedTS') && ...
+       ~isempty(strfind(texte79, 'comptes79/compte')) && ...
+       ~isempty(strfind(texte79, 'InheritedTsInSrcMsg')), ...
+       'le compteur a periode -1 est signale, nomme, et le reglage dit');
+rang79 = floor(r79.tout / 0.5 + 1e-9);
+assert(isequal(r79.yout(:, 2), mod(rang79, 8)) && ...
+       isequal(r79.yout(:, 1), mod(max(rang79 - 1, 0), 8)), ...
+       'il herite en arriere la periode 0,5 du retard qu''il alimente');
+lastwarn('');
+evalc('sim(m79, reglage79{:}, ''InheritedTsInSrcMsg'', ''none'');');
+[~, id79] = lastwarn();
+assert(isempty(id79), 'InheritedTsInSrcMsg none : rien n''est dit');
+vu79 = '';
+message79 = '';
+try
+    sim(m79, reglage79{:}, 'InheritedTsInSrcMsg', 'error');
+catch err
+    vu79 = err.identifier;
+    message79 = err.message;
+end
+assert(strcmp(vu79, 'Simulink:SampleTime:SourceInheritedTS') && ...
+       ~isempty(strfind(message79, 'comptes79/compte')), ...
+       'InheritedTsInSrcMsg error : la simulation est refusee, la source nommee');
+lastwarn('');
+evalc('sim(set_param(m79, ''compte'', ''tsamp'', 0.5), reglage79{:});');
+[~, id79] = lastwarn();
+assert(isempty(id79), 'un compteur a la periode dite n''est pas signale');
+% à pas variable aussi, la période vient du retard
+r79 = [];
+evalc('r79 = sim(m79, ''Solver'', ''ode45'', ''StopTime'', 2);');
+assert(all(r79.yout(:, 2) == mod(floor(r79.tout / 0.5 + 1e-9), 8)), ...
+       'a pas variable, le compteur herite aussi la periode 0,5');
+% deux lecteurs de périodes différentes : le pas de base
+deux79 = add_block(m79, 'delay', 'lent', 'SampleTime', 0.2);
+deux79 = add_block(deux79, 'terminator', 'fin');
+deux79 = add_line(add_line(deux79, 'compte', 'lent'), 'lent', 'fin');
+r79 = [];
+evalc('r79 = sim(deux79, reglage79{:});');
+assert(isequal(r79.yout(:, 2), mod(floor(r79.tout / 0.1 + 1e-9), 8)), ...
+       'deux lecteurs de periodes differentes : le compteur prend le pas de base');
+% à travers un bloc qui hérite : le Repeating Sequence Stair, doublé, puis
+% retardé
+via79 = new_system('via79');
+via79 = add_block(via79, 'repeatingsequencestair', 'escalier', 'OutValues', [3 1 4 1 5]);
+via79 = add_block(via79, 'gain', 'g', 'Gain', 2);
+via79 = add_block(via79, 'delay', 'retard', 'SampleTime', 0.5);
+via79 = add_block(via79, 'outport', 'y');
+via79 = add_block(via79, 'outport', 'yg');
+via79 = add_line(add_line(add_line(via79, 'escalier', 'g'), 'g', 'retard'), 'retard', 'y');
+via79 = add_line(via79, 'g', 'yg');
+r79 = [];
+evalc('r79 = sim(via79, reglage79{:});');
+valeurs79 = [3 1 4 1 5];
+assert(isequal(r79.yout(:, 2), 2 * valeurs79(mod(floor(r79.tout / 0.5 + 1e-9), 5) + 1).'), ...
+       'a travers un gain qui herite, l''escalier prend la periode du retard');
+% un bruit à période -1 n'est plus une constante : il tire à chaque pas
+bruit79 = new_system('bruit79');
+bruit79 = add_block(bruit79, 'randomnumber', 'b', 'SampleTime', -1);
+bruit79 = add_block(bruit79, 'outport', 'y');
+bruit79 = add_line(bruit79, 'b', 'y');
+r79 = [];
+evalc('r79 = sim(bruit79, ''Solver'', ''ode4'', ''FixedStep'', 0.1, ''StopTime'', 1);');
+assert(numel(unique(r79.yout)) == numel(r79.tout), ...
+       'un Random Number a periode -1 tire a chaque pas de base');
+% un Pulse Generator réglé par échantillons, à période -1 : celle du
+% retard qu'il alimente
+impulsion79 = new_system('impulsion79');
+impulsion79 = add_block(impulsion79, 'pulsegenerator', 'p', 'PulseType', 'Sample based', ...
+                        'Period', 4, 'PulseWidth', 2, 'SampleTime', -1);
+impulsion79 = add_block(impulsion79, 'delay', 'retard', 'SampleTime', 0.5);
+impulsion79 = add_block(impulsion79, 'outport', 'y');
+impulsion79 = add_block(impulsion79, 'outport', 'yp');
+impulsion79 = add_line(add_line(impulsion79, 'p', 'retard'), 'retard', 'y');
+impulsion79 = add_line(impulsion79, 'p', 'yp');
+r79 = [];
+evalc('r79 = sim(impulsion79, reglage79{:});');
+assert(isequal(r79.yout(:, 2), double(mod(floor(r79.tout / 0.5 + 1e-9), 4) < 2)), ...
+       'un Pulse Generator par echantillons herite la periode du retard');
+% dans un sous-système activé : rien n'est dit
+dedans79 = new_system('compteActive79');
+dedans79 = add_block(dedans79, 'counterfreerunning', 'n', 'NumBits', 3);
+dedans79 = add_block(dedans79, 'outport', 'Out1', 'Port', 1);
+dedans79 = add_block(dedans79, 'enableport', 'Enable');
+dedans79 = add_line(dedans79, 'n', 'Out1');
+active79 = new_system('active79');
+active79 = add_block(active79, 'pulsegenerator', 'porte', 'Period', 1, 'PulseWidth', 50);
+active79 = add_block(active79, 'subsystem', 'sous', 'Model', dedans79);
+active79 = add_block(active79, 'outport', 'y');
+active79 = add_line(add_line(active79, 'porte', 'sous/Enable'), 'sous', 'y');
+lastwarn('');
+evalc('sim(active79, reglage79{:});');
+[~, id79] = lastwarn();
+assert(isempty(id79), 'une source d''un sous-systeme active herite sans rien dire');
+% dans un sous-système atomique qui impose sa période : il la prend
+atome79 = new_system('atome79');
+atome79 = add_block(atome79, 'counterlimited', 'compte', 'uplimit', 9);
+atome79 = add_block(atome79, 'outport', 'Out1', 'Port', 1);
+atome79 = add_line(atome79, 'compte', 'Out1');
+a79 = new_system('atomique79');
+a79 = add_block(a79, 'simulink/Ports & Subsystems/Atomic Subsystem', 'a', 'Model', atome79, ...
+                'SystemSampleTime', 0.3);
+a79 = add_block(a79, 'outport', 'y');
+a79 = add_line(a79, 'a', 'y');
+lastwarn('');
+r79 = [];
+evalc('r79 = sim(a79, ''Solver'', ''FixedStepDiscrete'', ''FixedStep'', 0.1, ''StopTime'', 1.2);');
+[~, id79] = lastwarn();
+assert(isempty(id79) && isequal(r79.yout, floor(r79.tout / 0.3 + 1e-9)), ...
+       'dans un sous-systeme atomique, le compteur prend la periode imposee');
+% la batterie : chaque source qui porte une période, mise à -1, en trois
+% lieux — à la racine, dans un sous-système activé, dans un sous-système
+% atomique — et aux trois réglages du diagnostic
+assignin('base', 'donnees79', [0 0; 1 1; 2 0]);
+sources79 = {
+    'constant', {'SampleTime', -1}
+    'enumeratedconstant', {'SampleTime', -1}
+    'step', {'SampleTime', -1}
+    'sine', {'SampleTime', -1}
+    'digitalclock', {'SampleTime', -1}
+    'randomnumber', {'SampleTime', -1}
+    'uniformrandomnumber', {'SampleTime', -1}
+    'counterfreerunning', {}
+    'counterlimited', {}
+    'repeatingsequencestair', {}
+    'repeatingsequenceinterpolated', {'tsamp', -1}
+    'pulsegenerator', {'PulseType', 'Sample based', 'SampleTime', -1}
+    'fromworkspace', {'VariableName', 'donnees79', 'SampleTime', -1}
+    };
+lieux79 = {'racine', 'active', 'atomique'};
+niveaux79 = {'none', 'warning', 'error'};
+essais79 = 0;
+for q = 1:size(sources79, 1)
+    for l = 1:numel(lieux79)
+        source79 = add_block(new_system('source79'), sources79{q, 1}, 's', sources79{q, 2}{:});
+        source79 = add_block(source79, 'outport', 'y');
+        source79 = add_line(source79, 's', 'y');
+        switch lieux79{l}
+            case 'racine'
+                modele79 = source79;
+                chemin79 = 'source79/s';
+            case 'active'
+                ss79 = add_block(set_param(source79, 'y', 'Port', 1), 'enableport', 'Enable');
+                modele79 = add_block(new_system('lieu79'), 'pulsegenerator', 'porte', ...
+                                     'Period', 1, 'PulseWidth', 50);
+                modele79 = add_block(modele79, 'subsystem', 'sous', 'Model', ss79);
+                modele79 = add_block(modele79, 'outport', 'y');
+                modele79 = add_line(add_line(modele79, 'porte', 'sous/Enable'), 'sous', 'y');
+            case 'atomique'
+                modele79 = add_block(new_system('lieu79'), ...
+                                     'simulink/Ports & Subsystems/Atomic Subsystem', 'a', ...
+                                     'Model', source79, 'SystemSampleTime', 0.2);
+                modele79 = add_block(modele79, 'outport', 'y');
+                modele79 = add_line(modele79, 'a', 'y');
+        end
+        for v = 1:numel(niveaux79)
+            lastwarn('');
+            vu79 = '';
+            message79 = '';
+            try
+                evalc(['sim(modele79, ''Solver'', ''ode4'', ''FixedStep'', 0.1, ' ...
+                       '''StopTime'', 0.6, ''InheritedTsInSrcMsg'', niveaux79{v});']);
+            catch err
+                vu79 = err.identifier;
+                message79 = err.message;
+            end
+            [texte79, id79] = lastwarn();
+            cas79 = sprintf('%s, %s, %s', sources79{q, 1}, lieux79{l}, niveaux79{v});
+            if strcmp(lieux79{l}, 'racine') && v > 1
+                if v == 2
+                    assert(isempty(vu79) && ...
+                           strcmp(id79, 'Simulink:SampleTime:SourceInheritedTS') && ...
+                           ~isempty(strfind(texte79, chemin79)), ...
+                           [cas79 ' : l''avertissement qui nomme la source']);
+                else
+                    assert(strcmp(vu79, 'Simulink:SampleTime:SourceInheritedTS') && ...
+                           ~isempty(strfind(message79, chemin79)), ...
+                           [cas79 ' : l''erreur qui nomme la source']);
+                end
+            else
+                assert(isempty(vu79) && ~strcmp(id79, 'Simulink:SampleTime:SourceInheritedTS'), ...
+                       sprintf('%s : rien a dire (%s %s)', cas79, vu79, message79));
+            end
+            essais79 = essais79 + 1;
+        end
+    end
+end
+evalin('base', 'clear donnees79');
+fprintf('sources a periode -1 : %d essais\n', essais79);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

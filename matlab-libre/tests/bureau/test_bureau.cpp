@@ -2570,6 +2570,7 @@ end
                              !boite.liste(QStringLiteral("ZeroCrossAlgorithm"))->isEnabled() &&
                              boite.liste(QStringLiteral("EnableMultiTasking"))->isEnabled() &&
                              boite.liste(QStringLiteral("MultiTaskRateTransMsg")) != nullptr &&
+                             boite.liste(QStringLiteral("InheritedTsInSrcMsg")) != nullptr &&
                              boite.liste(QStringLiteral("BusObjectLabelMismatch")) != nullptr &&
                              boite.liste(QStringLiteral("ParameterOverflowMsg"))->isEnabled() &&
                              boite.liste(QStringLiteral("ParameterPrecisionLossMsg")) != nullptr &&

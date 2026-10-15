@@ -128,6 +128,7 @@ function c = compiler(modele, options)
     % --- 1. types et paramètres ---------------------------------------------
     enCours('modele', modele.blocs, cellfun(@(b) [nomModele '/' char(b.nom)], ...
                                             modele.blocs, 'UniformOutput', false));
+    heritees = [];
     for k = 1:n
         enCours('bloc', k);
         bloc = modele.blocs{k};
@@ -156,6 +157,13 @@ function c = compiler(modele, options)
         % Band-Limited White Noise à Random Number, Discrete Zero-Pole à
         % Discrete Transfer Fcn.
         origine = c.types{k};
+        % Un bloc source à période -1 l'hérite en arrière, de ce qu'il
+        % alimente, et Simulink le signale (InheritedTsInSrcMsg). Dans un
+        % sous-système conditionnel, une source tient sa période de sa
+        % garde : elle y hérite sans rien dire.
+        if c.garde(k) == 0 && sourceHeritee(origine, c.p{k})
+            heritees(end + 1) = k; %#ok<AGROW>
+        end
         [c.types{k}, c.p{k}] = normaliser(c.types{k}, c.p{k}, c.chemins{k});
         if strcmp(c.types{k}, 'matlabfunction') && ~strcmp(origine, 'matlabfunction')
             c.p{k}.Bibliotheque = origine;   % ce qu'il accepte, en complexe, est le sien
@@ -193,6 +201,17 @@ function c = compiler(modele, options)
         end
         c.nIn(k) = ne;
         c.nOut(k) = ns;
+    end
+    niveau = lower(char(champ(config, 'InheritedTsInSrcMsg', 'none')));
+    if ~silencieux && ~strcmp(niveau, 'none')
+        for k = heritees
+            signaler(niveau, 'Simulink:SampleTime:SourceInheritedTS', ...
+                     ['Le bloc source ''%s'' a la periode d''echantillonnage -1 : elle ' ...
+                      's''herite en arriere, de ce qu''il alimente. Donnez explicitement ' ...
+                      'la periode des sources ; le diagnostic InheritedTsInSrcMsg ' ...
+                      '(''Source block specifies -1 sample time'') se regle a ''none'' ' ...
+                      'dans la configuration du modele.'], c.chemins{k});
+        end
     end
 
     % Les blocs de code : leur fonction se prépare une fois, ici — une
@@ -3058,11 +3077,17 @@ function c = periodes(c, pas, verifier)
                 c.cadence(k) = 0;
                 if strcmp(p.PulseType, 'Sample based')
                     [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
+                    if c.cadence(k) == -1
+                        c.cadence(k) = -2;   % héritée en arrière, plus bas
+                    end
                 elseif c.variable
                     c.majeurSeul(k) = true;   % comme l'échelon
                 end
             case {'digitalclock', 'randomnumber', 'uniformrandomnumber'}
                 [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
+                if c.cadence(k) == -1
+                    c.cadence(k) = -2;   % héritée en arrière, plus bas
+                end
             case {'integrator', 'transferfcn', 'statespace', 'zeropole', 'pidcontroller', ...
                   'secondorderintegrator', 'chirp'}
                 c.cadence(k) = 0;
@@ -3070,15 +3095,13 @@ function c = periodes(c, pas, verifier)
                 c.cadence(k) = 0;
                 c.majeurSeul(k) = strcmp(p.WaveForm, 'random');   % un tirage par pas majeur
             case {'counterfreerunning', 'counterlimited', 'repeatingsequencestair'}
-                % Sans période donnée, une source hérite du pas de base : le
-                % pas fixe, ou chaque pas majeur à pas variable.
-                if p.tsamp(1) == -1 || p.tsamp(1) == 0
-                    if c.variable
-                        c.cadence(k) = 0;
-                        c.majeurSeul(k) = true;
-                    else
-                        c.cadence(k) = pas;
-                    end
+                % À la période -1, la leur s'hérite en arrière, plus bas ; à
+                % la période 0, c'est le pas de base : le pas fixe, ou
+                % chaque pas majeur à pas variable.
+                if p.tsamp(1) == -1
+                    c.cadence(k) = -2;
+                elseif p.tsamp(1) == 0
+                    [c.cadence(k), c.majeurSeul(k)] = pasDeBase(c, pas);
                 else
                     [c.cadence(k), c.decalage(k)] = lirePeriode(p.tsamp);
                 end
@@ -3151,6 +3174,11 @@ function c = periodes(c, pas, verifier)
                 c.cadence(k) = -1;
                 if p.SampleTime(1) ~= -1
                     [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
+                elseif c.nIn(k) == 0 && isfield(p, 'Bibliotheque')
+                    % une source de la bibliothèque écrite en MATLAB Function —
+                    % Repeating Sequence Interpolated, Signal Editor — : sa
+                    % période -1 s'hérite en arrière, plus bas
+                    c.cadence(k) = -2;
                 end
                 % Une fonction qui garde un état entre deux appels ne se
                 % rappelle qu'aux pas majeurs : un pas mineur ne doit pas
@@ -3196,6 +3224,24 @@ function c = periodes(c, pas, verifier)
                         [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
                     end
                 end
+        end
+    end
+    % L'héritage en arrière, comme dans Simulink : une source discrète par
+    % nature à période -1 — un compteur, un Repeating Sequence Stair par
+    % défaut — prend la période de ce qu'elle alimente, quand ses lecteurs,
+    % à travers ceux qui héritent, s'accordent sur une même période
+    % discrète ; sinon le pas de base.
+    heritiers = find(c.cadence == -2);
+    if ~isempty(heritiers)
+        lecteurs = lecteursDe(c);
+        for k = heritiers
+            [periode, decalage] = periodeEnAval(c, k, lecteurs);
+            if isempty(periode)
+                [c.cadence(k), c.majeurSeul(k)] = pasDeBase(c, pas);
+            else
+                c.cadence(k) = periode;
+                c.decalage(k) = decalage;
+            end
         end
     end
     % Dans un sous-système conditionnel, rien n'est constant : ce qui ne
@@ -3518,6 +3564,65 @@ function modele = insererTransition(modele, parties, T, rang)
                          sprintf('%s/%d', parties{1}, T.port));
     modele = add_line(modele, sprintf('%s/%d', source, ps), [nom '/1']);
     modele = add_line(modele, [nom '/1'], sprintf('%s/%d', parties{1}, T.port));
+end
+
+% Le pas de base, pour une source qui n'a pas d'autre période : le pas
+% fixe, ou chaque pas majeur à pas variable.
+function [cadence, majeur] = pasDeBase(c, pas)
+    if c.variable
+        cadence = 0;
+        majeur = true;
+    else
+        cadence = pas;
+        majeur = false;
+    end
+end
+
+% Les blocs qui lisent chaque bloc.
+function lecteurs = lecteursDe(c)
+    lecteurs = cell(1, c.n);
+    for j = 1:c.n
+        e = c.entrees{j};
+        e = e(e > 0);
+        for s = unique(c.proprio(e))
+            lecteurs{s}(end + 1) = j;
+        end
+    end
+end
+
+% La période que les lecteurs du bloc K lui donnent : ceux qui héritent
+% laissent décider ce qu'ils alimentent, une constante ne dit rien, un
+% lecteur continu ou deux périodes différentes n'en donnent aucune.
+function [periode, decalage] = periodeEnAval(c, k, lecteurs)
+    periode = [];
+    decalage = 0;
+    vus = k;
+    pile = lecteurs{k};
+    trouvees = zeros(0, 2);
+    while ~isempty(pile)
+        j = pile(end);
+        pile(end) = [];
+        if any(vus == j)
+            continue
+        end
+        vus(end + 1) = j; %#ok<AGROW>
+        if c.cadence(j) == -1
+            pile = [pile, lecteurs{j}]; %#ok<AGROW>
+        elseif c.cadence(j) == 0
+            return
+        elseif c.cadence(j) > 0 && isfinite(c.cadence(j))
+            trouvees(end + 1, :) = [c.cadence(j), c.decalage(j)]; %#ok<AGROW>
+        end
+    end
+    if isempty(trouvees)
+        return
+    end
+    tolerance = 1e-9 * trouvees(1, 1);
+    if all(abs(trouvees(:, 1) - trouvees(1, 1)) <= tolerance) && ...
+       all(abs(trouvees(:, 2) - trouvees(1, 2)) <= tolerance)
+        periode = trouvees(1, 1);
+        decalage = trouvees(1, 2);
+    end
 end
 
 function [periode, decalage] = lirePeriode(v)
@@ -5896,6 +6001,28 @@ function diagnostiquer(c)
                   'reglage AlgebraicLoopMsg du modele regle ce message.'], ...
                  c.nom, numel(c.boucles), strjoin(textes, ' ; '));
     end
+end
+
+% Une source dont la période dite est -1 : celle d'un compteur, d'un
+% Repeating Sequence Stair par défaut, ou qu'on a écrite. Une entrée du
+% modèle, un Pulse Generator réglé en temps, n'en ont pas ; le
+% Band-Limited White Noise refuse une période qui n'est pas positive.
+function oui = sourceHeritee(type, p)
+    v = [];
+    switch type
+        case {'counterfreerunning', 'counterlimited', 'repeatingsequencestair', ...
+              'repeatingsequenceinterpolated'}
+            v = p.tsamp;
+        case {'constant', 'enumeratedconstant', 'step', 'sine', 'digitalclock', ...
+              'randomnumber', 'uniformrandomnumber', 'fromfile', 'signaleditor', ...
+              'fromspreadsheet', 'fromworkspace'}
+            v = p.SampleTime;
+        case 'pulsegenerator'
+            if strcmp(p.PulseType, 'Sample based')
+                v = p.SampleTime;
+            end
+    end
+    oui = isnumeric(v) && ~isempty(v) && double(v(1)) == -1;
 end
 
 function signaler(niveau, identifiant, format, varargin)

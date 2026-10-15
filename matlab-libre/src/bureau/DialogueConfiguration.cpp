@@ -303,6 +303,10 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                   QStringLiteral("une transition sans Rate Transition en monotâche"),
                   kNiveaux,
                   QStringLiteral("Permise en monotâche : faut-il le dire, ou la refuser ?"));
+    nouvelleListe(QStringLiteral("InheritedTsInSrcMsg"), formulaireCadences,
+                  QStringLiteral("une source a la période -1"), kNiveaux,
+                  QStringLiteral("Un bloc source — un compteur par défaut — qui hérite sa "
+                                 "période en arrière, de ce qu'il alimente"));
     colonneDiagnostics->addWidget(groupeCadences);
     auto* groupeBus = new QGroupBox(QStringLiteral("Bus"));
     auto* formulaireBus = new QFormLayout(groupeBus);
