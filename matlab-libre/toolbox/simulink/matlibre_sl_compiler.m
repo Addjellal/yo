@@ -467,6 +467,9 @@ function p = lireParametres(entree, bloc, chemin)
         end
         p.(canon) = bloc.parametres.(ecrits{i});
     end
+    if strcmp(entree.type, 'selector')
+        p = indicesSelecteur(p);
+    end
     for i = 1:size(entree.params, 1)
         nom = entree.params{i, 1};
         nature = entree.params{i, 3};
@@ -692,6 +695,14 @@ function [type, p] = normaliser(type, p, chemin)
         case 'transferfcndirectformii'
             p = struct('Script', scriptFormeDirecte(p, chemin), 'SampleTime', -1);
             type = 'matlabfunction';
+        case 'selector'
+            % les options d'indices de Simulink, une par dimension : en
+            % MATLAB Function ; les seuls Indices d'autrefois restent natifs
+            if ~isempty(celluleDe(champ(p, 'IndexOptionArray', {}))) || ...
+               double(champ(p, 'NumberOfDimensions', 1)) ~= 1
+                p = struct('Script', scriptSelecteur(p, chemin), 'SampleTime', p.SampleTime);
+                type = 'matlabfunction';
+            end
         case 'datatypescalingstrip'
             p = struct('Script', sprintf(['function y = fcn(u)\nif isa(u, ''embedded.fi'')\n' ...
                                           '    y = storedInteger(u);\nelse\n    y = u;\n' ...
@@ -971,6 +982,172 @@ end
 % Assignment : y vaut Y0 — ou des zéros de la taille donnée —, puis ses
 % éléments aux indices voulus reçoivent ceux de U. Il s'écrit en une
 % fonction, que le bloc MATLAB Function calcule.
+% Les fichiers écrivent les Indices d'un Selector une valeur par dimension,
+% séparées de virgules : « 1,[1 3] » ne s'évalue pas d'un bloc. Le texte
+% est gardé tel quel, et le script du bloc en lit les valeurs une à une.
+function p = indicesSelecteur(p)
+    if ~(ischar(p.Indices) || isstring(p.Indices))
+        return
+    end
+    n = p.NumberOfDimensions;
+    if ischar(n) || isstring(n)
+        n = str2double(char(n));
+    end
+    options = p.IndexOptionArray;
+    if (isnumeric(n) && isscalar(n) && n ~= 1) || ~isempty(options)
+        p.IndicesTexte = char(p.Indices);
+        p.Indices = 1;
+    end
+end
+
+% Le Selector de Simulink : pour chaque dimension, tout (Select all), des
+% indices donnés ou lus sur un port (Index vector), ou une plage de
+% OutputSizeArray éléments à partir d'un indice donné ou lu (Starting
+% index) ; indices comptés de 1 ou de 0 (IndexMode). Un indice qui sort de
+% l'entrée est refusé en nommant le bloc.
+function script = scriptSelecteur(p, chemin)
+    n = double(p.NumberOfDimensions);
+    if ~(isscalar(n) && any(n == [1 2]))
+        error('Simulink:blocks:SelectorDimensions', ...
+              ['Le Selector ''%s'' a %s dimension(s) : MatLibre choisit en une ou deux ' ...
+               'dimensions.'], chemin, mat2str(n));
+    end
+    options = listeSelecteur(p.IndexOptionArray, true);
+    if isempty(options)
+        options = repmat({'Index vector (dialog)'}, 1, n);
+    end
+    indices = listeSelecteur(p.IndexParamArray, n > 1);
+    if isempty(indices) && isfield(p, 'IndicesTexte')
+        indices = listeSelecteur(p.IndicesTexte, n > 1);
+    elseif isempty(indices)
+        indices = {p.Indices};
+    end
+    tailles = listeSelecteur(p.OutputSizeArray, n > 1);
+    if numel(options) < n
+        error('Simulink:blocks:SelectorIndexOptions', ...
+              ['Le Selector ''%s'' a %d dimension(s) et %d option(s) d''indice ' ...
+               '(IndexOptionArray) : une par dimension.'], chemin, n, numel(options));
+    end
+    zero = double(strcmp(p.IndexMode, 'Zero-based'));
+    ch = litteralChemin(chemin);
+    arguments_ = {'u'};
+    corps = '[~, ~, essai] = matlibre_sl_instant();\n';
+    for d = 1:n
+        if n == 1
+            taille = 'numel(u)';
+        else
+            taille = sprintf('size(u, %d)', d);
+        end
+        nom = sprintf('i%d', d);
+        switch options{d}
+            case 'Select all'
+                corps = [corps sprintf('%s = 1:%s;\n', nom, taille)]; %#ok<AGROW>
+                continue
+            case {'Index vector (dialog)', 'Starting index (dialog)'}
+                v = valeurDe(indices, d, chemin, 'IndexParamArray');
+                v = double(v(:).') + zero;
+                if any(v ~= round(v))
+                    error('Simulink:blocks:SelectorInvalidIndex', ...
+                          ['Les indices %s de la dimension %d du Selector ''%s'' ne sont pas ' ...
+                           'des entiers.'], mat2str(v - zero), d, chemin);
+                end
+                if strcmp(options{d}, 'Index vector (dialog)')
+                    corps = [corps sprintf('%s = %s;\n', nom, mat2str(v))]; %#ok<AGROW>
+                else
+                    corps = [corps sprintf('%s = %d - 1 + (1:%d);\n', nom, v(1), ...
+                                           tailleSortie(tailles, d, chemin))]; %#ok<AGROW>
+                end
+            case {'Index vector (port)', 'Starting index (port)'}
+                port = sprintf('idx%d', d);
+                arguments_{end + 1} = port; %#ok<AGROW>
+                if strcmp(options{d}, 'Index vector (port)')
+                    corps = [corps sprintf('%s = round(double(%s(:).'')) + %d;\n', nom, port, ...
+                                           zero)]; %#ok<AGROW>
+                else
+                    corps = [corps sprintf('%s = round(double(%s(1))) + %d - 1 + (1:%d);\n', ...
+                                           nom, port, zero, tailleSortie(tailles, d, ...
+                                                                         chemin))]; %#ok<AGROW>
+                end
+                % la compilation essaie la fonction sur des indices nuls
+                corps = [corps sprintf('if essai\n    %s = min(max(%s, 1), max(%s, 1));\nend\n', ...
+                                       nom, nom, taille)]; %#ok<AGROW>
+            case 'Starting and ending indices (port)'
+                error('Simulink:blocks:SelectorVariableSize', ...
+                      ['La dimension %d du Selector ''%s'' prend ses indices de debut et de ' ...
+                       'fin sur un port : la sortie change de taille, et MatLibre ne simule ' ...
+                       'pas encore les signaux de taille variable.'], d, chemin);
+            otherwise
+                error('Simulink:blocks:SelectorIndexOptions', ...
+                      ['L''option d''indice ''%s'' du Selector ''%s'' est inconnue : ''Select ' ...
+                       'all'', ''Index vector (dialog)'', ''Index vector (port)'', ''Starting ' ...
+                       'index (dialog)'', ''Starting index (port)''.'], options{d}, chemin);
+        end
+        corps = [corps sprintf(['if any(%s < 1 | %s > %s)\n    error(''Simulink:Selector:' ...
+                                'IndexOutOfRange'', [''Les indices de la dimension %d de ' ...
+                                '''''%%s'''' (%%s) sortent de son entree, qui en a %%d ' ...
+                                '(IndexMode %s).''], %s, mat2str(%s - %d), %s);\nend\n'], ...
+                               nom, nom, taille, d, char(p.IndexMode), ch, nom, zero, taille)]; %#ok<AGROW>
+    end
+    if n == 1
+        corps = [corps 'y = u(i1);\nif ~isrow(u)\n    y = y(:);\nend\n'];
+    else
+        corps = [corps 'y = u(i1, i2);\n'];
+    end
+    script = strrep(['function y = fcn(' strjoin(arguments_, ', ') ')\n' corps], '\n', char(10));
+end
+
+% Les paramètres du Selector tels que les fichiers les écrivent, une
+% valeur par dimension séparées de virgules hors des crochets :
+% « Select all,Index vector (dialog) », « 1,[1 3] ». Une cellule, ou son
+% texte entre accolades, se lit telle quelle.
+function c = listeSelecteur(v, couper)
+    if (ischar(v) || isstring(v)) && couper
+        texte = strtrim(char(v));
+        if ~isempty(texte) && texte(1) ~= '{'
+            c = {};
+            profondeur = 0;
+            debut = 1;
+            for i = 1:numel(texte)
+                switch texte(i)
+                    case {'[', '(', '{'}
+                        profondeur = profondeur + 1;
+                    case {']', ')', '}'}
+                        profondeur = profondeur - 1;
+                    case ','
+                        if profondeur == 0
+                            c{end + 1} = strtrim(texte(debut:i - 1)); %#ok<AGROW>
+                            debut = i + 1;
+                        end
+                end
+            end
+            c{end + 1} = strtrim(texte(debut:end));
+            return
+        end
+    end
+    c = celluleDe(v);
+end
+
+function v = valeurDe(indices, d, chemin, nom)
+    if numel(indices) < d
+        error('Simulink:blocks:SelectorIndexOptions', ...
+              'Le Selector ''%s'' ne donne pas d''indice pour la dimension %d (%s).', ...
+              chemin, d, nom);
+    end
+    v = indices{d};
+    if ischar(v) || isstring(v)
+        v = matlibre_sl_expression(char(v), chemin, nom);
+    end
+end
+
+function t = tailleSortie(tailles, d, chemin)
+    t = double(valeurDe(tailles, d, chemin, 'OutputSizeArray'));
+    if ~(isscalar(t) && t >= 1 && t == round(t))
+        error('Simulink:blocks:SelectorOutputSize', ...
+              ['La taille de sortie de la dimension %d du Selector ''%s'' doit etre un ' ...
+               'entier positif (OutputSizeArray).'], d, chemin);
+    end
+end
+
 function script = scriptAffectation(p, chemin)
     n = double(p.NumberOfDimensions);
     if ~(isscalar(n) && any(n == [1 2]))

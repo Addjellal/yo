@@ -747,9 +747,12 @@ function s = classesFonction(c, k, tE)
         u{j} = valeurEssai(tE(j), 0, d);
     end
     sorties = cell(1, c.nOut(k));
+    matlibre_sl_instant('essai', true);
     try
         [sorties{:}] = h(u{:});
+        matlibre_sl_instant('essai', false);
     catch err
+        matlibre_sl_instant('essai', false);
         if strncmp(err.identifier, 'Simulink:', 9) && ~isempty(strfind(err.message, c.chemins{k}))
             rethrow(err);
         end
@@ -1241,7 +1244,7 @@ function admis = entreesComplexesAdmises(c, k, nE)
                     'complextomagnitudeangle', 'assignment', 'permutedimensions', ...
                     'squeeze', 'discretefirfilter', 'transpose', 'hermitiantranspose', ...
                     'creatediagonalmatrix', 'extractdiagonal', 'matrixsquare', ...
-                    'crossproduct', 'ishermitian', 'identitymatrix', 'submatrix'}));
+                    'crossproduct', 'ishermitian', 'identitymatrix', 'submatrix', 'selector'}));
                 if strcmp(p.Bibliotheque, 'permutematrix')
                     admis(1) = true;   % la matrice A, pas les indices
                 end
@@ -1312,12 +1315,15 @@ function [s, sonde] = complexiteFonction(c, k, xE, sonde)
                 end
             end
             sorties = cell(1, c.nOut(k));
+            matlibre_sl_instant('essai', true);
             try
                 [sorties{:}] = h(u{:});
+                matlibre_sl_instant('essai', false);
                 for q = 1:c.nOut(k)
                     s(q) = s(q) || (isnumeric(sorties{q}) && ~isreal(sorties{q}));
                 end
             catch err
+                matlibre_sl_instant('essai', false);
                 if essai == 1
                     clear(func2str(h));
                     if strncmp(err.identifier, 'Simulink:', 9) && ...

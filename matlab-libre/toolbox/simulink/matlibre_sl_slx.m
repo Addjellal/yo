@@ -937,6 +937,9 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
                 end
             end
         end
+        if strcmp(entree.type, 'selector')
+            b.parametres = parametresSelecteur(b.parametres);
+        end
         lignes{end + 1} = sprintf('%s  <Block BlockType="%s" Name="%s" SID="%d">', marge, ...
                                   typeSimulink, matlibre_xml_echapper(b.nom), sids(k)); %#ok<AGROW>
         if ~isempty(reference)
@@ -1125,6 +1128,39 @@ function nom = portDeControleEcrit(bloc, port)
     rang = port - nEntrees;
     if rang <= numel(noms)
         nom = noms{rang};
+    end
+end
+
+% Les options d'un Selector, rangées en cellules, s'écrivent comme Simulink
+% les range dans ses fichiers : « Select all,Index vector (dialog) »,
+% « 1,[1 3] ». Une dimension sans valeur — tout choisir — y vaut 1.
+function p = parametresSelecteur(p)
+    noms = {'IndexOptionArray', 'IndexOptions'; 'IndexParamArray', 'Indices'; ...
+            'OutputSizeArray', 'OutputSizes'};
+    for i = 1:size(noms, 1)
+        if ~isfield(p, noms{i, 1})
+            continue
+        end
+        v = p.(noms{i, 1});
+        p = rmfield(p, noms{i, 1});
+        if (ischar(v) || isstring(v)) && strncmp(strtrim(char(v)), '{', 1)
+            v = eval(strtrim(char(v)));
+        end
+        if iscell(v)
+            if isempty(v)
+                continue   % la valeur par défaut : rien à écrire
+            end
+            morceaux = cell(1, numel(v));
+            for j = 1:numel(v)
+                if isempty(v{j})
+                    morceaux{j} = '1';
+                else
+                    morceaux{j} = texteValeur(v{j});
+                end
+            end
+            v = strjoin(morceaux, ',');
+        end
+        p.(noms{i, 2}) = v;
     end
 end
 

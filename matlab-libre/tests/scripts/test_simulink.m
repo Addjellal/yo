@@ -11686,6 +11686,126 @@ for q = 1:size(refus89, 1)
 end
 fprintf('integrateur a etat enroule : ok\n');
 
+%% --------------------------------------------- 90. Le Selector en entier
+% Le Selector de Simulink : une option d'indices par dimension — tout,
+% indices donnés ou lus sur un port, plage d'une taille donnée à partir
+% d'un indice donné ou lu —, comptés de 1 ou de 0. Les anciens Indices
+% restent compris. Un indice hors de l'entrée est refusé en nommant le
+% bloc, à la compilation comme pendant la simulation.
+M90 = magic(4);
+regle90 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1};
+cas90 = {
+    {'Indices', [3 1]}, (1:6)', [3; 1]
+    {'NumberOfDimensions', 1, 'IndexOptionArray', {'Index vector (dialog)'}, ...
+     'IndexParamArray', {[2 4]}}, (10:15)', [11; 13]
+    {'NumberOfDimensions', 1, 'IndexMode', 'Zero-based', ...
+     'IndexOptionArray', {'Starting index (dialog)'}, 'IndexParamArray', {1}, ...
+     'OutputSizeArray', {3}}, (10:15)', [11; 12; 13]
+    {'NumberOfDimensions', 2, 'IndexOptionArray', {'Select all', 'Index vector (dialog)'}, ...
+     'IndexParamArray', {[], [4 1]}}, M90, M90(:, [4 1])
+    {'NumberOfDimensions', 2, 'IndexOptionArray', ...
+     {'Starting index (dialog)', 'Select all'}, 'IndexParamArray', {2, []}, ...
+     'OutputSizeArray', {2, []}}, M90, M90(2:3, :)
+    };
+for q = 1:size(cas90, 1)
+    m90 = new_system('selecteur90');
+    m90 = add_block(m90, 'constant', 'u', 'Value', cas90{q, 2});
+    m90 = add_block(m90, 'selector', 's', cas90{q, 1}{:});
+    m90 = add_block(m90, 'toworkspace', 'tw', 'VariableName', 'sortie90', 'SaveFormat', 'Array');
+    m90 = add_line(add_line(m90, 'u', 's'), 's', 'tw');
+    evalc('sim(m90, regle90{:});');
+    vu90 = evalin('base', 'sortie90');
+    if ndims(vu90) == 3
+        vu90 = vu90(:, :, end);
+    else
+        vu90 = vu90(end, :);
+    end
+    assert(isequal(double(vu90(:)), double(cas90{q, 3}(:))), ...
+           sprintf('Selector %d : %s au lieu de %s', q, mat2str(vu90), mat2str(cas90{q, 3})));
+end
+% des indices lus sur des ports, une ligne et une plage de colonnes
+p90 = new_system('ports90');
+p90 = add_block(p90, 'constant', 'u', 'Value', M90);
+p90 = add_block(p90, 'constant', 'ligne', 'Value', 3);
+p90 = add_block(p90, 'constant', 'debut', 'Value', 2);
+p90 = add_block(p90, 'selector', 's', 'NumberOfDimensions', 2, ...
+                'IndexOptionArray', {'Index vector (port)', 'Starting index (port)'}, ...
+                'OutputSizeArray', {1, 2});
+p90 = add_block(p90, 'outport', 'y');
+p90 = add_line(add_line(add_line(p90, 'u', 's/1'), 'ligne', 's/2'), 'debut', 's/3');
+p90 = add_line(p90, 's', 'y');
+[ne90, ~] = matlibre_sl_ports(p90.blocs{4});
+assert(ne90 == 3, 'un port d''indices par option (port)');
+r90 = sim(p90, regle90{:});
+assert(isequal(r90.yout(end, :), M90(3, 2:3)), 'la ligne 3, les colonnes 2 et 3, lues sur leurs ports');
+% ce qui est refusé
+vu90 = '';
+message90 = '';
+try
+    sim(set_param(p90, 'ligne', 'Value', 7), regle90{:});
+catch err
+    vu90 = err.identifier;
+    message90 = err.message;
+end
+assert(strcmp(vu90, 'Simulink:Selector:IndexOutOfRange') && ~isempty(strfind(message90, 'ports90/s')), ...
+       'un indice lu hors de l''entree arrete la simulation, en nommant le bloc');
+refus90 = {
+    {'NumberOfDimensions', 1, 'IndexOptionArray', {'Index vector (dialog)'}, ...
+     'IndexParamArray', {9}}, 'Simulink:Selector:IndexOutOfRange'
+    {'NumberOfDimensions', 1, 'IndexOptionArray', {'Starting and ending indices (port)'}}, ...
+        'Simulink:blocks:SelectorVariableSize'
+    {'NumberOfDimensions', 3}, 'Simulink:blocks:SelectorDimensions'
+    {'NumberOfDimensions', 1, 'IndexOptionArray', {'Choix inconnu'}}, ...
+        'Simulink:blocks:SelectorIndexOptions'
+    };
+for q = 1:size(refus90, 1)
+    m90 = new_system('refus90');
+    m90 = add_block(m90, 'constant', 'u', 'Value', (1:4)');
+    m90 = add_block(m90, 'selector', 's', refus90{q, 1}{:});
+    m90 = add_block(m90, 'terminator', 't');
+    m90 = add_line(add_line(m90, 'u', 's'), 's', 't');
+    vu90 = '';
+    message90 = '';
+    try
+        sim(m90, regle90{:});
+    catch err
+        vu90 = err.identifier;
+        message90 = err.message;
+    end
+    assert(strcmp(vu90, refus90{q, 2}) && ~isempty(strfind(message90, 'refus90/s')), ...
+           sprintf('Selector, refus %d : %s (%s)', q, vu90, message90));
+end
+% la forme des fichiers de Simulink, une valeur par dimension séparées de
+% virgules, se lit ; un .slx écrit les options ainsi, et se relit
+f90 = new_system('fichier90');
+f90 = add_block(f90, 'constant', 'u', 'Value', M90);
+f90 = add_block(f90, 'selector', 's', 'NumberOfDimensions', 2, ...
+                'IndexOptions', 'Select all,Index vector (dialog)', 'Indices', '1,[4 1]', ...
+                'OutputSizes', '1,1');
+f90 = add_block(f90, 'outport', 'y');
+f90 = add_line(add_line(f90, 'u', 's'), 's', 'y');
+r90 = sim(f90, regle90{:});
+assert(isequal(reshape(r90.yout(end, :), 4, 2), M90(:, [4 1])), 'IndexOptions et Indices a virgules');
+g90 = new_system('fichier91');
+g90 = add_block(g90, 'constant', 'u', 'Value', M90);
+g90 = add_block(g90, 'constant', 'i', 'Value', 2);
+g90 = add_block(g90, 'selector', 's', 'NumberOfDimensions', 2, ...
+                'IndexOptionArray', {'Starting index (port)', 'Index vector (dialog)'}, ...
+                'IndexParamArray', {[], [1 3]}, 'OutputSizeArray', {2, []});
+g90 = add_block(g90, 'outport', 'y');
+g90 = add_line(add_line(add_line(g90, 'u', 's/1'), 'i', 's/2'), 's', 'y');
+slx90 = [tempname '.slx'];
+save_system(g90, slx90);
+h90 = load_system(slx90);
+delete(slx90);
+parametres90 = h90.blocs{strcmp(cellfun(@(b) b.nom, h90.blocs, 'UniformOutput', false), 's')}.parametres;
+assert(strcmp(parametres90.IndexOptionArray, 'Starting index (port),Index vector (dialog)') && ...
+       strcmp(parametres90.Indices, '1,[1 3]'), 'le .slx range les options comme Simulink');
+r90 = sim(h90, regle90{:});
+assert(isequal(reshape(r90.yout(end, :), 2, 2), M90(2:3, [1 3])), 'le Selector relu du .slx');
+evalin('base', 'clear sortie90');
+fprintf('Selector en entier : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

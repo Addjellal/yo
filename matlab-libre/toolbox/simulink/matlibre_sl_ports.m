@@ -52,6 +52,22 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 3;   % up, u, lo
         case {'crossproduct', 'permutematrix'}
             nEntrees = 2;   % les deux vecteurs ; A et les indices P
+        case 'selector'
+            % l'entrée, puis un port par dimension dont les indices en viennent
+            options = lire(p, 'IndexOptionArray', {});
+            if ischar(options) || isstring(options)
+                texte = strtrim(char(options));
+                if ~isempty(texte) && texte(1) == '{'
+                    options = eval(texte);
+                else
+                    % la forme des fichiers : « Select all,Index vector (port) »
+                    options = strtrim(strsplit(texte, ','));
+                end
+            end
+            if ~iscell(options)
+                options = {};
+            end
+            nEntrees = 1 + sum(cellfun(@(o) ischar(o) && ~isempty(regexp(o, '\(port\)$', 'once')), options));
         case 'expandscalar'
             nEntrees = 0;
         case 'functioncaller'

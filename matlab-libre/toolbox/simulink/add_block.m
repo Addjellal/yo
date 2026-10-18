@@ -202,7 +202,12 @@ function modele = add_block(modele, type, nom, varargin)
 %                  élément nommé, qui le remplace
 %     mux          Inputs (un nombre, ou les largeurs)
 %     demux        Outputs (un nombre, ou les largeurs)
-%     selector     Indices
+%     selector     Indices ; ou NumberOfDimensions (1 ou 2), IndexMode,
+%                  IndexOptionArray ('Select all', 'Index vector (dialog)',
+%                  'Index vector (port)', 'Starting index (dialog)',
+%                  'Starting index (port)'), IndexParamArray,
+%                  OutputSizeArray — une option par dimension, un port
+%                  d'indices par option « (port) »
 %     assignment   NumberOfDimensions (1 ou 2), IndexMode, IndexOptionArray
 %                  ('Assign all', 'Index vector (dialog)', 'Starting index
 %                  (dialog)'), IndexParamArray, OutputInitialize,
