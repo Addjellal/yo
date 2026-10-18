@@ -1181,6 +1181,9 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     end
     rtol = double(reglages.RelTol);
     absoluAuto = ischar(reglages.AbsTol);
+    % AutoScaleAbsTol 'off' : la tolérance absolue automatique ne suit pas
+    % la taille des états
+    echelleAuto = ~isfield(reglages, 'AutoScaleAbsTol') || strcmp(reglages.AutoScaleAbsTol, 'on');
     if absoluAuto
         atol = rtol * 1e-3 * ones(nx, 1);
     else
@@ -1242,6 +1245,12 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     % suite, MaxConsecutiveMinStep pas de suite au pas minimal.
     maxZC = 1000;
     niveauZC = 2;
+    % deux passages par zéro se suivent quand moins de
+    % ConsecutiveZCsStepRelTol fois l'instant les sépare
+    toleranceZC = 0;
+    if isfield(reglages, 'ConsecutiveZCsStepRelTol')
+        toleranceZC = reglages.ConsecutiveZCsStepRelTol;
+    end
     auMinimum = 0;
     maxAuMinimum = 1;
     erreurAuMinimum = false;
@@ -1431,7 +1440,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                                                          rtol, touche);
                     end
                 end
-                if h <= 1e3 * toleranceTemps(t)
+                if h <= max(1e3 * toleranceTemps(t), toleranceZC * abs(t))
                     consecutifs = consecutifs + 1;
                     if adaptatif && consecutifs >= 3
                         desactive = true;
@@ -1513,7 +1522,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         avant = passagesZero(T, V, Z, x, t);
         if nx > 0
             maxAbs = max(maxAbs, abs(x));
-            if absoluAuto
+            if absoluAuto && echelleAuto
                 atol = rtol * max(maxAbs, 1e-3);
             end
         end

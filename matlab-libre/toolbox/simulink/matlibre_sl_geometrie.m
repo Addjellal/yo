@@ -160,9 +160,34 @@ function t = ecrireReglage(v)
         t = char(v);
     elseif isnumeric(v) || islogical(v)
         t = mat2str(v);
+    elseif isstruct(v)
+        t = texteStructure(v);   % SampleTimeProperty
     else
         t = ['<' class(v) '>'];
     end
+end
+
+% Un tableau de structures de nombres, en l'expression qui le refait.
+function t = texteStructure(s)
+    t = '<struct>';
+    noms = fieldnames(s);
+    morceaux = cell(1, numel(noms));
+    for i = 1:numel(noms)
+        valeurs = cell(1, numel(s));
+        for j = 1:numel(s)
+            x = s(j).(noms{i});
+            if ~(isnumeric(x) || islogical(x)) || ndims(x) > 2
+                return
+            end
+            valeurs{j} = mat2str(double(x));
+        end
+        if numel(s) == 1
+            morceaux{i} = sprintf('''%s'', %s', noms{i}, valeurs{1});
+        else
+            morceaux{i} = sprintf('''%s'', {%s}', noms{i}, strjoin(valeurs, ', '));
+        end
+    end
+    t = ['struct(' strjoin(morceaux, ', ') ')'];
 end
 
 function d = demiLargeur(type, largeur, hauteur)

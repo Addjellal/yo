@@ -167,6 +167,55 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                  QStringLiteral("Pas minimaux de suite"),
                  QStringLiteral("À pas variable : combien de pas de suite au pas minimal, sans "
                                 "tenir la tolérance, avant le diagnostic"));
+    nouveauChamp(QStringLiteral("ConsecutiveZCsStepRelTol"), formulaireOptions,
+                 QStringLiteral("Tolérance en temps des passages par zéro"),
+                 QStringLiteral("À pas variable : deux passages par zéro plus proches que "
+                                "elle fois l'instant se suivent, et comptent pour le "
+                                "diagnostic des passages de suite"));
+    nouvelleListe(QStringLiteral("AutoScaleAbsTol"), formulaireOptions,
+                  QStringLiteral("Tolérance absolue à l'échelle"),
+                  {QStringLiteral("on"), QStringLiteral("off")},
+                  QStringLiteral("À pas variable, tolérance absolue « auto » : celle de chaque "
+                                 "état suit le plus grand module qu'il a pris"));
+    nouvelleListe(QStringLiteral("ShapePreserveControl"), formulaireOptions,
+                  QStringLiteral("Préservation de la forme"),
+                  {QStringLiteral("DisableAll"), QStringLiteral("EnableAll")},
+                  QStringLiteral("À pas variable : accepté et rangé ; le pas de MatLibre ne "
+                                 "suit que l'erreur estimée"));
+    nouvelleListe(QStringLiteral("SolverJacobianMethodControl"), formulaireOptions,
+                  QStringLiteral("Méthode du jacobien"),
+                  {QStringLiteral("auto"), QStringLiteral("SparsePerturbation"),
+                   QStringLiteral("FullPerturbation"), QStringLiteral("SparseAnalytical"),
+                   QStringLiteral("FullAnalytical")},
+                  QStringLiteral("Solveurs implicites : MatLibre calcule le jacobien par "
+                                 "perturbation, en entier, quel que soit ce choix"));
+    nouvelleListe(QStringLiteral("SolverResetMethod"), formulaireOptions,
+                  QStringLiteral("Remise du solveur"),
+                  {QStringLiteral("Fast"), QStringLiteral("Robust")},
+                  QStringLiteral("ode15s, ode23t, ode23tb et daessc : le jacobien se recalcule "
+                                 "à chaque pas, comme en Robust"));
+    nouvelleListe(QStringLiteral("SampleTimeConstraint"), formulaireOptions,
+                  QStringLiteral("Contrainte des périodes"),
+                  {QStringLiteral("Unconstrained"), QStringLiteral("Specified"),
+                   QStringLiteral("STIndependent")},
+                  QStringLiteral("À pas fixe — STIndependent : aucun bloc ne fixe sa période, "
+                                 "le modèle les hérite ; Specified : les périodes sont celles "
+                                 "de la liste imposée"));
+    nouveauChamp(QStringLiteral("SampleTimeProperty"), formulaireOptions,
+                 QStringLiteral("Périodes imposées"),
+                 QStringLiteral("Contrainte Specified : une structure par période, de la plus "
+                                "rapide à la plus lente — struct('SamplePeriod', {0.1, 0.2}, "
+                                "'Offset', {0, 0}, 'Priority', {40, 41})"));
+    nouvelleListe(QStringLiteral("PositivePriorityOrder"), formulaireOptions,
+                  QStringLiteral("Priorité haute pour une valeur haute"),
+                  {QStringLiteral("off"), QStringLiteral("on")},
+                  QStringLiteral("Génération de code : accepté et rangé, sans effet sur la "
+                                 "simulation"));
+    nouvelleListe(QStringLiteral("ConcurrentTasks"), formulaireOptions,
+                  QStringLiteral("Tâches concurrentes sur la cible"),
+                  {QStringLiteral("off"), QStringLiteral("on")},
+                  QStringLiteral("Génération de code : accepté et rangé, sans effet sur la "
+                                 "simulation"));
     colonneSolveur->addWidget(groupeOptions);
     colonneSolveur->addStretch(1);
     pages_->addWidget(pageSolveur);
@@ -377,6 +426,8 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
     for (const QString& interrupteur : couples_.keys())
         connect(listes_.value(interrupteur), &QComboBox::currentIndexChanged, this,
                 [this](int) { donneesChange(); });
+    connect(listes_.value(QStringLiteral("SampleTimeConstraint")), &QComboBox::currentIndexChanged,
+            this, [this](int) { typeChange(); });
     connect(listes_.value(QStringLiteral("OutputOption")), &QComboBox::currentIndexChanged,
             this, [this](int) { donneesChange(); });
     typeChange();
@@ -420,11 +471,22 @@ void DialogueConfiguration::typeChange() {
                                QStringLiteral("InitialStep"), QStringLiteral("RelTol"),
                                QStringLiteral("AbsTol"), QStringLiteral("MaxConsecutiveZCs"),
                                QStringLiteral("MaxConsecutiveMinStep"),
-                               QStringLiteral("ZcThreshold")})
+                               QStringLiteral("ZcThreshold"),
+                               QStringLiteral("ConsecutiveZCsStepRelTol")})
         champs_.value(nom)->setEnabled(variable);
-    listes_.value(QStringLiteral("ZeroCrossAlgorithm"))->setEnabled(variable);
-    listes_.value(QStringLiteral("EnableMultiTasking"))->setEnabled(!variable);
-    listes_.value(QStringLiteral("AutoInsertRateTranBlk"))->setEnabled(!variable);
+    for (const QString& nom : {QStringLiteral("ZeroCrossAlgorithm"),
+                               QStringLiteral("AutoScaleAbsTol"),
+                               QStringLiteral("ShapePreserveControl")})
+        listes_.value(nom)->setEnabled(variable);
+    for (const QString& nom : {QStringLiteral("EnableMultiTasking"),
+                               QStringLiteral("AutoInsertRateTranBlk"),
+                               QStringLiteral("SampleTimeConstraint"),
+                               QStringLiteral("PositivePriorityOrder"),
+                               QStringLiteral("ConcurrentTasks")})
+        listes_.value(nom)->setEnabled(!variable);
+    champs_.value(QStringLiteral("SampleTimeProperty"))
+        ->setEnabled(!variable && listes_.value(QStringLiteral("SampleTimeConstraint"))
+                                          ->currentText() == QLatin1String("Specified"));
     for (const QString& nom : {QStringLiteral("MinStepSizeMsg"),
                                QStringLiteral("MaxConsecutiveZCsMsg")})
         listes_.value(nom)->setEnabled(variable);
@@ -464,6 +526,17 @@ void DialogueConfiguration::solveurChange() {
         ->setEnabled(choisi == QLatin1String("ode14x"));
     champs_.value(QStringLiteral("NumberNewtonIterations"))
         ->setEnabled(choisi == QLatin1String("ode14x") || choisi == QLatin1String("ode1be"));
+    // le jacobien vaut pour les solveurs implicites, la remise pour ceux
+    // qui gardent un jacobien d'un pas à l'autre dans Simulink
+    const QStringList implicites = {QStringLiteral("ode15s"), QStringLiteral("ode23s"),
+                                    QStringLiteral("ode23t"), QStringLiteral("ode23tb"),
+                                    QStringLiteral("daessc"), QStringLiteral("ode14x"),
+                                    QStringLiteral("ode1be")};
+    const QStringList remis = {QStringLiteral("ode15s"), QStringLiteral("ode23t"),
+                               QStringLiteral("ode23tb"), QStringLiteral("daessc")};
+    listes_.value(QStringLiteral("SolverJacobianMethodControl"))
+        ->setEnabled(implicites.contains(choisi));
+    listes_.value(QStringLiteral("SolverResetMethod"))->setEnabled(remis.contains(choisi));
 }
 
 QLineEdit* DialogueConfiguration::champ(const QString& nom) const {

@@ -11806,6 +11806,207 @@ assert(isequal(reshape(r90.yout(end, :), 2, 2), M90(2:3, [1 3])), 'le Selector r
 evalin('base', 'clear sortie90');
 fprintf('Selector en entier : ok\n');
 
+%% --------------------------------------------- 91. Le volet Solveur au complet
+% Les réglages du volet Solveur de Simulink qui manquaient : la tolérance
+% absolue à l'échelle des états, la tolérance en temps des passages par
+% zéro de suite, la contrainte des périodes et sa liste imposée ; le
+% jacobien, la remise, la préservation de la forme et les réglages de la
+% génération de code sont acceptés, rangés, relus d'un .slx.
+m91 = new_system('solveur91');
+defauts91 = {'AutoScaleAbsTol', 'on'; 'ShapePreserveControl', 'DisableAll'; ...
+             'SolverJacobianMethodControl', 'auto'; 'SolverResetMethod', 'Fast'; ...
+             'ConsecutiveZCsStepRelTol', '10*128*eps'; ...
+             'SampleTimeConstraint', 'Unconstrained'; 'PositivePriorityOrder', 'off'; ...
+             'ConcurrentTasks', 'off'};
+for q = 1:size(defauts91, 1)
+    assert(isequal(get_param(m91, defauts91{q, 1}), defauts91{q, 2}), ...
+           sprintf('%s vaut %s par defaut', defauts91{q, 1}, defauts91{q, 2}));
+end
+assert(isempty(get_param(m91, 'SampleTimeProperty')), 'aucune periode imposee par defaut');
+% la casse ne compte pas, une valeur inconnue est refusee en nommant ce qui vaut
+assert(strcmp(get_param(set_param(m91, 'solverresetmethod', 'robust'), 'SolverResetMethod'), ...
+              'Robust'), 'Robust, quelle que soit la casse');
+mauvais91 = {'AutoScaleAbsTol', 'oui'; 'ShapePreserveControl', 'Partiel'; ...
+             'SolverJacobianMethodControl', 'Exact'; 'SolverResetMethod', 'Lent'; ...
+             'SampleTimeConstraint', 'Libre'; 'SampleTimeProperty', 5; ...
+             'PositivePriorityOrder', 2};
+for q = 1:size(mauvais91, 1)
+    vu91 = '';
+    try
+        set_param(m91, mauvais91{q, 1}, mauvais91{q, 2});
+    catch err
+        vu91 = err.identifier;
+    end
+    assert(strcmp(vu91, 'Simulink:Config:InvalidValue'), ...
+           sprintf('%s refuse une valeur inconnue (%s)', mauvais91{q, 1}, vu91));
+end
+
+% AutoScaleAbsTol : avec AbsTol 'auto', la tolérance de chaque état suit
+% son plus grand module ; sans l'échelle, elle reste fine, et un
+% oscillateur d'amplitude 100 demande bien plus de pas
+o91 = new_system('oscillateur91');
+o91 = add_block(o91, 'integrator', 'v', 'InitialCondition', 0);
+o91 = add_block(o91, 'integrator', 'x', 'InitialCondition', 100);
+o91 = add_block(o91, 'gain', 'g', 'Gain', -1);
+o91 = add_block(o91, 'outport', 'y');
+o91 = add_line(add_line(add_line(add_line(o91, 'v', 'x'), 'x', 'g'), 'g', 'v'), 'x', 'y');
+regle91 = {'Solver', 'ode45', 'StopTime', 20, 'MaxStep', 10, 'RelTol', 1e-5};
+avec91 = sim(o91, regle91{:});
+sans91 = sim(o91, regle91{:}, 'AutoScaleAbsTol', 'off');
+assert(numel(sans91.tout) > numel(avec91.tout), ...
+       sprintf('sans l''echelle, plus de pas (%d contre %d)', numel(sans91.tout), ...
+               numel(avec91.tout)));
+assert(max(abs(sans91.yout - 100 * cos(sans91.tout))) < 0.01 && ...
+       max(abs(avec91.yout - 100 * cos(avec91.tout))) < 0.02, 'les deux suivent 100 cos t');
+% une tolérance absolue donnée ne suit pas l'échelle
+donnee91 = sim(o91, regle91{:}, 'AbsTol', 1e-4);
+donneeSans91 = sim(o91, regle91{:}, 'AbsTol', 1e-4, 'AutoScaleAbsTol', 'off');
+assert(isequal(donnee91.tout, donneeSans91.tout), 'AbsTol donnee : l''echelle n''y change rien');
+
+% ConsecutiveZCsStepRelTol : des passages par zéro espacés de pi/1000 ne se
+% suivent pas pour la tolérance par défaut ; avec 1e-2, ils se suivent
+% dès que l'instant dépasse 0,32, et le sixième arrête la simulation
+z91 = new_system('passages91');
+z91 = add_block(z91, 'sine', 'u', 'Frequency', 1000);
+z91 = add_block(z91, 'sign', 's');
+z91 = add_block(z91, 'outport', 'y');
+z91 = add_line(add_line(z91, 'u', 's'), 's', 'y');
+regle91 = {'Solver', 'ode45', 'StopTime', 1, 'MaxConsecutiveZCs', 5};
+r91 = sim(z91, regle91{:});
+assert(abs(r91.tout(end) - 1) < 1e-12, 'la tolerance par defaut : la simulation va a son terme');
+vu91 = '';
+message91 = '';
+try
+    sim(z91, regle91{:}, 'ConsecutiveZCsStepRelTol', 1e-2);
+catch err
+    vu91 = err.identifier;
+    message91 = err.message;
+end
+assert(strcmp(vu91, 'Simulink:Engine:SolverConsecutiveZCNum') && ...
+       ~isempty(strfind(message91, '5 passages')), ...
+       'une tolerance en temps large : les passages se suivent, le diagnostic tombe');
+vu91 = '';
+try
+    sim(z91, regle91{:}, 'ConsecutiveZCsStepRelTol', -1);
+catch err
+    vu91 = err.identifier;
+end
+assert(strcmp(vu91, 'Simulink:Config:InvalidValue'), 'une tolerance negative est refusee');
+
+% SampleTimeConstraint 'STIndependent' : le modèle hérite ses périodes
+s91 = new_system('independant91');
+s91 = add_block(s91, 'constant', 'c', 'Value', 2);
+s91 = add_block(s91, 'gain', 'g', 'Gain', 3);
+s91 = add_block(s91, 'outport', 'y');
+s91 = add_line(add_line(s91, 'c', 'g'), 'g', 'y');
+s91 = set_param(s91, 'Solver', 'FixedStepDiscrete', 'FixedStep', 'auto', ...
+                'SampleTimeConstraint', 'STIndependent', 'StopTime', 1);
+r91 = sim(s91);
+assert(all(r91.yout == 6), 'des periodes heritees : le modele se simule');
+refus91 = {};
+try
+    sim(s91, 'FixedStep', 0.1);
+catch err
+    refus91{end + 1} = err.identifier;
+end
+d91 = add_block(s91, 'unitdelay', 'd', 'SampleTime', 0.1);
+d91 = add_block(d91, 'outport', 'y2');
+d91 = add_line(add_line(d91, 'g', 'd'), 'd', 'y2');
+message91 = '';
+try
+    sim(d91);
+catch err
+    refus91{end + 1} = err.identifier;
+    message91 = err.message;
+end
+assert(isequal(refus91, {'Simulink:SampleTime:STIndependentFixedStep', ...
+                         'Simulink:SampleTime:STIndependentExplicitTs'}) && ...
+       ~isempty(strfind(message91, 'independant91/d')), ...
+       'STIndependent : un pas fixe donne, un bloc a periode propre, refuses');
+r91 = sim(set_param(d91, 'd', 'SampleTime', -1));
+assert(numel(r91.tout) == 51, 'le Unit Delay a periode -1 herite : accepte');
+% a pas variable, la contrainte ne vaut pas
+r91 = sim(d91, 'Solver', 'VariableStepDiscrete');
+assert(abs(r91.yout(end, 2) - 6) < 1e-12, 'a pas variable, la contrainte ne vaut pas');
+
+% SampleTimeConstraint 'Specified' : les périodes du modèle sont celles de
+% la liste, et le pas 'auto' leur plus grand commun diviseur
+p91 = new_system('imposees91');
+p91 = add_block(p91, 'constant', 'c', 'Value', 1);
+p91 = add_block(p91, 'unitdelay', 'lent', 'SampleTime', 0.2);
+p91 = add_block(p91, 'outport', 'y');
+p91 = add_line(add_line(p91, 'c', 'lent'), 'lent', 'y');
+p91 = set_param(p91, 'Solver', 'FixedStepDiscrete', 'FixedStep', 'auto', 'StopTime', 1);
+r91 = sim(p91);
+assert(abs(r91.tout(2) - 0.2) < 1e-12, 'sans contrainte, le pas fondamental est 0,2');
+liste91 = struct('SamplePeriod', {0.05, 0.2}, 'Offset', {0, 0}, 'Priority', {40, 41});
+q91 = set_param(p91, 'SampleTimeConstraint', 'Specified', 'SampleTimeProperty', liste91);
+r91 = sim(q91);
+assert(abs(r91.tout(2) - 0.05) < 1e-12 && abs(r91.yout(end) - 1) < 1e-12, ...
+       'Specified : le pas est le plus grand commun diviseur des periodes imposees');
+r91 = sim(set_param(q91, 'SampleTimeProperty', ...
+                    'struct(''SamplePeriod'', {0.05, 0.2}, ''Offset'', {0, 0})'));
+assert(abs(r91.tout(2) - 0.05) < 1e-12, 'la liste donnee par son expression');
+refus91 = {};
+messages91 = {};
+cas91 = {set_param(add_block(q91, 'unitdelay', 'autre', 'SampleTime', 0.3), 'StopTime', 1), ...
+         set_param(p91, 'SampleTimeConstraint', 'Specified'), ...
+         set_param(q91, 'SampleTimeProperty', struct('SamplePeriod', {0.2, 0.05})), ...
+         set_param(q91, 'SampleTimeProperty', struct('SamplePeriod', {0.05, 0.2}, ...
+                                                     'Offset', {0, 0.3}))};
+for q = 1:numel(cas91)
+    try
+        sim(cas91{q});
+        refus91{end + 1} = ''; %#ok<AGROW>
+    catch err
+        refus91{end + 1} = err.identifier; %#ok<AGROW>
+        messages91{end + 1} = err.message; %#ok<AGROW>
+    end
+end
+assert(isequal(refus91, {'Simulink:SampleTime:NotInSampleTimeProperty', ...
+                         'Simulink:SampleTime:InvalidSampleTimeProperty', ...
+                         'Simulink:SampleTime:InvalidSampleTimeProperty', ...
+                         'Simulink:SampleTime:InvalidSampleTimeProperty'}) && ...
+       ~isempty(strfind(messages91{1}, 'imposees91/autre')), ...
+       sprintf('Specified : une periode absente, une liste vide, desordonnee ou fausse (%s)', ...
+               strjoin(refus91, ', ')));
+
+% le jacobien, la remise, la forme et la génération de code ne changent pas
+% ce que calcule un solveur implicite
+k91 = new_system('raide91');
+k91 = add_block(k91, 'integrator', 'x', 'InitialCondition', 1);
+k91 = add_block(k91, 'gain', 'g', 'Gain', -1000);
+k91 = add_block(k91, 'outport', 'y');
+k91 = add_line(add_line(add_line(k91, 'x', 'g'), 'g', 'x'), 'x', 'y');
+base91 = sim(k91, 'Solver', 'ode15s', 'StopTime', 0.1);
+autre91 = sim(k91, 'Solver', 'ode15s', 'StopTime', 0.1, ...
+              'SolverJacobianMethodControl', 'FullAnalytical', 'SolverResetMethod', 'Robust', ...
+              'ShapePreserveControl', 'EnableAll', 'PositivePriorityOrder', 'on', ...
+              'ConcurrentTasks', 'on');
+assert(isequal(base91.tout, autre91.tout) && isequal(base91.yout, autre91.yout), ...
+       'jacobien, remise, forme et generation de code : les memes pas, les memes valeurs');
+
+% un .slx range ces réglages, et les relit
+e91 = set_param(p91, 'SampleTimeConstraint', 'Specified', 'SampleTimeProperty', liste91, ...
+                'AutoScaleAbsTol', 'off', 'ShapePreserveControl', 'EnableAll', ...
+                'SolverJacobianMethodControl', 'SparsePerturbation', ...
+                'ConsecutiveZCsStepRelTol', 1e-9);
+slx91 = [tempname '.slx'];
+save_system(e91, slx91);
+f91 = load_system(slx91);
+delete(slx91);
+assert(strcmp(get_param(f91, 'SampleTimeConstraint'), 'Specified') && ...
+       strcmp(get_param(f91, 'AutoScaleAbsTol'), 'off') && ...
+       strcmp(get_param(f91, 'ShapePreserveControl'), 'EnableAll') && ...
+       strcmp(get_param(f91, 'SolverJacobianMethodControl'), 'SparsePerturbation') && ...
+       isequal(get_param(f91, 'ConsecutiveZCsStepRelTol'), 1e-9), 'le .slx relit les reglages');
+relue91 = evalin('base', get_param(f91, 'SampleTimeProperty'));
+assert(isequal([relue91.SamplePeriod], [0.05 0.2]) && isequal([relue91.Priority], [40 41]), ...
+       'la liste des periodes imposees, relue du .slx');
+r91 = sim(f91);
+assert(abs(r91.tout(2) - 0.05) < 1e-12, 'le modele relu se simule sous sa contrainte');
+fprintf('volet Solveur au complet : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

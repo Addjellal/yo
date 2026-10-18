@@ -380,9 +380,15 @@ function c = compiler(modele, options)
     % se rapportent à lui
     if champ(options, 'pasAuto', false)
         pas = pasFondamental(c, tDebut, tFinal);
+        if ~c.variable && strcmp(champ(config, 'SampleTimeConstraint', ''), 'Specified')
+            % les périodes imposées font le pas fondamental
+            imposees = periodesImposees(config, c.nom);
+            pas = pgcdReel([imposees(:, 1); imposees(imposees(:, 2) > 0, 2)].');
+        end
         c.pas = pas;
     end
     c = periodes(c, pas);
+    contrainteDesPeriodes(c, config, champ(options, 'pasAuto', false));
     c = transitionsDeCadence(c, config, silencieux, champ(options, 'transitionsPosees', false));
 
     % --- 9. ce que le calcul lira : paramètres et états ---------------------
@@ -4024,6 +4030,8 @@ function c = periodes(c, pas, verifier)
                 end
         end
     end
+    % les périodes que les blocs fixent eux-mêmes, avant tout héritage
+    c.periodeDonnee = c.cadence > 0 & isfinite(c.cadence);
     % L'héritage en arrière, comme dans Simulink : une source discrète par
     % nature à période -1 — un compteur, un Repeating Sequence Stair par
     % défaut — prend la période de ce qu'elle alimente, quand ses lecteurs,
@@ -4452,6 +4460,87 @@ function [periode, decalage] = lirePeriode(v)
     decalage = 0;
     if numel(v) >= 2
         decalage = v(2);
+    end
+end
+
+% Periodic sample time constraint (SampleTimeConstraint), à pas fixe comme
+% dans Simulink. 'STIndependent' : le modèle doit pouvoir hériter ses
+% périodes de qui le référence — aucun bloc ne fixe la sienne, et le pas
+% reste 'auto'. 'Specified' : ses périodes sont celles de
+% SampleTimeProperty, et nulle autre.
+function contrainteDesPeriodes(c, config, pasAuto)
+    if c.variable
+        return
+    end
+    switch champ(config, 'SampleTimeConstraint', 'Unconstrained')
+        case 'STIndependent'
+            if ~pasAuto
+                error('Simulink:SampleTime:STIndependentFixedStep', ...
+                      ['Le modele ''%s'' se veut independant des periodes ' ...
+                       '(SampleTimeConstraint STIndependent) : il tient son pas de qui le ' ...
+                       'reference, et son pas fixe (FixedStep) doit rester ''auto''.'], c.nom);
+            end
+            k = find(c.periodeDonnee, 1);
+            if ~isempty(k)
+                error('Simulink:SampleTime:STIndependentExplicitTs', ...
+                      ['Le bloc ''%s'' fixe sa periode d''echantillonnage (%s) dans le modele ' ...
+                       '''%s'', qui se veut independant des periodes (SampleTimeConstraint ' ...
+                       'STIndependent) : donnez-lui la periode -1, qu''il heritera.'], ...
+                      c.chemins{k}, mat2str([c.cadence(k) c.decalage(k)]), c.nom);
+            end
+        case 'Specified'
+            imposees = periodesImposees(config, c.nom);
+            for k = find(c.cadence > 0 & isfinite(c.cadence))
+                ecart = abs(imposees(:, 1) - c.cadence(k)) + abs(imposees(:, 2) - c.decalage(k));
+                if ~any(ecart <= 1e-9 * c.cadence(k))
+                    error('Simulink:SampleTime:NotInSampleTimeProperty', ...
+                          ['Le bloc ''%s'' tourne a la periode %s, que le modele ''%s'' ne ' ...
+                           'compte pas parmi les siennes (SampleTimeConstraint Specified) : ' ...
+                           'SampleTimeProperty donne %s.'], c.chemins{k}, ...
+                          mat2str([c.cadence(k) c.decalage(k)]), c.nom, mat2str(imposees));
+                end
+            end
+    end
+end
+
+% Les périodes de SampleTimeProperty, [période décalage] par ligne, de la
+% plus rapide à la plus lente.
+function imposees = periodesImposees(config, nomModele)
+    v = champ(config, 'SampleTimeProperty', []);
+    if ischar(v) || isstring(v)
+        try
+            v = evalin('base', char(v));
+        catch err
+            error('Simulink:SampleTime:InvalidSampleTimeProperty', ...
+                  'Le reglage SampleTimeProperty du modele ''%s'' ne s''evalue pas : %s', ...
+                  nomModele, err.message);
+        end
+    end
+    if isempty(v) || ~isstruct(v) || ~isfield(v, 'SamplePeriod')
+        error('Simulink:SampleTime:InvalidSampleTimeProperty', ...
+              ['Le modele ''%s'' impose ses periodes (SampleTimeConstraint Specified) : ' ...
+               'SampleTimeProperty doit les donner, une structure par periode, de champs ' ...
+               'SamplePeriod, Offset et Priority.'], nomModele);
+    end
+    imposees = zeros(numel(v), 2);
+    for i = 1:numel(v)
+        periode = double(v(i).SamplePeriod);
+        decalage = 0;
+        if isfield(v, 'Offset') && ~isempty(v(i).Offset)
+            decalage = double(v(i).Offset);
+        end
+        if ~(isscalar(periode) && isreal(periode) && periode > 0 && isfinite(periode)) || ...
+           ~(isscalar(decalage) && isreal(decalage) && decalage >= 0 && decalage < periode)
+            error('Simulink:SampleTime:InvalidSampleTimeProperty', ...
+                  ['La periode %d de SampleTimeProperty du modele ''%s'' est positive et ' ...
+                   'finie, son decalage de 0 a la periode exclue.'], i, nomModele);
+        end
+        imposees(i, :) = [periode decalage];
+    end
+    if any(diff(imposees(:, 1)) < 0)
+        error('Simulink:SampleTime:InvalidSampleTimeProperty', ...
+              ['Les periodes de SampleTimeProperty du modele ''%s'' vont de la plus rapide ' ...
+               'a la plus lente ; elles valent ici %s.'], nomModele, mat2str(imposees(:, 1).'));
     end
 end
 

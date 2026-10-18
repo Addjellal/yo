@@ -889,8 +889,12 @@ function ecrire(modele, fichier)
         if ~any(strcmp(nom{1}, toujours)) && isequal(config.(nom{1}), defauts.(nom{1}))
             continue
         end
+        texte = texteValeur(config.(nom{1}));
+        if isstruct(config.(nom{1}))
+            texte = texteStructure(config.(nom{1}));   % SampleTimeProperty
+        end
         lignes{end + 1} = sprintf('    <P Name="%s">%s</P>', nom{1}, ...
-                                  matlibre_xml_echapper(texteValeur(config.(nom{1})))); %#ok<AGROW>
+                                  matlibre_xml_echapper(texte)); %#ok<AGROW>
     end
     compteur = 0;
     [lignes, ~] = ecrireSysteme(modele, lignes, '    ', compteur);
@@ -1162,6 +1166,33 @@ function p = parametresSelecteur(p)
         end
         p.(noms{i, 2}) = v;
     end
+end
+
+% Un tableau de structures de nombres et de textes, en l'expression qui le
+% refait : « struct('SamplePeriod', {0.1, 0.2}, 'Offset', {0, 0}) ».
+function t = texteStructure(s)
+    t = '';
+    noms = fieldnames(s);
+    morceaux = cell(1, numel(noms));
+    for i = 1:numel(noms)
+        valeurs = cell(1, numel(s));
+        for j = 1:numel(s)
+            x = s(j).(noms{i});
+            if ischar(x) || isstring(x)
+                valeurs{j} = ['''' strrep(char(x), '''', '''''') ''''];
+            elseif (isnumeric(x) || islogical(x)) && ndims(x) <= 2
+                valeurs{j} = mat2str(double(x), 17);
+            else
+                return   % une valeur que le texte ne rend pas
+            end
+        end
+        if numel(s) == 1
+            morceaux{i} = sprintf('''%s'', %s', noms{i}, valeurs{1});
+        else
+            morceaux{i} = sprintf('''%s'', {%s}', noms{i}, strjoin(valeurs, ', '));
+        end
+    end
+    t = ['struct(' strjoin(morceaux, ', ') ')'];
 end
 
 function t = texteValeur(v)

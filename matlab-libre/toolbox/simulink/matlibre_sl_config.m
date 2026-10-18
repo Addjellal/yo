@@ -64,6 +64,48 @@ function varargout = matlibre_sl_config(action, varargin)
 %     ZcThreshold          'auto'     la bande autour de zéro où
 %                                     l'algorithme adaptatif ignore une
 %                                     traversée
+%     ConsecutiveZCsStepRelTol '10*128*eps'  la tolérance en temps : deux
+%                                     passages par zéro plus proches que
+%                                     elle fois l'instant se suivent, et
+%                                     comptent pour MaxConsecutiveZCs ;
+%                                     sous la résolution de localisation
+%                                     de MatLibre, 1e-7 fois l'instant,
+%                                     elle n'y change rien
+%     AutoScaleAbsTol      'on'       avec AbsTol 'auto' : la tolérance
+%                                     absolue de chaque état suit le plus
+%                                     grand module qu'il a pris, fois
+%                                     RelTol ; 'off' : elle reste à RelTol
+%                                     fois 1e-3
+%     ShapePreserveControl 'DisableAll'  'EnableAll' est accepté et
+%                                     rangé ; le pas de MatLibre ne suit
+%                                     que l'erreur estimée
+%     SolverJacobianMethodControl 'auto'  ou SparsePerturbation,
+%                                     FullPerturbation, SparseAnalytical,
+%                                     FullAnalytical : les solveurs
+%                                     implicites de MatLibre calculent le
+%                                     jacobien par perturbation, en
+%                                     entier — ce que Simulink fait aussi
+%                                     d'un bloc sans jacobien analytique
+%     SolverResetMethod    'Fast'     ou 'Robust' : le jacobien se
+%                                     recalcule à chaque pas, remises du
+%                                     solveur comprises, comme en Robust
+%     SampleTimeConstraint 'Unconstrained'  à pas fixe — 'STIndependent' :
+%                                     le modèle doit pouvoir hériter ses
+%                                     périodes de qui le référence, aucun
+%                                     bloc ne fixe la sienne et le pas
+%                                     reste 'auto' ; 'Specified' : ses
+%                                     périodes sont celles de
+%                                     SampleTimeProperty, et le pas
+%                                     'auto' leur plus grand commun
+%                                     diviseur
+%     SampleTimeProperty   []         les périodes imposées : une
+%                                     structure par période, champs
+%                                     SamplePeriod, Offset et Priority,
+%                                     de la plus rapide à la plus lente
+%     PositivePriorityOrder 'off', ConcurrentTasks 'off'  réglages de la
+%                                     génération de code, acceptés et
+%                                     rangés : la simulation n'en dépend
+%                                     pas
 %     EnableMultiTasking   'off'      'on', à pas fixe : chaque cadence est
 %                                     une tâche, et un bloc discret ne lit
 %                                     un bloc d'une autre cadence qu'à
@@ -279,7 +321,12 @@ function d = defauts()
                'WriteAfterReadMsg', 'UseLocalSettings', 'WriteAfterWriteMsg', 'UseLocalSettings', ...
                'BusObjectLabelMismatch', 'warning', 'ParameterDowncastMsg', 'error', ...
                'ParameterOverflowMsg', 'error', 'ParameterUnderflowMsg', 'none', ...
-               'ParameterPrecisionLossMsg', 'warning');
+               'ParameterPrecisionLossMsg', 'warning', ...
+               'ConsecutiveZCsStepRelTol', '10*128*eps', 'AutoScaleAbsTol', 'on', ...
+               'ShapePreserveControl', 'DisableAll', 'SolverJacobianMethodControl', 'auto', ...
+               'SolverResetMethod', 'Fast', 'SampleTimeConstraint', 'Unconstrained', ...
+               'SampleTimeProperty', [], 'PositivePriorityOrder', 'off', ...
+               'ConcurrentTasks', 'off');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -465,9 +512,41 @@ function v = valider(nom, v)
                       ['Le reglage OutputTimes est un vecteur d''instants, ou l''expression ' ...
                        'qui le donne.']);
             end
+        case {'AutoScaleAbsTol', 'PositivePriorityOrder', 'ConcurrentTasks'}
+            v = choix(nom, v, {'off', 'on'});
+        case 'ShapePreserveControl'
+            v = choix(nom, v, {'DisableAll', 'EnableAll'});
+        case 'SolverJacobianMethodControl'
+            v = choix(nom, v, {'auto', 'SparsePerturbation', 'FullPerturbation', ...
+                               'SparseAnalytical', 'FullAnalytical'});
+        case 'SolverResetMethod'
+            v = choix(nom, v, {'Fast', 'Robust'});
+        case 'ConsecutiveZCsStepRelTol'
+            v = nombre(nom, v, false);
+        case 'SampleTimeConstraint'
+            v = choix(nom, v, {'Unconstrained', 'Specified', 'STIndependent'});
+        case 'SampleTimeProperty'
+            v = proprietesPeriodes(v);
         case ''
             error('Simulink:Commands:ParamUnknown', ...
                   'Le modele n''a pas de reglage nomme ''%s''.', char(nom));
+    end
+end
+
+% Les périodes qu'impose SampleTimeConstraint 'Specified' : une structure
+% par période — SamplePeriod, et Offset, Priority s'il y a lieu —, ou
+% l'expression qui les donne, évaluée au moment de simuler.
+function v = proprietesPeriodes(v)
+    if isstring(v)
+        v = char(v);
+    end
+    if ischar(v) || (isnumeric(v) && isempty(v))
+        return
+    end
+    if ~(isstruct(v) && isfield(v, 'SamplePeriod'))
+        error('Simulink:Config:InvalidValue', ...
+              ['Le reglage SampleTimeProperty est une structure par periode, de champs ' ...
+               'SamplePeriod, Offset et Priority, ou l''expression qui les donne.']);
     end
 end
 

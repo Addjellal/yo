@@ -2463,6 +2463,69 @@ end
                          "l'ordre maximal change ressort avec le solveur");
             }
             {
+                // Le reste du volet Solveur de Simulink : la tolerance
+                // absolue a l'echelle, la tolerance en temps des passages
+                // par zero et la preservation de la forme a pas variable ;
+                // le jacobien et la remise des solveurs implicites ; la
+                // contrainte des periodes a pas fixe, et sa liste quand
+                // elle est imposee.
+                QMap<QString, QString> valeurs;
+                valeurs.insert(QStringLiteral("SolverType"), QStringLiteral("Variable-step"));
+                valeurs.insert(QStringLiteral("Solver"), QStringLiteral("ode45"));
+                valeurs.insert(QStringLiteral("AutoScaleAbsTol"), QStringLiteral("on"));
+                valeurs.insert(QStringLiteral("ConsecutiveZCsStepRelTol"),
+                               QStringLiteral("10*128*eps"));
+                valeurs.insert(QStringLiteral("SampleTimeConstraint"),
+                               QStringLiteral("Unconstrained"));
+                valeurs.insert(QStringLiteral("SampleTimeProperty"), QStringLiteral("[]"));
+                DialogueConfiguration boite(
+                    QStringLiteral("m"), valeurs, {QStringLiteral("ode4"), QStringLiteral("ode14x")},
+                    {QStringLiteral("ode45"), QStringLiteral("ode15s"), QStringLiteral("ode23s")});
+                verifier(boite.liste(QStringLiteral("AutoScaleAbsTol"))->isEnabled() &&
+                             boite.liste(QStringLiteral("ShapePreserveControl"))->isEnabled() &&
+                             boite.champ(QStringLiteral("ConsecutiveZCsStepRelTol"))->isEnabled() &&
+                             !boite.liste(QStringLiteral("SampleTimeConstraint"))->isEnabled(),
+                         "a pas variable : l'echelle de la tolerance et la tolerance en "
+                         "temps se reglent, la contrainte des periodes non");
+                verifier(!boite.liste(QStringLiteral("SolverJacobianMethodControl"))->isEnabled() &&
+                             !boite.liste(QStringLiteral("SolverResetMethod"))->isEnabled(),
+                         "ode45, explicite, n'a ni jacobien ni remise a regler");
+                boite.choixSolveur()->setCurrentIndex(
+                    boite.choixSolveur()->findText(QStringLiteral("ode15s")));
+                verifier(boite.liste(QStringLiteral("SolverJacobianMethodControl"))->isEnabled() &&
+                             boite.liste(QStringLiteral("SolverResetMethod"))->isEnabled(),
+                         "ode15s choisi, son jacobien et sa remise se reglent");
+                boite.choixSolveur()->setCurrentIndex(
+                    boite.choixSolveur()->findText(QStringLiteral("ode23s")));
+                verifier(boite.liste(QStringLiteral("SolverJacobianMethodControl"))->isEnabled() &&
+                             !boite.liste(QStringLiteral("SolverResetMethod"))->isEnabled(),
+                         "ode23s : le jacobien, sans remise");
+                boite.liste(QStringLiteral("AutoScaleAbsTol"))
+                    ->setCurrentIndex(boite.liste(QStringLiteral("AutoScaleAbsTol"))
+                                          ->findText(QStringLiteral("off")));
+                boite.choixType()->setCurrentIndex(
+                    boite.choixType()->findText(QStringLiteral("Fixed-step")));
+                verifier(boite.liste(QStringLiteral("SampleTimeConstraint"))->isEnabled() &&
+                             !boite.champ(QStringLiteral("SampleTimeProperty"))->isEnabled() &&
+                             !boite.liste(QStringLiteral("AutoScaleAbsTol"))->isEnabled(),
+                         "a pas fixe : la contrainte des periodes se regle, sa liste pas "
+                         "encore");
+                boite.liste(QStringLiteral("SampleTimeConstraint"))
+                    ->setCurrentIndex(boite.liste(QStringLiteral("SampleTimeConstraint"))
+                                          ->findText(QStringLiteral("Specified")));
+                verifier(boite.champ(QStringLiteral("SampleTimeProperty"))->isEnabled(),
+                         "la contrainte Specified ouvre la liste des periodes imposees");
+                boite.champ(QStringLiteral("SampleTimeProperty"))
+                    ->setText(QStringLiteral("struct('SamplePeriod', {0.1, 0.2})"));
+                QStringList noms;
+                for (const auto& c : boite.changements()) noms << c.first;
+                verifier(noms.contains(QStringLiteral("AutoScaleAbsTol")) &&
+                             noms.contains(QStringLiteral("SampleTimeConstraint")) &&
+                             noms.contains(QStringLiteral("SampleTimeProperty")) &&
+                             !noms.contains(QStringLiteral("ConsecutiveZCsStepRelTol")),
+                         "les reglages touches ressortent, et eux seuls");
+            }
+            {
                 // odeN et daessc : la methode d'integration d'odeN ne se
                 // regle qu'odeN choisi ; l'ordre maximal vaut pour daessc
                 // comme pour ode15s.
