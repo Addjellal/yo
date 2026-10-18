@@ -67,6 +67,8 @@ function varargout = matlibre_sl_executer(action, varargin)
             [y, dx] = point(varargin{:});
             varargout{1} = y;
             varargout{2} = dx;
+        case 'pointhybride'
+            [varargout{1}, varargout{2}, varargout{3}] = pointHybride(varargin{:});
         case 'tableau'
             [varargout{1}, varargout{2}, varargout{3}] = tableau(varargin{1});
         case 'encours'
@@ -2296,6 +2298,32 @@ function [y, dx] = point(T, x, u)
     [V, ~] = passe(T, T.listeTout, T.V0, T.Z0, x(:), T.tDebut, 0, true, touche);
     dx = derivees(T, V, x(:), T.tDebut);
     y = V(T.sortiesModele);
+end
+
+% Un point dont les états discrets sont donnés, et ces états un pas plus
+% tard : ce que DLINMOD linéarise. Toutes les périodes sans décalage
+% tombent à l'instant du point.
+function [y, dx, Zsuivant] = pointHybride(T, x, Z, u)
+    T.graphes = containers.Map('KeyType', 'double', 'ValueType', 'any');
+    T.iterateurs = containers.Map('KeyType', 'double', 'ValueType', 'any');
+    P = T.P;
+    pos = 0;
+    for k = T.entreesModele
+        p = T.pA(k);
+        w = T.oB(k) - T.oA(k) + 1;
+        P(p:p + w - 1) = u(pos + 1:pos + w);
+        pos = pos + w;
+    end
+    T.P = P;
+    G = size(T.groupes, 1);
+    touche = false(1, G);
+    for g = 1:G
+        touche(g) = T.groupes(g, 2) == 0;
+    end
+    [V, Z] = passe(T, T.listeTout, T.V0, Z(:), x(:), T.tDebut, 0, true, touche);
+    dx = derivees(T, V, x(:), T.tDebut);
+    y = V(T.sortiesModele);
+    Zsuivant = majs(T, V, Z, T.tDebut, touche, x(:));
 end
 
 % === la passe de sortie =======================================================

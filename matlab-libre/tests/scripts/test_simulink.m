@@ -12602,6 +12602,130 @@ assert(strcmp(h97.DataSource, 'MATLAB Code') && strcmp(h97.MATLABCode, 'K = 2;')
        'la source et le code de l''espace');
 fprintf('espace de travail dans le .slx : ok\n');
 
+%% ----------------------------------------- 98. Batterie de linéarisations
+% Des systèmes linéaires tirés au hasard — fonctions de transfert,
+% représentations d'état, zéros-pôles, gains, intégrateurs, et leurs
+% pendants discrets —, assemblés en série, en parallèle, en contre-
+% réaction, et en série d'une contre-réaction : LINMOD et DLINMOD doivent
+% rendre la réponse en fréquence que donne l'assemblage des réponses des
+% blocs, à l'arrondi près, quel que soit l'ordre des états.
+rng(98);
+pulsations98 = [0.1 1 3 10];
+Ts98 = 0.1;
+nCas98 = 0;
+echecs98 = {};
+for discret98 = [false true]
+    for topologie98 = 1:4
+        for tirage98 = 1:6
+            blocs98 = cell(1, 3);
+            for q = 1:3
+                % le retour (2) est strictement propre : pas de boucle algébrique
+                blocs98{q} = lineaireAuHasard(discret98, q == 2, Ts98);
+            end
+            m98 = new_system('lineaire98');
+            m98 = add_block(m98, 'inport', 'u', 'Port', 1);
+            m98 = add_block(m98, 'outport', 'y', 'Port', 1);
+            for q = 1:3
+                m98 = add_block(m98, blocs98{q}.type, sprintf('G%d', q), blocs98{q}.parametres{:});
+            end
+            switch topologie98
+                case 1   % série : G2 G1
+                    m98 = add_line(add_line(add_line(m98, 'u', 'G1'), 'G1', 'G2'), 'G2', 'y');
+                    m98 = add_block(m98, 'terminator', 't3');
+                    m98 = add_block(m98, 'ground', 'g3');
+                    m98 = add_line(add_line(m98, 'g3', 'G3'), 'G3', 't3');
+                    nom98 = 'serie';
+                case 2   % parallèle : G1 + G2
+                    m98 = add_block(m98, 'sum', 's', 'Inputs', '++');
+                    m98 = add_line(add_line(m98, 'u', 'G1'), 'u', 'G2');
+                    m98 = add_line(add_line(add_line(m98, 'G1', 's/1'), 'G2', 's/2'), 's', 'y');
+                    m98 = add_block(m98, 'terminator', 't3');
+                    m98 = add_block(m98, 'ground', 'g3');
+                    m98 = add_line(add_line(m98, 'g3', 'G3'), 'G3', 't3');
+                    nom98 = 'parallele';
+                otherwise   % contre-réaction G1 / (1 + G1 G2), suivie de G3 en 4
+                    m98 = add_block(m98, 'sum', 's', 'Inputs', '+-');
+                    m98 = add_line(add_line(m98, 'u', 's/1'), 's', 'G1');
+                    m98 = add_line(add_line(m98, 'G1', 'G2'), 'G2', 's/2');
+                    if topologie98 == 3
+                        m98 = add_line(m98, 'G1', 'y');
+                        m98 = add_block(m98, 'terminator', 't3');
+                        m98 = add_block(m98, 'ground', 'g3');
+                        m98 = add_line(add_line(m98, 'g3', 'G3'), 'G3', 't3');
+                        nom98 = 'contre-reaction';
+                    else
+                        m98 = add_line(add_line(m98, 'G1', 'G3'), 'G3', 'y');
+                        nom98 = 'serie d''une contre-reaction';
+                    end
+            end
+            if discret98
+                z98 = exp(1i * pulsations98 * Ts98);
+            else
+                z98 = 1i * pulsations98;
+            end
+            H98 = zeros(3, numel(z98));
+            for q = 1:3
+                H98(q, :) = blocs98{q}.reponse(z98);
+            end
+            switch topologie98
+                case 1
+                    attendu98 = H98(2, :) .* H98(1, :);
+                case 2
+                    attendu98 = H98(1, :) + H98(2, :);
+                case 3
+                    attendu98 = H98(1, :) ./ (1 + H98(1, :) .* H98(2, :));
+                otherwise
+                    attendu98 = H98(3, :) .* H98(1, :) ./ (1 + H98(1, :) .* H98(2, :));
+            end
+            contexte98 = sprintf('%s %s (%s, %s, %s)', nom98, ...
+                                 char(string(discret98) + ""), blocs98{1}.type, ...
+                                 blocs98{2}.type, blocs98{3}.type);
+            try
+                if discret98
+                    [A98, B98, C98, D98] = dlinmod(m98, Ts98);
+                else
+                    [A98, B98, C98, D98] = linmod(m98);
+                end
+            catch err
+                echecs98{end + 1} = sprintf('%s : %s %s', contexte98, err.identifier, ...
+                                            err.message); %#ok<SAGROW>
+                continue
+            end
+            n98 = size(A98, 1);
+            obtenu98 = zeros(1, numel(z98));
+            for k = 1:numel(z98)
+                obtenu98(k) = C98 * ((z98(k) * eye(n98) - A98) \ B98) + D98;
+            end
+            ecart98 = max(abs(obtenu98 - attendu98) ./ max(1, abs(attendu98)));
+            if ~(ecart98 < 1e-5)
+                echecs98{end + 1} = sprintf('%s : ecart relatif %g', contexte98, ecart98); %#ok<SAGROW>
+            end
+            nCas98 = nCas98 + 1;
+        end
+    end
+end
+assert(isempty(echecs98), sprintf('linearisations : %s', strjoin(echecs98, ' ; ')));
+% le retard d'un pas : z^-1, exactement
+d98 = new_system('retard98');
+d98 = add_block(d98, 'inport', 'u', 'Port', 1);
+d98 = add_block(d98, 'unitdelay', 'd', 'SampleTime', 0.1);
+d98 = add_block(d98, 'outport', 'y', 'Port', 1);
+d98 = add_line(add_line(d98, 'u', 'd'), 'd', 'y');
+[A98, B98, C98, D98] = dlinmod(d98, 0.1);
+assert(isequal([A98 B98; C98 D98], [0 1; 1 0]), 'Unit Delay : z^-1');
+% un bloc discret d'une autre période est refusé en le nommant
+vu98 = '';
+message98 = '';
+try
+    dlinmod(d98, 0.2);
+catch err
+    vu98 = err.identifier;
+    message98 = err.message;
+end
+assert(strcmp(vu98, 'Simulink:Commands:DlinmodPeriode') && ~isempty(strfind(message98, 'retard98/d')), ...
+       'DLINMOD ne reechantillonne pas un bloc discret');
+fprintf('linearisations : %d systemes tires au hasard, et le retard d''un pas : ok\n', nCas98);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -13134,4 +13258,63 @@ function [s, ok] = allerModele(type, reglage, valeur)
         s = add_line(s, sprintf('b1/%d', j), [puits '/1']);
     end
     ok = true;
+end
+
+% Un système linéaire tiré au hasard, et sa réponse en fréquence : type et
+% paramètres d'un bloc de Simulink, stable, d'ordre un à trois.
+% STRICT le veut strictement propre. Un bloc discret prend la période TS.
+function b = lineaireAuHasard(discret, strict, Ts)
+    genre = randi(5);
+    if strict && genre == 4
+        genre = 1;   % un gain n'est pas strictement propre
+    end
+    n = randi(3);
+    if discret
+        poles = 0.8 * (2 * rand(1, n) - 1);   % dans le cercle unité
+        zeros_ = 0.9 * (2 * rand(1, n - strict) - 1);
+    else
+        poles = -0.5 - 4 * rand(1, n);
+        zeros_ = -0.3 - 3 * rand(1, n - strict);
+    end
+    gainK = 0.5 + rand();
+    suffixe = {};
+    prefixe = '';
+    if discret
+        suffixe = {'SampleTime', Ts};
+        prefixe = 'discrete';
+    end
+    switch genre
+        case 1   % fonction de transfert
+            num = gainK * poly(zeros_);
+            den = poly(poles);
+            b.type = [prefixe 'transferfcn'];
+            b.parametres = [{'Numerator', num, 'Denominator', den}, suffixe];
+            b.reponse = @(s) polyval(num, s) ./ polyval(den, s);
+        case 2   % représentation d'état
+            A = diag(poles) + 0.1 * triu(rand(n), 1);
+            B = rand(n, 1) + 0.1;
+            C = rand(1, n) + 0.1;
+            D = (~strict) * rand();
+            b.type = [prefixe 'statespace'];
+            b.parametres = [{'A', A, 'B', B, 'C', C, 'D', D}, suffixe];
+            b.reponse = @(s) arrayfun(@(z) C * ((z * eye(n) - A) \ B) + D, s);
+        case 3   % zéros et pôles
+            b.type = [prefixe 'zeropole'];
+            b.parametres = [{'Zeros', zeros_(:), 'Poles', poles(:), 'Gain', gainK}, suffixe];
+            b.reponse = @(s) gainK * arrayfun(@(z) prod(z - zeros_) / prod(z - poles), s);
+        case 4   % gain
+            b.type = 'gain';
+            b.parametres = {'Gain', gainK};
+            b.reponse = @(s) gainK * ones(size(s));
+        otherwise   % intégrateur, ou retard d'un pas
+            if discret
+                b.type = 'unitdelay';
+                b.parametres = {'SampleTime', Ts};
+                b.reponse = @(z) 1 ./ z;
+            else
+                b.type = 'integrator';
+                b.parametres = {};
+                b.reponse = @(s) 1 ./ s;
+            end
+    end
 end
