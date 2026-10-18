@@ -94,6 +94,10 @@ function modele = add_block(modele, type, nom, varargin)
 %                  decrementstoredinteger, decrementtozero, decrementtimetozero
 %                  — un de plus, un de moins, sans descendre sous zéro
 %     descriptorstatespace E, A, B, C, D, InitialCondition — E dx/dt = A x + B u
+%     transferfcndirectformii NumCoefVec, DenCoefVec (sans le 1 de tête),
+%                  vinit, RndMeth, DoSatur — la forme directe II
+%     datatypescalingstrip — l'entier stocké d'une virgule fixe
+%     functioncallsplit NumOutputPorts — l'appel d'un générateur partagé
 %     checkdiscretegradient gradient ; checkinputresolution resolution —
 %                  enabled, callback, stopWhenAssertionFail, export
 %     transpose, hermitiantranspose, creatediagonalmatrix, extractdiagonal,

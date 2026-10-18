@@ -11087,6 +11087,130 @@ for q = 1:size(refus82, 1)
 end
 fprintf('Second-Order Integrator complet : ok\n');
 
+%% ------ 83. Transfer Fcn Direct Form II, Data Type Scaling Strip, Function-Call Split
+% Transfer Fcn Direct Form II rend ce que rend un Discrete Filter de mêmes
+% coefficients, part de ses états vinit, range son résultat dans le type
+% de son entrée — arrondi, saturé ou replié — et refuse d'hériter d'un
+% signal continu. Data Type Scaling Strip rend l'entier stocké d'une
+% virgule fixe. Function-Call Split partage l'appel d'un générateur entre
+% deux sous-systèmes appelés, et refuse d'appeler autre chose.
+valeurs83 = [1 -2 0.5 3 0 -1 2 4 -3 1];
+num83 = [0.2 0.3 0.2];
+den83 = [-0.9 0.6];
+f83 = new_system('forme83');
+f83 = add_block(f83, 'repeatingsequencestair', 'u', 'OutValues', valeurs83, 'tsamp', 0.1);
+f83 = add_block(f83, 'transferfcndirectformii', 'd', 'NumCoefVec', num83, 'DenCoefVec', den83);
+f83 = add_block(f83, 'discretefilter', 'r', 'Numerator', num83, 'Denominator', [1 den83], ...
+                'SampleTime', 0.1);
+f83 = add_block(f83, 'outport', 'yd');
+f83 = add_block(f83, 'outport', 'yr');
+f83 = add_line(add_line(add_line(f83, 'u', 'd'), 'u', 'r'), 'd', 'yd');
+f83 = add_line(f83, 'r', 'yr');
+r83 = sim(f83, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 0.9);
+assert(max(abs(r83.yout(:, 1) - r83.yout(:, 2))) < 1e-12, ...
+       'la forme directe II rend ce que rend le Discrete Filter');
+% les états partent de vinit : y(0) = b0 w0 + b1 v + b2 v, w0 = u0 - a1 v - a2 v
+v83 = 0.5;
+r83 = sim(set_param(f83, 'd', 'vinit', v83), 'Solver', 'FixedStepDiscrete', ...
+          'FixedStep', 0.1, 'StopTime', 0.1);
+w0 = valeurs83(1) - (den83(1) + den83(2)) * v83;
+assert(abs(r83.yout(1, 1) - (num83(1) * w0 + (num83(2) + num83(3)) * v83)) < 1e-12, ...
+       'les etats de la forme directe II partent de vinit');
+% un entier : arrondi, puis saturé ou replié
+e83 = new_system('entier83');
+e83 = add_block(e83, 'constant', 'u', 'Value', int16(400), 'SampleTime', 1);
+e83 = add_block(e83, 'transferfcndirectformii', 'd', 'NumCoefVec', 100, 'DenCoefVec', 0);
+e83 = add_block(e83, 'outport', 'y');
+e83 = add_line(add_line(e83, 'u', 'd'), 'd', 'y');
+regle83 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1};
+replie83 = sim(e83, regle83{:});
+sature83 = sim(set_param(e83, 'd', 'DoSatur', 'on'), regle83{:});
+assert(isa(replie83.yout, 'int16') && replie83.yout(1) == int16(40000 - 65536) && ...
+       sature83.yout(1) == intmax('int16'), 'un entier deborde : replie, ou sature (DoSatur)');
+a83 = sim(set_param(set_param(e83, 'u', 'Value', int16(3)), 'd', 'NumCoefVec', 0.5), regle83{:});
+c83 = sim(set_param(set_param(set_param(e83, 'u', 'Value', int16(3)), 'd', 'NumCoefVec', 0.5), ...
+                    'd', 'RndMeth', 'Ceiling'), regle83{:});
+assert(a83.yout(1) == 1 && c83.yout(1) == 2, '1,5 arrondi selon RndMeth : Floor 1, Ceiling 2');
+vu83 = '';
+message83 = '';
+try
+    sim(set_param(f83, 'u', 'tsamp', 0), 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 1);
+    s83 = new_system('continu83');
+    s83 = add_block(s83, 'sine', 'u');
+    s83 = add_block(s83, 'transferfcndirectformii', 'd');
+    s83 = add_line(add_block(add_line(s83, 'u', 'd'), 'outport', 'y'), 'd', 'y');
+    sim(s83, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 1);
+catch err
+    vu83 = err.identifier;
+    message83 = err.message;
+end
+assert(strcmp(vu83, 'Simulink:SampleTime:DiscreteBlockContinuous') && ...
+       ~isempty(strfind(message83, 'continu83/d')), ...
+       'la forme directe II refuse un signal continu, en se nommant');
+% Data Type Scaling Strip : l'entier stocké
+t83 = new_system('strip83');
+t83 = add_block(t83, 'constant', 'u', 'Value', 2.5, 'OutDataTypeStr', 'fixdt(1,16,8)');
+t83 = add_block(t83, 'datatypescalingstrip', 's');
+t83 = add_block(t83, 'constant', 'v', 'Value', 3.7);
+t83 = add_block(t83, 'datatypescalingstrip', 's2');
+t83 = add_block(t83, 'outport', 'y');
+t83 = add_block(t83, 'outport', 'y2');
+t83 = add_line(add_line(add_line(t83, 'u', 's'), 's', 'y'), 'v', 's2');
+t83 = add_line(t83, 's2', 'y2');
+r83 = sim(t83, regle83{:});
+assert(r83.yout(1, 1) == 640 && abs(r83.yout(1, 2) - 3.7) < 1e-15, ...
+       'Data Type Scaling Strip : 2,5 en fixdt(1,16,8) est l''entier 640 ; un double passe');
+% Function-Call Split : un générateur, deux compteurs appelés
+compteur83 = new_system('compteur83');
+compteur83 = add_block(compteur83, 'constant', 'un', 'Value', 1);
+compteur83 = add_block(compteur83, 'sum', 'plus', 'Signs', '++');
+compteur83 = add_block(compteur83, 'delay', 'avant', 'InitialCondition', 0);
+compteur83 = add_block(compteur83, 'outport', 'n', 'Port', 1);
+compteur83 = add_block(compteur83, 'triggerport', 'f', 'TriggerType', 'function-call');
+compteur83 = add_line(add_line(compteur83, 'un', 'plus', 1), 'avant', 'plus', 2);
+compteur83 = add_line(add_line(compteur83, 'plus', 'avant'), 'plus', 'n');
+p83 = new_system('partage83');
+p83 = add_block(p83, 'functioncallgenerator', 'horloge', 'sample_time', 0.5);
+p83 = add_block(p83, 'functioncallsplit', 'partage');
+p83 = add_block(p83, 'subsystem', 'a', 'Model', compteur83);
+p83 = add_block(p83, 'subsystem', 'b', 'Model', compteur83);
+p83 = add_block(p83, 'outport', 'ya');
+p83 = add_block(p83, 'outport', 'yb');
+p83 = add_line(add_line(p83, 'horloge', 'partage'), 'partage/1', 'a/Trigger');
+p83 = add_line(add_line(p83, 'partage/2', 'b/Trigger'), 'a', 'ya');
+p83 = add_line(p83, 'b', 'yb');
+for solveur = {'ode4', 'ode45'}
+    r83 = sim(p83, 'Solver', solveur{1}, 'FixedStep', 0.1, 'StopTime', 2);
+    assert(isequal(r83.yout(end, :), [5 5]), ...
+           [solveur{1} ' : chaque sous-systeme est appele a chaque appel du generateur']);
+end
+base83 = new_system('partage83');
+base83 = add_block(base83, 'functioncallgenerator', 'horloge', 'sample_time', 0.5);
+base83 = add_block(base83, 'functioncallsplit', 'partage');
+base83 = add_block(base83, 'subsystem', 'a', 'Model', compteur83);
+base83 = add_block(base83, 'gain', 'g');
+base83 = add_block(base83, 'constant', 'k');
+base83 = add_line(base83, 'partage/1', 'a/Trigger');
+refus83 = {
+    add_line(add_line(base83, 'horloge', 'partage'), 'partage/2', 'g'), ...
+        'Simulink:blocks:FcnCallOutputToNonFcnCallInput', 'partage83/partage'
+    add_line(base83, 'k', 'partage'), 'Simulink:blocks:FcnCallSubsystemInputNotFcnCall', ...
+        'partage83/a'
+    };
+for q = 1:size(refus83, 1)
+    vu83 = '';
+    message83 = '';
+    try
+        sim(refus83{q, 1}, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 1);
+    catch err
+        vu83 = err.identifier;
+        message83 = err.message;
+    end
+    assert(strcmp(vu83, refus83{q, 2}) && ~isempty(strfind(message83, refus83{q, 3})), ...
+           sprintf('Function-Call Split, refus %d : %s (%s)', q, vu83, message83));
+end
+fprintf('Transfer Fcn Direct Form II, Data Type Scaling Strip, Function-Call Split : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

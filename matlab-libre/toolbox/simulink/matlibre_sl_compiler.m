@@ -681,6 +681,29 @@ function [type, p] = normaliser(type, p, chemin)
             type = 'matlabfunction';
         case 'secondorderintegratorlimited'
             type = 'secondorderintegrator';   % le même bloc, ses bornes posées
+        case 'transferfcndirectformii'
+            p = struct('Script', scriptFormeDirecte(p, chemin), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'datatypescalingstrip'
+            p = struct('Script', sprintf(['function y = fcn(u)\nif isa(u, ''embedded.fi'')\n' ...
+                                          '    y = storedInteger(u);\nelse\n    y = u;\n' ...
+                                          'end\n']), 'SampleTime', -1);
+            type = 'matlabfunction';
+        case 'functioncallsplit'
+            % l'appel passe à chaque sortie ; VERIFIERAPPELS le suit
+            n = double(p.NumOutputPorts);
+            if ~(isscalar(n) && n >= 1 && n == round(n))
+                error('Simulink:Parameters:InvalidValue', ...
+                      ['Le nombre de sorties NumOutputPorts de ''%s'' doit etre un entier ' ...
+                       'positif.'], chemin);
+            end
+            sorties = sprintf('y%d, ', 1:n);
+            corps = sprintf('y%d = u;\n', 1:n);
+            % calculé à chaque passe : l'appel ne vaut qu'à son instant, il ne se
+            % tient pas jusqu'au suivant
+            p = struct('Script', sprintf('function [%s] = fcn(u)\n%s', sorties(1:end - 2), corps), ...
+                       'SampleTime', 0);
+            type = 'matlabfunction';
         case 'descriptorstatespace'
             [A, B, C, D, x0] = descripteurVersEtat(p, chemin);
             p = struct('A', A, 'B', B, 'C', C, 'D', D, 'X0', x0);
@@ -1283,6 +1306,55 @@ function script = scriptControle(type, p, chemin)
     end
     script = strrep([entete '[t, ~, essai] = matlibre_sl_instant();\n' test echec fin], ...
                     '\n', char(10));
+end
+
+% Transfer Fcn Direct Form II : (b0 + b1 z^-1 + ...) / (1 + a1 z^-1 + ...),
+% les états w de la forme directe II partant de vinit ; une entrée vecteur
+% est autant de voies. Le résultat se range dans le type de l'entrée :
+% arrondi selon RndMeth, saturé (DoSatur) ou replié.
+function script = scriptFormeDirecte(p, chemin)
+    b = double(p.NumCoefVec(:).');
+    a = double(p.DenCoefVec(:).');
+    v0 = double(p.vinit);
+    if isempty(b) || any(~isfinite(b)) || any(~isfinite(a))
+        error('Simulink:Parameters:InvalidValue', ...
+              ['Les coefficients de ''%s'' doivent etre des vecteurs de nombres finis, le ' ...
+               'numerateur non vide.'], chemin);
+    end
+    if ~(isscalar(v0) && isfinite(v0))
+        error('Simulink:Parameters:InvalidValue', ...
+              'La condition initiale vinit de ''%s'' doit etre un scalaire fini.', chemin);
+    end
+    n = max(numel(b) - 1, numel(a));
+    b = [b, zeros(1, n + 1 - numel(b))];
+    a = [a, zeros(1, n - numel(a))];
+    arrondis = struct('Ceiling', 'ceil(v)', 'Convergent', 'convergent(v)', ...
+                      'Floor', 'floor(v)', 'Nearest', 'floor(v + 0.5)', ...
+                      'Round', 'round(v)', 'Simplest', 'floor(v)', 'Zero', 'fix(v)');
+    arrondi = arrondis.(char(p.RndMeth));
+    if strcmp(arrondi, 'convergent(v)')
+        arrondi = 'round(v) - (abs(v - fix(v)) == 0.5 & mod(round(v), 2) ~= 0) .* sign(v)';
+    end
+    if strcmp(p.DoSatur, 'on')
+        debord = '    v = min(max(v, bas), haut);\n';
+    else
+        debord = '    v = mod(v - bas, haut - bas + 1) + bas;\n';
+    end
+    ch = litteralChemin(chemin);
+    script = sprintf(['function y = fcn(u)\npersistent w\nb = %s;\na = %s;\n' ...
+                      'if islogical(u)\n    error(''Simulink:DataType:InputPortDataTypeMismatch'', ' ...
+                      '[''L''''entree de ''''%%s'''' est un booleen : ce filtre calcule sur une ' ...
+                      'valeur numerique.''], %s);\nend\n' ...
+                      'x = double(u(:)).'';\nif isempty(w)\n    w = %s * ones(%d, numel(x));\nend\n' ...
+                      'if %d > 0\n    w0 = x - a * w;\n    yd = b(1) * w0 + b(2:end) * w;\n' ...
+                      '    w = [w0; w(1:end - 1, :)];\nelse\n    yd = b(1) * x;\nend\n' ...
+                      'yd = reshape(yd, size(u));\n' ...
+                      'if isa(u, ''embedded.fi'')\n    y = fi(yd, numerictype(u));\n' ...
+                      'elseif isinteger(u)\n    v = yd;\n    v = %s;\n' ...
+                      '    bas = double(intmin(class(u)));\n    haut = double(intmax(class(u)));\n' ...
+                      debord '    y = cast(v, class(u));\n' ...
+                      'elseif isa(u, ''single'')\n    y = single(yd);\nelse\n    y = yd;\nend\n'], ...
+                     mat2str(b, 17), mat2str(a, 17), ch, sprintf('%.17g', v0), n, n, arrondi);
 end
 
 % Le Second-Order Integrator : x et dx/dt, chacun borné ou non, x enroulé
@@ -2638,6 +2710,9 @@ function verifierAppels(c)
         end
         rang = 1 + (c.p{g}.Enable ~= 0);
         e = c.entrees{g};
+        if rang <= numel(e) && e(rang) ~= 0
+            e(rang) = sourceAppel(c, e(rang));
+        end
         if rang <= numel(e) && e(rang) ~= 0 && appelParGraphe(c, e(rang))
             continue
         end
@@ -2648,13 +2723,14 @@ function verifierAppels(c)
                    'doit etre relie a un Function-Call Generator.'], c.chemins{g});
         end
     end
-    for k = find(strcmp(c.types, 'functioncallgenerator'))
+    for k = find(strcmp(c.types, 'functioncallgenerator') | estPartage(c))
         for b = 1:c.n
             e = c.entrees{b};
-            if ~any(e == c.portDebut(k))
+            if ~any(e >= c.portDebut(k) & e < c.portDebut(k) + max(c.nOut(k), 1))
                 continue
             end
-            appele = strcmp(c.types{b}, 'garde') && strcmp(c.p{b}.Trigger, 'function-call');
+            appele = (strcmp(c.types{b}, 'garde') && strcmp(c.p{b}.Trigger, 'function-call')) || ...
+                     estPartage(c, b);
             if ~appele
                 error('Simulink:blocks:FcnCallOutputToNonFcnCallInput', ...
                       ['Le generateur d''appels ''%s'' est relie a ''%s'', qui n''est pas ' ...
@@ -2662,6 +2738,34 @@ function verifierAppels(c)
                       c.chemins{k}, c.chemins{b});
             end
         end
+    end
+end
+
+% Les Function-Call Split : des MATLAB Function de la bibliothèque, qui
+% passent l'appel à chacune de leurs sorties.
+function oui = estPartage(c, k)
+    if nargin < 2
+        oui = false(1, c.n);
+        for j = find(strcmp(c.types, 'matlabfunction'))
+            oui(j) = estPartage(c, j);
+        end
+        return
+    end
+    oui = strcmp(c.types{k}, 'matlabfunction') && isfield(c.p{k}, 'Bibliotheque') && ...
+          strcmp(c.p{k}.Bibliotheque, 'functioncallsplit');
+end
+
+% Le port qui appelle vraiment : à travers les Function-Call Split, celui
+% du générateur ou du diagramme.
+function g = sourceAppel(c, g)
+    vus = 0;
+    while g > 0 && estPartage(c, c.proprio(g)) && vus < c.n
+        e = c.entrees{c.proprio(g)};
+        g = 0;
+        if ~isempty(e)
+            g = e(1);
+        end
+        vus = vus + 1;
     end
 end
 
@@ -3805,6 +3909,18 @@ function c = periodes(c, pas, verifier)
            (strcmp(c.types{k}, 'matlabfunction') && c.fonctions{k}.persistante)
             c.cadence(k) = 0;
             c.majeurSeul(k) = true;
+        end
+    end
+    % Transfer Fcn Direct Form II est discret par nature : il ne peut hériter
+    % d'un signal continu.
+    for k = find(strcmp(c.types, 'matlabfunction'))
+        if isfield(c.p{k}, 'Bibliotheque') && strcmp(c.p{k}.Bibliotheque, ...
+                                                    'transferfcndirectformii') && ...
+           c.garde(k) == 0 && c.cadence(k) == 0
+            error('Simulink:SampleTime:DiscreteBlockContinuous', ...
+                  ['Le bloc ''%s'' est discret, et herite de son entree une periode ' ...
+                   'continue. Echantillonnez son entree (Zero-Order Hold, Rate Transition).'], ...
+                  c.chemins{k});
         end
     end
     % Decrement Time To Zero retire sa période : il lui en faut une, fixe.

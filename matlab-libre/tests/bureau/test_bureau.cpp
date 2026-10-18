@@ -1575,7 +1575,8 @@ int main(int argc, char** argv) {
                         "m = add_block(m, 'datastorememory', 'memoire', "
                         "'DataStoreName', 'A');\n");
                 if (QLatin1String(b->type) == QLatin1String("difference") ||
-                    QLatin1String(b->type) == QLatin1String("discretederivative"))
+                    QLatin1String(b->type) == QLatin1String("discretederivative") ||
+                    QLatin1String(b->type) == QLatin1String("transferfcndirectformii"))
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'zoh', 'echantillon', 'SampleTime', "
                         "0.01), 'echantillon', '%1');\n").arg(QLatin1String(b->type));

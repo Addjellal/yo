@@ -54,6 +54,8 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 2;   % les deux vecteurs ; A et les indices P
         case 'expandscalar'
             nEntrees = 0;
+        case 'functioncallsplit'
+            nSorties = entier(lire(p, 'NumOutputPorts', 2));
         case 'identitymatrix'
             % une entrée quand elle donne les dimensions, la période et le type
             nEntrees = double(strcmpi(char(lire(p, 'InheritOutputPortAttributes', 'off')), 'on'));
