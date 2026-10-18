@@ -374,6 +374,9 @@ function varargout = sim(modele, varargin)
                                                       resultat, toc(debutSimulation));
     complet.ErrorMessage = '';
     sortie = Simulink.SimulationOutput(complet);
+    if strcmpi(config.LoggingToFile, 'on')
+        journalEnFichier(resultat, char(config.LoggingFileName), nomModele);
+    end
     if nargout == 0
         % Sans sortie, comme dans Simulink : le résultat va dans OUT — ou
         % dans tout et yout si ReturnWorkspaceOutputs vaut 'off'.
@@ -392,6 +395,28 @@ function varargout = sim(modele, varargin)
         end
     else
         varargout{1} = sortie;
+    end
+end
+
+% LoggingToFile : les données journalisées en Dataset — le journal des
+% signaux, les sorties, les états — vont aussi dans le fichier MAT
+% LoggingFileName, sous leur nom.
+function journalEnFichier(resultat, fichier, nomModele)
+    donnees = struct();
+    for nom = fieldnames(resultat).'
+        if isa(resultat.(nom{1}), 'Simulink.SimulationData.Dataset')
+            donnees.(nom{1}) = resultat.(nom{1});
+        end
+    end
+    if isempty(fieldnames(donnees))
+        return
+    end
+    try
+        save(fichier, '-struct', 'donnees');
+    catch err
+        error('Simulink:Logging:CannotWriteFile', ...
+              ['Le modele ''%s'' journalise dans ''%s'' (LoggingToFile), qui ne s''ecrit ' ...
+               'pas : %s'], nomModele, fichier, err.message);
     end
 end
 

@@ -113,6 +113,30 @@ function varargout = matlibre_sl_config(action, varargin)
 %                                     chaque bloc Model peut donner sa
 %                                     valeur (ParameterArgumentValues,
 %                                     InstanceParameters)
+%     LoggingToFile        'off'      'on' : les données journalisées en
+%     LoggingFileName      'out.mat'  Dataset — logsout, yout, xout — vont
+%                                     aussi dans ce fichier MAT
+%     SignalLoggingSaveFormat 'Dataset'  la forme du journal des signaux
+%     Description          ''         un texte qui décrit le modèle
+%     FastRestart          'off'      'on' est accepté : chaque simulation
+%                                     recompile le modèle, et donne ce
+%                                     qu'elle donnerait sans
+%     EnablePacing 'off', PacingRate 1  le rythme de la simulation dans
+%                                     l'éditeur, accepté et rangé
+%     ArrayBoundsChecking  'none'     accepté : un indice hors d'un
+%                                     tableau, dans une MATLAB Function,
+%                                     arrête toujours la simulation
+%     StrictBusMsg, DefaultParameterBehavior, InlineParams,
+%     SystemTargetFile, TargetLang, GenerateReport, Lock,
+%     SampleTimeColors, ShowPortDataTypes, RecordCoverage  réglages de la
+%                                     génération de code, de l'affichage
+%                                     et de la couverture : acceptés et
+%                                     rangés, la simulation n'en dépend
+%                                     pas
+%     SimulationStatus, SimulationTime, BlockDiagramType  se lisent sans
+%                                     se régler : 'stopped' et 0 hors
+%                                     simulation ; 'model', 'library' ou
+%                                     'subsystem'
 %     EnableMultiTasking   'off'      'on', à pas fixe : chaque cadence est
 %                                     une tâche, et un bloc discret ne lit
 %                                     un bloc d'une autre cadence qu'à
@@ -333,7 +357,14 @@ function d = defauts()
                'ShapePreserveControl', 'DisableAll', 'SolverJacobianMethodControl', 'auto', ...
                'SolverResetMethod', 'Fast', 'SampleTimeConstraint', 'Unconstrained', ...
                'SampleTimeProperty', [], 'PositivePriorityOrder', 'off', ...
-               'ConcurrentTasks', 'off', 'ParameterArgumentNames', '');
+               'ConcurrentTasks', 'off', 'ParameterArgumentNames', '', ...
+               'LoggingToFile', 'off', 'LoggingFileName', 'out.mat', ...
+               'SignalLoggingSaveFormat', 'Dataset', 'Description', '', 'FastRestart', 'off', ...
+               'EnablePacing', 'off', 'PacingRate', 1, 'ArrayBoundsChecking', 'none', ...
+               'StrictBusMsg', 'ErrorLevel1', 'DefaultParameterBehavior', 'Tunable', ...
+               'InlineParams', 'off', 'SystemTargetFile', 'grt.tlc', 'TargetLang', 'C', ...
+               'GenerateReport', 'off', 'Lock', 'off', 'SampleTimeColors', 'off', ...
+               'ShowPortDataTypes', 'off', 'RecordCoverage', 'off');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -541,6 +572,34 @@ function v = valider(nom, v)
             v = choix(nom, v, {'Unconstrained', 'Specified', 'STIndependent'});
         case 'SampleTimeProperty'
             v = proprietesPeriodes(v);
+        case {'LoggingToFile', 'FastRestart', 'EnablePacing', 'InlineParams', ...
+              'GenerateReport', 'Lock', 'SampleTimeColors', 'ShowPortDataTypes', 'RecordCoverage'}
+            v = choix(nom, v, {'off', 'on'});
+        case 'SignalLoggingSaveFormat'
+            v = choix(nom, v, {'Dataset'});
+        case 'ArrayBoundsChecking'
+            v = choix(nom, v, {'none', 'warning', 'error'});
+        case 'StrictBusMsg'
+            v = choix(nom, v, {'None', 'Warning', 'ErrorLevel1', 'WarnOnBusTreatedAsVector', ...
+                               'ErrorOnBusTreatedAsVector'});
+        case 'DefaultParameterBehavior'
+            v = choix(nom, v, {'Tunable', 'Inlined'});
+        case 'TargetLang'
+            v = choix(nom, v, {'C', 'C++'});
+        case {'Description', 'SystemTargetFile', 'LoggingFileName'}
+            if isstring(v) && isscalar(v)
+                v = char(v);
+            end
+            if ~ischar(v) || size(v, 1) > 1 || (isempty(strtrim(v)) && ~strcmp(nom, 'Description'))
+                error('Simulink:Config:InvalidValue', ...
+                      'Le reglage %s est un texte ; pas %s.', nom, decrire(v));
+            end
+        case 'PacingRate'
+            v = nombre(nom, v, false);
+            if isnumeric(v) && ~(isscalar(v) && v > 0 && isfinite(v))
+                error('Simulink:Config:InvalidValue', ...
+                      'Le reglage PacingRate est un nombre strictement positif.');
+            end
         case 'ParameterArgumentNames'
             if isstring(v) && isscalar(v)
                 v = char(v);

@@ -139,6 +139,12 @@ function modele = reglerModele(modele, couples)
             modele.nom = char(valeur);
             continue
         end
+        if any(strcmpi(nom, {'SimulationStatus', 'SimulationTime', 'BlockDiagramType'}))
+            error('Simulink:Commands:SetParamReadOnly', ...
+                  ['Le reglage %s du modele ''%s'' se lit, mais ne se regle pas : ' ...
+                   'SimulationCommand lance et arrete la simulation, NEW_SYSTEM fixe le ' ...
+                   'genre du diagramme.'], nom, char(modele.nom));
+        end
         if strcmpi(nom, 'SimulationCommand')
             commander(modele, valeur);
             continue

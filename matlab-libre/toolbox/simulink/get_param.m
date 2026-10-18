@@ -328,6 +328,20 @@ function [trouve, valeur] = reglageModele(modele, nom)
         valeur = matlibre_sl_espace('lire', char(modele.nom));
         return
     end
+    switch lower(nom)
+        case 'simulationstatus'
+            valeur = 'stopped';   % aucune simulation ne tourne quand on la lit
+            return
+        case 'simulationtime'
+            valeur = 0;
+            return
+        case 'blockdiagramtype'
+            valeur = 'model';
+            if isfield(modele, 'parametres') && isfield(modele.parametres, 'BlockDiagramType')
+                valeur = lower(char(modele.parametres.BlockDiagramType));
+            end
+            return
+    end
     if strcmpi(nom, 'Blocks')
         valeur = cell(1, numel(modele.blocs));
         for i = 1:numel(modele.blocs)

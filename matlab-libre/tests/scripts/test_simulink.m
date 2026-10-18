@@ -13146,6 +13146,78 @@ end
 assert(strcmp(vu102, 'Simulink:Commands:InvSimulinkObjectName'), 'un bloc absent');
 fprintf('compilation lue par get_param, periodes du modele : ok\n');
 
+%% ----------------------------------- 103. Les réglages qu'emploient les scripts
+% Les réglages du modèle que les scripts de Simulink posent couramment se
+% lisent et se règlent : FastRestart, Description, la génération de code,
+% l'affichage, la couverture — rangés, la simulation n'en dépend pas —,
+% et LoggingToFile, qui écrit aussi le journal en Dataset dans un fichier
+% MAT. SimulationStatus, SimulationTime et BlockDiagramType se lisent
+% sans se régler.
+m103 = new_system('reglages103');
+m103 = add_block(m103, 'sine', 'u');
+m103 = add_block(m103, 'gain', 'g', 'Gain', 2);
+m103 = add_block(m103, 'outport', 'y');
+m103 = add_line(add_line(m103, 'u', 'g'), 'g', 'y');
+defauts103 = {'FastRestart', 'off'; 'Description', ''; 'SignalLoggingSaveFormat', 'Dataset'; ...
+              'LoggingToFile', 'off'; 'LoggingFileName', 'out.mat'; 'EnablePacing', 'off'; ...
+              'PacingRate', 1; 'ArrayBoundsChecking', 'none'; 'StrictBusMsg', 'ErrorLevel1'; ...
+              'DefaultParameterBehavior', 'Tunable'; 'InlineParams', 'off'; ...
+              'SystemTargetFile', 'grt.tlc'; 'TargetLang', 'C'; 'GenerateReport', 'off'; ...
+              'Lock', 'off'; 'SampleTimeColors', 'off'; 'ShowPortDataTypes', 'off'; ...
+              'RecordCoverage', 'off'; 'SimulationStatus', 'stopped'; 'SimulationTime', 0; ...
+              'BlockDiagramType', 'model'};
+for q = 1:size(defauts103, 1)
+    assert(isequal(get_param(m103, defauts103{q, 1}), defauts103{q, 2}), ...
+           sprintf('%s par defaut', defauts103{q, 1}));
+end
+assert(strcmp(get_param(new_system('bib103', 'Library'), 'BlockDiagramType'), 'library'), ...
+       'BlockDiagramType d''une bibliotheque');
+base103 = sim(m103, 'StopTime', 1);
+regle103 = set_param(m103, 'FastRestart', 'on', 'Description', 'un gain', 'InlineParams', 'on', ...
+                     'DefaultParameterBehavior', 'Inlined', 'TargetLang', 'C++', ...
+                     'SampleTimeColors', 'on', 'EnablePacing', 'on', 'PacingRate', 2);
+assert(strcmp(get_param(regle103, 'Description'), 'un gain') && ...
+       strcmp(get_param(regle103, 'TargetLang'), 'C++'), 'les reglages poses se relisent');
+autre103 = sim(regle103, 'StopTime', 1);
+assert(isequal(base103.yout, autre103.yout), 'la simulation n''en depend pas');
+refus103 = {'FastRestart', 'oui'; 'TargetLang', 'Fortran'; 'PacingRate', -1; ...
+            'Description', 5; 'SignalLoggingSaveFormat', 'ModelDataLogs'; ...
+            'SimulationStatus', 'running'; 'BlockDiagramType', 'library'};
+for q = 1:size(refus103, 1)
+    vu103 = '';
+    try
+        set_param(m103, refus103{q, 1}, refus103{q, 2});
+    catch err
+        vu103 = err.identifier;
+    end
+    assert(any(strcmp(vu103, {'Simulink:Config:InvalidValue', ...
+                              'Simulink:Commands:SetParamReadOnly'})), ...
+           sprintf('%s refuse %s (%s)', refus103{q, 1}, ...
+                   strtrim(evalc('disp(refus103{q, 2})')), vu103));
+end
+% LoggingToFile : le journal en Dataset, aussi dans le fichier
+fichier103 = [tempname '.mat'];
+j103 = set_param(m103, 'SaveFormat', 'Dataset', 'LoggingToFile', 'on', 'LoggingFileName', fichier103);
+p103 = get_param(j103, 'g', 'PortHandles');
+j103 = set_param(j103, p103.Outport(1), 'DataLogging', 'on', 'Name', 'double103');
+out103 = sim(j103, 'StopTime', 1);
+assert(exist(fichier103, 'file') == 2, 'LoggingToFile ecrit le fichier');
+lu103 = load(fichier103);
+delete(fichier103);
+assert(isa(lu103.logsout, 'Simulink.SimulationData.Dataset') && ...
+       isa(lu103.yout, 'Simulink.SimulationData.Dataset') && ...
+       isequal(lu103.logsout.getElement('double103').Values.Data, ...
+               out103.logsout.getElement('double103').Values.Data), ...
+       'le journal et les sorties, en Dataset, dans le fichier');
+vu103 = '';
+try
+    sim(set_param(j103, 'LoggingFileName', fullfile(tempname, 'absent', 'x.mat')), 'StopTime', 0.1);
+catch err
+    vu103 = err.identifier;
+end
+assert(strcmp(vu103, 'Simulink:Logging:CannotWriteFile'), 'un fichier qui ne s''ecrit pas');
+fprintf('reglages des scripts : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
