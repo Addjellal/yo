@@ -558,6 +558,14 @@ function T = preparer(c)
             end
         end
     end
+    % Les accès d'un pas aux mémoires partagées, qui se signalent : lecture
+    % avant écriture, écriture après lecture, seconde écriture — 0 rien, 1
+    % un avertissement, 2 une erreur.
+    T.niveauxMemoire = zeros(n, 3);
+    for m = find(strcmp(c.types, 'datastorememory'))
+        T.niveauxMemoire(m, :) = niveauxAcces(c, m);
+    end
+    T.accesMemoire = any(T.niveauxMemoire(:) > 0);
     T.bornes = [];
     for k = find(strcmp(c.types, 'integrator'))
         if c.seg{k}(1) ~= 0
@@ -2290,6 +2298,11 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
     sub = T.sub;
     diagnostic = T.diagnostic;
     castK = T.castK;
+    acces = majeur && T.accesMemoire && isfield(T, 'alertes');
+    if acces
+        ecrit = zeros(1, numel(code));
+        lu = zeros(1, numel(code));
+    end
     for q = 1:numel(liste)
         k = liste(q);
         if diagnostic
@@ -2744,6 +2757,9 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                     case 59   % data store read
                         z = zA(T.P(p));
                         V(a:b) = Z(z:z + T.P(p + 1) - 1);
+                        if acces
+                            [ecrit, lu] = accesMemoire(T, k, T.P(p), false, ecrit, lu, t);
+                        end
                 end
             case 6
                 switch code(k)
@@ -2809,6 +2825,9 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                             z = zA(T.P(p));
                             largeur = T.P(p + 1);
                             Z(z:z + largeur - 1) = V(eA(e + 1):eB(e + 1)) + zeros(largeur, 1);
+                            if acces
+                                [ecrit, lu] = accesMemoire(T, k, T.P(p), true, ecrit, lu, t);
+                            end
                         end
                 end
             case 7
@@ -3236,6 +3255,68 @@ end
 
 % Un diagnostic : l'erreur, ou l'avertissement, une seule fois par CLE et
 % par simulation.
+% Les niveaux des diagnostics d'accès d'une mémoire partagée : le réglage
+% du modèle, ou celui du bloc Data Store Memory (UseLocalSettings).
+function niveaux = niveauxAcces(c, m)
+    noms = {'ReadBeforeWriteMsg', 'WriteAfterReadMsg', 'WriteAfterWriteMsg'};
+    defauts = {'none', 'none', 'warning'};
+    echelle = {'none', 'warning', 'error'};
+    niveaux = zeros(1, 3);
+    for q = 1:3
+        reglage = 'UseLocalSettings';
+        if isstruct(c.config) && isfield(c.config, noms{q})
+            reglage = char(c.config.(noms{q}));
+        end
+        switch reglage
+            case 'DisableAll'
+                niveaux(q) = 0;
+            case 'EnableAllAsWarning'
+                niveaux(q) = 1;
+            case 'EnableAllAsError'
+                niveaux(q) = 2;
+            otherwise
+                local = defauts{q};
+                if isfield(c.p{m}, noms{q})
+                    local = char(c.p{m}.(noms{q}));
+                end
+                niveaux(q) = find(strcmp(echelle, local)) - 1;
+        end
+    end
+end
+
+% Un accès d'un pas majeur à la mémoire M : une lecture avant toute
+% écriture du pas, une écriture après une lecture, une seconde écriture.
+function [ecrit, lu] = accesMemoire(T, k, m, ecriture, ecrit, lu, t)
+    niveaux = T.niveauxMemoire(m, :);
+    if ~ecriture
+        if ecrit(m) == 0 && niveaux(1) > 0
+            alerter(T, niveaux(1), 'Simulink:DataStores:ReadBeforeWrite', ...
+                    sprintf('lecture:%d:%d', m, k), ...
+                    sprintf(['''%s'' lit la memoire partagee de ''%s'' a t = %g, avant que ' ...
+                             'rien ne l''ecrive dans ce pas (ReadBeforeWriteMsg).'], ...
+                            T.chemins{k}, T.chemins{m}, t));
+        end
+        if lu(m) == 0
+            lu(m) = k;
+        end
+        return
+    end
+    if ecrit(m) > 0 && niveaux(3) > 0
+        alerter(T, niveaux(3), 'Simulink:DataStores:WriteAfterWrite', ...
+                sprintf('double:%d', m), ...
+                sprintf(['La memoire partagee de ''%s'' est ecrite deux fois a t = %g : par ' ...
+                         '''%s'', puis par ''%s'' (WriteAfterWriteMsg).'], T.chemins{m}, t, ...
+                        T.chemins{ecrit(m)}, T.chemins{k}));
+    elseif lu(m) > 0 && niveaux(2) > 0
+        alerter(T, niveaux(2), 'Simulink:DataStores:WriteAfterRead', ...
+                sprintf('apresLecture:%d:%d', m, k), ...
+                sprintf(['''%s'' ecrit la memoire partagee de ''%s'' a t = %g, apres que ''%s'' ' ...
+                         'l''a lue dans ce pas (WriteAfterReadMsg).'], T.chemins{k}, ...
+                        T.chemins{m}, t, T.chemins{lu(m)}));
+    end
+    ecrit(m) = k;
+end
+
 function alerter(T, niveau, id, cle, texte)
     if niveau == 2
         error(id, '%s', texte);

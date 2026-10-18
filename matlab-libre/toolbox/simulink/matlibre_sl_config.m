@@ -75,6 +75,16 @@ function varargout = matlibre_sl_config(action, varargin)
 %                                     multitâche : warning ou error
 %     SingleTaskRateTransMsg 'none'   une transition sans Rate Transition
 %                                     en monotâche : none, warning, error
+%     ReadBeforeWriteMsg, WriteAfterReadMsg, WriteAfterWriteMsg
+%                          'UseLocalSettings'  les accès d'un pas aux
+%                                     mémoires partagées : lecture avant
+%                                     toute écriture, écriture après une
+%                                     lecture, seconde écriture — le
+%                                     réglage de chaque Data Store Memory
+%                                     ('none', 'none', 'warning' par
+%                                     défaut), ou 'DisableAll',
+%                                     'EnableAllAsWarning',
+%                                     'EnableAllAsError' pour toutes
 %     InheritedTsInSrcMsg  'warning'  un bloc source à période -1 — un
 %                                     compteur, un Repeating Sequence
 %                                     Stair par défaut —, qui l'hérite en
@@ -261,7 +271,8 @@ function d = defauts()
                'ZeroCrossAlgorithm', 'Nonadaptive', 'ZcThreshold', 'auto', ...
                'EnableMultiTasking', 'off', 'AutoInsertRateTranBlk', 'off', ...
                'MultiTaskRateTransMsg', 'error', 'SingleTaskRateTransMsg', 'none', ...
-               'InheritedTsInSrcMsg', 'warning', ...
+               'InheritedTsInSrcMsg', 'warning', 'ReadBeforeWriteMsg', 'UseLocalSettings', ...
+               'WriteAfterReadMsg', 'UseLocalSettings', 'WriteAfterWriteMsg', 'UseLocalSettings', ...
                'BusObjectLabelMismatch', 'warning', 'ParameterDowncastMsg', 'error', ...
                'ParameterOverflowMsg', 'error', 'ParameterUnderflowMsg', 'none', ...
                'ParameterPrecisionLossMsg', 'warning');
@@ -404,6 +415,9 @@ function v = valider(nom, v)
             v = choix(nom, v, {'none', 'warning', 'error'});
         case 'MinStepSizeMsg'
             v = choix(nom, v, {'warning', 'error'});
+        case {'ReadBeforeWriteMsg', 'WriteAfterReadMsg', 'WriteAfterWriteMsg'}
+            v = choix(nom, v, {'UseLocalSettings', 'DisableAll', 'EnableAllAsWarning', ...
+                               'EnableAllAsError'});
         case 'DataTypeOverride'
             v = choix(nom, v, {'UseLocalSettings', 'ScaledDouble', 'Double', 'Single', 'Off'});
         case 'DataTypeOverrideAppliesTo'

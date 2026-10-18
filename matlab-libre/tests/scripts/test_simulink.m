@@ -11523,6 +11523,94 @@ assert(isequal(sim(relu86, regle86{:}).yout(end, :), [6 10]), ...
 delete(fichier86);
 fprintf('Simulink Function et Function Caller : ok\n');
 
+%% --------------------------- 87. Les accès aux mémoires partagées, diagnostiqués
+% Les diagnostics d'accès de Simulink aux mémoires partagées : dans un pas,
+% une lecture avant toute écriture (ReadBeforeWriteMsg), une écriture
+% après une lecture (WriteAfterReadMsg), une seconde écriture
+% (WriteAfterWriteMsg). Chaque Data Store Memory a son réglage — rien,
+% rien, avertissement par défaut — ; le modèle les laisse faire
+% (UseLocalSettings), les tait tous, ou les fait tous avertir ou refuser.
+m87 = new_system('memoire87');
+m87 = add_block(m87, 'datastorememory', 'mem', 'DataStoreName', 'A', 'InitialValue', 0);
+m87 = add_block(m87, 'constant', 'c1', 'Value', 1, 'SampleTime', 1);
+m87 = add_block(m87, 'constant', 'c2', 'Value', 2, 'SampleTime', 1);
+m87 = add_block(m87, 'datastorewrite', 'w1', 'DataStoreName', 'A');
+m87 = add_block(m87, 'datastorewrite', 'w2', 'DataStoreName', 'A');
+m87 = add_line(add_line(m87, 'c1', 'w1'), 'c2', 'w2');
+regle87 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 2};
+assert(strcmp(get_param(m87, 'WriteAfterWriteMsg'), 'UseLocalSettings') && ...
+       strcmp(get_param(m87, 'mem', 'WriteAfterWriteMsg'), 'warning'), ...
+       'par defaut, le reglage du bloc ; une seconde ecriture avertit');
+lastwarn('');
+evalc('sim(m87, regle87{:});');
+[texte87, id87] = lastwarn();
+assert(strcmp(id87, 'Simulink:DataStores:WriteAfterWrite') && ...
+       ~isempty(strfind(texte87, 'memoire87/w1')) && ~isempty(strfind(texte87, 'memoire87/w2')), ...
+       'deux ecritures dans un pas : l''avertissement nomme les deux blocs');
+vu87 = '';
+try
+    sim(m87, regle87{:}, 'WriteAfterWriteMsg', 'EnableAllAsError');
+catch err
+    vu87 = err.identifier;
+end
+assert(strcmp(vu87, 'Simulink:DataStores:WriteAfterWrite'), 'EnableAllAsError : refuse');
+lastwarn('');
+evalc('sim(m87, regle87{:}, ''WriteAfterWriteMsg'', ''DisableAll'');');
+[~, id87] = lastwarn();
+assert(isempty(id87), 'DisableAll : rien n''est dit');
+lastwarn('');
+evalc('sim(set_param(m87, ''mem'', ''WriteAfterWriteMsg'', ''none''), regle87{:});');
+[~, id87] = lastwarn();
+assert(isempty(id87), 'le bloc a none : rien n''est dit');
+% une lecture avant l'écriture du pas, une écriture après une lecture
+l87 = new_system('lecture87');
+l87 = add_block(l87, 'datastorememory', 'mem', 'DataStoreName', 'B', ...
+                'ReadBeforeWriteMsg', 'error', 'WriteAfterReadMsg', 'warning');
+l87 = add_block(l87, 'datastoreread', 'r', 'DataStoreName', 'B', 'SampleTime', 1);
+l87 = add_block(l87, 'gain', 'g', 'Gain', 2);
+l87 = add_block(l87, 'datastorewrite', 'w', 'DataStoreName', 'B');
+l87 = add_block(l87, 'outport', 'y');
+l87 = add_line(add_line(add_line(l87, 'r', 'g'), 'g', 'w'), 'r', 'y');
+vu87 = '';
+message87 = '';
+try
+    sim(l87, regle87{:});
+catch err
+    vu87 = err.identifier;
+    message87 = err.message;
+end
+assert(strcmp(vu87, 'Simulink:DataStores:ReadBeforeWrite') && ...
+       ~isempty(strfind(message87, 'lecture87/r')), ...
+       'une lecture avant toute ecriture du pas : refusee (ReadBeforeWriteMsg error)');
+lastwarn('');
+evalc('sim(set_param(l87, ''mem'', ''ReadBeforeWriteMsg'', ''none''), regle87{:});');
+[texte87, id87] = lastwarn();
+assert(strcmp(id87, 'Simulink:DataStores:WriteAfterRead') && ...
+       ~isempty(strfind(texte87, 'lecture87/w')), ...
+       'une ecriture apres une lecture du pas : l''avertissement');
+% une mémoire globale (Simulink.Signal) ne se signale pas, sauf à tout
+% activer
+assignin('base', 'G87', Simulink.Signal);
+g87 = new_system('globale87');
+g87 = add_block(g87, 'constant', 'c1', 'Value', 1, 'SampleTime', 1);
+g87 = add_block(g87, 'constant', 'c2', 'Value', 2, 'SampleTime', 1);
+g87 = add_block(g87, 'datastorewrite', 'w1', 'DataStoreName', 'G87');
+g87 = add_block(g87, 'datastorewrite', 'w2', 'DataStoreName', 'G87');
+g87 = add_line(add_line(g87, 'c1', 'w1'), 'c2', 'w2');
+lastwarn('');
+evalc('sim(g87, regle87{:});');
+[~, id87] = lastwarn();
+vu87 = '';
+try
+    sim(g87, regle87{:}, 'WriteAfterWriteMsg', 'EnableAllAsError');
+catch err
+    vu87 = err.identifier;
+end
+assert(isempty(id87) && strcmp(vu87, 'Simulink:DataStores:WriteAfterWrite'), ...
+       'une memoire globale : rien par defaut, refusee quand tout est active');
+evalin('base', 'clear G87');
+fprintf('acces aux memoires partagees : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

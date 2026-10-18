@@ -217,7 +217,8 @@ function modele = add_block(modele, type, nom, varargin)
 %     merge        Inputs, InitialOutput        l'entrée dont le sous-système
 %                                               vient de calculer
 %     manualswitch sw ('1' : la première entrée, '0' : la seconde)
-%     datastorememory DataStoreName, InitialValue ; datastoreread et
+%     datastorememory DataStoreName, InitialValue, ReadBeforeWriteMsg,
+%                  WriteAfterReadMsg, WriteAfterWriteMsg ; datastoreread et
 %                  datastorewrite DataStoreName — une mémoire partagée,
 %                  lue avant d'être écrite à chaque pas
 %     ratetransition OutPortSampleTime, X0, Deterministic — tenue vers une

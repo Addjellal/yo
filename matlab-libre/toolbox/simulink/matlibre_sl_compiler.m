@@ -2619,8 +2619,11 @@ function modele = memoiresGlobales(modele)
             bloc = [bloc '_']; %#ok<AGROW>
         end
         noms{end + 1} = bloc; %#ok<AGROW>
+        % une mémoire globale : réglée sur place, ses accès ne se signalent
+        % pas, comme dans Simulink (UseLocalSettings)
         modele = add_block(modele, 'datastorememory', bloc, 'DataStoreName', nom{1}, ...
-                           'InitialValue', double(valeur));
+                           'InitialValue', double(valeur), 'ReadBeforeWriteMsg', 'none', ...
+                           'WriteAfterReadMsg', 'none', 'WriteAfterWriteMsg', 'none');
     end
 end
 

@@ -331,6 +331,22 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                   QStringLiteral("un entier déborde et sature"), kNiveaux,
                   QStringLiteral("… et s'y arrête : SaturateOnIntegerOverflow"));
     colonneDiagnostics->addWidget(groupeDonneesDiag);
+    auto* groupeMemoires = new QGroupBox(QStringLiteral("Mémoires partagées"));
+    auto* formulaireMemoires = new QFormLayout(groupeMemoires);
+    const QStringList accesMemoire = {QStringLiteral("UseLocalSettings"),
+                                      QStringLiteral("DisableAll"),
+                                      QStringLiteral("EnableAllAsWarning"),
+                                      QStringLiteral("EnableAllAsError")};
+    nouvelleListe(QStringLiteral("ReadBeforeWriteMsg"), formulaireMemoires,
+                  QStringLiteral("une lecture avant l'écriture du pas"), accesMemoire,
+                  QStringLiteral("Le réglage de chaque Data Store Memory, ou le même pour toutes"));
+    nouvelleListe(QStringLiteral("WriteAfterReadMsg"), formulaireMemoires,
+                  QStringLiteral("une écriture après une lecture du pas"), accesMemoire,
+                  QStringLiteral("Le réglage de chaque Data Store Memory, ou le même pour toutes"));
+    nouvelleListe(QStringLiteral("WriteAfterWriteMsg"), formulaireMemoires,
+                  QStringLiteral("deux écritures dans le pas"), accesMemoire,
+                  QStringLiteral("Le réglage de chaque Data Store Memory, ou le même pour toutes"));
+    colonneDiagnostics->addWidget(groupeMemoires);
     auto* groupeParametres = new QGroupBox(QStringLiteral("Paramètres"));
     auto* formulaireParametres = new QFormLayout(groupeParametres);
     nouvelleListe(QStringLiteral("ParameterDowncastMsg"), formulaireParametres,
