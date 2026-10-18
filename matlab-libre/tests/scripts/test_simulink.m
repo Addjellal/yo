@@ -11397,6 +11397,132 @@ for q = 1:size(refus85, 1)
 end
 fprintf('ports d''element de bus : ok\n');
 
+%% ---------------------------- 86. Simulink Function et Function Caller
+% Un Simulink Function est une fonction faite de blocs, que les Function
+% Caller appellent par son nom et son prototype — y = f(u), [s, d] =
+% sd(a, b) — ; une fonction « scoped » se voit dans son système et ses
+% sous-systèmes, et s'appelle qualifiée d'ailleurs (A.f). Une fonction
+% introuvable, un prototype qui ne s'accorde pas, une fonction à états
+% appelée de plusieurs endroits — que MatLibre ne partage pas encore —
+% sont refusés en nommant le bloc.
+m86 = new_system('fonctions86');
+m86 = add_block(m86, 'Simulink Function', 'double');
+corps86 = get_param(m86, 'double', 'Model');
+corps86 = set_param(corps86, 'f', 'FunctionName', 'timestwo');
+corps86 = add_block(corps86, 'gain', 'g', 'Gain', 2);
+corps86 = delete_line(corps86, 'u', 'y');
+corps86 = add_line(add_line(corps86, 'u', 'g'), 'g', 'y');
+m86 = set_param(m86, 'double', 'Model', corps86);
+[ne86, ns86] = matlibre_sl_ports(m86.blocs{1});
+assert(ne86 == 0 && ns86 == 0, 'un Simulink Function n''a pas de port : on l''appelle');
+m86 = add_block(m86, 'constant', 'a', 'Value', 3);
+m86 = add_block(m86, 'constant', 'b', 'Value', 5);
+m86 = add_block(m86, 'functioncaller', 'appel1', 'FunctionPrototype', 'y = timestwo(u)');
+m86 = add_block(m86, 'functioncaller', 'appel2', 'FunctionPrototype', 'z = timestwo(x)');
+m86 = add_block(m86, 'outport', 'y1');
+m86 = add_block(m86, 'outport', 'y2');
+m86 = add_line(add_line(m86, 'a', 'appel1'), 'appel1', 'y1');
+m86 = add_line(add_line(m86, 'b', 'appel2'), 'appel2', 'y2');
+regle86 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 3};
+r86 = sim(m86, regle86{:});
+assert(isequal(r86.yout(end, :), [6 10]), 'deux appels de timestwo : 6 et 10');
+% deux arguments d'entrée, deux de sortie, appariés par leur nom
+sd86 = new_system('sd86');
+sd86 = add_block(sd86, 'triggerport', 'f', 'TriggerType', 'function-call', ...
+                 'IsSimulinkFunction', 'on', 'FunctionName', 'sd');
+sd86 = add_block(sd86, 'argin', 'a', 'ArgumentName', 'a', 'Port', 1);
+sd86 = add_block(sd86, 'argin', 'b', 'ArgumentName', 'b', 'Port', 2);
+sd86 = add_block(sd86, 'sum', 'plus', 'Signs', '++');
+sd86 = add_block(sd86, 'sum', 'moins', 'Signs', '+-');
+sd86 = add_block(sd86, 'argout', 's', 'ArgumentName', 's', 'Port', 1);
+sd86 = add_block(sd86, 'argout', 'd', 'ArgumentName', 'd', 'Port', 2);
+sd86 = add_line(add_line(sd86, 'a', 'plus/1'), 'b', 'plus/2');
+sd86 = add_line(add_line(sd86, 'a', 'moins/1'), 'b', 'moins/2');
+sd86 = add_line(add_line(sd86, 'plus', 's'), 'moins', 'd');
+p86 = new_system('prototype86');
+p86 = add_block(p86, 'subsystem', 'fonction', 'Model', sd86);
+p86 = add_block(p86, 'constant', 'x', 'Value', 7);
+p86 = add_block(p86, 'constant', 'w', 'Value', 2);
+p86 = add_block(p86, 'functioncaller', 'appel', 'FunctionPrototype', '[d, s] = sd(b, a)');
+p86 = add_block(p86, 'outport', 'o1');
+p86 = add_block(p86, 'outport', 'o2');
+p86 = add_line(add_line(p86, 'x', 'appel/1'), 'w', 'appel/2');
+p86 = add_line(add_line(p86, 'appel/1', 'o1'), 'appel/2', 'o2');
+r86 = sim(p86, regle86{:});
+% b = 7, a = 2 : d = a - b = -5, s = 9
+assert(isequal(r86.yout(end, :), [-5 9]), 'les arguments s''apparient par leur nom');
+% une fonction à états, appelée d'un seul endroit : elle compte
+compte86 = new_system('compte86');
+compte86 = add_block(compte86, 'triggerport', 'f', 'TriggerType', 'function-call', ...
+                     'IsSimulinkFunction', 'on', 'FunctionName', 'compte');
+compte86 = add_block(compte86, 'argin', 'u', 'ArgumentName', 'u');
+compte86 = add_block(compte86, 'sum', 's', 'Signs', '++');
+compte86 = add_block(compte86, 'delay', 'z', 'SampleTime', 1);
+compte86 = add_block(compte86, 'argout', 'y', 'ArgumentName', 'y');
+compte86 = add_line(add_line(compte86, 'u', 's/1'), 'z', 's/2');
+compte86 = add_line(add_line(compte86, 's', 'z'), 's', 'y');
+c86 = new_system('etats86');
+c86 = add_block(c86, 'subsystem', 'fonction', 'Model', compte86);
+c86 = add_block(c86, 'constant', 'un', 'Value', 1, 'SampleTime', 1);
+c86 = add_block(c86, 'functioncaller', 'appel', 'FunctionPrototype', 'y = compte(u)');
+c86 = add_block(c86, 'outport', 'y');
+c86 = add_line(add_line(c86, 'un', 'appel'), 'appel', 'y');
+r86 = sim(c86, regle86{:});
+assert(isequal(r86.yout(:).', [1 2 3 4]), 'une fonction a etats, appelee d''un endroit, compte');
+% une fonction « scoped » dans un sous-système : invisible d'ailleurs sans
+% qualifiant, visible qualifiée
+boite86 = new_system('A');
+boite86 = add_block(boite86, 'subsystem', 'fonction', 'Model', corps86);
+boite86 = add_block(boite86, 'inport', 'In1');
+boite86 = add_block(boite86, 'outport', 'Out1');
+boite86 = add_line(boite86, 'In1', 'Out1');
+q86 = new_system('portee86');
+q86 = add_block(q86, 'subsystem', 'A', 'Model', boite86);
+q86 = add_block(q86, 'constant', 'k', 'Value', 4);
+q86 = add_block(q86, 'functioncaller', 'appel', 'FunctionPrototype', 'y = timestwo(u)', ...
+                'ScopedFunctionName', 'A.timestwo');
+q86 = add_block(q86, 'outport', 'y');
+q86 = add_block(q86, 'terminator', 't');
+q86 = add_line(add_line(add_line(q86, 'k', 'appel'), 'appel', 'y'), 'k', 'A');
+q86 = add_line(q86, 'A', 't');
+r86 = sim(q86, regle86{:});
+assert(r86.yout(end) == 8, 'une fonction scoped, appelee qualifiee : A.timestwo');
+refus86 = {
+    set_param(q86, 'appel', 'ScopedFunctionName', ''), 'Simulink:SimulinkFunction:FunctionNotFound', ...
+        'portee86/appel'
+    set_param(m86, 'appel1', 'FunctionPrototype', 'y = absente(u)'), ...
+        'Simulink:SimulinkFunction:FunctionNotFound', 'fonctions86/appel1'
+    add_line(add_block(add_block(set_param(p86, 'appel', 'FunctionPrototype', ...
+                                           '[d, s] = sd(b, a, c)'), 'constant', 'c3'), ...
+                       'terminator', 't3'), 'c3', 'appel/3'), ...
+        'Simulink:SimulinkFunction:PrototypeMismatch', 'prototype86/appel'
+    add_line(add_block(add_block(c86, 'functioncaller', 'autre', 'FunctionPrototype', ...
+                                 'y = compte(u)'), 'terminator', 'fin'), 'autre', 'fin'), ...
+        'Simulink:SimulinkFunction:SharedStateNotSupported', 'etats86/fonction'
+    add_block(new_system('seul86'), 'argin', 'u'), ...
+        'Simulink:SimulinkFunction:ArgumentOutsideFunction', 'seul86/u'
+    };
+for q = 1:size(refus86, 1)
+    vu86 = '';
+    message86 = '';
+    try
+        evalc('sim(refus86{q, 1}, regle86{:});');
+    catch err
+        vu86 = err.identifier;
+        message86 = err.message;
+    end
+    assert(strcmp(vu86, refus86{q, 2}) && ~isempty(strfind(message86, refus86{q, 3})), ...
+           sprintf('Simulink Function, refus %d : %s (%s)', q, vu86, message86));
+end
+% le .slx garde la fonction et ses appels
+fichier86 = [tempname() '.slx'];
+save_system(m86, fichier86);
+relu86 = load_system(fichier86);
+assert(isequal(sim(relu86, regle86{:}).yout(end, :), [6 10]), ...
+       'relu du .slx, le modele appelle sa fonction de meme');
+delete(fichier86);
+fprintf('Simulink Function et Function Caller : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

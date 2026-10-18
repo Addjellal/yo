@@ -310,6 +310,10 @@ const BlocBibliotheque blocs[] = {
     // Les blocs de code : une expression, une fonction MATLAB, et la
     // machine à états de Stateflow.
     {"Fonctions", "fcn", "Une expression de l'entrée u : u(1)*sin(u(2))", "'Expr', 'u^2'"},
+    {"Fonctions", "Simulink Function", "Une fonction faite de blocs, appelée par son nom : y = f(u)",
+     ""},
+    {"Fonctions", "functioncaller", "Appelle un Simulink Function par son prototype",
+     "'FunctionPrototype', 'y = f(u)'"},
     {"Fonctions", "matlabfunction",
      "Une fonction MATLAB : ses arguments sont les entrées, ses sorties les sorties", ""},
     {"Fonctions", "interpretedmatlabfunction", "Une fonction MATLAB appliquée à l'entrée",

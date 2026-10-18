@@ -68,12 +68,17 @@ function modele = matlibre_sl_aplatir(modele)
         nomRacine = char(modele.nom);
     end
     modele = portsDeBus(modele, nomRacine);
+    % Les Simulink Function du modèle, et les appels qui les désignent
+    definitions = fonctionsDuModele(modele, nomRacine);
     % Un modèle ordinaire ne paie rien : le dépliage ne coûte que le
     % parcours qui constate qu'il n'y a rien à déplier.
     garde = 0;
     while true
         % les blocs de la bibliothèque que Simulink bâtit en sous-systèmes
         modele = matlibre_sl_bibliotheque(modele);
+        if ~isempty(definitions)
+            modele = appelsDeFonctions(modele, definitions, nomRacine);
+        end
         k = premier(modele);
         if k == 0
             % les réseaux physiques, une fois tout déplié, deviennent des
@@ -170,6 +175,302 @@ function modele = rafraichirLiens(modele)
             neuf.parametres.Position = bloc.parametres.Position;
         end
         modele.blocs{j} = neuf;
+    end
+end
+
+% Les Simulink Function d'un modèle et de ses sous-systèmes : leur nom,
+% le système qui les porte — d'où se voit une fonction « scoped » —, leur
+% visibilité et leur corps. Les Function Caller se comptent par fonction :
+% une fonction à états n'a qu'un appelant, MatLibre dépliant chaque appel.
+function definitions = fonctionsDuModele(modele, nomRacine)
+    definitions = struct('nom', {}, 'systeme', {}, 'chemin', {}, 'visibilite', {}, ...
+                         'interieur', {}, 'appels', {}, 'aEtats', {});
+    appels = struct('nom', {}, 'chemin', {});
+    [definitions, appels] = parcourirFonctions(modele, nomRacine, definitions, appels);
+    for q = 1:numel(appels)
+        d = resoudreFonction(definitions, appels(q).nom, appels(q).chemin);
+        if d > 0
+            definitions(d).appels = definitions(d).appels + 1;
+        end
+    end
+    for d = 1:numel(definitions)
+        if definitions(d).appels > 1 && definitions(d).aEtats
+            error('Simulink:SimulinkFunction:SharedStateNotSupported', ...
+                  ['Le Simulink Function ''%s'' (%s) a des etats, et %d Function Caller ' ...
+                   'l''appellent : MatLibre deplie chaque appel, et ne partage pas encore ' ...
+                   'ses etats entre eux. Donnez a chaque appelant sa fonction.'], ...
+                  definitions(d).chemin, definitions(d).nom, definitions(d).appels);
+        end
+    end
+end
+
+function [definitions, appels] = parcourirFonctions(modele, systeme, definitions, appels)
+    modele = matlibre_sl_modele(modele);
+    for j = 1:numel(modele.blocs)
+        b = modele.blocs{j};
+        type = typeCanonique(b.type);
+        chemin = [systeme '/' char(b.nom)];
+        if strcmp(type, 'functioncaller')
+            appels(end + 1) = struct('nom', nomAppele(b.parametres, chemin), ...
+                                     'chemin', systeme); %#ok<AGROW>
+            continue
+        end
+        if ~strcmp(type, 'subsystem') || ~(isfield(b.parametres, 'Model') || ...
+                                          isfield(b.parametres, 'Modele'))
+            continue
+        end
+        try
+            interne = contenu(struct('type', 'subsystem', 'parametres', b.parametres), chemin);
+        catch
+            continue   % le dépliage dira ce qui ne va pas
+        end
+        declencheur = declencheurDeFonction(interne);
+        if declencheur > 0
+            p = interne.blocs{declencheur}.parametres;
+            definitions(end + 1) = struct('nom', char(lireParametre(p, 'FunctionName', 'f')), ...
+                'systeme', systeme, 'chemin', chemin, ...
+                'visibilite', char(lireParametre(p, 'FunctionVisibility', 'scoped')), ...
+                'interieur', interne, 'appels', 0, 'aEtats', aDesEtats(interne)); %#ok<AGROW>
+            [definitions, appels] = parcourirFonctions(interne, chemin, definitions, appels);
+        else
+            [definitions, appels] = parcourirFonctions(interne, chemin, definitions, appels);
+        end
+    end
+end
+
+% Le rang du Trigger qui fait d'un sous-système un Simulink Function, 0 s'il
+% n'y en a pas.
+function k = declencheurDeFonction(interne)
+    k = 0;
+    for j = 1:numel(interne.blocs)
+        b = interne.blocs{j};
+        if strcmp(typeCanonique(b.type), 'triggerport') && ...
+           strcmpi(char(lireParametre(b.parametres, 'IsSimulinkFunction', 'off')), 'on')
+            k = j;
+            return
+        end
+    end
+end
+
+% Un corps qui garde un état : un bloc à mémoire, ou un sous-système qui
+% en porte un.
+function oui = aDesEtats(interne)
+    oui = false;
+    memoire = {'integrator', 'delay', 'memory', 'discreteintegrator', 'discretetransferfcn', ...
+               'discretefilter', 'discretestatespace', 'transferfcn', 'statespace', ...
+               'zeropole', 'chart', 'tappeddelay', 'difference', 'discretederivative', ...
+               'transportdelay', 'variabletransportdelay', 'secondorderintegrator', ...
+               'secondorderintegratorlimited', 'pidcontroller', 'pidcontroller2dof', ...
+               'datastorememory', 'ratelimiter', 'counterfreerunning', 'counterlimited', ...
+               'zoh', 'firstorderhold', 'descriptorstatespace', 'transferfcndirectformii', ...
+               'detectchange', 'detectincrease', 'detectdecrease', 'detectrisepositive', ...
+               'detectrisenonnegative', 'detectfallnegative', 'detectfallnonpositive', ...
+               'derivative', 'backlash', 'relay', 'ic', 'ratetransition'};
+    for j = 1:numel(interne.blocs)
+        b = interne.blocs{j};
+        type = typeCanonique(b.type);
+        if any(strcmp(type, memoire)) || (strcmp(type, 'matlabfunction') && ...
+           ~isempty(regexp(char(lireParametre(b.parametres, 'Script', '')), ...
+                           '(^|\n)\s*persistent\s', 'once')))
+            oui = true;
+            return
+        end
+        if strcmp(type, 'subsystem') && isfield(b.parametres, 'Model')
+            try
+                oui = aDesEtats(matlibre_sl_modele(b.parametres.Model));
+            catch
+            end
+            if oui
+                return
+            end
+        end
+    end
+end
+
+% Le nom de la fonction qu'appelle un Function Caller : ScopedFunctionName,
+% ou celui de son prototype.
+function nom = nomAppele(p, chemin)
+    nom = lireParametre(p, 'ScopedFunctionName', '');
+    if isstring(nom) && isscalar(nom)
+        nom = char(nom);
+    end
+    if ~ischar(nom) || size(nom, 1) > 1
+        error('Simulink:SimulinkFunction:InvalidPrototype', ...
+              ['Le nom de la fonction qu''appelle le Function Caller ''%s'' ' ...
+               '(ScopedFunctionName) est un texte : f, ou A.f.'], chemin);
+    end
+    nom = strtrim(nom);
+    if isempty(nom)
+        [~, nom] = matlibre_sl_prototype(lireParametre(p, 'FunctionPrototype', 'y=f(u)'));
+    end
+    if isempty(nom)
+        error('Simulink:SimulinkFunction:InvalidPrototype', ...
+              ['Le prototype du Function Caller ''%s'' ne se lit pas : il s''ecrit ' ...
+               'y = f(u), [y1, y2] = f(u1, u2), ou f(u).'], chemin);
+    end
+end
+
+% La fonction que voit un appel fait depuis le système SYSTEME : « A.f »
+% désigne celle du sous-système A ; « f » la plus proche de celles que
+% portent SYSTEME et ses parents, ou une fonction globale. 0 si aucune.
+function d = resoudreFonction(definitions, nom, systeme)
+    d = 0;
+    qualifiant = '';
+    point = find(nom == '.', 1, 'last');
+    if ~isempty(point)
+        qualifiant = nom(1:point - 1);
+        nom = nom(point + 1:end);
+    end
+    meilleur = -1;
+    for q = 1:numel(definitions)
+        D = definitions(q);
+        if ~strcmp(D.nom, nom)
+            continue
+        end
+        if ~isempty(qualifiant)
+            barre = find(D.systeme == '/', 1, 'last');
+            dernier = D.systeme;
+            if ~isempty(barre)
+                dernier = D.systeme(barre + 1:end);
+            end
+            visible = strcmp(dernier, qualifiant);
+        else
+            visible = strcmp(D.visibilite, 'global') || strcmp(systeme, D.systeme) || ...
+                      strncmp(systeme, [D.systeme '/'], numel(D.systeme) + 1);
+        end
+        if visible && numel(D.systeme) > meilleur
+            d = q;
+            meilleur = numel(D.systeme);
+        end
+    end
+end
+
+% Les blocs du niveau courant : un Simulink Function n'y calcule pas — on
+% l'appelle —, et chaque Function Caller devient un sous-système qui porte
+% le corps de la fonction, ses arguments en entrées et en sorties.
+function modele = appelsDeFonctions(modele, definitions, nomRacine)
+    for j = 1:numel(modele.blocs)
+        b = modele.blocs{j};
+        if strcmp(b.type, 'subsystem') && (isfield(b.parametres, 'Model') || ...
+                                          isfield(b.parametres, 'Modele'))
+            try
+                interne = contenu(b, char(b.nom));
+            catch
+                continue
+            end
+            if declencheurDeFonction(interne) > 0
+                b.type = 'docblock';   % une définition : elle ne calcule rien ici
+                b.parametres = struct();
+                modele.blocs{j} = b;
+            end
+            continue
+        end
+        if ~strcmp(b.type, 'functioncaller')
+            continue
+        end
+        nom = char(b.nom);
+        barre = find(nom == '/', 1, 'last');
+        systeme = nomRacine;
+        if ~isempty(barre)
+            systeme = [nomRacine '/' nom(1:barre - 1)];
+        end
+        chemin = [nomRacine '/' nom];
+        appele = nomAppele(b.parametres, chemin);
+        d = resoudreFonction(definitions, appele, systeme);
+        if d == 0
+            error('Simulink:SimulinkFunction:FunctionNotFound', ...
+                  ['Le Function Caller ''%s'' appelle ''%s'', qu''aucun Simulink Function ' ...
+                   'visible d''ici ne definit : une fonction « scoped » se voit dans son ' ...
+                   'systeme et ses sous-systemes, ou s''appelle qualifiee (A.%s).'], ...
+                  chemin, appele, regexprep(appele, '^.*\.', ''));
+        end
+        b.type = 'subsystem';
+        b.parametres = struct('Model', corpsAppele(definitions(d), b.parametres, chemin));
+        modele.blocs{j} = b;
+    end
+end
+
+% Le corps d'une fonction pour un appel : son Trigger ne sert plus, ses
+% arguments d'entrée et de sortie deviennent des Inport et des Outport au
+% rang de l'argument de même nom dans le prototype de l'appel — ou au même
+% rang, si les noms diffèrent mais pas leur nombre.
+function interne = corpsAppele(D, p, chemin)
+    [sortiesAppel, ~, entreesAppel] = matlibre_sl_prototype( ...
+        lireParametre(p, 'FunctionPrototype', 'y=f(u)'));
+    interne = D.interieur;
+    rangsE = [];
+    nomsE = {};
+    rangsS = [];
+    nomsS = {};
+    for j = 1:numel(interne.blocs)
+        b = interne.blocs{j};
+        switch typeCanonique(b.type)
+            case 'triggerport'
+                interne.blocs{j}.type = 'docblock';
+                interne.blocs{j}.parametres = struct();
+            case 'argin'
+                rangsE(end + 1) = j; %#ok<AGROW>
+                nomsE{end + 1} = nomArgument(b, 'u', D.chemin); %#ok<AGROW>
+            case 'argout'
+                rangsS(end + 1) = j; %#ok<AGROW>
+                nomsS{end + 1} = nomArgument(b, 'y', D.chemin); %#ok<AGROW>
+            case {'inport', 'outport'}
+                error('Simulink:SimulinkFunction:PortsNotSupported', ...
+                      ['Le Simulink Function ''%s'' porte un Inport ou un Outport : MatLibre ' ...
+                       'ne lui connait que ses arguments (Argument Inport, Argument Outport).'], ...
+                      D.chemin);
+        end
+    end
+    placesE = placerArguments(nomsE, entreesAppel, D, chemin, 'd''entree');
+    placesS = placerArguments(nomsS, sortiesAppel, D, chemin, 'de sortie');
+    for q = 1:numel(rangsE)
+        b = interne.blocs{rangsE(q)};
+        interne.blocs{rangsE(q)}.type = 'inport';
+        interne.blocs{rangsE(q)}.parametres = argumentEnPort(b.parametres, placesE(q));
+    end
+    for q = 1:numel(rangsS)
+        b = interne.blocs{rangsS(q)};
+        interne.blocs{rangsS(q)}.type = 'outport';
+        interne.blocs{rangsS(q)}.parametres = argumentEnPort(b.parametres, placesS(q));
+    end
+end
+
+% Le nom d'un argument de Simulink Function : un identificateur.
+function nom = nomArgument(b, defaut, chemin)
+    nom = lireParametre(b.parametres, 'ArgumentName', defaut);
+    if isstring(nom) && isscalar(nom)
+        nom = char(nom);
+    end
+    if ~ischar(nom) || ~isvarname(strtrim(nom))
+        error('Simulink:SimulinkFunction:InvalidArgumentName', ...
+              ['L''argument ''%s'' du Simulink Function ''%s'' doit porter un nom ' ...
+               '(ArgumentName) : un identificateur, u ou y.'], char(b.nom), chemin);
+    end
+    nom = strtrim(nom);
+end
+
+function places = placerArguments(noms, appel, D, chemin, quoi)
+    if numel(noms) ~= numel(appel)
+        error('Simulink:SimulinkFunction:PrototypeMismatch', ...
+              ['Le Function Caller ''%s'' passe %d argument(s) %s a ''%s'', qui en prend ' ...
+               '%d (%s).'], chemin, numel(appel), quoi, D.chemin, numel(noms), ...
+              strjoin(noms, ', '));
+    end
+    places = 1:numel(noms);
+    [trouves, ou] = ismember(noms, appel);
+    if all(trouves)
+        places = ou;
+    end
+end
+
+function q = argumentEnPort(p, rang)
+    q = struct('Port', rang);
+    for champ = {'OutDataTypeStr', 'PortDimensions'}
+        v = lireParametre(p, champ{1}, []);
+        if ~isempty(v) && ~(ischar(v) && strncmpi(v, 'Inherit', 7)) && ...
+           ~(isnumeric(v) && isequal(double(v), -1))
+            q.(champ{1}) = v;
+        end
     end
 end
 

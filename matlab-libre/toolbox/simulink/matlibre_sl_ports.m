@@ -54,6 +54,22 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 2;   % les deux vecteurs ; A et les indices P
         case 'expandscalar'
             nEntrees = 0;
+        case 'functioncaller'
+            % ses arguments : ceux de son prototype, y = f(u)
+            [sorties, ~, entrees] = matlibre_sl_prototype(lire(p, 'FunctionPrototype', 'y=f(u)'));
+            nEntrees = numel(entrees);
+            nSorties = numel(sorties);
+            prototype = lire(p, 'FunctionPrototype', 'y=f(u)');
+            if isempty(entrees) && isempty(sorties) && ...
+               (~(ischar(prototype) && size(prototype, 1) <= 1) || ...
+                isempty(regexp(prototype, '\w', 'once')))
+                nEntrees = NaN;
+                nSorties = NaN;
+            end
+        case 'argin'
+            nEntrees = 0;
+        case 'argout'
+            nSorties = 0;
         case 'functioncallsplit'
             nSorties = entier(lire(p, 'NumOutputPorts', 2));
         case 'identitymatrix'
@@ -541,8 +557,12 @@ function [nEntrees, nSorties] = bornesSousSysteme(p)
         switch typeCanonique(modele.blocs{k}.type)
             case {'inport', 'enableport', 'triggerport', 'actionport', 'resetport'}
                 % Les ports de contrôle viennent après les entrées : Enable,
-                % puis Trigger ; ou Action Port ; et Reset.
-                nEntrees = nEntrees + 1;
+                % puis Trigger ; ou Action Port ; et Reset. Le Trigger d'un
+                % Simulink Function n'est pas un port : on l'appelle.
+                if ~strcmpi(char(lire(modele.blocs{k}.parametres, 'IsSimulinkFunction', 'off')), ...
+                            'on')
+                    nEntrees = nEntrees + 1;
+                end
             case 'outport'
                 nSorties = nSorties + 1;
             case {'inbuselement', 'outbuselement'}

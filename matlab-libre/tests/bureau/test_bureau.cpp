@@ -1604,6 +1604,10 @@ int main(int argc, char** argv) {
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'constant', 'v', 'Value', [1 2]), "
                         "'v', 'demux');\n");
+                // Un Function Caller appelle un Simulink Function, f.
+                if (QLatin1String(b->type) == QLatin1String("functioncaller"))
+                    essaiTous += QStringLiteral(
+                        "m = add_block(m, 'Simulink Function', 'fonction');\n");
                 // Un produit vectoriel veut deux vecteurs à trois éléments.
                 if (QLatin1String(b->type) == QLatin1String("crossproduct"))
                     essaiTous += QStringLiteral(

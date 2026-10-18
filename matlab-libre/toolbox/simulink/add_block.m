@@ -99,6 +99,10 @@ function modele = add_block(modele, type, nom, varargin)
 %     datatypescalingstrip — l'entier stocké d'une virgule fixe
 %     functioncallsplit NumOutputPorts — l'appel d'un générateur partagé
 %     docblock DocumentType ; modelinfo — des notes, qui ne calculent rien
+%     functioncaller FunctionPrototype ('y = f(u)', '[s, d] = sd(a, b)'),
+%                  ScopedFunctionName ('A.f') — appelle le Simulink Function
+%                  de ce nom ; 'Simulink Function' de la bibliothèque en pose
+%                  un, y = f(u) ; argin, argout ArgumentName — ses arguments
 %     inbuselement PortName, Element, Port — dans un sous-système, l'élément
 %                  Element (n.c pour un bus emboîté, '' pour le bus entier)
 %                  du bus qui entre par le port PortName
@@ -650,6 +654,16 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
             controles = {'whileiterator', 'While Iterator'};
         case 'foreachsubsystem'
             controles = {'foreach', 'For Each'};
+        case 'simulinkfunction'
+            % y = f(u) : un Trigger qui en fait une fonction appelée par son
+            % nom, un argument d'entrée u relié à l'argument de sortie y
+            gabarit = new_system(regexprep(nom, '[^A-Za-z0-9_]', '_'));
+            gabarit = add_block(gabarit, 'triggerport', 'f', 'TriggerType', 'function-call', ...
+                                'IsSimulinkFunction', 'on', 'FunctionName', 'f');
+            gabarit = add_block(gabarit, 'argin', 'u', 'ArgumentName', 'u');
+            gabarit = add_block(gabarit, 'argout', 'y', 'ArgumentName', 'y');
+            gabarit = add_line(gabarit, 'u', 'y');
+            return
         case 'variantsubsystem'
             % deux variantes qui laissent passer leur entrée, V == 1 et
             % V == 2, entre In1 et Out1 — sans lien, comme dans Simulink

@@ -681,6 +681,11 @@ function [type, p] = normaliser(type, p, chemin)
             type = 'matlabfunction';
         case 'secondorderintegratorlimited'
             type = 'secondorderintegrator';   % le même bloc, ses bornes posées
+        case {'argin', 'argout'}
+            error('Simulink:SimulinkFunction:ArgumentOutsideFunction', ...
+                  ['Le bloc ''%s'' est un argument de Simulink Function : il ne vit que dans ' ...
+                   'un sous-systeme dont le Trigger est une fonction (IsSimulinkFunction).'], ...
+                  chemin);
         case 'transferfcndirectformii'
             p = struct('Script', scriptFormeDirecte(p, chemin), 'SampleTime', -1);
             type = 'matlabfunction';
