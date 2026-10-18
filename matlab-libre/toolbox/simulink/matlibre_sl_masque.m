@@ -178,7 +178,13 @@ function matlibre__v = evaluerBrut(matlibre__texte, matlibre__W, matlibre__chemi
     end
     matlibre__ids = unique(regexp(matlibre__texte, '[A-Za-z]\w*', 'match'));
     % l'espace de travail du modèle passe avant celui de base
-    [matlibre__nomsM, matlibre__valeursM] = matlibre_sl_espace('variables', matlibre__chemin);
+    % dans un modèle référencé, c'est son espace de travail qui compte, non
+    % celui du modèle qui le référence
+    matlibre__source = matlibre__chemin;
+    if isfield(matlibre__W, 'matlibre__modele')
+        matlibre__source = matlibre__W.matlibre__modele;
+    end
+    [matlibre__nomsM, matlibre__valeursM] = matlibre_sl_espace('variables', matlibre__source);
     for matlibre__k = 1:numel(matlibre__ids)
         matlibre__id = matlibre__ids{matlibre__k};
         if any(strcmp(matlibre__noms, matlibre__id)) || strncmp(matlibre__id, 'matlibre__', 10)

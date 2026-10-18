@@ -12441,6 +12441,126 @@ end
 assert(isempty(echecs95), sprintf('get_param puis set_param : %s', strjoin(echecs95, ' ; ')));
 fprintf('get_param puis set_param : %d parametres et reglages reposes, sans ecart\n', nReposes95);
 
+%% ------------------------------- 96. Modèles référencés : espace de travail, arguments
+% Les blocs d'un modèle référencé ne voient que son espace de travail —
+% non celui du modèle qui le référence —, puis l'espace de base. Ses
+% arguments (ParameterArgumentNames), des variables de cet espace,
+% prennent la valeur que chaque bloc Model leur donne
+% (ParameterArgumentValues, InstanceParameters), évaluée là où le bloc
+% se trouve ; sans valeur, celle de l'espace du modèle référencé.
+enfant96 = new_system('enfant96');
+enfant96 = add_block(enfant96, 'inport', 'u');
+enfant96 = add_block(enfant96, 'gain', 'g', 'Gain', 'K');
+enfant96 = add_block(enfant96, 'outport', 'y');
+enfant96 = add_line(add_line(enfant96, 'u', 'g'), 'g', 'y');
+assignin(get_param(enfant96, 'ModelWorkspace'), 'K', 7);
+parent96 = new_system('parent96');
+parent96 = add_block(parent96, 'constant', 'c', 'Value', 2);
+parent96 = add_block(parent96, 'modelreference', 'm', 'ModelName', 'enfant96');
+parent96 = add_block(parent96, 'outport', 'y');
+parent96 = add_line(add_line(parent96, 'c', 'm'), 'm', 'y');
+K = 3; %#ok<NASGU>
+assignin(get_param(parent96, 'ModelWorkspace'), 'K', 5);
+r96 = sim(parent96, 'StopTime', 0.1);
+assert(r96.yout(end) == 14, 'le modele reference lit son K (7), non celui du parent ni de base');
+clear K
+% une variable du seul espace du parent ne se voit pas dans l'enfant
+enfant96 = set_param(enfant96, 'g', 'Gain', 'Q');
+assignin(get_param(parent96, 'ModelWorkspace'), 'Q', 4);
+vu96 = '';
+message96 = '';
+try
+    sim(parent96, 'StopTime', 0.1);
+catch err
+    vu96 = err.identifier;
+    message96 = err.message;
+end
+assert(strcmp(vu96, 'Simulink:Commands:ParametreNonEvalue') && ...
+       ~isempty(strfind(message96, 'parent96/m/g')), ...
+       'l''espace du parent ne fuit pas dans le modele reference');
+enfant96 = set_param(enfant96, 'g', 'Gain', 'K');
+% les arguments : trois blocs Model, trois valeurs
+enfant96 = set_param(enfant96, 'ParameterArgumentNames', 'K');
+assert(strcmp(get_param(enfant96, 'ParameterArgumentNames'), 'K'), 'les arguments du modele');
+assignin(get_param(parent96, 'ModelWorkspace'), 'J96', 4);
+parent96 = add_block(parent96, 'modelreference', 'm2', 'ModelName', 'enfant96', ...
+                     'ParameterArgumentValues', struct('K', '5'));
+parent96 = add_block(parent96, 'modelreference', 'm3', 'ModelName', 'enfant96', ...
+                     'InstanceParameters', struct('Name', 'K', 'Value', '2*J96'));
+parent96 = add_block(parent96, 'outport', 'y2');
+parent96 = add_block(parent96, 'outport', 'y3');
+parent96 = add_line(add_line(parent96, 'c', 'm2'), 'm2', 'y2');
+parent96 = add_line(add_line(parent96, 'c', 'm3'), 'm3', 'y3');
+r96 = sim(parent96, 'StopTime', 0.1);
+assert(isequal(r96.yout(end, :), [14 10 16]), ...
+       'sans valeur, 7 ; ParameterArgumentValues 5 ; InstanceParameters 2*J96 du parent, 8');
+% ce qui est refusé
+refus96 = {set_param(parent96, 'm2', 'ParameterArgumentValues', struct('Z', '1')), ...
+           'Simulink:modelReference:NotAnArgument', 'parent96/m2'};
+enfantFaux96 = set_param(enfant96, 'ParameterArgumentNames', 'K, absent');
+vu96 = '';
+try
+    set_param(enfant96, 'ParameterArgumentNames', '1x');
+catch err
+    vu96 = err.identifier;
+end
+assert(strcmp(vu96, 'Simulink:Config:InvalidValue'), 'un argument se nomme comme une variable');
+vu96 = '';
+message96 = '';
+try
+    sim(refus96{1}, 'StopTime', 0.1);
+catch err
+    vu96 = err.identifier;
+    message96 = err.message;
+end
+assert(strcmp(vu96, refus96{2}) && ~isempty(strfind(message96, refus96{3})), ...
+       sprintf('un argument inconnu : %s (%s)', vu96, message96));
+gardeEnfant96 = enfant96;
+enfant96 = enfantFaux96;
+vu96 = '';
+try
+    sim(parent96, 'StopTime', 0.1);
+catch err
+    vu96 = err.identifier;
+end
+assert(strcmp(vu96, 'Simulink:modelReference:ArgumentNotInWorkspace'), ...
+       'un argument qui n''est pas dans l''espace du modele reference');
+enfant96 = gardeEnfant96;
+% .slx et .m gardent les arguments
+dossier96 = tempname();
+mkdir(dossier96);
+avant96 = pwd();
+cd(dossier96);
+save_system(parent96, fullfile(dossier96, 'rebati96.m'));
+clear rebati96
+q96 = feval('rebati96');
+r96 = sim(q96, 'StopTime', 0.1);
+assert(isequal(r96.yout(end, :), [14 10 16]), 'les arguments rebatis du .m');
+save_system(parent96, fullfile(dossier96, 'parent96.slx'));
+p96 = load_system(fullfile(dossier96, 'parent96.slx'));
+J96 = 4;   % un .slx ne porte pas encore l'espace de travail du modele
+r96 = sim(p96, 'StopTime', 0.1);
+assert(isequal(r96.yout(end, :), [14 10 16]), 'les arguments relus du .slx');
+clear J96
+% une cellule mêlée s'écrit aussi en .m : les indices d'un Selector
+g96 = new_system('selecteur96');
+g96 = add_block(g96, 'constant', 'u', 'Value', magic(4));
+g96 = add_block(g96, 'selector', 's', 'NumberOfDimensions', 2, ...
+                'IndexOptionArray', {'Select all', 'Index vector (dialog)'}, ...
+                'IndexParamArray', {[], [4 1]});
+g96 = add_block(g96, 'outport', 'y');
+g96 = add_line(add_line(g96, 'u', 's'), 's', 'y');
+save_system(g96, fullfile(dossier96, 'selecteur96.m'));
+clear selecteur96
+h96 = feval('selecteur96');
+r96 = sim(h96, 'StopTime', 0.1);
+M96 = magic(4);
+assert(isequal(reshape(r96.yout(end, :), 4, 2), M96(:, [4 1])), ...
+       'le Selector aux indices mels, rebati de son .m');
+cd(avant96);
+rmdir(dossier96, 's');
+fprintf('modeles references, espace et arguments : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

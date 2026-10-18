@@ -674,6 +674,11 @@ function modele = deplier(modele, k)
     if ~isempty(matlibre_sl_masque('variables', bloc))
         espaceInterieur = matlibre_sl_masque('espace', bloc, espaceParent, chemin);
     end
+    if strcmp(bloc.type, 'modelreference')
+        % un modèle référencé ne voit que son propre espace de travail, et
+        % les arguments que lui passe le bloc Model
+        espaceInterieur = espaceReference(bloc, interne, chemin, espaceParent);
+    end
 
     % Le bloc du sous-système garde sa place dans la liste — donc son
     % rang, donc tous les liens qui le désignent —, mais devient un
@@ -1038,6 +1043,114 @@ function [noms, rangs] = portsNommes(modele, type)
     % le rang du port est sa place parmi les autres, comme au dépliage
     [~, ordre] = sort(rangs);
     rangs(ordre) = 1:numel(rangs);
+end
+
+% L'espace des blocs d'un modèle référencé : son espace de travail — que
+% le champ matlibre__modele désigne —, et les valeurs que le bloc Model
+% donne à ses arguments (ParameterArgumentNames), par
+% ParameterArgumentValues ou InstanceParameters, évaluées là où le bloc
+% Model se trouve. Un argument sans valeur garde celle de l'espace de
+% travail du modèle référencé.
+function W = espaceReference(bloc, interne, chemin, espaceParent)
+    nomRef = char(interne.nom);
+    W = struct('matlibre__modele', nomRef);
+    declares = {};
+    if isfield(interne, 'parametres') && isfield(interne.parametres, 'ParameterArgumentNames')
+        declares = strtrim(strsplit(char(interne.parametres.ParameterArgumentNames), ','));
+        declares = declares(~cellfun(@isempty, declares));
+    end
+    nomsEspace = matlibre_sl_espace('variables', nomRef);
+    for q = 1:numel(declares)
+        if ~any(strcmp(nomsEspace, declares{q}))
+            error('Simulink:modelReference:ArgumentNotInWorkspace', ...
+                  ['L''argument ''%s'' du modele ''%s'' (ParameterArgumentNames), que ''%s'' ' ...
+                   'reference, n''est pas une variable de son espace de travail : posez-l''y ' ...
+                   '(get_param(modele, ''ModelWorkspace'')).'], declares{q}, nomRef, chemin);
+        end
+    end
+    [noms, valeurs] = valeursArguments(bloc.parametres, chemin);
+    for q = 1:numel(noms)
+        if ~any(strcmp(declares, noms{q}))
+            liste = strjoin(declares, ', ');
+            if isempty(liste)
+                liste = 'aucun';
+            end
+            error('Simulink:modelReference:NotAnArgument', ...
+                  ['Le bloc Model ''%s'' donne une valeur a ''%s'', qui n''est pas un argument ' ...
+                   'du modele ''%s'' (ParameterArgumentNames : %s).'], chemin, noms{q}, ...
+                  nomRef, liste);
+        end
+        v = valeurs{q};
+        if ischar(v) || isstring(v)
+            if isempty(strtrim(char(v)))
+                continue   % sans valeur : celle de l'espace de travail du modèle référencé
+            end
+            v = matlibre_sl_masque('evaluer', char(v), espaceParent, chemin, noms{q});
+        end
+        W.(noms{q}) = v;
+    end
+end
+
+% Les arguments que donne un bloc Model : ParameterArgumentValues, une
+% structure dont chaque champ est un argument, et InstanceParameters, une
+% structure par argument (Name, Value) — ou l'expression qui les écrit,
+% telle qu'un fichier la relit.
+function [noms, valeurs] = valeursArguments(p, chemin)
+    noms = {};
+    valeurs = {};
+    valeursArg = lireStructure(lireParametre(p, 'ParameterArgumentValues', []), chemin, ...
+                               'ParameterArgumentValues');
+    if ~isempty(valeursArg)
+        if ~isscalar(valeursArg)
+            error('Simulink:modelReference:InvalidArgumentValues', ...
+                  ['ParameterArgumentValues du bloc Model ''%s'' est une structure, un champ ' ...
+                   'par argument.'], chemin);
+        end
+        for f = fieldnames(valeursArg).'
+            noms{end + 1} = f{1}; %#ok<AGROW>
+            valeurs{end + 1} = valeursArg.(f{1}); %#ok<AGROW>
+        end
+    end
+    instances = lireStructure(lireParametre(p, 'InstanceParameters', []), chemin, ...
+                              'InstanceParameters');
+    if ~isempty(instances)
+        if ~isfield(instances, 'Name') || ~isfield(instances, 'Value')
+            error('Simulink:modelReference:InvalidArgumentValues', ...
+                  ['InstanceParameters du bloc Model ''%s'' est une structure par argument, ' ...
+                   'de champs Name et Value.'], chemin);
+        end
+        for i = 1:numel(instances)
+            noms{end + 1} = char(instances(i).Name); %#ok<AGROW>
+            valeurs{end + 1} = instances(i).Value; %#ok<AGROW>
+        end
+    end
+end
+
+function v = lireStructure(v, chemin, nom)
+    if isstring(v)
+        v = char(v);
+    end
+    if ischar(v)
+        texte = strtrim(v);
+        if isempty(texte) || strcmp(texte, '[]')
+            v = [];
+            return
+        end
+        try
+            v = eval(texte);
+        catch err
+            error('Simulink:modelReference:InvalidArgumentValues', ...
+                  '%s du bloc Model ''%s'' ne se lit pas : %s', nom, chemin, err.message);
+        end
+    end
+    if isempty(v) && ~isstruct(v)
+        v = [];
+        return
+    end
+    if ~isstruct(v)
+        error('Simulink:modelReference:InvalidArgumentValues', ...
+              '%s du bloc Model ''%s'' est une structure.', nom, chemin);
+    end
 end
 
 % Ce qu'est un diagramme : 'model', 'library' ou 'subsystem'

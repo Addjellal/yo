@@ -926,15 +926,20 @@ assert(get_param(relu, 'StopTime') == 3, 'le reglage du modele se relit aussi');
 bdclose('all');
 delete(chemin);
 
-% Ce que SAVE_SYSTEM ne sait pas ecrire, il le refuse en le nommant.
+% Ce que SAVE_SYSTEM ne sait pas ecrire, il le refuse en le nommant ; une
+% cellule, meme melee, s'ecrit.
 refuseValeur = false;
 try
-    save_system(add_block(new_system('x'), 'gain', 'g', 'Gain', {1}), ...
+    save_system(add_block(new_system('x'), 'gain', 'g', 'Gain', @sin), ...
                 [tempname() '.m']);
 catch err
     refuseValeur = strcmp(err.identifier, 'Simulink:Commands:SaveUnsupported');
 end
 assert(refuseValeur);
+fichierCellule = [tempname() '.m'];
+save_system(add_block(new_system('x'), 'gain', 'g', 'Gain', {1, [2 3]}), fichierCellule);
+assert(~isempty(strfind(fileread(fichierCellule), '{1, [2 3]}')), 'une cellule melee s''ecrit');
+delete(fichierCellule);
 
 %% ------------------------------ SIMULINK : LE REGISTRE DE LA SESSION
 bdclose('all');

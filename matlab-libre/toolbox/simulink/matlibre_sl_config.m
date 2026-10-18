@@ -106,6 +106,13 @@ function varargout = matlibre_sl_config(action, varargin)
 %                                     génération de code, acceptés et
 %                                     rangés : la simulation n'en dépend
 %                                     pas
+%     ParameterArgumentNames ''       les arguments du modèle, quand un
+%                                     bloc Model le référence : des
+%                                     variables de son espace de travail,
+%                                     séparées par des virgules, auxquelles
+%                                     chaque bloc Model peut donner sa
+%                                     valeur (ParameterArgumentValues,
+%                                     InstanceParameters)
 %     EnableMultiTasking   'off'      'on', à pas fixe : chaque cadence est
 %                                     une tâche, et un bloc discret ne lit
 %                                     un bloc d'une autre cadence qu'à
@@ -326,7 +333,7 @@ function d = defauts()
                'ShapePreserveControl', 'DisableAll', 'SolverJacobianMethodControl', 'auto', ...
                'SolverResetMethod', 'Fast', 'SampleTimeConstraint', 'Unconstrained', ...
                'SampleTimeProperty', [], 'PositivePriorityOrder', 'off', ...
-               'ConcurrentTasks', 'off');
+               'ConcurrentTasks', 'off', 'ParameterArgumentNames', '');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -534,6 +541,21 @@ function v = valider(nom, v)
             v = choix(nom, v, {'Unconstrained', 'Specified', 'STIndependent'});
         case 'SampleTimeProperty'
             v = proprietesPeriodes(v);
+        case 'ParameterArgumentNames'
+            if isstring(v) && isscalar(v)
+                v = char(v);
+            end
+            noms = {};
+            if ischar(v) && size(v, 1) <= 1
+                noms = strtrim(strsplit(v, ','));
+                noms = noms(~cellfun(@isempty, noms));
+            end
+            if ~ischar(v) || size(v, 1) > 1 || ~all(cellfun(@isvarname, noms))
+                error('Simulink:Config:InvalidValue', ...
+                      ['Le reglage ParameterArgumentNames nomme les arguments du modele, des ' ...
+                       'variables separees par des virgules (''K, decalage'') ; pas %s.'], ...
+                      decrire(v));
+            end
         case ''
             error('Simulink:Commands:ParamUnknown', ...
                   'Le modele n''a pas de reglage nomme ''%s''.', char(nom));

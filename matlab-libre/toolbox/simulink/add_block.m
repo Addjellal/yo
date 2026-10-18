@@ -487,7 +487,11 @@ function modele = add_block(modele, type, nom, varargin)
 %                  entrée énumérée : '{Couleur.Rouge, Couleur.Vert}'),
 %                  ShowDefaultCase
 %     modelreference ModelName             un autre modèle — variable,
-%                  fichier .m, .slx ou .mdl —, relu à chaque simulation
+%                  fichier .m, .slx ou .mdl —, relu à chaque simulation,
+%                  dont les blocs ne voient que son espace de travail ;
+%                  ParameterArgumentValues (struct('K', '5')) ou
+%                  InstanceParameters (Name, Value) donnent leur valeur
+%                  à ses arguments (ParameterArgumentNames)
 %     subsystemreference ReferencedSubsystem  un fichier de sous-système,
 %                  NEW_SYSTEM(NOM, 'Subsystem'), déroulé à sa place
 %

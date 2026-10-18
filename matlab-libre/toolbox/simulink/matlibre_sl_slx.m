@@ -988,6 +988,10 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
                 valeur = round(double(valeur) * 40);
             end
             texte = texteValeur(valeur);
+            if isstruct(valeur) && any(strcmp(champs{j}, {'ParameterArgumentValues', ...
+                                                           'InstanceParameters'}))
+                texte = texteStructure(valeur);   % les arguments d'un bloc Model
+            end
             if isempty(texte) && ~ischar(valeur)
                 continue   % une valeur que le texte ne rend pas : une machine, un objet
             end

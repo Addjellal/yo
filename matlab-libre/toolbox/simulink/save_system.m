@@ -256,6 +256,38 @@ function texte = ecrireValeur(valeur, nomBloc, nomParametre)
         % un membre s'écrit comme Simulink le range, en texte : il se
         % relit à la simulation
         texte = citer(matlibre_sl_types('texte', valeur));
+    elseif iscell(valeur) && ndims(valeur) <= 2
+        % une cellule mêlée — les indices d'un Selector, {[], [1 3]} —,
+        % élément par élément
+        lignes = cell(1, size(valeur, 1));
+        for i = 1:size(valeur, 1)
+            morceaux = cell(1, size(valeur, 2));
+            for j = 1:size(valeur, 2)
+                morceaux{j} = ecrireValeur(valeur{i, j}, nomBloc, nomParametre);
+            end
+            lignes{i} = strjoin(morceaux, ', ');
+        end
+        texte = ['{' strjoin(lignes, '; ') '}'];
+        if isempty(valeur)
+            texte = '{}';
+        end
+    elseif isstruct(valeur) && ndims(valeur) <= 2 && min(size(valeur)) <= 1
+        % une structure, ou une rangée de structures : les arguments d'un
+        % bloc Model (InstanceParameters)
+        noms = fieldnames(valeur);
+        morceaux = cell(1, numel(noms));
+        for q = 1:numel(noms)
+            valeurs = cell(1, numel(valeur));
+            for i = 1:numel(valeur)
+                valeurs{i} = ecrireValeur(valeur(i).(noms{q}), nomBloc, nomParametre);
+            end
+            if isscalar(valeur) && ~iscell(valeur.(noms{q}))
+                morceaux{q} = sprintf('%s, %s', citer(noms{q}), valeurs{1});
+            else
+                morceaux{q} = sprintf('%s, {%s}', citer(noms{q}), strjoin(valeurs, ', '));
+            end
+        end
+        texte = ['struct(' strjoin(morceaux, ', ') ')'];
     else
         error('Simulink:Commands:SaveUnsupported', ...
               ['Le parametre ''%s'' du bloc ''%s'' est de classe ''%s'' : ' ...
