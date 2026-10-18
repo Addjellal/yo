@@ -199,6 +199,7 @@ function sortie = executer(entree, modele, capturer)
         else
             resultat = sim(modele, [], [], entree.ExternalInput);
         end
+        resultat = struct(resultat);   % ses variables, que PostSimFcn reçoit
         restaurer(avant);
         avant = [];
         resultat.ErrorMessage = '';
@@ -418,7 +419,7 @@ function sorties = assembler(resultats, taille)
                 s.(champs{i}) = [];
             end
         end
-        liste{k} = s;
+        liste{k} = Simulink.SimulationOutput(s);
     end
     sorties = reshape([liste{:}], taille);
 end

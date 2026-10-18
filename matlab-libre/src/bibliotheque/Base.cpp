@@ -819,13 +819,26 @@ FONCTION(fnSubsref) {
         const Valeur& subs = chaine.champ("subs", k);
         if (genre == ".") {
             std::string nom = subs.versTexte();
-            if (courant.classe == Classe::Objet)
+            if (courant.classe == Classe::Objet) {
                 courant = it.lireProprieteObjet(courant, nom);
-            else if (courant.estStructure())
+            } else if (courant.estStructure() && k + 1 == n && nargout > 1 &&
+                       courant.nelem() > 1) {
+                // « [a, b, c] = subsref(s, substruct('.', 'f')) » sur un
+                // tableau de structures : la liste des champs, un par
+                // élément, comme « s.f ».
+                if (!courant.aChamp(nom))
+                    erreur("MATLAB:nonExistentField",
+                           "Reference to non-existent field '" + nom + "'.");
+                std::vector<Valeur> liste;
+                for (std::size_t e = 0; e < courant.nelem(); ++e)
+                    liste.push_back(courant.champ(nom, e));
+                return liste;
+            } else if (courant.estStructure()) {
                 courant = courant.champ(nom);
-            else
+            } else {
                 erreur("MATLAB:nonStrucReference",
                        "Dot indexing is not supported for variables of this type.");
+            }
             continue;
         }
         std::vector<Valeur> idx;

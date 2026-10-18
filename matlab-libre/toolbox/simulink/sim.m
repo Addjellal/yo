@@ -1,9 +1,12 @@
 function varargout = sim(modele, varargin)
 %SIM Simule un modèle.
 %   RESULTAT = SIM(MODELE) simule le modèle avec ses propres réglages :
-%   instants de début et de fin, solveur, pas. RESULTAT porte le vecteur
-%   des instants et, pour chaque bloc, le signal relevé à sa sortie — ou,
-%   pour un bloc qui n'en a pas, ce qui arrive à son entrée.
+%   instants de début et de fin, solveur, pas. RESULTAT, un
+%   SIMULINK.SIMULATIONOUTPUT, porte le vecteur des instants et, pour
+%   chaque bloc, le signal relevé à sa sortie — ou, pour un bloc qui n'en
+%   a pas, ce qui arrive à son entrée —, ses métadonnées
+%   (SimulationMetadata) et ErrorMessage ; RESULTAT.get('yout') et
+%   RESULTAT.who s'y emploient comme dans Simulink.
 %
 %   SIM(MODELE,TFINAL) fixe l'instant final ; SIM(MODELE,[TDEBUT TFINAL])
 %   les deux ; SIM(MODELE,INSTANTS) donne aussi le pas par l'écart de
@@ -219,6 +222,7 @@ function varargout = sim(modele, varargin)
     [config, imposes, externe, tousLesPas] = lireArguments(matlibre_sl_config('lire', modele), ...
                                                            varargin);
     nomModele = char(modele.nom);
+    debutSimulation = tic;
     tDebut = nombre(config.StartTime, nomModele, 'StartTime');
     tFinal = nombre(config.StopTime, nomModele, 'StopTime');
     % L'état de fonctionnement complet d'une simulation précédente : la
@@ -363,11 +367,18 @@ function varargout = sim(modele, varargin)
         return
     end
     [resultat, exportes] = nommer(resultat, config);
+    % le résultat, un Simulink.SimulationOutput : les variables, les
+    % métadonnées de la simulation, et son message d'erreur, vide
+    complet = resultat;
+    complet.SimulationMetadata = metadonneesSimulation(nomModele, config, tDebut, tFinal, ...
+                                                      resultat, toc(debutSimulation));
+    complet.ErrorMessage = '';
+    sortie = Simulink.SimulationOutput(complet);
     if nargout == 0
         % Sans sortie, comme dans Simulink : le résultat va dans OUT — ou
         % dans tout et yout si ReturnWorkspaceOutputs vaut 'off'.
         if strcmpi(config.ReturnWorkspaceOutputs, 'on')
-            assignin('base', char(config.ReturnWorkspaceOutputsName), resultat);
+            assignin('base', char(config.ReturnWorkspaceOutputsName), sortie);
         else
             for k = 1:numel(exportes)
                 assignin('base', exportes{k}, resultat.(exportes{k}));
@@ -380,8 +391,24 @@ function varargout = sim(modele, varargin)
             end
         end
     else
-        varargout{1} = resultat;
+        varargout{1} = sortie;
     end
+end
+
+% Les métadonnées d'une simulation, comme Simulink les range : le modèle,
+% ses instants et son solveur, la façon dont elle s'est arrêtée, sa durée.
+function m = metadonneesSimulation(nomModele, config, tDebut, tFinal, resultat, duree)
+    info = struct('ModelName', nomModele, 'StartTime', tDebut, 'StopTime', tFinal, ...
+                  'SolverInfo', struct('Type', config.SolverType, 'Solver', config.Solver));
+    evenement = 'ReachedStopTime';
+    if isfield(resultat, 'tout') && ~isempty(resultat.tout) && isfinite(tFinal) && ...
+       resultat.tout(end) < tFinal - 1e-9 * max(1, abs(tFinal))
+        evenement = 'StopCommand';   % un bloc Stop Simulation l'a arrêtée
+    end
+    m = struct('ModelInfo', info, ...
+               'ExecutionInfo', struct('StopEvent', evenement, 'ErrorDiagnostic', []), ...
+               'TimingInfo', struct('TotalElapsedWallTime', duree), ...
+               'UserString', '', 'UserData', []);
 end
 
 % Les instants relevés à pas variable : ceux que SIM(MODELE,[T0 ... TN])

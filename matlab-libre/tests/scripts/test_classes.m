@@ -533,4 +533,19 @@ for kE = 1:size(refusEnum, 1)
 end
 disp('enumerations : ok');
 
+% Une classe qui surcharge subsref : là où une liste est attendue, sa
+% méthode numArgumentsFromSubscript dit combien de valeurs rendre.
+recueil = RecueilEssai(struct('elements', struct('nom', {'a', 'b', 'c'}), 'seul', 7));
+assert(isequal({recueil.elements.nom}, {'a', 'b', 'c'}), 'une liste lue par subsref');
+assert(isequal([recueil.seul], 7) && isequal({recueil.seul}, {7}), 'une seule valeur');
+assert(strcmp(horzcat(recueil.elements.nom), 'abc'), 'la liste en arguments d''un appel');
+[premier, deuxieme] = recueil.elements.nom;
+assert(strcmp(premier, 'a') && strcmp(deuxieme, 'b'), 'deux sorties demandees');
+% subsref par defaut : la liste des champs d'un tableau de structures
+tableau = struct('v', {1, 2, 3});
+[u1, u2, u3] = subsref(tableau, substruct('.', 'v'));
+assert(isequal([u1 u2 u3], [1 2 3]), 'subsref rend la liste des champs');
+assert(isequal(subsref(tableau(2), substruct('.', 'v')), 2), 'subsref d''un seul element');
+disp('numArgumentsFromSubscript : ok');
+
 disp('classes : toutes les verifications passent');

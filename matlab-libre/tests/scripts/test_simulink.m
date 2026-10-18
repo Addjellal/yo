@@ -12994,6 +12994,95 @@ assert(isempty(echecs100), sprintf('noms de blocs : %s', strjoin(echecs100, ' ; 
 fprintf('noms de blocs : %d noms difficiles, relies, regles, simules, ecrits et relus\n', ...
         numel(listeNoms100));
 
+%% ------------------------------------------- 101. Simulink.SimulationOutput
+% SIM rend un Simulink.SimulationOutput, comme Simulink : ses variables
+% se lisent par leur nom ou par get, who les nomme, SimulationMetadata
+% dit le modèle, ses instants, son solveur, comment la simulation s'est
+% arrêtée et ce qu'elle a duré, ErrorMessage est vide si elle a abouti.
+% PARSIM et SIM d'un tableau de SimulationInput en rendent un tableau.
+m101 = new_system('sortie101');
+m101 = add_block(m101, 'constant', 'c', 'Value', 3);
+m101 = add_block(m101, 'integrator', 'x');
+m101 = add_block(m101, 'outport', 'y');
+m101 = add_line(add_line(m101, 'c', 'x'), 'x', 'y');
+out101 = sim(m101, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 2);
+assert(isa(out101, 'Simulink.SimulationOutput'), 'SIM rend un Simulink.SimulationOutput');
+assert(abs(out101.yout(end) - 6) < 1e-9 && isequal(out101.get('yout'), out101.yout) && ...
+       isequal(out101.find('tout'), out101.tout), 'les variables, par leur nom, get et find');
+noms101 = out101.who;
+assert(iscell(noms101) && any(strcmp(noms101, 'tout')) && any(strcmp(noms101, 'yout')) && ...
+       isfield(out101, 'yout') && ~isfield(out101, 'absent'), 'who et isfield');
+md101 = out101.SimulationMetadata;
+assert(strcmp(md101.ModelInfo.ModelName, 'sortie101') && md101.ModelInfo.StopTime == 2 && ...
+       strcmp(md101.ModelInfo.SolverInfo.Solver, 'ode4') && ...
+       strcmp(md101.ExecutionInfo.StopEvent, 'ReachedStopTime') && ...
+       md101.TimingInfo.TotalElapsedWallTime >= 0 && isempty(out101.ErrorMessage), ...
+       'les metadonnees de la simulation');
+assert(isequal(out101.getSimulationMetadata(), md101), 'getSimulationMetadata');
+etiquete101 = out101.setUserString('essai');
+etiquete101 = etiquete101.setUserData(struct('n', 4));
+assert(strcmp(etiquete101.SimulationMetadata.UserString, 'essai') && ...
+       etiquete101.SimulationMetadata.UserData.n == 4 && ...
+       isempty(out101.SimulationMetadata.UserString), 'setUserString et setUserData rendent une copie');
+s101 = struct(out101);
+assert(isstruct(s101) && isfield(s101, 'yout') && isfield(s101, 'ErrorMessage'), 'struct');
+vu101 = '';
+try
+    out101.absent; %#ok<VUNUS>
+catch err
+    vu101 = err.identifier;
+end
+assert(strcmp(vu101, 'MATLAB:noSuchMethodOrField'), 'une variable absente, comme dans MATLAB');
+vu101 = '';
+try
+    out101.get('absent');
+catch err
+    vu101 = err.identifier;
+end
+assert(strcmp(vu101, 'Simulink:Simulation:UnknownVariable'), 'get d''une variable absente');
+affiche101 = evalc('disp(out101)');
+assert(~isempty(strfind(affiche101, 'Simulink.SimulationOutput:')) && ...
+       ~isempty(strfind(affiche101, 'SimulationMetadata')) && ...
+       ~isempty(strfind(affiche101, 'ErrorMessage')), 'l''affichage de Simulink');
+% arrêtée par un bloc Stop Simulation
+a101 = add_block(m101, 'comparetoconstant', 'cmp', 'relop', '>=', 'const', 3);
+a101 = add_block(a101, 'stopsimulation', 'stop');
+a101 = add_line(add_line(a101, 'x', 'cmp'), 'cmp', 'stop');
+out101 = sim(a101, 'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 2);
+assert(strcmp(out101.SimulationMetadata.ExecutionInfo.StopEvent, 'StopCommand') && ...
+       out101.tout(end) < 2, 'Stop Simulation : StopCommand');
+% sans sortie : out dans l'espace de base
+evalin('base', 'clear out');
+sim(m101, 'StopTime', 0.5);
+assert(isa(evalin('base', 'out'), 'Simulink.SimulationOutput'), 'out dans l''espace de base');
+evalin('base', 'clear out');
+% un tableau de SimulationInput : un tableau de SimulationOutput
+in101 = Simulink.SimulationInput('sortie101');
+in101(2) = Simulink.SimulationInput('sortie101');
+in101(1) = in101(1).setBlockParameter('sortie101/c', 'Value', '5');
+in101(2) = in101(2).setBlockParameter('sortie101/c', 'Value', 'inexistante101');
+sortie101 = m101; %#ok<NASGU>   % le modele, sous son nom, dans l'espace de base
+assignin('base', 'sortie101', m101);
+outs101 = sim(in101, 'ShowProgress', 'off');
+assert(isa(outs101, 'Simulink.SimulationOutput') && isequal(size(outs101), [1 2]), ...
+       'un tableau de SimulationOutput');
+assert(isempty(outs101(1).ErrorMessage) && ~isempty(outs101(2).ErrorMessage) && ...
+       strcmp(outs101(2).SimulationMetadata.ExecutionInfo.StopEvent, 'DiagnosticError'), ...
+       'la simulation en erreur porte son message');
+evalin('base', 'clear sortie101');
+% la structure d'avant se lit toujours : la liste des signaux, les noms
+out101 = sim(m101, 'StopTime', 0.5);
+etiquettes101 = {out101.signals.label};
+assert(numel(etiquettes101) == numel(out101.signals) && numel(etiquettes101) >= 2, ...
+       'une liste lue dans un SimulationOutput');
+noms101 = fieldnames(out101);
+assert(isequal(noms101(end - 1:end)', {'ErrorMessage', 'SimulationMetadata'}), ...
+       'FIELDNAMES : les variables, puis ErrorMessage et SimulationMetadata');
+for k101 = 1:numel(noms101)
+    valeur101 = out101.(noms101{k101}); %#ok<NASGU>   % chaque nom se lit
+end
+fprintf('Simulink.SimulationOutput : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

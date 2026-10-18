@@ -2253,7 +2253,29 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     // La classe prend en charge toute la chaîne restante,
                     // comme le veut la documentation de subsref.
                     Valeur s = substruct(n->acces, k, &base);
-                    auto r = appelerMethode(base, "subsref", {s}, std::max(nargout, 1));
+                    int voulues = std::max(nargout, 1);
+                    // Là où une liste est attendue — « {o.a.b} », les
+                    // arguments d'un appel —, la classe dit combien de
+                    // valeurs rendre par numArgumentsFromSubscript, avec
+                    // le contexte matlab.indexing.IndexingContext.Expression.
+                    if (nargout < 0 && def->aMethode("numArgumentsFromSubscript")) {
+                        Valeur contexte = Valeur::texte("Expression");
+                        auto defContexte = classeDefinie("matlab.indexing.IndexingContext");
+                        if (defContexte &&
+                            std::find(defContexte->enumerations.begin(),
+                                      defContexte->enumerations.end(),
+                                      "Expression") != defContexte->enumerations.end())
+                            contexte = membreEnumeration(defContexte, "Expression");
+                        auto nb = appelerMethode(base, "numArgumentsFromSubscript",
+                                                 {s, contexte}, 1);
+                        if (nb.empty() || nb[0].nelem() != 1 || !(nb[0].scal() >= 0) ||
+                            nb[0].scal() != std::floor(nb[0].scal()))
+                            erreur("MATLAB:index:numArgumentsFromSubscript",
+                                   "numArgumentsFromSubscript de la classe '" + base.nomObjet +
+                                   "' doit rendre un entier positif ou nul.");
+                        voulues = (int)nb[0].scal();
+                    }
+                    auto r = appelerMethode(base, "subsref", {s}, voulues);
                     for (auto& x : r) suivant.push_back(x);
                     chaineConsommee = true;
                     continue;
