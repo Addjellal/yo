@@ -11649,6 +11649,43 @@ evalc(['sim(set_param(m88, ''A'', ''Value'', [2 1; 1 3]), regle88{:}, ' ...
 assert(~strcmp(id88, 'Simulink:blocks:ProductSingularMatrix'), 'une matrice inversible : rien');
 fprintf('produit matriciel singulier : ok\n');
 
+%% ------------------------------------ 89. L'intégrateur à état enroulé
+% WrapState : l'état de l'intégrateur s'enroule entre deux valeurs — un
+% angle entre -pi et pi —, sans passage par zéro, comme dans Simulink.
+% Borner et enrouler à la fois est refusé, comme des valeurs inversées.
+m89 = new_system('angle89');
+m89 = add_block(m89, 'constant', 'w', 'Value', 1);
+m89 = add_block(m89, 'integrator', 'theta', 'WrapState', 'on');
+m89 = add_block(m89, 'outport', 'y');
+m89 = add_line(add_line(m89, 'w', 'theta'), 'theta', 'y');
+for solveur = {'ode45', 'ode4'}
+    r89 = sim(m89, 'Solver', solveur{1}, 'FixedStep', 0.01, 'RelTol', 1e-9, 'AbsTol', 1e-12, ...
+              'StopTime', 10);
+    attendu89 = mod(r89.tout + pi, 2 * pi) - pi;
+    assert(max(abs(r89.yout - attendu89)) < 1e-6 && all(r89.yout < pi) && ...
+           all(r89.yout >= -pi), [solveur{1} ' : l''angle s''enroule entre -pi et pi']);
+end
+r89 = sim(set_param(m89, 'theta', 'WrappedStateUpperValue', 1, 'WrappedStateLowerValue', 0), ...
+          'Solver', 'ode45', 'RelTol', 1e-9, 'AbsTol', 1e-12, 'StopTime', 3.5);
+assert(abs(r89.yout(end) - 0.5) < 1e-6, 'enroule entre 0 et 1 : 3,5 devient 0,5');
+refus89 = {
+    {'LimitOutput', 'on'}, 'Simulink:blocks:IntegratorWrapAndLimit'
+    {'WrappedStateUpperValue', -4}, 'Simulink:blocks:IntegratorWrapValues'
+    };
+for q = 1:size(refus89, 1)
+    vu89 = '';
+    message89 = '';
+    try
+        sim(set_param(m89, 'theta', refus89{q, 1}{:}), 'Solver', 'ode45', 'StopTime', 1);
+    catch err
+        vu89 = err.identifier;
+        message89 = err.message;
+    end
+    assert(strcmp(vu89, refus89{q, 2}) && ~isempty(strfind(message89, 'angle89/theta')), ...
+           sprintf('integrateur enroule, refus %d : %s', q, vu89));
+end
+fprintf('integrateur a etat enroule : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

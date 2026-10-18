@@ -572,6 +572,16 @@ function T = preparer(c)
             T.bornes(end + 1) = k;
         end
     end
+    % un intégrateur dont l'état s'enroule (WrapState)
+    T.enroulement = cell(1, n);
+    if isfield(c, 'enroulement')
+        T.enroulement = c.enroulement;
+    end
+    for k = find(strcmp(c.types, 'integrator'))
+        if ~isempty(T.enroulement{k}) && ~any(T.bornes == k)
+            T.bornes(end + 1) = k;
+        end
+    end
     % un Second-Order Integrator borné ou enroulé
     for k = find(strcmp(c.types, 'secondorderintegrator'))
         w = c.seg{k}(1);
@@ -926,6 +936,10 @@ function x = borner(T, x)
         p = T.pA(k);
         if T.code(k) == 77
             x(a:b) = bornerSOI(parametresSOI(T, k), x(a:b));
+            continue
+        end
+        if ~isempty(T.enroulement{k})
+            x(a:b) = enroulerSOIx(x(a:b), T.enroulement{k}(:, 1), T.enroulement{k}(:, 2));
             continue
         end
         w = b - a + 1;
@@ -2857,7 +2871,10 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                             V(a:b) = vv;
                         end
                     case 70   % integrator
-                        if T.P(p) == 0
+                        if ~isempty(T.enroulement{k})
+                            V(a:b) = enroulerSOIx(x(T.xA(k):T.xB(k)), T.enroulement{k}(:, 1), ...
+                                                  T.enroulement{k}(:, 2));
+                        elseif T.P(p) == 0
                             V(a:b) = x(T.xA(k):T.xB(k));
                         else
                             w = b - a + 1;

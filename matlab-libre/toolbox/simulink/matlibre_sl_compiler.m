@@ -122,6 +122,9 @@ function c = compiler(modele, options)
     % Les réglages des signaux qui partent de chaque bloc — leur nom, leur
     % journalisation —, que SIM lit pour logsout.
     c.signaux = cell(1, n);
+    % L'enroulement de l'état d'un intégrateur (WrapState) : [bas, haut] par
+    % élément, vide sinon.
+    c.enroulement = cell(1, n);
     % La plage [OutMin, OutMax] de chaque bloc qui en dit une, vide sinon.
     c.plage = cell(1, n);
 
@@ -4864,6 +4867,23 @@ function c = abaisser(c, pas, tDebut)
                 if borne && any(bas > haut)
                     error('Simulink:blocks:IntegratorLimits', ...
                           'La borne basse de ''%s'' depasse sa borne haute.', ch);
+                end
+                if strcmp(champ(p, 'WrapState', 'off'), 'on')
+                    % l'état enroulé entre ses deux valeurs : un angle
+                    if borne
+                        error('Simulink:blocks:IntegratorWrapAndLimit', ...
+                              ['''%s'' borne sa sortie et enroule son etat : l''un ou ' ...
+                               'l''autre (LimitOutput, WrapState).'], ch);
+                    end
+                    basE = etendre(p.WrappedStateLowerValue, w, ch, 'WrappedStateLowerValue');
+                    hautE = etendre(p.WrappedStateUpperValue, w, ch, 'WrappedStateUpperValue');
+                    if any(basE >= hautE)
+                        error('Simulink:blocks:IntegratorWrapValues', ...
+                              ['La valeur basse d''enroulement de ''%s'' doit etre strictement ' ...
+                               'sous la haute (WrappedStateLowerValue < WrappedStateUpperValue).'], ...
+                              ch);
+                    end
+                    c.enroulement{k} = [basE, hautE];
                 end
                 if borne
                     x0 = min(max(x0, bas), haut);

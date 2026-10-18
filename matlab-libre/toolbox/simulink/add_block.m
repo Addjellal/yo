@@ -238,7 +238,9 @@ function modele = add_block(modele, type, nom, varargin)
 %                  falling, either, level, level hold : une entrée de
 %                  remise), InitialConditionSource (external : une entrée
 %                  de condition initiale), ShowSaturationPort,
-%                  ShowStatePort (le port d'état, 'integ/State') ;
+%                  ShowStatePort (le port d'état, 'integ/State'), WrapState,
+%                  WrappedStateUpperValue, WrappedStateLowerValue (l'état
+%                  enroulé, un angle entre -pi et pi) ;
 %                  « Integrator Limited » le borne d'avance entre 0 et 1
 %     derivative   —                            vaut zéro au premier pas
 %     transferfcn  Numerator, Denominator
