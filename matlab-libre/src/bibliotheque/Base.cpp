@@ -1316,8 +1316,9 @@ void enregistrerBase(Interpreteur& it) {
     it.enregistrer("flintmax", fnFlintmax, "base", "flintmax  Plus grand entier exact.");
     it.enregistrer("i", fnImaginaire, "base", "i  Unite imaginaire.");
     it.enregistrer("j", fnImaginaire, "base", "j  Unite imaginaire.");
-    it.enregistrer("I", fnImaginaire, "base", "I  Unite imaginaire.");
-    it.enregistrer("J", fnImaginaire, "base", "J  Unite imaginaire.");
+    // I et J ne le sont pas : MATLAB distingue la casse, et seuls i et j
+    // donnent l'unite imaginaire ; I reste libre pour une identite, J pour
+    // une jacobienne, et un I oublie s'y signale au lieu de valoir 1i.
     it.enregistrer("intmax", fnIntmax, "base", "intmax  Plus grand entier d'une classe.");
     it.enregistrer("intmin", fnIntmin, "base", "intmin  Plus petit entier d'une classe.");
 

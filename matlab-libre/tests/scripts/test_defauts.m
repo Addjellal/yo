@@ -683,6 +683,18 @@ assert(iscell(videRe) && isempty(videRe));
 assert(verifierRefus(@() regexp({'a', 'b'}, {'a', 'b', 'c'})));
 assert(verifierRefus(@() regexp({'a', 3}, 'a')));
 
+%% ---------------------- I ET J NE SONT PAS L'UNITE IMAGINAIRE
+% MATLAB distingue la casse : i et j donnent l'unite imaginaire, I et J
+% ne sont rien tant qu'on ne les pose pas. « 2*J » valait 2i, et un J
+% oublie passait sans erreur.
+assert(isequal(2 * i, 2i) && isequal(3 + j, 3 + 1j) && isequal(1i * 1j, -1));
+assert(verifierRefus(@() eval('2 * J')));
+assert(verifierRefus(@() eval('I + 1')));
+I = eye(2);
+J = [1 2; 3 4];
+assert(isequal(I * J, J), 'I et J, poses, sont des variables comme les autres');
+clear I J
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)

@@ -668,8 +668,7 @@ Expression Traducteur::traduire(const NoeudPtr& n) {
                 if (n->texte == "Inf" || n->texte == "inf")
                     return scalaire("INFINITY", TypeC{});
                 if (n->texte == "NaN" || n->texte == "nan") return scalaire("NAN", TypeC{});
-                if (n->texte == "i" || n->texte == "j" || n->texte == "I" ||
-                    n->texte == "J") {
+                if (n->texte == "i" || n->texte == "j") {
                     // Aucune variable ne les cache : c'est l'unité imaginaire.
                     aides.insert("complexe");
                     aides.insert("cplx_de");

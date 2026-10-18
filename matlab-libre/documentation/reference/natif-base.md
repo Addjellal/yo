@@ -2,21 +2,6 @@
 
 Fonctions natives du groupe `base`.
 
-## `I`
-
-```
-I  L'unité imaginaire, en majuscule ; synonyme de i.
-
-    Syntaxe
-       I
-
-    Exemples
-       I^2                                % -1
-       isequal(I, 1i)
-
-    Voir aussi I, J, COMPLEX, ABS.
-```
-
 ## `Inf`
 
 ```
@@ -36,21 +21,6 @@ INF  L'infini de la virgule flottante.
        min([3 1 4])               % démarrer une recherche depuis Inf
 
     Voir aussi NAN, ISINF, ISFINITE, REALMAX.
-```
-
-## `J`
-
-```
-J  L'unité imaginaire, en majuscule ; synonyme de j.
-
-    Syntaxe
-       J
-
-    Exemples
-       J^2                                % -1
-       isequal(J, 1j)
-
-    Voir aussi J, I, COMPLEX, ABS.
 ```
 
 ## `NaN`

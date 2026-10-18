@@ -1995,30 +1995,6 @@ EVAL  Exécute du code écrit dans un texte.
 
     Voir aussi EVALC, EVALIN, ASSIGNIN, FEVAL, STR2FUNC.
 
-### I
-I  L'unité imaginaire, en majuscule ; synonyme de i.
-
-    Syntaxe
-       I
-
-    Exemples
-       I^2                                % -1
-       isequal(I, 1i)
-
-    Voir aussi I, J, COMPLEX, ABS.
-
-### J
-J  L'unité imaginaire, en majuscule ; synonyme de j.
-
-    Syntaxe
-       J
-
-    Exemples
-       J^2                                % -1
-       isequal(J, 1j)
-
-    Voir aussi J, I, COMPLEX, ABS.
-
 ### assertEqual
 ASSERTEQUAL  Vérifie l'égalité de deux valeurs, dans un test.
     ASSERTEQUAL(A,B) lève une erreur si A et B diffèrent.
