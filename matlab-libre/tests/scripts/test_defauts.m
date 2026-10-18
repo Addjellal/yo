@@ -658,6 +658,31 @@ assert(strcmp(char(instant), '02-Jan-2024'));
 % Et sans format, on garde le sien.
 assert(strcmp(char(string(instant)), '02-Jan-2024'));
 
+%% ------------------------- REGEXP SUR UNE CELLULE DE TEXTES
+% Une cellule se cherchait comme un seul texte vide et rendait [] : chaque
+% sortie est une cellule de la taille de l'entree, un resultat par texte.
+textesRe = {'Index vector (port)', 'Select all'; 'abc port', ''};
+debutsRe = regexp(textesRe, '\(port\)$', 'once');
+assert(iscell(debutsRe) && isequal(size(debutsRe), [2 2]));
+assert(isequal(debutsRe{1, 1}, 14) && isempty(debutsRe{1, 2}) && isempty(debutsRe{2, 1}));
+assert(isequal(~cellfun(@isempty, regexp({'a1', 'b', 'c22'}, '\d')), [true false true]));
+motsRe = regexp({'un deux', 'trois'}, '\w+', 'match');
+assert(isequal(motsRe{1}, {'un', 'deux'}) && isequal(motsRe{2}, {'trois'}));
+assert(isequal(regexp({'ab', 'xy'}, 'b', 'match', 'once'), {'b', ''}));
+jetonsRe = regexp({'x=1', 'y=22'}, '(\w)=(\d+)', 'tokens', 'once');
+assert(strcmp(jetonsRe{2}{2}, '22'));
+[dRe, fRe] = regexp({'aXb', 'XX'}, 'X');
+assert(isequal(dRe, {2, [1 2]}) && isequal(fRe, {2, [1 2]}));
+% REGEXPI aussi, et une cellule de motifs devant un texte
+assert(isequal(regexpi({'ABC', 'abc'}, 'b', 'once'), {2, 2}));
+assert(isequal(regexp('abcabc', {'b', 'c'}), {[2 5], [3 6]}));
+% deux cellules, element par element ; une cellule vide rend une cellule vide
+assert(isequal(regexp({'ab', 'cd'}, {'b', 'c'}), {2, 1}));
+videRe = regexp({}, 'a');
+assert(iscell(videRe) && isempty(videRe));
+assert(verifierRefus(@() regexp({'a', 'b'}, {'a', 'b', 'c'})));
+assert(verifierRefus(@() regexp({'a', 3}, 'a')));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)

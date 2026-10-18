@@ -993,8 +993,7 @@ std::regex compilerMotif(const std::string& motif, bool ignorerCasse) {
     }
 }
 
-std::vector<Valeur> regexpInterne(std::vector<Valeur>& args, int nargout, bool ignorerCasse) {
-    exigerArguments(args, 2, 0, "regexp");
+std::vector<Valeur> regexpUn(std::vector<Valeur>& args, int nargout, bool ignorerCasse) {
     std::string texte = args[0].versTexte();
     std::string motif = args[1].versTexte();
     std::vector<std::string> options;
@@ -1092,6 +1091,72 @@ std::vector<Valeur> regexpInterne(std::vector<Valeur>& args, int nargout, bool i
             sorties.push_back(Valeur::structureVide());
         }
         if ((int)sorties.size() >= std::max(1, nargout)) break;
+    }
+    return sorties;
+}
+
+// Un tableau de textes — une cellule, un tableau de chaînes — se cherche
+// texte par texte : chaque sortie devient une cellule de même taille, dont
+// chaque élément est ce que rend le texte qu'elle remplace. Un texte et
+// une cellule de motifs se cherchent motif par motif ; deux cellules,
+// élément par élément.
+std::vector<Valeur> regexpInterne(std::vector<Valeur>& args, int nargout, bool ignorerCasse) {
+    const char* nom = ignorerCasse ? "regexpi" : "regexp";
+    exigerArguments(args, 2, 0, nom);
+    auto estTableau = [](const Valeur& v) {
+        return v.classe == Classe::Cellule || (v.classe == Classe::Chaine && v.nelem() != 1);
+    };
+    bool tableauTextes = estTableau(args[0]);
+    bool tableauMotifs = estTableau(args[1]);
+    if (!tableauTextes && !tableauMotifs) return regexpUn(args, nargout, ignorerCasse);
+    auto elements = [&](const Valeur& v, const char* role) {
+        std::vector<std::string> l;
+        if (v.classe == Classe::Cellule) {
+            for (const auto& c : v.cellules) {
+                if (!(c.classe == Classe::Caractere && c.nlignes() <= 1) &&
+                    !(c.classe == Classe::Chaine && c.nelem() == 1))
+                    erreur("MATLAB:regexp:InvalidInput",
+                           std::string("Chaque element de la cellule ") + role + " de " + nom +
+                               " doit etre un texte (vecteur de caracteres ou chaine).");
+                l.push_back(c.versTexte());
+            }
+        } else {
+            for (const auto& s : v.chaines) l.push_back(s);
+        }
+        return l;
+    };
+    std::vector<std::string> textes, motifs;
+    if (tableauTextes) textes = elements(args[0], "des textes");
+    else textes.push_back(args[0].versTexte());
+    if (tableauMotifs) motifs = elements(args[1], "des motifs");
+    else motifs.push_back(args[1].versTexte());
+    if (tableauTextes && tableauMotifs && textes.size() != motifs.size())
+        erreur("MATLAB:regexp:CellArraySizeMismatch",
+               std::string(nom) + " : la cellule des textes et celle des motifs doivent avoir "
+               "autant d'elements (" + std::to_string(textes.size()) + " et " +
+               std::to_string(motifs.size()) + ").");
+    std::vector<int> dims = tableauTextes ? args[0].dims : args[1].dims;
+    std::size_t n = tableauTextes ? textes.size() : motifs.size();
+    std::vector<Valeur> sousArgs = args;
+    auto appeler = [&](const std::string& t, const std::string& m) {
+        sousArgs[0] = Valeur::texte(t);
+        sousArgs[1] = Valeur::texte(m);
+        return regexpUn(sousArgs, nargout, ignorerCasse);
+    };
+    std::vector<Valeur> sorties;
+    for (std::size_t k = 0; k < n; ++k) {
+        std::vector<Valeur> r = appeler(textes[tableauTextes ? k : 0],
+                                        motifs[tableauMotifs ? k : 0]);
+        if (sorties.empty()) {
+            for (std::size_t q = 0; q < r.size(); ++q) sorties.push_back(Valeur::celluleDims(dims));
+        }
+        for (std::size_t q = 0; q < r.size() && q < sorties.size(); ++q)
+            sorties[q].cellules[k] = r[q];
+    }
+    if (sorties.empty()) {
+        // une cellule vide : autant de cellules vides que de sorties
+        std::size_t combien = appeler("", "").size();
+        for (std::size_t q = 0; q < combien; ++q) sorties.push_back(Valeur::celluleDims(dims));
     }
     return sorties;
 }
