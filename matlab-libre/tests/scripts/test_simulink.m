@@ -13218,6 +13218,68 @@ end
 assert(strcmp(vu103, 'Simulink:Logging:CannotWriteFile'), 'un fichier qui ne s''ecrit pas');
 fprintf('reglages des scripts : ok\n');
 
+%% ------------------------------------ 104. Batterie : chaque choix de chaque bloc
+% Chaque valeur de chaque paramètre à choix de chaque type de bloc, l'une
+% après l'autre : le bloc, seul entre des constantes et des sorties, se
+% simule, ou il est refusé d'une erreur de Simulink qui le nomme — jamais
+% d'une erreur interne.
+catalogue104 = matlibre_sl_catalogue();
+regle104 = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.3};
+nEssais104 = 0;
+nRefus104 = 0;
+echecs104 = {};
+dossier104 = tempname();
+mkdir(dossier104);
+avant104 = pwd();
+cd(dossier104);
+for kT = 1:numel(catalogue104)
+    entree104 = catalogue104(kT);
+    if strcmp(entree104.famille, 'Interne')
+        continue
+    end
+    for q = 1:size(entree104.params, 1)
+        nature104 = entree104.params{q, 3};
+        if ~iscell(nature104)
+            continue
+        end
+        for v = 1:numel(nature104)
+            contexte104 = sprintf('%s.%s = %s', entree104.type, entree104.params{q, 1}, ...
+                                  nature104{v});
+            nEssais104 = nEssais104 + 1;
+            try
+                [s104, ok104] = allerModele(entree104.type, ...
+                                            {entree104.params{q, 1}, nature104{v}}, 0.5);
+            catch err
+                if ~strncmp(err.identifier, 'Simulink:', 9)
+                    echecs104{end + 1} = sprintf('%s : ADD_BLOCK, erreur interne %s : %s', ...
+                                                 contexte104, err.identifier, err.message); %#ok<SAGROW>
+                end
+                nRefus104 = nRefus104 + 1;
+                continue
+            end
+            if ~ok104
+                continue
+            end
+            try
+                evalc('sim(s104, regle104{:});');
+            catch err
+                if ~(strncmp(err.identifier, 'Simulink:', 9) || ...
+                     strncmp(err.identifier, 'Stateflow:', 10) || ...
+                     strncmp(err.identifier, 'Simscape:', 9)) || ...
+                   isempty(strfind(err.message, 'aller94'))
+                    echecs104{end + 1} = sprintf('%s : SIM, %s : %s', contexte104, ...
+                                                 err.identifier, err.message); %#ok<SAGROW>
+                end
+                nRefus104 = nRefus104 + 1;
+            end
+        end
+    end
+end
+cd(avant104);
+rmdir(dossier104, 's');
+assert(isempty(echecs104), sprintf('chaque choix : %s', strjoin(echecs104, ' ; ')));
+fprintf('chaque choix de chaque bloc : %d essais, %d refus nommes\n', nEssais104, nRefus104);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
