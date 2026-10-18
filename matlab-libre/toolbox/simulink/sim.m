@@ -231,9 +231,16 @@ function varargout = sim(modele, varargin)
             tDebut = depart.startTime;
         end
     end
-    if ~isscalar(tFinal) || ~(tFinal >= tDebut)
+    if ~isscalar(tDebut) || ~isreal(tDebut) || ~isfinite(tDebut)
+        error('Simulink:SolverConfig:InvalidStartTime', ...
+              ['L''instant de debut (StartTime) du modele ''%s'' est un nombre reel et fini ; ' ...
+               'il vaut ici %s.'], nomModele, mat2str(tDebut));
+    end
+    if ~isscalar(tFinal) || ~isreal(tFinal) || ~(tFinal >= tDebut)
         error('Simulink:SolverConfig:StopTimeBeforeStartTime', ...
-              'La duree doit etre un nombre positif : l''instant final precede le debut.');
+              ['La duree de la simulation du modele ''%s'' doit etre positive : l''instant ' ...
+               'final (StopTime) %s precede le debut (StartTime) %s.'], nomModele, ...
+              mat2str(tFinal), mat2str(tDebut));
     end
     variable = strcmpi(matlibre_sl_config('type', config.Solver), 'Variable-step');
     sortie = instantsDeSortie(config, variable, imposes, tousLesPas, tDebut, tFinal, nomModele);
@@ -255,8 +262,10 @@ function varargout = sim(modele, varargin)
     else
         pas = nombre(pas, nomModele, 'FixedStep');
     end
-    if ~isscalar(pas) || ~(pas > 0) || isinf(pas)
-        error('Simulink:SolverConfig:InvalidFixedStep', 'Le pas doit etre un nombre strictement positif.');
+    if ~isscalar(pas) || ~isreal(pas) || ~(pas > 0) || isinf(pas)
+        error('Simulink:SolverConfig:InvalidFixedStep', ...
+              ['Le pas fixe (FixedStep) du modele ''%s'' est un nombre strictement positif et ' ...
+               'fini, ou ''auto'' ; il vaut ici %s.'], nomModele, mat2str(pas));
     end
 
     options = struct('pas', pas, 'tDebut', tDebut, 'tFinal', tFinal, 'config', config, ...

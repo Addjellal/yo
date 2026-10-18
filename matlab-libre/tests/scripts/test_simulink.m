@@ -12122,6 +12122,174 @@ cd(avant92);
 rmdir(dossier92, 's');
 fprintf('references de sous-systeme : ok\n');
 
+%% ------------------------------------------ 93. Batterie des réglages du modèle
+% Chaque réglage du modèle, mis à une valeur qu'on pourrait taper par
+% erreur, est refusé par SET_PARAM ou par SIM d'une erreur de Simulink, ou
+% accepté et simulé : jamais une erreur interne. Puis chaque solveur, sur
+% des modèles dont on connaît la solution — linéaire, raide, passage par
+% zéro, multicadence, boucle algébrique —, croisé avec les options des
+% passages par zéro, de la tolérance et des instants de sortie : il
+% rend la solution, ou il est refusé en nommant ce qui l'empêche.
+b93 = new_system('reglages93');
+b93 = add_block(b93, 'sine', 'u');
+b93 = add_block(b93, 'integrator', 'x');
+b93 = add_block(b93, 'unitdelay', 'd', 'SampleTime', 0.1);
+b93 = add_block(b93, 'outport', 'y1');
+b93 = add_block(b93, 'outport', 'y2');
+b93 = add_line(add_line(add_line(b93, 'u', 'x'), 'x', 'y1'), 'u', 'd');
+b93 = add_line(b93, 'd', 'y2');
+b93 = set_param(b93, 'StopTime', 0.5);
+noms93 = fieldnames(matlibre_sl_config('defauts'));
+fautes93 = {'variableInexistante', NaN, [], [1 2; 3 4], -1, 1 + 2i, 'texte (', {}, ...
+            struct('a', 1), Inf};
+nSimules93 = 0;
+nRefuses93 = 0;
+for kN = 1:numel(noms93)
+    for kF = 1:numel(fautes93)
+        contexte93 = sprintf('%s = %s', noms93{kN}, strtrim(evalc('disp(fautes93{kF})')));
+        try
+            m93 = set_param(b93, noms93{kN}, fautes93{kF});
+        catch err
+            assert(strncmp(err.identifier, 'Simulink:', 9), ...
+                   sprintf('%s : SET_PARAM, erreur interne %s : %s', contexte93, ...
+                           err.identifier, err.message));
+            nRefuses93 = nRefuses93 + 1;
+            continue
+        end
+        if strcmp(noms93{kN}, 'StopTime') && isequal(fautes93{kF}, Inf)
+            nRefuses93 = nRefuses93 + 1;   % sans fin, et sans Stop Simulation
+            continue
+        end
+        try
+            evalc('sim(m93);');
+            nSimules93 = nSimules93 + 1;
+        catch err
+            assert(strncmp(err.identifier, 'Simulink:', 9) && ...
+                   (~isempty(strfind(err.message, 'reglages93')) || ...
+                    ~isempty(strfind(err.message, noms93{kN}))), ...
+                   sprintf('%s : SIM, erreur interne ou anonyme %s : %s', contexte93, ...
+                           err.identifier, err.message));
+            nRefuses93 = nRefuses93 + 1;
+        end
+    end
+end
+fprintf('batterie des reglages, valeurs fautives : %d simulations, %d refus nommes\n', ...
+        nSimules93, nRefuses93);
+
+% Les modèles de référence, et leur solution à l'instant final.
+modeles93 = cell(1, 5);
+attendus93 = zeros(1, 5);
+fins93 = [2 2 5 2 2];
+% x' = 1 - 2x
+m93 = new_system('lineaire93');
+m93 = add_block(m93, 'constant', 'c', 'Value', 1);
+m93 = add_block(m93, 'sum', 's', 'Inputs', '+-');
+m93 = add_block(m93, 'gain', 'g', 'Gain', 2);
+m93 = add_block(m93, 'integrator', 'x');
+m93 = add_block(m93, 'outport', 'y');
+m93 = add_line(add_line(add_line(m93, 'c', 's/1'), 's', 'x'), 'x', 'g');
+m93 = add_line(add_line(m93, 'g', 's/2'), 'x', 'y');
+modeles93{1} = m93;
+attendus93(1) = 0.5 * (1 - exp(-4));
+% raide : x' = 1000 (cos t - x)
+m93 = new_system('raide93');
+m93 = add_block(m93, 'clock', 't');
+m93 = add_block(m93, 'trigonometry', 'cos', 'Operator', 'cos');
+m93 = add_block(m93, 'sum', 's', 'Inputs', '+-');
+m93 = add_block(m93, 'gain', 'g', 'Gain', 1000);
+m93 = add_block(m93, 'integrator', 'x', 'InitialCondition', 1);
+m93 = add_block(m93, 'outport', 'y');
+m93 = add_line(add_line(add_line(m93, 't', 'cos'), 'cos', 's/1'), 's', 'g');
+m93 = add_line(add_line(add_line(m93, 'g', 'x'), 'x', 's/2'), 'x', 'y');
+modeles93{2} = m93;
+attendus93(2) = (1e6 * cos(2) + 1e3 * sin(2)) / (1e6 + 1);
+% passage par zéro : l'intégrale de |sin t|, qui se coude en pi
+m93 = new_system('coude93');
+m93 = add_block(m93, 'sine', 'u');
+m93 = add_block(m93, 'abs', 'a');
+m93 = add_block(m93, 'integrator', 'x');
+m93 = add_block(m93, 'outport', 'y');
+m93 = add_line(add_line(add_line(m93, 'u', 'a'), 'a', 'x'), 'x', 'y');
+modeles93{3} = m93;
+attendus93(3) = 3 + cos(5);
+% multicadence : x = t, tenu tous les 0,25 s, et un retard à 0,1 s
+m93 = new_system('cadences93');
+m93 = add_block(m93, 'constant', 'c', 'Value', 1);
+m93 = add_block(m93, 'integrator', 'x');
+m93 = add_block(m93, 'zoh', 'h', 'SampleTime', 0.25);
+m93 = add_block(m93, 'unitdelay', 'd', 'SampleTime', 0.1);
+m93 = add_block(m93, 'sum', 's', 'Inputs', '++');
+m93 = add_block(m93, 'outport', 'y');
+m93 = add_line(add_line(add_line(m93, 'c', 'x'), 'x', 'h'), 'c', 'd');
+m93 = add_line(add_line(add_line(m93, 'h', 's/1'), 'd', 's/2'), 's', 'y');
+modeles93{4} = m93;
+attendus93(4) = 3;
+% boucle algébrique : y = x - y/2, x = t
+m93 = new_system('boucle93');
+m93 = add_block(m93, 'constant', 'c', 'Value', 1);
+m93 = add_block(m93, 'integrator', 'x');
+m93 = add_block(m93, 'sum', 's', 'Inputs', '+-');
+m93 = add_block(m93, 'gain', 'g', 'Gain', 0.5);
+m93 = add_block(m93, 'outport', 'y');
+m93 = add_line(add_line(add_line(m93, 'c', 'x'), 'x', 's/1'), 's', 'g');
+m93 = add_line(add_line(m93, 'g', 's/2'), 's', 'y');
+modeles93{5} = m93;
+attendus93(5) = 2 / 1.5;
+
+solveurs93 = matlibre_sl_config('solveurs');
+liste93 = [solveurs93.fixe, solveurs93.variable];
+zc93 = {'UseLocalSettings', 'EnableAll', 'DisableAll'};
+algo93 = {'Nonadaptive', 'Adaptive'};
+echelle93 = {'on', 'off'};
+sorties93 = {{'OutputOption', 'RefineOutputTimes', 'Refine', 1}, ...
+             {'OutputOption', 'RefineOutputTimes', 'Refine', 3}, ...
+             {'OutputOption', 'AdditionalOutputTimes', 'OutputTimes', '[0.5 1 1.5]'}, ...
+             {'OutputOption', 'SpecifiedOutputTimes', 'OutputTimes', '[0.5 1 1.5]'}};
+nSimules93 = 0;
+nRefuses93 = 0;
+for kS = 1:numel(liste93)
+    solveur93 = liste93{kS};
+    variable93 = any(strcmp(solveur93, solveurs93.variable));
+    for kM = 1:numel(modeles93)
+        k93 = kS + kM;
+        regle93 = {'Solver', solveur93, 'StopTime', fins93(kM), ...
+                   'ZeroCrossControl', zc93{1 + mod(k93, 3)}, ...
+                   'ZeroCrossAlgorithm', algo93{1 + mod(k93, 2)}, ...
+                   'AutoScaleAbsTol', echelle93{1 + mod(floor(k93 / 2), 2)}};
+        if variable93
+            regle93 = [regle93, {'RelTol', 1e-5, 'MaxStep', 0.05}, ...
+                       sorties93{1 + mod(k93, 4)}]; %#ok<AGROW>
+        else
+            regle93 = [regle93, {'FixedStep', 2e-3}]; %#ok<AGROW>
+        end
+        contexte93 = sprintf('%s sous %s', modeles93{kM}.nom, strjoin(cellfun(@(v) ...
+                             strtrim(evalc('disp(v)')), regle93, 'UniformOutput', false), ' '));
+        try
+            evalc('r93 = sim(modeles93{kM}, regle93{:});');
+        catch err
+            discret93 = any(strcmp(solveur93, {'FixedStepDiscrete', 'VariableStepDiscrete'}));
+            assert(discret93 && strcmp(err.identifier, ...
+                                       'Simulink:Engine:DiscreteSolverContinuousStates'), ...
+                   sprintf('%s : %s (%s)', contexte93, err.identifier, err.message));
+            nRefuses93 = nRefuses93 + 1;
+            continue
+        end
+        assert(abs(r93.tout(end) - fins93(kM)) < 1e-9 && all(isfinite(r93.yout(:))), ...
+               sprintf('%s : la simulation s''arrete a %g', contexte93, r93.tout(end)));
+        ecart93 = abs(r93.yout(end, 1) - attendus93(kM));
+        tolerance93 = 2e-2 * max(1, abs(attendus93(kM)));
+        assert(ecart93 < tolerance93, sprintf('%s : %g au lieu de %g', contexte93, ...
+                                             r93.yout(end, 1), attendus93(kM)));
+        if variable93 && strcmp(regle93{end - 2}, 'SpecifiedOutputTimes')
+            assert(isequal(r93.tout(:).', [0 0.5 1 1.5 fins93(kM)]), ...
+                   sprintf('%s : les instants demandes seuls', contexte93));
+        end
+        nSimules93 = nSimules93 + 1;
+    end
+end
+fprintf('batterie des solveurs croises : %d simulations, %d refus nommes\n', ...
+        nSimules93, nRefuses93);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

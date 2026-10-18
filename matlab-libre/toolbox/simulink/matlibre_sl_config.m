@@ -401,12 +401,17 @@ function v = valider(nom, v)
         case 'Solver'
             liste = solveurs();
             connus = [liste.fixe, liste.variable];
-            v = char(v);
-            trouve = find(strcmpi(v, connus), 1);
+            if isstring(v) && isscalar(v)
+                v = char(v);
+            end
+            trouve = [];
+            if ischar(v) && size(v, 1) <= 1
+                trouve = find(strcmpi(v, connus), 1);
+            end
             if isempty(trouve)
                 error('Simulink:Commands:SolveurInconnu', ...
-                      'Le solveur ''%s'' est inconnu ; les solveurs disponibles sont : %s.', ...
-                      v, strjoin(connus, ', '));
+                      ['Le solveur (Solver) %s est inconnu ; les solveurs disponibles sont : ' ...
+                       '%s.'], decrire(v), strjoin(connus, ', '));
             end
             v = connus{trouve};
         case 'SolverType'
@@ -421,10 +426,12 @@ function v = valider(nom, v)
                                'processor-in-the-loop (pil)', 'external'});
         case {'ReturnWorkspaceOutputsName', 'FinalStateName', 'SignalLoggingName', ...
               'TimeSaveName', 'StateSaveName', 'OutputSaveName'}
-            v = char(v);
-            if ~isvarname(v)
+            if isstring(v) && isscalar(v)
+                v = char(v);
+            end
+            if ~ischar(v) || ~isvarname(v)
                 error('Simulink:Config:InvalidValue', ...
-                      '%s est un nom de variable ; pas ''%s''.', nom, v);
+                      '%s est un nom de variable ; pas %s.', nom, decrire(v));
             end
         case 'InitialState'
             if isstring(v)
@@ -551,13 +558,32 @@ function v = proprietesPeriodes(v)
 end
 
 function v = choix(nom, v, admis)
-    trouve = find(strcmpi(char(v), admis), 1);
+    if isstring(v) && isscalar(v)
+        v = char(v);
+    end
+    trouve = [];
+    if ischar(v) && size(v, 1) <= 1
+        trouve = find(strcmpi(v, admis), 1);
+    end
     if isempty(trouve)
         error('Simulink:Config:InvalidValue', ...
-              'Le reglage %s vaut l''une de ces valeurs : %s ; pas ''%s''.', ...
-              nom, strjoin(admis, ', '), char(v));
+              'Le reglage %s vaut l''une de ces valeurs : %s ; pas %s.', ...
+              nom, strjoin(admis, ', '), decrire(v));
     end
     v = admis{trouve};
+end
+
+% Une valeur refusée, telle qu'un message la montre : un texte entre
+% apostrophes, un nombre ou une matrice écrits, une autre valeur par sa
+% classe.
+function t = decrire(v)
+    if ischar(v) && size(v, 1) <= 1
+        t = ['''' v ''''];
+    elseif (isnumeric(v) || islogical(v)) && ndims(v) <= 2 && numel(v) <= 16
+        t = mat2str(v);
+    else
+        t = sprintf('une valeur de classe %s', class(v));
+    end
 end
 
 % Un entier compris entre deux bornes, donné en nombre ou en texte.
@@ -565,7 +591,7 @@ function v = entier(nom, v, bas, haut)
     if ischar(v) || isstring(v)
         v = str2double(char(v));
     end
-    if ~(isnumeric(v) && isscalar(v) && isreal(v)) || isnan(v) || v ~= round(v) || ...
+    if ~(isnumeric(v) && isscalar(v) && isreal(v)) || ~isfinite(v) || v ~= round(v) || ...
        v < bas || v > haut
         if isinf(haut)
             error('Simulink:Config:InvalidValue', ...
