@@ -63,6 +63,11 @@ function modele = matlibre_sl_aplatir(modele)
     for j = 1:numel(modele.blocs)
         modele.blocs{j}.type = typeCanonique(modele.blocs{j}.type);
     end
+    nomRacine = '';
+    if isfield(modele, 'nom')
+        nomRacine = char(modele.nom);
+    end
+    modele = portsDeBus(modele, nomRacine);
     % Un modèle ordinaire ne paie rien : le dépliage ne coûte que le
     % parcours qui constate qu'il n'y a rien à déplier.
     garde = 0;
@@ -168,6 +173,141 @@ function modele = rafraichirLiens(modele)
     end
 end
 
+% Les ports d'élément de bus d'un système deviennent ce qu'ils abrègent.
+% Les In Bus Element de même nom de port sont une seule entrée — un
+% Inport —, dont chacun reprend son élément par un Bus Selector, ou le bus
+% entier si son élément est vide. Les Out Bus Element de même nom de port
+% forment ensemble le bus d'une seule sortie : un Bus Creator, dont chaque
+% élément est le signal de l'un d'eux, alimente un Outport.
+function modele = portsDeBus(modele, chemin)
+    types = cellfun(@(b) b.type, modele.blocs, 'UniformOutput', false);
+    entrees = find(strcmp(types, 'inbuselement'));
+    sorties = find(strcmp(types, 'outbuselement'));
+    if isempty(entrees) && isempty(sorties)
+        return
+    end
+    noms = cellfun(@(b) char(b.nom), modele.blocs, 'UniformOutput', false);
+    ports = struct('nom', {}, 'bloc', {});
+    for j = entrees
+        p = modele.blocs{j}.parametres;
+        nomPort = texteDuPort(p, 'PortName', 'InBus', chemin, modele.blocs{j}.nom);
+        element = strtrim(texteDuPort(p, 'Element', 'signal1', chemin, modele.blocs{j}.nom));
+        q = find(strcmp({ports.nom}, nomPort), 1);
+        if isempty(q)
+            parametres = struct('Port', lireParametre(p, 'Port', 1));
+            for champ = {'OutDataTypeStr', 'PortDimensions', 'SampleTime'}
+                v = lireParametre(p, champ{1}, []);
+                if ~isempty(v) && ~(ischar(v) && strncmpi(v, 'Inherit', 7)) && ...
+                   ~(isnumeric(v) && isequal(double(v), -1))
+                    parametres.(champ{1}) = v;
+                end
+            end
+            nomEntree = nomLibre(noms, nomPort);
+            modele.blocs{end + 1} = struct('type', 'inport', 'nom', nomEntree, ...
+                                           'parametres', parametres);
+            noms{end + 1} = nomEntree; %#ok<AGROW>
+            ports(end + 1) = struct('nom', nomPort, 'bloc', numel(modele.blocs)); %#ok<AGROW>
+            q = numel(ports);
+        end
+        b = modele.blocs{j};
+        if isempty(element)
+            b.type = 'signalconversion';
+            b.parametres = struct();
+        else
+            b.type = 'busselector';
+            b.parametres = struct('OutputSignals', element);
+        end
+        modele.blocs{j} = b;
+        modele.liens(end + 1, :) = [ports(q).bloc, j, 1, 1];
+    end
+    groupes = struct('nom', {}, 'blocs', {}, 'elements', {});
+    for j = sorties
+        p = modele.blocs{j}.parametres;
+        nomPort = texteDuPort(p, 'PortName', 'OutBus', chemin, modele.blocs{j}.nom);
+        element = strtrim(texteDuPort(p, 'Element', 'signal1', chemin, modele.blocs{j}.nom));
+        if any(element == '.')
+            error('Simulink:blocks:BusElementPortNested', ...
+                  ['L''element ''%s'' de ''%s/%s'' est emboite : MatLibre ne batit pas un bus ' ...
+                   'emboite par des Out Bus Element ; formez-le par un Bus Creator.'], ...
+                  element, chemin, char(modele.blocs{j}.nom));
+        end
+        q = find(strcmp({groupes.nom}, nomPort), 1);
+        if isempty(q)
+            groupes(end + 1) = struct('nom', nomPort, 'blocs', [], 'elements', {{}}); %#ok<AGROW>
+            q = numel(groupes);
+        end
+        if any(strcmp(groupes(q).elements, element)) || ...
+           (~isempty(groupes(q).elements) && (isempty(element) || any(cellfun(@isempty, ...
+                                                                    groupes(q).elements))))
+            error('Simulink:blocks:BusElementPortDuplicate', ...
+                  ['''%s/%s'' ecrit l''element ''%s'' du port ''%s'', qu''un autre Out Bus ' ...
+                   'Element ecrit deja : chaque element d''un port est unique.'], chemin, ...
+                  char(modele.blocs{j}.nom), element, nomPort);
+        end
+        groupes(q).blocs(end + 1) = j;
+        groupes(q).elements{end + 1} = element;
+    end
+    for q = 1:numel(groupes)
+        premierBloc = modele.blocs{groupes(q).blocs(1)};
+        p = premierBloc.parametres;
+        parametres = struct('Port', lireParametre(p, 'Port', 1), ...
+                            'OutputWhenDisabled', lireParametre(p, 'OutputWhenDisabled', 'held'));
+        initiale = lireParametre(p, 'InitialOutput', []);
+        if ~isempty(initiale)
+            parametres.InitialOutput = initiale;
+        end
+        nomSortie = nomLibre(noms, groupes(q).nom);
+        modele.blocs{end + 1} = struct('type', 'outport', 'nom', nomSortie, ...
+                                       'parametres', parametres);
+        noms{end + 1} = nomSortie; %#ok<AGROW>
+        sortie = numel(modele.blocs);
+        if isempty(groupes(q).elements{1})
+            % le signal entier, ou le bus entier, sans élément
+            source = groupes(q).blocs(1);
+            modele.blocs{source}.type = 'signalconversion';
+            modele.blocs{source}.parametres = struct();
+            modele.liens(end + 1, :) = [source, sortie, 1, 1];
+            continue
+        end
+        nomBus = nomLibre(noms, [groupes(q).nom ' bus']);
+        modele.blocs{end + 1} = struct('type', 'buscreator', 'nom', nomBus, 'parametres', ...
+                                       struct('Inputs', strjoin(groupes(q).elements, ',')));
+        noms{end + 1} = nomBus; %#ok<AGROW>
+        createur = numel(modele.blocs);
+        for r = 1:numel(groupes(q).blocs)
+            j = groupes(q).blocs(r);
+            modele.blocs{j}.type = 'signalconversion';
+            modele.blocs{j}.parametres = struct();
+            modele.liens(end + 1, :) = [j, createur, r, 1];
+        end
+        modele.liens(end + 1, :) = [createur, sortie, 1, 1];
+    end
+end
+
+% Un nom de bloc libre dans le système, tiré de BASE.
+% Le nom d'un port d'élément de bus, ou de son élément : un texte d'une
+% ligne.
+function v = texteDuPort(p, nom, defaut, chemin, bloc)
+    v = lireParametre(p, nom, defaut);
+    if isstring(v) && isscalar(v)
+        v = char(v);
+    end
+    if ~ischar(v) || size(v, 1) > 1
+        error('Simulink:blocks:BusElementPortName', ...
+              ['Le parametre %s de ''%s/%s'' est un texte : le nom du port, ou le chemin ' ...
+               'de l''element dans le bus.'], nom, chemin, char(bloc));
+    end
+end
+
+function nom = nomLibre(noms, base)
+    nom = base;
+    rang = 1;
+    while any(strcmp(noms, nom))
+        rang = rang + 1;
+        nom = sprintf('%s %d', base, rang);
+    end
+end
+
 % Le nom MatLibre d'un type, quelle que soit la façon dont on l'a écrit.
 % Un type inconnu reste tel quel : c'est la compilation qui le refusera,
 % en nommant le bloc par son chemin.
@@ -203,6 +343,7 @@ function modele = deplier(modele, k)
     for j = 1:numel(interne.blocs)
         interne.blocs{j}.type = typeCanonique(interne.blocs{j}.type);
     end
+    interne = portsDeBus(interne, chemin);
     n = numel(modele.blocs);
     m = numel(interne.blocs);
     entrees = parRang(interne, 'inport');

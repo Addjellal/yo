@@ -536,6 +536,7 @@ function [nEntrees, nSorties] = bornesSousSysteme(p)
         nSorties = NaN;
         return
     end
+    nomsBus = {{}, {}};
     for k = 1:numel(modele.blocs)
         switch typeCanonique(modele.blocs{k}.type)
             case {'inport', 'enableport', 'triggerport', 'actionport', 'resetport'}
@@ -544,6 +545,22 @@ function [nEntrees, nSorties] = bornesSousSysteme(p)
                 nEntrees = nEntrees + 1;
             case 'outport'
                 nSorties = nSorties + 1;
+            case {'inbuselement', 'outbuselement'}
+                % les ports d'élément de bus de même nom sont un seul port
+                sortie = strcmp(typeCanonique(modele.blocs{k}.type), 'outbuselement');
+                defaut = 'InBus';
+                if sortie
+                    defaut = 'OutBus';
+                end
+                nom = lire(modele.blocs{k}.parametres, 'PortName', defaut);
+                if ~ischar(nom) || size(nom, 1) > 1
+                    nom = sprintf('<%d>', k);   % un nom qui n'en est pas un : la compilation le dira
+                end
+                if ~any(strcmp(nomsBus{1 + sortie}, nom))
+                    nomsBus{1 + sortie}{end + 1} = nom;
+                    nEntrees = nEntrees + ~sortie;
+                    nSorties = nSorties + sortie;
+                end
         end
     end
 end

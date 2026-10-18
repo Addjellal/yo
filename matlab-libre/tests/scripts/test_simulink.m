@@ -11290,6 +11290,113 @@ delete(fichier84);
 rmdir(dossier84, 's');
 fprintf('DocBlock, Model Info et nouveaux blocs en .slx : ok\n');
 
+%% ----------------------- 85. Les ports d'élément de bus : In et Out Bus Element
+% In Bus Element et Out Bus Element, les ports de bus des sous-systèmes de
+% Simulink : les In Bus Element de même nom de port sont une seule entrée,
+% chacun en reprenant un élément par son nom — chemin pointé pour un bus
+% emboîté, le bus entier si l'élément est vide — ; les Out Bus Element de
+% même nom forment ensemble le bus d'une seule sortie.
+dedans85 = new_system('dedans85');
+dedans85 = add_block(dedans85, 'inbuselement', 'a', 'PortName', 'InBus', 'Element', 'a');
+dedans85 = add_block(dedans85, 'inbuselement', 'b', 'PortName', 'InBus', 'Element', 'b');
+dedans85 = add_block(dedans85, 'gain', 'ga', 'Gain', 2);
+dedans85 = add_block(dedans85, 'gain', 'gb', 'Gain', 3);
+dedans85 = add_block(dedans85, 'outbuselement', 'x', 'PortName', 'OutBus', 'Element', 'x');
+dedans85 = add_block(dedans85, 'outbuselement', 'y', 'PortName', 'OutBus', 'Element', 'y');
+dedans85 = add_line(add_line(dedans85, 'a', 'ga'), 'b', 'gb');
+dedans85 = add_line(add_line(dedans85, 'ga', 'x'), 'gb', 'y');
+m85 = new_system('bus85');
+m85 = add_block(m85, 'constant', 'c1', 'Value', 1);
+m85 = add_block(m85, 'constant', 'c2', 'Value', 2);
+m85 = add_block(m85, 'buscreator', 'bc', 'Inputs', 'a,b');
+m85 = add_block(m85, 'subsystem', 's', 'Model', dedans85);
+m85 = add_block(m85, 'busselector', 'bs', 'OutputSignals', 'y,x');
+m85 = add_block(m85, 'outport', 'oy');
+m85 = add_block(m85, 'outport', 'ox');
+m85 = add_line(add_line(m85, 'c1', 'bc/1'), 'c2', 'bc/2');
+m85 = add_line(add_line(m85, 'bc', 's'), 's', 'bs');
+m85 = add_line(add_line(m85, 'bs/1', 'oy'), 'bs/2', 'ox');
+[ne85, ns85] = matlibre_sl_ports(m85.blocs{4});
+assert(ne85 == 1 && ns85 == 1, 'deux In Bus Element et deux Out Bus Element : un port de chaque');
+regle85 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1};
+r85 = sim(m85, regle85{:});
+assert(isequal(r85.yout(end, :), [6 2]), ...
+       'les elements a et b lus par leur nom, x et y ecrits dans le bus de sortie');
+% un bus emboîté : l'élément n.c ; le bus entier quand l'élément est vide
+emboite85 = new_system('emboite85');
+emboite85 = add_block(emboite85, 'inbuselement', 'nc', 'PortName', 'B', 'Element', 'n.c');
+emboite85 = add_block(emboite85, 'inbuselement', 'tout', 'PortName', 'B', 'Element', '');
+emboite85 = add_block(emboite85, 'busselector', 'sel', 'OutputSignals', 'e');
+emboite85 = add_block(emboite85, 'outport', 'o1', 'Port', 1);
+emboite85 = add_block(emboite85, 'outport', 'o2', 'Port', 2);
+emboite85 = add_line(add_line(emboite85, 'nc', 'o1'), 'tout', 'sel');
+emboite85 = add_line(emboite85, 'sel', 'o2');
+e85 = new_system('externe85');
+e85 = add_block(e85, 'constant', 'c', 'Value', 5);
+e85 = add_block(e85, 'constant', 'd', 'Value', 6);
+e85 = add_block(e85, 'constant', 'e', 'Value', 7);
+e85 = add_block(e85, 'buscreator', 'n', 'Inputs', 'c,d');
+e85 = add_block(e85, 'buscreator', 'haut', 'Inputs', 'n,e');
+e85 = add_block(e85, 'subsystem', 's', 'Model', emboite85);
+e85 = add_block(e85, 'outport', 'y1');
+e85 = add_block(e85, 'outport', 'y2');
+e85 = add_line(add_line(add_line(e85, 'c', 'n/1'), 'd', 'n/2'), 'n', 'haut/1');
+e85 = add_line(add_line(e85, 'e', 'haut/2'), 'haut', 's');
+e85 = add_line(add_line(e85, 's/1', 'y1'), 's/2', 'y2');
+r85 = sim(e85, regle85{:});
+assert(isequal(r85.yout(end, :), [5 7]), ...
+       'l''element n.c d''un bus emboite, et le bus entier quand l''element est vide');
+% deux ports de bus et une entrée ordinaire, par leur rang
+mixte85 = new_system('mixte85');
+mixte85 = add_block(mixte85, 'inport', 'u', 'Port', 2);
+mixte85 = add_block(mixte85, 'inbuselement', 'p', 'PortName', 'P', 'Element', 'a', 'Port', 1);
+mixte85 = add_block(mixte85, 'sum', 's', 'Signs', '+-');
+mixte85 = add_block(mixte85, 'outport', 'o');
+mixte85 = add_line(add_line(add_line(mixte85, 'p', 's/1'), 'u', 's/2'), 's', 'o');
+x85 = new_system('rangs85');
+x85 = add_block(x85, 'constant', 'k', 'Value', 10);
+x85 = add_block(x85, 'buscreator', 'bc', 'Inputs', 'a,b');
+x85 = add_block(x85, 'constant', 'm', 'Value', 4);
+x85 = add_block(x85, 'subsystem', 's', 'Model', mixte85);
+x85 = add_block(x85, 'outport', 'y');
+x85 = add_line(add_line(x85, 'k', 'bc/1'), 'k', 'bc/2');
+x85 = add_line(add_line(add_line(x85, 'bc', 's/1'), 'm', 's/2'), 's', 'y');
+r85 = sim(x85, regle85{:});
+assert(r85.yout(end) == 6, 'le port de bus au rang 1, l''entree ordinaire au rang 2');
+% le .slx garde les ports d'élément de bus
+fichier85 = [tempname() '.slx'];
+save_system(m85, fichier85);
+dossier85 = tempname();
+unzip(fichier85, dossier85);
+xml85 = fileread(fullfile(dossier85, 'simulink', 'blockdiagram.xml'));
+assert(~isempty(strfind(xml85, 'IsBusElementPort')), ...
+       'le .slx ecrit les ports d''element de bus comme Simulink');
+relu85 = load_system(fichier85);
+assert(isequal(sim(relu85, regle85{:}).yout, sim(m85, regle85{:}).yout), ...
+       'relu du .slx, le modele aux ports de bus simule de meme');
+delete(fichier85);
+rmdir(dossier85, 's');
+% ce qui est refusé
+refus85 = {
+    set_param(dedans85, 'y', 'Element', 'x'), 'Simulink:blocks:BusElementPortDuplicate'
+    set_param(dedans85, 'y', 'Element', 'z.w'), 'Simulink:blocks:BusElementPortNested'
+    set_param(dedans85, 'b', 'Element', 'absent'), 'Simulink:'
+    };
+for q = 1:size(refus85, 1)
+    vu85 = '';
+    message85 = '';
+    try
+        sim(set_param(m85, 's', 'Model', refus85{q, 1}), regle85{:});
+    catch err
+        vu85 = err.identifier;
+        message85 = err.message;
+    end
+    assert(strncmp(vu85, refus85{q, 2}, numel(refus85{q, 2})) && ...
+           ~isempty(strfind(message85, 'bus85/s')), ...
+           sprintf('ports de bus, refus %d : %s (%s)', q, vu85, message85));
+end
+fprintf('ports d''element de bus : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

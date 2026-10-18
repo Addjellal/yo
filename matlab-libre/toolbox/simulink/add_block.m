@@ -99,6 +99,11 @@ function modele = add_block(modele, type, nom, varargin)
 %     datatypescalingstrip — l'entier stocké d'une virgule fixe
 %     functioncallsplit NumOutputPorts — l'appel d'un générateur partagé
 %     docblock DocumentType ; modelinfo — des notes, qui ne calculent rien
+%     inbuselement PortName, Element, Port — dans un sous-système, l'élément
+%                  Element (n.c pour un bus emboîté, '' pour le bus entier)
+%                  du bus qui entre par le port PortName
+%     outbuselement PortName, Element, Port — l'élément Element du bus qui
+%                  sort par le port PortName
 %     checkdiscretegradient gradient ; checkinputresolution resolution —
 %                  enabled, callback, stopWhenAssertionFail, export
 %     transpose, hermitiantranspose, creatediagonalmatrix, extractdiagonal,

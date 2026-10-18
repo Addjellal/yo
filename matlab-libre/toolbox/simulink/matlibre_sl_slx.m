@@ -648,6 +648,12 @@ function [type, refus] = typeDe(b)
         return
     end
     candidats = {b.type};
+    if any(strcmp(b.type, {'Inport', 'Outport'})) && isfield(P, 'IsBusElementPort') && ...
+       strcmpi(char(P.IsBusElementPort), 'on')
+        % un port d'élément de bus : In Bus Element, Out Bus Element
+        candidats = {strrep(strrep(b.type, 'Inport', 'In Bus Element'), 'Outport', ...
+                            'Out Bus Element')};
+    end
     if any(strcmp(b.type, {'Reference', 'SimscapeBlock'})) && isfield(P, 'SourceBlock')
         source = regexprep(P.SourceBlock, '\\n|\n', ' ');
         candidats = {source};
@@ -936,6 +942,9 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
         if ~isempty(reference)
             lignes{end + 1} = sprintf('%s    <P Name="SourceBlock">%s</P>', marge, ...
                                       matlibre_xml_echapper(reference)); %#ok<AGROW>
+        end
+        if any(strcmp(entree.type, {'inbuselement', 'outbuselement'}))
+            lignes{end + 1} = sprintf('%s    <P Name="IsBusElementPort">on</P>', marge); %#ok<AGROW>
         end
         champs = fieldnames(b.parametres);
         variablesMasque = matlibre_sl_masque('variables', b);
