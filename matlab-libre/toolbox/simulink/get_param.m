@@ -14,6 +14,17 @@ function valeur = get_param(modele, nom, parametre)
 %     PortHandles   les poignées de ses ports : Inport, Outport...
 %     DialogParameters  la liste de ses paramètres, avec leurs valeurs
 %                   admises quand ce sont des choix
+%     ObjectParameters  tous ses paramètres — ceux du dialogue, et Name,
+%                   Parent, BlockType, Ports... —, leur type, leurs valeurs
+%                   admises et s'ils se règlent (Attributes)
+%     Mask, MaskType  'off' et '' pour un bloc sans masque
+%     CompiledSampleTime  sa période, [période décalage], une fois le
+%                   modèle compilé : [0 0] continue, [0 1] continue fixée
+%                   aux pas mineurs, [Inf 0] constante
+%     CompiledPortWidths, CompiledPortDimensions, CompiledPortDataTypes,
+%     CompiledPortComplexSignals  la largeur, les dimensions ([nombre de
+%                   dimensions, dimensions...] par port), le type et la
+%                   complexité de ses ports, Inport et Outport
 %
 %   GET_PARAM(MODELE,'ModelWorkspace') rend l'espace de travail du modèle,
 %   un Simulink.ModelWorkspace, dont les variables passent avant celles de
@@ -55,6 +66,10 @@ function valeur = get_param(modele, nom, parametre)
     end
     if nargin == 3 && strcmpi(char(parametre), 'PortHandles')
         valeur = matlibre_sl_signaux('poignees', modele, char(nom));
+        return
+    end
+    if nargin == 3 && strncmpi(char(parametre), 'Compiled', 8)
+        valeur = compile(modele, char(nom), char(parametre));
         return
     end
     nom = char(nom);
@@ -128,6 +143,10 @@ function valeur = get_param(modele, nom, parametre)
             return
     end
     entree = matlibre_sl_catalogue('type', bloc.type);
+    if strcmpi(champ, 'ObjectParameters')
+        valeur = parametresObjet(entree);
+        return
+    end
     if strcmpi(champ, 'DialogParameters')
         valeur = struct();
         for k = 1:size(entree.params, 1)
@@ -142,6 +161,19 @@ function valeur = get_param(modele, nom, parametre)
         return
     end
     canon = matlibre_sl_catalogue('parametre', entree, champ);
+    if isempty(canon) && any(strcmpi(champ, {'Mask', 'MaskType'}))
+        % un bloc sans masque : Mask vaut 'off', MaskType est vide
+        valeur = '';
+        if strcmpi(champ, 'Mask')
+            valeur = 'off';
+        end
+        for nomMasque = fieldnames(bloc.parametres).'
+            if strcmpi(nomMasque{1}, champ)
+                valeur = bloc.parametres.(nomMasque{1});
+            end
+        end
+        return
+    end
     if isempty(canon)
         error('Simulink:Commands:ParamUnknown', ...
               'Le bloc ''%s'' n''a pas de paramètre ''%s''.', feuille, champ);
@@ -158,6 +190,122 @@ function valeur = get_param(modele, nom, parametre)
     end
     error('Simulink:Commands:ParamUnknown', ...
           'Le bloc ''%s'' n''a pas de paramètre ''%s''.', feuille, champ);
+end
+
+% Tous les paramètres d'un bloc, comme les décrit ObjectParameters : ceux
+% de son dialogue, réglables, ceux que tout bloc porte, et ceux qui se
+% lisent sans se régler.
+function valeur = parametresObjet(entree)
+    valeur = struct();
+    for k = 1:size(entree.params, 1)
+        nature = entree.params{k, 3};
+        if iscell(nature)
+            valeur.(entree.params{k, 1}) = struct('Type', 'enum', 'Enum', {nature}, ...
+                                                  'Attributes', {{'read-write'}});
+        else
+            valeur.(entree.params{k, 1}) = struct('Type', 'string', 'Enum', {{}}, ...
+                                                  'Attributes', {{'read-write'}});
+        end
+    end
+    for nom = [{'Name', 'Mask', 'MaskType'}, matlibre_sl_catalogue('communs')]
+        if ~isfield(valeur, nom{1})
+            valeur.(nom{1}) = struct('Type', 'string', 'Enum', {{}}, 'Attributes', {{'read-write'}});
+        end
+    end
+    for nom = {'Parent', 'BlockType', 'Ports', 'PortHandles', 'LinkStatus', 'ReferenceBlock', ...
+               'DialogParameters', 'ObjectParameters', 'CompiledSampleTime', ...
+               'CompiledPortWidths', 'CompiledPortDimensions', 'CompiledPortDataTypes', ...
+               'CompiledPortComplexSignals'}
+        valeur.(nom{1}) = struct('Type', 'string', 'Enum', {{}}, 'Attributes', {{'read-only'}});
+    end
+end
+
+% Ce que la compilation sait d'un bloc : sa période, la largeur, les
+% dimensions, le type et la complexité de ses ports. Le modèle se compile
+% le temps de la lecture, comme sous model([], [], [], 'compile').
+function valeur = compile(modele, nom, champ)
+    modele = matlibre_sl_modele(modele);
+    prefixe = [char(modele.nom) '/'];
+    if strncmp(nom, prefixe, numel(prefixe))
+        nom = nom(numel(prefixe) + 1:end);
+    end
+    c = matlibre_sl_compiler(modele, struct('silencieux', true, 'tFinal', 0));
+    k = find(strcmp(c.chemins, [prefixe nom]), 1);
+    if isempty(k)
+        error('Simulink:Commands:InvSimulinkObjectName', ...
+              ['Nom d''objet Simulink invalide : aucun bloc compile de ''%s'' ne s''appelle ' ...
+               '''%s''.'], char(modele.nom), nom);
+    end
+    entrees = c.entrees{k};
+    sorties = c.portDebut(k) + (0:c.nOut(k) - 1);
+    switch lower(champ)
+        case 'compiledsampletime'
+            t = c.cadence(k);
+            if t == 0 && c.majeurSeul(k)
+                valeur = [0 1];
+            elseif isinf(t)
+                valeur = [Inf 0];
+            else
+                valeur = [t c.decalage(k)];
+            end
+        case 'compiledportwidths'
+            valeur = struct('Inport', largeurs(c, entrees), 'Outport', largeurs(c, sorties));
+        case 'compiledportdimensions'
+            valeur = struct('Inport', dimensions(c, entrees), 'Outport', dimensions(c, sorties));
+        case 'compiledportdatatypes'
+            valeur = struct('Inport', {typesDesPorts(c, entrees)}, ...
+                            'Outport', {typesDesPorts(c, sorties)});
+        case 'compiledportcomplexsignals'
+            valeur = struct('Inport', complexes(c, entrees), 'Outport', complexes(c, sorties));
+        otherwise
+            error('Simulink:Commands:ParamUnknown', ...
+                  'Le bloc ''%s'' n''a pas de parametre ''%s''.', nom, champ);
+    end
+end
+
+function w = largeurs(c, ports)
+    w = ones(1, numel(ports));
+    for i = 1:numel(ports)
+        if ports(i) > 0
+            w(i) = prod(c.dims{ports(i)});
+        end
+    end
+end
+
+% Les dimensions de chaque port, à la suite : [1 n] pour un vecteur, [2 l c]
+% pour une matrice, comme Simulink les range.
+function d = dimensions(c, ports)
+    d = zeros(1, 0);
+    for i = 1:numel(ports)
+        taille = [1 1];
+        if ports(i) > 0
+            taille = c.dims{ports(i)};
+        end
+        if any(taille == 1)
+            d = [d, 1, prod(taille)]; %#ok<AGROW>
+        else
+            d = [d, numel(taille), taille]; %#ok<AGROW>
+        end
+    end
+end
+
+function t = typesDesPorts(c, ports)
+    t = cell(1, numel(ports));
+    for i = 1:numel(ports)
+        t{i} = 'double';
+        if ports(i) > 0
+            t{i} = matlibre_sl_types('nom', c.typePort(ports(i)));
+        end
+    end
+end
+
+function x = complexes(c, ports)
+    x = false(1, numel(ports));
+    for i = 1:numel(ports)
+        if ports(i) > 0
+            x(i) = logical(c.complexePort(ports(i)));
+        end
+    end
 end
 
 % Un réglage du modèle : Name, Blocks, un réglage de configuration — avec

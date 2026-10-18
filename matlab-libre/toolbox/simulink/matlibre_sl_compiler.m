@@ -4088,6 +4088,13 @@ function c = periodes(c, pas, verifier)
             else
                 finies = cad(isfinite(cad) & cad > 0);
                 c.cadence(k) = min(finies);
+                % le décalage vient avec la période, celui des entrées les
+                % plus rapides quand elles s'accordent : [0.2 0.1] s'hérite
+                % tout entier
+                decalages = unique(c.decalage(sources(cad == c.cadence(k))));
+                if isscalar(decalages)
+                    c.decalage(k) = decalages;
+                end
             end
             change = true;
         end

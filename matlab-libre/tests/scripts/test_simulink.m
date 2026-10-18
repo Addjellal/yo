@@ -13083,6 +13083,69 @@ for k101 = 1:numel(noms101)
 end
 fprintf('Simulink.SimulationOutput : ok\n');
 
+%% ------------------------------- 102. Ce que la compilation sait des blocs
+% GET_PARAM lit ce que la compilation sait d'un bloc — sa période, la
+% largeur, les dimensions, le type et la complexité de ses ports —, et
+% SIMULINK.BLOCKDIAGRAM.GETSAMPLETIMES les périodes du modèle, comme la
+% légende de Simulink : D1, D2..., Cont, FiM, Inf. Un bloc qui hérite
+% d'une période décalée en hérite le décalage. ObjectParameters décrit
+% tous les paramètres d'un bloc ; Mask et MaskType valent 'off' et ''
+% sans masque.
+m102 = new_system('compile102');
+m102 = add_block(m102, 'constant', 'c', 'Value', 'int8(4)');
+m102 = add_block(m102, 'constant', 'mat', 'Value', ones(2, 3));
+m102 = add_block(m102, 'unitdelay', 'd', 'SampleTime', [0.2 0.1]);
+m102 = add_block(m102, 'gain', 'g', 'Gain', 1);
+m102 = add_block(m102, 'integrator', 'x');
+m102 = add_block(m102, 'constant', 'k', 'Value', 1);
+m102 = add_block(m102, 'mux', 'mx', 'Inputs', 3);
+m102 = add_block(m102, 'constant', 'z', 'Value', 1 + 2i);
+for q = 1:4
+    m102 = add_block(m102, 'outport', sprintf('y%d', q));
+end
+m102 = add_line(add_line(add_line(m102, 'c', 'd'), 'd', 'g'), 'g', 'y1');
+m102 = add_line(add_line(m102, 'mat', 'y2'), 'k', 'x');
+m102 = add_line(add_line(add_line(m102, 'x', 'mx/1'), 'k', 'mx/2'), 'k', 'mx/3');
+m102 = add_line(add_line(m102, 'mx', 'y3'), 'z', 'y4');
+assert(isequal(get_param(m102, 'd', 'CompiledSampleTime'), [0.2 0.1]) && ...
+       isequal(get_param(m102, 'g', 'CompiledSampleTime'), [0.2 0.1]) && ...
+       isequal(get_param(m102, 'x', 'CompiledSampleTime'), [0 0]) && ...
+       isequal(get_param(m102, 'k', 'CompiledSampleTime'), [Inf 0]), ...
+       'les periodes compilees, le decalage herite compris');
+w102 = get_param(m102, 'mx', 'CompiledPortWidths');
+assert(isequal(w102.Inport, [1 1 1]) && w102.Outport == 3, 'les largeurs');
+d102 = get_param(m102, 'mat', 'CompiledPortDimensions');
+assert(isempty(d102.Inport) && isequal(d102.Outport, [2 2 3]), 'les dimensions');
+t102 = get_param(m102, 'compile102/g', 'CompiledPortDataTypes');
+assert(isequal(t102.Inport, {'int8'}) && isequal(t102.Outport, {'int8'}), 'les types');
+x102 = get_param(m102, 'z', 'CompiledPortComplexSignals');
+assert(x102.Outport == true, 'la complexite');
+p102 = Simulink.BlockDiagram.getSampleTimes(m102);
+assert(isa(p102, 'Simulink.SampleTime') && numel(p102) == 3 && ...
+       isequal(p102(1).Value, [0.2 0.1]) && strcmp(p102(1).Annotation, 'D1') && ...
+       strcmp(p102(1).Description, 'Discrete 1') && strcmp(p102(2).Annotation, 'Cont') && ...
+       strcmp(p102(3).Annotation, 'Inf'), 'les periodes du modele, comme la legende');
+% le gain qui hérite tient sa valeur entre ses instants décalés : la
+r102 = sim(m102, 'Solver', 'ode4', 'FixedStep', 0.05, 'StopTime', 0.4);
+y102 = double(r102.yout(:, 1));
+% sa condition initiale jusqu'à l'instant 0,3, l'entrée échantillonnée en 0,1 ensuite
+assert(all(y102(r102.tout < 0.3 - 1e-12) == 0) && all(y102(r102.tout > 0.3 - 1e-12) == 4), ...
+       'le retard decale, et le gain qui en herite');
+o102 = get_param(m102, 'x', 'ObjectParameters');
+assert(strcmp(o102.InitialCondition.Type, 'string') && ...
+       isequal(o102.Parent.Attributes, {'read-only'}) && ...
+       strcmp(get_param(m102, 'x', 'MaskType'), '') && strcmp(get_param(m102, 'x', 'Mask'), 'off'), ...
+       'ObjectParameters, Mask et MaskType');
+assert(isempty(gcb), 'hors de l''editeur, aucun bloc courant');
+vu102 = '';
+try
+    get_param(m102, 'absent', 'CompiledSampleTime');
+catch err
+    vu102 = err.identifier;
+end
+assert(strcmp(vu102, 'Simulink:Commands:InvSimulinkObjectName'), 'un bloc absent');
+fprintf('compilation lue par get_param, periodes du modele : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
