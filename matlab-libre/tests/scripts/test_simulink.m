@@ -12290,6 +12290,157 @@ end
 fprintf('batterie des solveurs croises : %d simulations, %d refus nommes\n', ...
         nSimules93, nRefuses93);
 
+%% ------------------------------------- 94. Batterie des allers-retours en fichier
+% Chaque type de bloc du catalogue, seul, réglé par défaut puis sur un
+% autre de ses choix : écrit en .slx et relu, écrit en programme .m et
+% rebâti, il doit se simuler exactement comme avant — ou être refusé de
+% la même erreur. Un paramètre qu'un fichier perdrait, ou relirait
+% autrement, se voit ainsi.
+dossier94 = tempname();
+mkdir(dossier94);
+avant94 = pwd();
+cd(dossier94);
+catalogue94 = matlibre_sl_catalogue();
+types94 = {};
+for kT = 1:numel(catalogue94)
+    if ~strcmp(catalogue94(kT).famille, 'Interne')
+        types94{end + 1} = catalogue94(kT).type; %#ok<SAGROW>
+    end
+end
+regle94 = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.5};
+nCompares94 = 0;
+echecs94 = {};
+for kT = 1:numel(types94)
+    entree94 = matlibre_sl_catalogue('type', types94{kT});
+    for variante94 = 1:2
+        decrit94 = types94{kT};
+        reglage94 = {};
+        if variante94 == 2
+            % chaque choix à sa deuxième valeur
+            for q = 1:size(entree94.params, 1)
+                nature94 = entree94.params{q, 3};
+                if iscell(nature94) && numel(nature94) >= 2
+                    reglage94 = [reglage94, entree94.params(q, 1), nature94(2)]; %#ok<AGROW>
+                end
+            end
+            if isempty(reglage94)
+                continue
+            end
+            decrit94 = [types94{kT} ' (choix seconds)'];
+        end
+        try
+            [s94, ok94] = allerModele(types94{kT}, reglage94, 0.5);
+        catch
+            continue   % un réglage que le bloc refuse : la batterie des paramètres en répond
+        end
+        if ~ok94
+            continue
+        end
+        [y94, id94] = allerSimuler(s94, regle94);
+        if any(strcmp(id94, {'refus', 'Simulink:Commands:SousSystemeVide'}))
+            % un sous-système sans modèle : MatLibre le refuse, un fichier le
+            % relit vide, ce que Simulink simule
+            continue
+        end
+        for format94 = {'.slx', '.m'}
+            fichier94 = fullfile(dossier94, ['aller94' format94{1}]);
+            try
+                save_system(s94, fichier94);
+                if strcmp(format94{1}, '.slx')
+                    r94 = load_system(fichier94);
+                else
+                    clear aller94
+                    r94 = feval('aller94');
+                end
+                delete(fichier94);
+            catch err
+                echecs94{end + 1} = sprintf('%s %s : ecriture ou relecture : %s %s', ...
+                                            decrit94, format94{1}, err.identifier, err.message); %#ok<SAGROW>
+                if exist(fichier94, 'file')
+                    delete(fichier94);
+                end
+                continue
+            end
+            [z94, idr94] = allerSimuler(r94, regle94);
+            if ~strcmp(id94, idr94) || (strcmp(id94, 'ok') && ...
+                                        ~(isequal(size(y94), size(z94)) && ...
+                                          all(y94(:) == z94(:) | abs(y94(:) - z94(:)) <= 1e-9 | ...
+                                              (isnan(y94(:)) & isnan(z94(:))))))
+                echecs94{end + 1} = sprintf('%s %s : %s puis %s', decrit94, format94{1}, ...
+                                            id94, idr94); %#ok<SAGROW>
+            end
+            nCompares94 = nCompares94 + 1;
+        end
+    end
+end
+cd(avant94);
+rmdir(dossier94, 's');
+assert(isempty(echecs94), sprintf('allers-retours en fichier : %s', strjoin(echecs94, ' ; ')));
+fprintf('allers-retours en fichier : %d comparaisons, sans ecart\n', nCompares94);
+%% ----------------------------------- 95. Batterie : get_param puis set_param
+% Ce que GET_PARAM rend d'un paramètre se repose par SET_PARAM tel quel —
+% c'est ainsi qu'un script copie le réglage d'un bloc sur un autre — et
+% le modèle se simule exactement comme avant. Chaque paramètre de chaque
+% type de bloc du catalogue, et chaque réglage du modèle.
+catalogue95 = matlibre_sl_catalogue();
+regle95 = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.5};
+nReposes95 = 0;
+echecs95 = {};
+for kT = 1:numel(catalogue95)
+    entree95 = catalogue95(kT);
+    if strcmp(entree95.famille, 'Interne')
+        continue
+    end
+    try
+        [s95, ok95] = allerModele(entree95.type, {}, 0.5);
+    catch
+        continue
+    end
+    if ~ok95
+        continue
+    end
+    [y95, id95] = allerSimuler(s95, regle95);
+    for q = 1:size(entree95.params, 1)
+        nom95 = entree95.params{q, 1};
+        contexte95 = sprintf('%s.%s', entree95.type, nom95);
+        try
+            v95 = get_param(s95, 'b1', nom95);
+        catch err
+            echecs95{end + 1} = sprintf('%s : GET_PARAM %s', contexte95, err.identifier); %#ok<SAGROW>
+            continue
+        end
+        try
+            t95 = set_param(s95, 'b1', nom95, v95);
+        catch err
+            echecs95{end + 1} = sprintf('%s : SET_PARAM de ce que GET_PARAM rend %s : %s', ...
+                                        contexte95, err.identifier, err.message); %#ok<SAGROW>
+            continue
+        end
+        [z95, idr95] = allerSimuler(t95, regle95);
+        if ~strcmp(id95, idr95) || (strcmp(id95, 'ok') && ...
+                                    ~(isequal(size(y95), size(z95)) && ...
+                                      all(y95(:) == z95(:) | abs(y95(:) - z95(:)) <= 1e-12 | ...
+                                          (isnan(y95(:)) & isnan(z95(:))))))
+            echecs95{end + 1} = sprintf('%s : %s puis %s', contexte95, id95, idr95); %#ok<SAGROW>
+        end
+        nReposes95 = nReposes95 + 1;
+    end
+end
+% les réglages du modèle
+m95 = new_system('reglages95');
+for nom95 = fieldnames(matlibre_sl_config('defauts')).'
+    try
+        v95 = get_param(m95, nom95{1});
+        m95 = set_param(m95, nom95{1}, v95);
+        nReposes95 = nReposes95 + 1;
+    catch err
+        echecs95{end + 1} = sprintf('reglage %s : %s : %s', nom95{1}, err.identifier, ...
+                                    err.message); %#ok<SAGROW>
+    end
+end
+assert(isempty(echecs95), sprintf('get_param puis set_param : %s', strjoin(echecs95, ' ; ')));
+fprintf('get_param puis set_param : %d parametres et reglages reposes, sans ecart\n', nReposes95);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -12785,4 +12936,41 @@ function m = boucle76(nom, b, c, domaine, deux)
         m = add_line(m, 'u', 'procede');
     end
     m = add_line(m, 'procede', 'y');
+end
+
+% Simuler, et rendre les sorties, ou l'identifiant de l'erreur.
+function [y, id] = allerSimuler(s, regle)
+    y = [];
+    id = 'ok';
+    try
+        evalc('r = sim(s, regle{:});');
+        y = double(r.yout);
+    catch err
+        id = err.identifier;
+        if isempty(id)
+            id = 'refus';
+        end
+    end
+end
+
+% Un bloc seul, réglé, ses entrées sur des constantes, ses sorties sur
+% des Outport.
+function [s, ok] = allerModele(type, reglage, valeur)
+    s = add_block(new_system('aller94'), type, 'b1', reglage{:});
+    ok = false;
+    [ne, ns] = matlibre_sl_ports(s.blocs{1});
+    if isnan(ne) || isnan(ns)
+        return
+    end
+    for i = 1:ne
+        source = sprintf('c%d', i);
+        s = add_block(s, 'constant', source, 'Value', valeur);
+        s = add_line(s, [source '/1'], sprintf('b1/%d', i));
+    end
+    for j = 1:ns
+        puits = sprintf('o%d', j);
+        s = add_block(s, 'outport', puits);
+        s = add_line(s, sprintf('b1/%d', j), [puits '/1']);
+    end
+    ok = true;
 end
