@@ -4634,6 +4634,15 @@ function y = produit(T, k, V, u, p, e)
     y = [];
     for j = 1:nIn
         M = reshape(V(T.eA(e + j):T.eB(e + j)), T.P(d + 2 * j - 2), T.P(d + 2 * j - 1));
+        if ops(j) < 0 && isfield(T, 'niveaux') && isfield(T.niveaux, 'singuliere') && ...
+           T.niveaux.singuliere > 0 && (size(M, 1) ~= size(M, 2) || rcond(M) < eps)
+            % CheckMatrixSingularityMsg : la matrice que le produit inverse
+            % est singulière
+            alerter(T, T.niveaux.singuliere, 'Simulink:blocks:ProductSingularMatrix', ...
+                    sprintf('singuliere:%d', k), ...
+                    sprintf(['Le produit matriciel de ''%s'' inverse son entree %d, une matrice ' ...
+                             'singuliere (CheckMatrixSingularityMsg).'], T.chemins{k}, j));
+        end
         if j == 1
             if ops(1) > 0
                 y = M;
@@ -4647,10 +4656,6 @@ function y = produit(T, k, V, u, p, e)
         end
     end
     y = y(:);
-    if ~all(isfinite(y)) && any(ops < 0)
-        warning('Simulink:blocks:ProductSingularMatrix', ...
-                'Le produit matriciel de ''%s'' inverse une matrice singuliere.', T.chemins{k});
-    end
 end
 
 function V = fonctionMath(T, k, V, u, p, e, a, b)

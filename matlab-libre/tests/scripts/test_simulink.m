@@ -11611,6 +11611,44 @@ assert(isempty(id87) && strcmp(vu87, 'Simulink:DataStores:WriteAfterWrite'), ...
 evalin('base', 'clear G87');
 fprintf('acces aux memoires partagees : ok\n');
 
+%% ---------------------------- 88. Un produit qui inverse une matrice singulière
+% Le diagnostic « Division by singular matrix » de Simulink
+% (CheckMatrixSingularityMsg) : un Product en multiplication matricielle
+% qui inverse une entrée singulière ne dit rien par défaut, avertit en se
+% nommant, ou arrête la simulation. Une entrée inversible ne dit jamais
+% rien.
+m88 = new_system('singulier88');
+m88 = add_block(m88, 'constant', 'A', 'Value', [1 2; 2 4]);
+m88 = add_block(m88, 'constant', 'B', 'Value', eye(2));
+m88 = add_block(m88, 'product', 'p', 'Inputs', '*/', 'Multiplication', 'Matrix(*)');
+m88 = add_block(m88, 'terminator', 't');
+m88 = add_line(add_line(add_line(m88, 'B', 'p/1'), 'A', 'p/2'), 'p', 't');
+regle88 = {'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1};
+assert(strcmp(get_param(m88, 'CheckMatrixSingularityMsg'), 'none'), ...
+       'CheckMatrixSingularityMsg vaut none par defaut, comme dans Simulink');
+lastwarn('');
+evalc('sim(m88, regle88{:});');
+[~, id88] = lastwarn();
+assert(~strcmp(id88, 'Simulink:blocks:ProductSingularMatrix'), 'none : rien n''est dit');
+lastwarn('');
+evalc('sim(m88, regle88{:}, ''CheckMatrixSingularityMsg'', ''warning'');');
+[texte88, id88] = lastwarn();
+assert(strcmp(id88, 'Simulink:blocks:ProductSingularMatrix') && ...
+       ~isempty(strfind(texte88, 'singulier88/p')), 'warning : l''avertissement nomme le bloc');
+vu88 = '';
+try
+    evalc('sim(m88, regle88{:}, ''CheckMatrixSingularityMsg'', ''error'');');
+catch err
+    vu88 = err.identifier;
+end
+assert(strcmp(vu88, 'Simulink:blocks:ProductSingularMatrix'), 'error : la simulation s''arrete');
+lastwarn('');
+evalc(['sim(set_param(m88, ''A'', ''Value'', [2 1; 1 3]), regle88{:}, ' ...
+       '''CheckMatrixSingularityMsg'', ''error'');']);
+[~, id88] = lastwarn();
+assert(~strcmp(id88, 'Simulink:blocks:ProductSingularMatrix'), 'une matrice inversible : rien');
+fprintf('produit matriciel singulier : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

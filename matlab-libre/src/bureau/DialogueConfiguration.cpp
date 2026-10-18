@@ -330,6 +330,10 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
     nouvelleListe(QStringLiteral("IntegerSaturationMsg"), formulaireDonneesDiag,
                   QStringLiteral("un entier déborde et sature"), kNiveaux,
                   QStringLiteral("… et s'y arrête : SaturateOnIntegerOverflow"));
+    nouvelleListe(QStringLiteral("CheckMatrixSingularityMsg"), formulaireDonneesDiag,
+                  QStringLiteral("un produit inverse une matrice singulière"), kNiveaux,
+                  QStringLiteral("Un Product en multiplication matricielle, dont une entrée "
+                                 "divisée est singulière"));
     colonneDiagnostics->addWidget(groupeDonneesDiag);
     auto* groupeMemoires = new QGroupBox(QStringLiteral("Mémoires partagées"));
     auto* formulaireMemoires = new QFormLayout(groupeMemoires);
