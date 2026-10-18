@@ -12893,6 +12893,107 @@ assert(~isempty(strfind(message99, 'zenon99/s')), 'Zenon : le Sign qui bascule e
 fprintf('diagnostics : %d essais, chacun se tait, avertit ou arrete comme il le doit\n', ...
         nEssais99);
 
+%% ------------------------------------------- 100. Batterie des noms de blocs
+% Simulink admet dans un nom de bloc des espaces, des accents, des
+% apostrophes, des guillemets, des retours à la ligne, des chiffres en
+% tête, et la barre oblique, qu'un chemin double (« a//b »). Chaque nom
+% de la liste, donné à un gain entre une constante et une sortie, doit
+% se relier, se régler, se simuler, s'écrire en .slx et en .m et se
+% relire, et nommer le bloc dans les erreurs.
+listeNoms100 = {'mon gain', 'gain é à ù', 'l''apostrophe', 'guillemets "x"', ...
+           ['deux' char(10) 'lignes'], '2gain', 'a//b', 'tab	ulation', 'é', ...
+           'signe+moins-', 'parenthèses (k)', 'virgule, point.', 'Gain'};
+dossier100 = tempname();
+mkdir(dossier100);
+avant100 = pwd();
+cd(dossier100);
+echecs100 = {};
+for kN = 1:numel(listeNoms100)
+    nom100 = listeNoms100{kN};
+    affiche100 = strrep(nom100, char(10), '\n');
+    try
+        m100 = new_system('noms100');
+        m100 = add_block(m100, 'constant', 'c', 'Value', 3);
+        m100 = add_block(m100, 'gain', nom100, 'Gain', 2);
+        m100 = add_block(m100, 'outport', 'y');
+        m100 = add_line(add_line(m100, 'c', nom100), nom100, 'y');
+        % un bloc que MatLibre écrit en MATLAB Function, nommé de même : son
+        % code porte le nom
+        m100 = add_block(m100, 'selector', [nom100 ' s'], 'IndexOptionArray', ...
+                         {'Index vector (dialog)'}, 'IndexParamArray', {1});
+        m100 = add_block(m100, 'outport', 'y2');
+        m100 = add_line(add_line(m100, 'c', [nom100 ' s']), [nom100 ' s'], 'y2');
+        m100 = set_param(m100, nom100, 'Gain', 5);
+        if get_param(m100, nom100, 'Gain') ~= 5
+            echecs100{end + 1} = sprintf('%s : set_param puis get_param', affiche100); %#ok<SAGROW>
+        end
+        r100 = sim(m100, 'StopTime', 0.1);
+        if ~isequal(r100.yout(end, :), [15 3])
+            echecs100{end + 1} = sprintf('%s : %s au lieu de [15 3]', affiche100, ...
+                                         mat2str(r100.yout(end, :))); %#ok<SAGROW>
+        end
+    catch err
+        echecs100{end + 1} = sprintf('%s : %s %s', affiche100, err.identifier, err.message); %#ok<SAGROW>
+        continue
+    end
+    % les fichiers
+    for format100 = {'.slx', '.m'}
+        try
+            fichier100 = fullfile(dossier100, ['noms100' format100{1}]);
+            save_system(m100, fichier100);
+            if strcmp(format100{1}, '.slx')
+                relu100 = load_system(fichier100);
+            else
+                clear noms100
+                relu100 = feval('noms100');
+            end
+            delete(fichier100);
+            r100 = sim(relu100, 'StopTime', 0.1);
+            trouve100 = any(cellfun(@(b) strcmp(b.nom, nom100), relu100.blocs));
+            if ~isequal(r100.yout(end, :), [15 3]) || ~trouve100
+                echecs100{end + 1} = sprintf('%s %s : relu autrement', affiche100, ...
+                                             format100{1}); %#ok<SAGROW>
+            end
+        catch err
+            echecs100{end + 1} = sprintf('%s %s : %s %s', affiche100, format100{1}, ...
+                                         err.identifier, err.message); %#ok<SAGROW>
+            if exist(fichier100, 'file')
+                delete(fichier100);
+            end
+        end
+    end
+    % une erreur nomme le bloc par son chemin
+    try
+        sim(set_param(m100, nom100, 'Gain', 'inconnue100'), 'StopTime', 0.1);
+        echecs100{end + 1} = sprintf('%s : un gain inconnu passe', affiche100); %#ok<SAGROW>
+    catch err
+        if isempty(strfind(err.message, ['noms100/' nom100]))
+            echecs100{end + 1} = sprintf('%s : l''erreur ne nomme pas le bloc : %s', ...
+                                         affiche100, err.message); %#ok<SAGROW>
+        end
+    end
+end
+% un texte sur plusieurs lignes, apostrophe comprise : le code d'un bloc
+% MATLAB Function s'écrit en .m et se relit
+f100 = new_system('code100');
+f100 = add_block(f100, 'constant', 'c', 'Value', 3);
+f100 = add_block(f100, 'matlabfunction', 'f', 'Script', ...
+                 sprintf('function y = fcn(u)\n%% l''apostrophe\ny = 2*u;'));
+f100 = add_block(f100, 'outport', 'y');
+f100 = add_line(add_line(f100, 'c', 'f'), 'f', 'y');
+save_system(f100, fullfile(dossier100, 'code100.m'));
+clear code100
+g100 = feval('code100');
+r100 = sim(g100, 'StopTime', 0.1);
+if r100.yout(end) ~= 6 || ~strcmp(get_param(g100, 'f', 'Script'), get_param(f100, 'f', 'Script'))
+    echecs100{end + 1} = 'le code d''un bloc MATLAB Function sur plusieurs lignes, en .m';
+end
+cd(avant100);
+rmdir(dossier100, 's');
+assert(isempty(echecs100), sprintf('noms de blocs : %s', strjoin(echecs100, ' ; ')));
+fprintf('noms de blocs : %d noms difficiles, relies, regles, simules, ecrits et relus\n', ...
+        numel(listeNoms100));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

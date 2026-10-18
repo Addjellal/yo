@@ -179,8 +179,29 @@ function oui = estModele(valeur)
           isfield(valeur, 'liens') && isfield(valeur, 'nom');
 end
 
+% Un texte entre apostrophes, doublées. Un retour à la ligne ne tient pas
+% dans une chaîne de MATLAB : le texte s'y recoud par char(10) — le nom
+% d'un bloc sur deux lignes, le code d'un bloc MATLAB Function.
 function texte = citer(valeur)
-    texte = ['''' strrep(char(valeur), '''', '''''') ''''];
+    s = char(valeur);
+    coupures = find(s == char(10) | s == char(13));
+    if isempty(coupures)
+        texte = ['''' strrep(s, '''', '''''') ''''];
+        return
+    end
+    morceaux = {};
+    debut = 1;
+    for i = coupures
+        if i > debut
+            morceaux{end + 1} = ['''' strrep(s(debut:i - 1), '''', '''''') '''']; %#ok<AGROW>
+        end
+        morceaux{end + 1} = sprintf('char(%d)', double(s(i))); %#ok<AGROW>
+        debut = i + 1;
+    end
+    if debut <= numel(s)
+        morceaux{end + 1} = ['''' strrep(s(debut:end), '''', '''''') ''''];
+    end
+    texte = ['[' strjoin(morceaux, ' ') ']'];
 end
 
 % Une valeur de paramètre se réécrit telle qu'un programme la relira.
