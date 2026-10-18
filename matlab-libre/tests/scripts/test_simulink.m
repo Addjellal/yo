@@ -12007,6 +12007,121 @@ r91 = sim(f91);
 assert(abs(r91.tout(2) - 0.05) < 1e-12, 'le modele relu se simule sous sa contrainte');
 fprintf('volet Solveur au complet : ok\n');
 
+%% ------------------------------------------- 92. Les références de sous-système
+% Un fichier de sous-système — NEW_SYSTEM(NOM, 'Subsystem') — ne se simule
+% pas seul : des blocs Subsystem Reference le désignent par son nom
+% (ReferencedSubsystem), et la compilation le déroule à leur place, chaque
+% instance avec ses états. Il se relit à chaque simulation, s'écrit et se
+% relit en .slx et en .m ; ce qui n'en est pas un est refusé en nommant le
+% bloc.
+double92 = new_system('double92', 'Subsystem');
+double92 = add_block(double92, 'inport', 'u');
+double92 = add_block(double92, 'gain', 'g', 'Gain', 2);
+double92 = add_block(double92, 'integrator', 'x', 'InitialCondition', 0);
+double92 = add_block(double92, 'outport', 'y');
+double92 = add_block(double92, 'outport', 'somme');
+double92 = add_line(add_line(add_line(double92, 'u', 'g'), 'g', 'y'), 'g', 'x');
+double92 = add_line(double92, 'x', 'somme');
+assert(strcmp(get_param(double92, 'BlockDiagramType'), 'subsystem'), ...
+       'NEW_SYSTEM(NOM, ''Subsystem'') : un fichier de sous-systeme');
+vu92 = '';
+try
+    sim(double92);
+catch err
+    vu92 = err.identifier;
+end
+assert(strcmp(vu92, 'Simulink:SubsystemReference:CannotSimulateSubsystemFile'), ...
+       'un fichier de sous-systeme ne se simule pas seul');
+% deux instances, chacune ses états
+m92 = new_system('reference92');
+m92 = add_block(m92, 'constant', 'a', 'Value', 3);
+m92 = add_block(m92, 'constant', 'b', 'Value', -1);
+m92 = add_block(m92, 'subsystemreference', 'r1', 'ReferencedSubsystem', 'double92');
+m92 = add_block(m92, 'subsystemreference', 'r2', 'ReferencedSubsystem', 'double92');
+for q = 1:4
+    m92 = add_block(m92, 'outport', sprintf('y%d', q));
+end
+m92 = add_line(add_line(m92, 'a', 'r1'), 'b', 'r2');
+m92 = add_line(add_line(m92, 'r1/1', 'y1'), 'r1/2', 'y2');
+m92 = add_line(add_line(m92, 'r2/1', 'y3'), 'r2/2', 'y4');
+[ne92, ns92] = matlibre_sl_ports(m92.blocs{3});
+assert(ne92 == 1 && ns92 == 2, 'les ports d''une reference : ceux du fichier');
+regle92 = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 1};
+r92 = sim(m92, regle92{:});
+assert(max(abs(r92.yout(end, :) - [6 6 -2 -2])) < 1e-9, ...
+       'deux instances, deux entrees, deux integrateurs');
+% le fichier change : la référence suit
+double92 = set_param(double92, 'g', 'Gain', 5);
+r92 = sim(m92, regle92{:});
+assert(max(abs(r92.yout(end, :) - [15 15 -5 -5])) < 1e-9, 'relu a chaque simulation');
+% ce qui est refusé, en nommant le bloc
+modele92 = new_system('modele92');
+modele92 = add_block(modele92, 'inport', 'u');
+modele92 = add_block(modele92, 'outport', 'y');
+modele92 = add_line(modele92, 'u', 'y');
+refus92 = {'', 'Simulink:SubsystemReference:EmptyReference'; ...
+           'inexistant92', 'Simulink:SubsystemReference:SubsystemNotFound'; ...
+           'modele92', 'Simulink:SubsystemReference:NotASubsystemFile'};
+for q = 1:size(refus92, 1)
+    f92 = new_system('refus92');
+    f92 = add_block(f92, 'subsystemreference', 'r', 'ReferencedSubsystem', refus92{q, 1});
+    vu92 = '';
+    message92 = '';
+    try
+        sim(f92, regle92{:});
+    catch err
+        vu92 = err.identifier;
+        message92 = err.message;
+    end
+    assert(strcmp(vu92, refus92{q, 2}) && ~isempty(strfind(message92, 'refus92/r')), ...
+           sprintf('reference ''%s'' : %s (%s)', refus92{q, 1}, vu92, message92));
+end
+f92 = new_system('refus92');
+f92 = add_block(f92, 'constant', 'c', 'Value', 1);
+f92 = add_block(f92, 'modelreference', 'm', 'ModelName', 'double92');
+f92 = add_block(f92, 'terminator', 't1');
+f92 = add_block(f92, 'terminator', 't2');
+f92 = add_line(add_line(add_line(f92, 'c', 'm'), 'm/1', 't1'), 'm/2', 't2');
+vu92 = '';
+try
+    sim(f92, regle92{:});
+catch err
+    vu92 = err.identifier;
+end
+assert(strcmp(vu92, 'Simulink:modelReference:SubsystemFileReferenced'), ...
+       'un bloc Model ne reference pas un fichier de sous-systeme');
+vu92 = '';
+try
+    new_system('autre92', 'Autre');
+catch err
+    vu92 = err.message;
+end
+assert(~isempty(strfind(vu92, 'Subsystem')), 'NEW_SYSTEM dit les trois types');
+% le fichier et le modèle s'écrivent et se relisent : .slx et .m
+dossier92 = tempname();
+mkdir(dossier92);
+avant92 = pwd();
+cd(dossier92);
+save_system(double92, fullfile(dossier92, 'double92.slx'));
+relu92 = load_system(fullfile(dossier92, 'double92.slx'));
+assert(strcmp(get_param(relu92, 'BlockDiagramType'), 'subsystem'), ...
+       'le .slx garde le genre du diagramme');
+save_system(m92, fullfile(dossier92, 'reference92.slx'));
+clear double92
+mr92 = load_system(fullfile(dossier92, 'reference92.slx'));
+types92 = cellfun(@(b) b.type, mr92.blocs, 'UniformOutput', false);
+assert(sum(strcmp(types92, 'subsystemreference')) == 2, 'les Subsystem Reference relus du .slx');
+r92 = sim(mr92, regle92{:});
+assert(max(abs(r92.yout(end, :) - [15 15 -5 -5])) < 1e-9, ...
+       'le modele relu deroule le fichier de sous-systeme relu du dossier');
+delete(fullfile(dossier92, 'double92.slx'));
+save_system(relu92, fullfile(dossier92, 'double92.m'));
+r92 = sim(mr92, regle92{:});
+assert(max(abs(r92.yout(end, :) - [15 15 -5 -5])) < 1e-9, 'le fichier de sous-systeme en .m');
+cd(avant92);
+rmdir(dossier92, 's');
+fprintf('references de sous-systeme : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

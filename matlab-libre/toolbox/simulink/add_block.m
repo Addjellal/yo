@@ -488,6 +488,8 @@ function modele = add_block(modele, type, nom, varargin)
 %                  ShowDefaultCase
 %     modelreference ModelName             un autre modèle — variable,
 %                  fichier .m, .slx ou .mdl —, relu à chaque simulation
+%     subsystemreference ReferencedSubsystem  un fichier de sous-système,
+%                  NEW_SYSTEM(NOM, 'Subsystem'), déroulé à sa place
 %
 %   Le sous-système porte le modèle qu'il abrège, bâti comme les autres
 %   par NEW_SYSTEM. Ses blocs INPORT sont ses entrées et ses blocs OUTPORT

@@ -72,6 +72,9 @@ function modele = lire(fichier)
                'fausserait.'], D.nom, numel(refuses), strjoin(refuses, ', '));
     end
     modele = poserConfiguration(modele, D.config);
+    if isfield(D, 'genre') && ~isempty(D.genre)
+        modele.parametres.BlockDiagramType = D.genre;
+    end
 end
 
 % Un .slx : l'archive s'ouvre dans un dossier temporaire, puis chaque
@@ -94,6 +97,16 @@ function D = lireSlxArchive(fichier, base)
     end
     racine = matlibre_xml_analyser(fileread(principal));
     modeleXml = enfant(racine, 'Model');
+    genre = '';
+    % une bibliothèque, un fichier de sous-système
+    for autre = {'Library', 'Subsystem'}
+        if isempty(modeleXml)
+            modeleXml = enfant(racine, autre{1});
+            if ~isempty(modeleXml)
+                genre = lower(autre{1});
+            end
+        end
+    end
     if isempty(modeleXml)
         if strcmp(racine.Name, 'Model')
             modeleXml = racine;
@@ -102,7 +115,7 @@ function D = lireSlxArchive(fichier, base)
                   'simulink/blockdiagram.xml ne porte pas d''element Model.');
         end
     end
-    D = struct('nom', base, 'defauts', struct(), 'config', struct());
+    D = struct('nom', base, 'defauts', struct(), 'config', struct(), 'genre', genre);
     if isfield(modeleXml.Attributes, 'Name')
         D.nom = modeleXml.Attributes.Name;
     end
@@ -648,6 +661,9 @@ function [type, refus] = typeDe(b)
         return
     end
     candidats = {b.type};
+    if strcmp(b.type, 'SubSystem') && isfield(P, 'ReferencedSubsystem')
+        candidats = {'Subsystem Reference'};   % un sous-système qui désigne son fichier
+    end
     if any(strcmp(b.type, {'Inport', 'Outport'})) && isfield(P, 'IsBusElementPort') && ...
        strcmpi(char(P.IsBusElementPort), 'on')
         % un port d'élément de bus : In Bus Element, Out Bus Element
@@ -877,7 +893,8 @@ function ecrire(modele, fichier)
          'relationships/blockDiagram"/></Relationships>']);
     lignes = {'<?xml version="1.0" encoding="utf-8"?>', ...
               '<ModelInformation Version="1.0">', ...
-              sprintf('  <Model Name="%s">', matlibre_xml_echapper(modele.nom))};
+              sprintf('  <%s Name="%s">', elementDiagramme(modele), ...
+                      matlibre_xml_echapper(modele.nom))};
     config = matlibre_sl_config('lire', modele);
     toujours = {'StartTime', 'StopTime', 'SolverType', 'Solver', 'FixedStep', 'RelTol', ...
                 'AbsTol', 'MaxStep', 'MinStep', 'InitialStep', 'ZeroCrossControl', ...
@@ -898,7 +915,7 @@ function ecrire(modele, fichier)
     end
     compteur = 0;
     [lignes, ~] = ecrireSysteme(modele, lignes, '    ', compteur);
-    lignes = [lignes, {'  </Model>', '</ModelInformation>'}];
+    lignes = [lignes, {sprintf('  </%s>', elementDiagramme(modele)), '</ModelInformation>'}];
     ecrireTexte(fullfile(dossier, 'simulink', 'blockdiagram.xml'), strjoin(lignes, sprintf('\n')));
     mkdir(fullfile(dossier, 'matlibre'));
     ecrireTexte(fullfile(dossier, 'matlibre', 'auteur.xml'), ...
@@ -924,6 +941,12 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
         b = modele.blocs{k};
         entree = matlibre_sl_catalogue('type', b.type);
         typeSimulink = entree.simulink;
+        if strcmp(entree.type, 'subsystemreference')
+            typeSimulink = 'SubSystem';   % un sous-système qui désigne son fichier
+            if ~isfield(b.parametres, 'ReferencedSubsystem')
+                b.parametres.ReferencedSubsystem = '';   % vide, il reste une référence
+            end
+        end
         reference = '';
         if (referenceDeBibliotheque(entree.type) || strcmp(typeSimulink, 'SimscapeBlock')) && ...
            ~isempty(entree.chemins)
@@ -1193,6 +1216,20 @@ function t = texteStructure(s)
         end
     end
     t = ['struct(' strjoin(morceaux, ', ') ')'];
+end
+
+% L'élément qui porte le diagramme : Model, Library pour une bibliothèque,
+% Subsystem pour un fichier de sous-système.
+function element = elementDiagramme(modele)
+    element = 'Model';
+    if isfield(modele, 'parametres') && isfield(modele.parametres, 'BlockDiagramType')
+        switch lower(char(modele.parametres.BlockDiagramType))
+            case 'library'
+                element = 'Library';
+            case 'subsystem'
+                element = 'Subsystem';
+        end
+    end
 end
 
 function t = texteValeur(v)

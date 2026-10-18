@@ -17,6 +17,11 @@ function modele = new_system(nom, genre)
 %   y garde le lien — la bibliothèque changée, le bloc suit —, mais elle ne
 %   se simule pas elle-même.
 %
+%   NEW_SYSTEM(NOM,'Subsystem') crée un fichier de sous-système : un bloc
+%   Subsystem Reference le désigne par son nom (ReferencedSubsystem), et
+%   la compilation le déroule à sa place, comme un sous-système. Il ne se
+%   simule pas seul.
+%
 %   Les modèles se décrivent ici en appelant ces fonctions, ou se lisent
 %   d'un fichier .slx ou .mdl de Simulink par LOAD_SYSTEM. SAVE_SYSTEM en
 %   écrit un programme .m, ou un .slx, que LOAD_SYSTEM relit.
@@ -40,10 +45,13 @@ function modele = new_system(nom, genre)
         switch lower(char(genre))
             case 'library'
                 modele.parametres.BlockDiagramType = 'library';
+            case 'subsystem'
+                modele.parametres.BlockDiagramType = 'subsystem';
             case 'model'
             otherwise
                 error('Simulink:Commands:NewSystemType', ...
-                      'NEW_SYSTEM(NOM,TYPE) : le type est ''Model'' ou ''Library''.');
+                      ['NEW_SYSTEM(NOM,TYPE) : le type est ''Model'', ''Library'' ou ' ...
+                       '''Subsystem''.']);
         end
     end
 end

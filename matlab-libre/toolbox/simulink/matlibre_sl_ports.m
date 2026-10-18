@@ -140,6 +140,19 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             [nEntrees, nSorties] = bornesSousSysteme(p);
         case {'lookup', 'directlookup'}
             nEntrees = entier(lire(p, 'NumberOfTableDimensions', 1));
+        case 'subsystemreference'
+            nom = lire(p, 'ReferencedSubsystem', '');
+            if isempty(nom)
+                nEntrees = 0;
+                nSorties = 0;
+            else
+                try
+                    [nEntrees, nSorties] = bornesSousSysteme(struct('Model', char(nom)));
+                catch
+                    nEntrees = NaN;   % un fichier introuvable : la compilation le dira
+                    nSorties = NaN;
+                end
+            end
         case 'modelreference'
             nom = lire(p, 'ModelName', '');
             if isempty(nom)

@@ -624,7 +624,8 @@ end
 function k = premier(modele)
     k = 0;
     for j = 1:numel(modele.blocs)
-        if any(strcmp(modele.blocs{j}.type, {'subsystem', 'modelreference'}))
+        if any(strcmp(modele.blocs{j}.type, {'subsystem', 'modelreference', ...
+                                             'subsystemreference'}))
             k = j;
             return
         end
@@ -847,6 +848,42 @@ function p = typeDuPort(parametres)
 end
 
 function interne = contenu(bloc, chemin)
+    if strcmp(bloc.type, 'subsystemreference')
+        % Un Subsystem Reference déroule à sa place le fichier de
+        % sous-système qu'il désigne, relu à chaque simulation.
+        nom = lireParametre(bloc.parametres, 'ReferencedSubsystem', '');
+        if isstring(nom) && isscalar(nom)
+            nom = char(nom);
+        end
+        if ~ischar(nom) || size(nom, 1) > 1
+            error('Simulink:SubsystemReference:InvalidReference', ...
+                  ['Le Subsystem Reference ''%s'' designe son fichier de sous-systeme par ' ...
+                   'un nom, en texte (ReferencedSubsystem).'], chemin);
+        end
+        nom = strtrim(nom);
+        if isempty(nom)
+            error('Simulink:SubsystemReference:EmptyReference', ...
+                  ['Le Subsystem Reference ''%s'' ne designe pas de fichier de sous-systeme ' ...
+                   '(ReferencedSubsystem).'], chemin);
+        end
+        nom = regexprep(nom, '\.(slx|mdl)$', '');
+        try
+            interne = matlibre_sl_modele(nom);
+        catch err
+            error('Simulink:SubsystemReference:SubsystemNotFound', ...
+                  'Le Subsystem Reference ''%s'' designe ''%s'', introuvable : %s', ...
+                  chemin, nom, err.message);
+        end
+        genre = genreDiagramme(interne);
+        if ~strcmp(genre, 'subsystem')
+            error('Simulink:SubsystemReference:NotASubsystemFile', ...
+                  ['Le Subsystem Reference ''%s'' designe ''%s'', qui est un%s et non un ' ...
+                   'fichier de sous-systeme : un fichier de sous-systeme se cree par ' ...
+                   'NEW_SYSTEM(NOM, ''Subsystem''), un modele se reference par un bloc Model.'], ...
+                  chemin, nom, libelleDiagramme(genre));
+        end
+        return
+    end
     if strcmp(bloc.type, 'modelreference')
         % Une référence de modèle relit son modèle à chaque simulation.
         nom = '';
@@ -865,6 +902,11 @@ function interne = contenu(bloc, chemin)
             error('Simulink:modelReference:ModelNotFound', ...
                   'La reference de modele ''%s'' designe ''%s'', introuvable : %s', ...
                   chemin, nom, err.message);
+        end
+        if strcmp(genreDiagramme(interne), 'subsystem')
+            error('Simulink:modelReference:SubsystemFileReferenced', ...
+                  ['La reference de modele ''%s'' designe ''%s'', un fichier de ' ...
+                   'sous-systeme : c''est un Subsystem Reference qui le deroule.'], chemin, nom);
         end
         return
     end
@@ -901,8 +943,9 @@ end
 % valent zéro.
 function nouveau = choisirVariante(interne, p, chemin)
     types = cellfun(@(b) typeCanonique(b.type), interne.blocs, 'UniformOutput', false);
-    choix = find(ismember(types, {'subsystem', 'modelreference'}));
-    autres = find(~ismember(types, {'subsystem', 'modelreference', 'inport', 'outport'}));
+    choix = find(ismember(types, {'subsystem', 'modelreference', 'subsystemreference'}));
+    autres = find(~ismember(types, {'subsystem', 'modelreference', 'subsystemreference', ...
+                                    'inport', 'outport'}));
     if ~isempty(autres)
         error('Simulink:Variants:InvalidBlockInVariant', ...
               ['Le sous-systeme a variantes ''%s'' ne porte que ses ports et ses ' ...
@@ -995,6 +1038,24 @@ function [noms, rangs] = portsNommes(modele, type)
     % le rang du port est sa place parmi les autres, comme au dépliage
     [~, ordre] = sort(rangs);
     rangs(ordre) = 1:numel(rangs);
+end
+
+% Ce qu'est un diagramme : 'model', 'library' ou 'subsystem'
+% (BlockDiagramType).
+function genre = genreDiagramme(modele)
+    genre = 'model';
+    if isfield(modele, 'parametres') && isfield(modele.parametres, 'BlockDiagramType')
+        genre = lower(char(modele.parametres.BlockDiagramType));
+    end
+end
+
+function texte = libelleDiagramme(genre)
+    switch genre
+        case 'library'
+            texte = 'e bibliotheque';
+        otherwise
+            texte = ' modele';
+    end
 end
 
 function v = lireParametre(p, nom, defaut)
@@ -1128,7 +1189,7 @@ end
 % sinon — une constante (Inf) mise à part. Un bloc continu y est refusé.
 function enfant = imposerPeriode(enfant, ts, chemin)
     nom = [chemin '/' regexprep(char(enfant.nom), '^.*/', '')];
-    if any(strcmp(enfant.type, {'subsystem', 'modelreference'}))
+    if any(strcmp(enfant.type, {'subsystem', 'modelreference', 'subsystemreference'}))
         enfant.periodeImposee = ts;
         return
     end
