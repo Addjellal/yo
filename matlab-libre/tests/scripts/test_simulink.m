@@ -12726,6 +12726,173 @@ assert(strcmp(vu98, 'Simulink:Commands:DlinmodPeriode') && ~isempty(strfind(mess
        'DLINMOD ne reechantillonne pas un bloc discret');
 fprintf('linearisations : %d systemes tires au hasard, et le retard d''un pas : ok\n', nCas98);
 
+%% ---------------------------------------------- 99. Batterie des diagnostics
+% Chaque diagnostic du modèle, sur un modèle qui le déclenche, réglé à
+% chacun de ses niveaux : à none, la simulation se tait et va à son
+% terme ; à warning, elle avertit et va à son terme ; à error, elle
+% s'arrête d'une erreur de Simulink qui nomme le bloc ou le modèle — et
+% l'avertissement et l'erreur portent le même identifiant.
+declencheurs99 = struct('reglage', {}, 'modele', {}, 'regle', {});
+% boucle algébrique
+m99 = new_system('boucle99');
+m99 = add_block(m99, 'constant', 'c', 'Value', 1);
+m99 = add_block(m99, 'sum', 's', 'Inputs', '+-');
+m99 = add_block(m99, 'gain', 'g', 'Gain', 0.5);
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(add_line(add_line(m99, 'c', 's/1'), 's', 'g'), 'g', 's/2');
+m99 = add_line(m99, 's', 'y');
+declencheurs99(end + 1) = struct('reglage', 'AlgebraicLoopMsg', 'modele', m99, 'regle', {{}});
+% entrée non reliée, sortie non reliée
+m99 = new_system('nonrelie99');
+m99 = add_block(m99, 'gain', 'g', 'Gain', 2);
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(m99, 'g', 'y');
+declencheurs99(end + 1) = struct('reglage', 'UnconnectedInputMsg', 'modele', m99, 'regle', {{}});
+m99 = new_system('nonrelie99');
+m99 = add_block(m99, 'constant', 'c', 'Value', 1);
+m99 = add_block(m99, 'gain', 'g', 'Gain', 2);
+m99 = add_line(m99, 'c', 'g');
+declencheurs99(end + 1) = struct('reglage', 'UnconnectedOutputMsg', 'modele', m99, 'regle', {{}});
+% infini
+m99 = new_system('infini99');
+m99 = add_block(m99, 'constant', 'a', 'Value', 1);
+m99 = add_block(m99, 'constant', 'b', 'Value', 0);
+m99 = add_block(m99, 'product', 'p', 'Inputs', '*/');
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(add_line(add_line(m99, 'a', 'p/1'), 'b', 'p/2'), 'p', 'y');
+declencheurs99(end + 1) = struct('reglage', 'SignalInfNanChecking', 'modele', m99, 'regle', {{}});
+% entiers qui débordent, repliés ou saturés
+m99 = new_system('entiers99');
+m99 = add_block(m99, 'constant', 'a', 'Value', 'int8(100)');
+m99 = add_block(m99, 'constant', 'b', 'Value', 'int8(100)');
+m99 = add_block(m99, 'sum', 's', 'Inputs', '++');
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(add_line(add_line(m99, 'a', 's/1'), 'b', 's/2'), 's', 'y');
+declencheurs99(end + 1) = struct('reglage', 'IntegerOverflowMsg', 'modele', m99, 'regle', {{}});
+declencheurs99(end + 1) = struct('reglage', 'IntegerSaturationMsg', 'modele', ...
+                                 set_param(m99, 's', 'SaturateOnIntegerOverflow', 'on'), ...
+                                 'regle', {{}});
+% plage de sortie
+m99 = new_system('plage99');
+m99 = add_block(m99, 'constant', 'c', 'Value', 2);
+m99 = add_block(m99, 'gain', 'g', 'Gain', 1, 'OutMax', 1);
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(add_line(m99, 'c', 'g'), 'g', 'y');
+declencheurs99(end + 1) = struct('reglage', 'SignalRangeChecking', 'modele', m99, 'regle', {{}});
+% matrice singulière inversée
+m99 = new_system('singuliere99');
+m99 = add_block(m99, 'constant', 'a', 'Value', eye(2));
+m99 = add_block(m99, 'constant', 'b', 'Value', [1 2; 2 4]);
+m99 = add_block(m99, 'product', 'p', 'Inputs', '*/', 'Multiplication', 'Matrix(*)');
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(add_line(add_line(m99, 'a', 'p/1'), 'b', 'p/2'), 'p', 'y');
+declencheurs99(end + 1) = struct('reglage', 'CheckMatrixSingularityMsg', 'modele', m99, ...
+                                 'regle', {{}});
+% source à période -1
+m99 = new_system('source99');
+m99 = add_block(m99, 'counterfreerunning', 'n', 'SampleTime', -1);
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(m99, 'n', 'y');
+declencheurs99(end + 1) = struct('reglage', 'InheritedTsInSrcMsg', 'modele', m99, 'regle', {{}});
+% paramètres rangés dans un type étroit
+m99 = new_system('parametres99');
+m99 = add_block(m99, 'constant', 'c', 'Value', 2.3, 'OutDataTypeStr', 'int8');
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(m99, 'c', 'y');
+declencheurs99(end + 1) = struct('reglage', 'ParameterPrecisionLossMsg', 'modele', m99, ...
+                                 'regle', {{}});
+declencheurs99(end + 1) = struct('reglage', 'ParameterOverflowMsg', 'modele', ...
+                                 set_param(m99, 'c', 'Value', 300), 'regle', {{}});
+declencheurs99(end + 1) = struct('reglage', 'ParameterDowncastMsg', 'modele', ...
+                                 set_param(m99, 'c', 'Value', 'int32(5)'), 'regle', {{}});
+declencheurs99(end + 1) = struct('reglage', 'ParameterUnderflowMsg', 'modele', ...
+                                 set_param(m99, 'c', 'Value', 1e-6, 'OutDataTypeStr', ...
+                                           'fixdt(1,16,4)'), 'regle', {{}});
+% passages par zéro sans fin : Zénon
+m99 = new_system('zenon99');
+m99 = add_block(m99, 'integrator', 'x', 'InitialCondition', 1);
+m99 = add_block(m99, 'sign', 's');
+m99 = add_block(m99, 'gain', 'g', 'Gain', -1);
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(add_line(add_line(add_line(m99, 'x', 's'), 's', 'g'), 'g', 'x'), 'x', 'y');
+declencheurs99(end + 1) = struct('reglage', 'MaxConsecutiveZCsMsg', 'modele', m99, ...
+                                 'regle', {{'Solver', 'ode45', 'StopTime', 1.1, ...
+                                            'MaxConsecutiveZCs', 20}});
+% transition de cadence sans Rate Transition, en monotâche
+m99 = new_system('cadences99');
+m99 = add_block(m99, 'constant', 'c', 'Value', 1);
+m99 = add_block(m99, 'unitdelay', 'rapide', 'SampleTime', 0.1);
+m99 = add_block(m99, 'unitdelay', 'lent', 'SampleTime', 0.2);
+m99 = add_block(m99, 'outport', 'y');
+m99 = add_line(add_line(add_line(m99, 'c', 'rapide'), 'rapide', 'lent'), 'lent', 'y');
+declencheurs99(end + 1) = struct('reglage', 'SingleTaskRateTransMsg', 'modele', m99, ...
+                                 'regle', {{'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1}});
+regleCommune99 = {'StopTime', 0.5};
+nEssais99 = 0;
+echecs99 = {};
+for kD = 1:numel(declencheurs99)
+    d99 = declencheurs99(kD);
+    regle99 = [regleCommune99, d99.regle];
+    ids99 = struct('warning', '', 'error', '');
+    for niveau99 = {'none', 'warning', 'error'}
+        contexte99 = sprintf('%s = %s', d99.reglage, niveau99{1});
+        lastwarn('');
+        vu99 = '';
+        message99 = '';
+        try
+            evalc('sim(d99.modele, regle99{:}, d99.reglage, niveau99{1});');
+        catch err
+            vu99 = err.identifier;
+            message99 = err.message;
+        end
+        [~, averti99] = lastwarn();
+        switch niveau99{1}
+            case 'none'
+                if ~isempty(vu99)
+                    echecs99{end + 1} = sprintf('%s : arrete (%s : %s)', contexte99, vu99, ...
+                                                message99); %#ok<SAGROW>
+                end
+                ids99.none = averti99;
+            case 'warning'
+                if ~isempty(vu99)
+                    echecs99{end + 1} = sprintf('%s : arrete (%s : %s)', contexte99, vu99, ...
+                                                message99); %#ok<SAGROW>
+                elseif isempty(averti99)
+                    echecs99{end + 1} = sprintf('%s : aucun avertissement', contexte99); %#ok<SAGROW>
+                end
+                ids99.warning = averti99;
+            case 'error'
+                if isempty(vu99)
+                    echecs99{end + 1} = sprintf('%s : la simulation va a son terme', contexte99); %#ok<SAGROW>
+                elseif ~strncmp(vu99, 'Simulink:', 9) || isempty(strfind(message99, d99.modele.nom))
+                    echecs99{end + 1} = sprintf('%s : erreur anonyme %s : %s', contexte99, vu99, ...
+                                                message99); %#ok<SAGROW>
+                end
+                ids99.error = vu99;
+        end
+        nEssais99 = nEssais99 + 1;
+    end
+    if ~isempty(ids99.none) && strcmp(ids99.none, ids99.warning)
+        echecs99{end + 1} = sprintf('%s = none avertit encore (%s)', d99.reglage, ids99.none); %#ok<SAGROW>
+    end
+    if ~isempty(ids99.warning) && ~isempty(ids99.error) && ~strcmp(ids99.warning, ids99.error)
+        echecs99{end + 1} = sprintf('%s : avertissement %s, erreur %s', d99.reglage, ...
+                                    ids99.warning, ids99.error); %#ok<SAGROW>
+    end
+end
+assert(isempty(echecs99), sprintf('diagnostics : %s', strjoin(echecs99, ' ; ')));
+% le diagnostic de Zénon nomme le bloc qui bascule
+message99 = '';
+try
+    sim(declencheurs99(strcmp({declencheurs99.reglage}, 'MaxConsecutiveZCsMsg')).modele, ...
+        'Solver', 'ode45', 'StopTime', 1.1, 'MaxConsecutiveZCs', 20);
+catch err
+    message99 = err.message;
+end
+assert(~isempty(strfind(message99, 'zenon99/s')), 'Zenon : le Sign qui bascule est nomme');
+fprintf('diagnostics : %d essais, chacun se tait, avertit ou arrete comme il le doit\n', ...
+        nEssais99);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

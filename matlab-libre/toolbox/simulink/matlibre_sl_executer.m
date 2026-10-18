@@ -1449,13 +1449,15 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                         consecutifs = 0;
                     end
                     if consecutifs > maxZC
-                        texte = sprintf(['Plus de %d passages par zero consecutifs a t = %g : ' ...
-                                         'le modele bascule sans avancer (comportement de ' ...
-                                         'Zenon). Revoyez le seuil qui bascule, ou coupez la ' ...
-                                         'detection des passages par zero (ZeroCrossControl, ' ...
-                                         'ou le parametre ZeroCross du bloc) ; ' ...
-                                         'MaxConsecutiveZCs et MaxConsecutiveZCsMsg reglent ' ...
-                                         'ce diagnostic.'], maxZC, t);
+                        texte = sprintf(['Plus de %d passages par zero consecutifs a t = %g ' ...
+                                         'dans le modele ''%s'' : il bascule sans avancer ' ...
+                                         '(comportement de Zenon). Ils viennent de %s. Revoyez ' ...
+                                         'le seuil qui bascule, ou coupez la detection des ' ...
+                                         'passages par zero (ZeroCrossControl, ou le ' ...
+                                         'parametre ZeroCross du bloc) ; MaxConsecutiveZCs et ' ...
+                                         'MaxConsecutiveZCsMsg reglent ce diagnostic.'], ...
+                                        maxZC, t, T.nom, ...
+                                        strjoin(blocsQuiBasculent(T, V, Z, x, t, change), ', '));
                         if niveauZC == 2
                             error('Simulink:Engine:SolverConsecutiveZCNum', '%s', texte);
                         end
@@ -2069,6 +2071,26 @@ end
 % MinMax, Saturation, Dead Zone, Relay, Switch, Hit Crossing, Backlash,
 % Coulomb Friction, Compare To Zero et To Constant, et les bornes d'un
 % intégrateur.
+% Les blocs dont un passage par zéro vient de basculer, que nomme le
+% diagnostic de Zénon : chacun rend autant de fonctions que passagesZero
+% lui en compte.
+function noms = blocsQuiBasculent(T, V, Z, x, t, change)
+    noms = {};
+    debut = 0;
+    for k = T.zc
+        T1 = T;
+        T1.zc = k;
+        n = numel(passagesZero(T1, V, Z, x, t));
+        if any(change(debut + 1:min(debut + n, numel(change))))
+            noms{end + 1} = ['''' T.chemins{k} '''']; %#ok<AGROW>
+        end
+        debut = debut + n;
+    end
+    if isempty(noms)
+        noms = {'blocs que le solveur ne distingue pas'};
+    end
+end
+
 function g = passagesZero(T, V, Z, x, t) %#ok<INUSD>
     g = zeros(0, 1);
     for k = T.zc
