@@ -10959,6 +10959,134 @@ for q = 1:size(resolutions81, 1)
 end
 fprintf('Increment - Decrement, Descriptor State-Space, controles : ok\n');
 
+%% ------------------------------------ 82. Le Second-Order Integrator complet
+% Le Second-Order Integrator de Simulink en entier : x et dx/dt bornés —
+% x à sa borne y tient, dx/dt s'annule, et x repart quand u l'en écarte —,
+% x enroulé, conditions initiales lues sur des entrées, remise par une
+% entrée, réinitialisation de dx/dt quand x atteint sa borne — de quoi
+% faire rebondir une balle —, une seule sortie si l'on veut. Les réglages
+% impossibles sont refusés en nommant le bloc.
+precis82 = {'Solver', 'ode45', 'RelTol', 1e-9, 'AbsTol', 1e-12, 'MaxStep', 0.01};
+% libre : x = -t^2/2
+m82 = new_system('soi82');
+m82 = add_block(m82, 'constant', 'u', 'Value', -1);
+m82 = add_block(m82, 'secondorderintegrator', 's');
+m82 = add_block(m82, 'outport', 'x');
+m82 = add_block(m82, 'outport', 'v');
+m82 = add_line(add_line(add_line(m82, 'u', 's'), 's/1', 'x'), 's/2', 'v');
+r82 = sim(m82, precis82{:}, 'StopTime', 2);
+assert(max(abs(r82.yout(:, 1) + r82.tout .^ 2 / 2)) < 1e-9 && ...
+       max(abs(r82.yout(:, 2) + r82.tout)) < 1e-9, 'libre, il integre deux fois');
+% la variante bornée de la bibliothèque : x entre 0 et 1, u = 1
+b82 = add_block(new_system('borne82'), 'step', 'u', 'Time', 2, 'Before', 1, 'After', -1);
+b82 = add_block(b82, 'simulink/Continuous/Integrator, Second-Order Limited', 's');
+b82 = add_block(b82, 'outport', 'x');
+b82 = add_block(b82, 'outport', 'v');
+b82 = add_line(add_line(add_line(b82, 'u', 's'), 's/1', 'x'), 's/2', 'v');
+assert(strcmp(get_param(b82, 's', 'LimitX'), 'on') && ...
+       get_param(b82, 's', 'UpperLimitX') == 1, 'la variante bornee : x entre 0 et 1');
+for solveur = {'ode45', 'ode4'}
+    r82 = sim(b82, 'Solver', solveur{1}, 'FixedStep', 0.001, 'RelTol', 1e-9, 'AbsTol', 1e-12, ...
+              'MaxStep', 0.01, 'StopTime', 3);
+    x82 = @(t) interp1(r82.tout, r82.yout(:, 1), t);
+    v82 = @(t) interp1(r82.tout, r82.yout(:, 2), t);
+    % x = t^2/2 jusqu'à 1 en t = sqrt(2) ; tenu à 1, dx/dt nul ; repart à t = 2
+    assert(abs(x82(1) - 0.5) < 1e-3 && abs(v82(1) - 1) < 1e-3, ...
+           [solveur{1} ' : avant la borne, x = t^2/2']);
+    assert(abs(x82(1.8) - 1) < 1e-9 && abs(v82(1.8)) < 1e-9, ...
+           [solveur{1} ' : a la borne, x tient et dx/dt est nul']);
+    assert(abs(x82(2.5) - (1 - 0.125)) < 2e-3 && abs(v82(2.5) + 0.5) < 2e-3, ...
+           [solveur{1} ' : u l''en ecarte, x repart de sa borne']);
+    assert(all(r82.yout(:, 1) <= 1 + 1e-12) && all(r82.yout(:, 1) >= -1e-12), ...
+           [solveur{1} ' : x ne sort pas de ses bornes']);
+end
+% dx/dt borné à 0,5 : x = t^2/2 jusqu'en t = 0,5, puis x croît de 0,5 par seconde
+d82 = set_param(m82, 'u', 'Value', 1);
+d82 = set_param(d82, 's', 'LimitDXDT', 'on', 'UpperLimitDXDT', 0.5, 'LowerLimitDXDT', -0.5);
+r82 = sim(d82, precis82{:}, 'StopTime', 2);
+assert(abs(r82.yout(end, 1) - (0.125 + 0.5 * 1.5)) < 1e-6 && ...
+       abs(r82.yout(end, 2) - 0.5) < 1e-12, 'dx/dt tenu a sa borne, x croit lineairement');
+% x enroulé dans [-pi, pi[ : dx/dt = 1 constant
+e82 = set_param(m82, 'u', 'Value', 0);
+e82 = set_param(e82, 's', 'ICDXDT', 1, 'WrapX', 'on');
+r82 = sim(e82, precis82{:}, 'StopTime', 4);
+attendu82 = mod(r82.tout + pi, 2 * pi) - pi;
+assert(max(abs(r82.yout(:, 1) - attendu82)) < 1e-6 && all(r82.yout(:, 1) < pi), ...
+       'x enroule entre -pi et pi');
+% la balle qui rebondit : x au-dessus de 0, dx/dt réinitialisé à -0,8 fois
+% la vitesse d'arrivée, lue sur l'entrée dx0
+balle82 = new_system('balle82');
+balle82 = add_block(balle82, 'constant', 'g', 'Value', -9.81);
+balle82 = add_block(balle82, 'secondorderintegrator', 's', 'ICX', 10, ...
+                    'ICSourceDXDT', 'external', 'LimitX', 'on', 'LowerLimitX', 0, ...
+                    'ReinitDXDTwhenXreachesSaturation', 'on');
+balle82 = add_block(balle82, 'gain', 'e', 'Gain', -0.8);
+balle82 = add_block(balle82, 'outport', 'x');
+balle82 = add_line(add_line(balle82, 'g', 's/1'), 's/1', 'x');
+balle82 = add_line(add_line(balle82, 's/2', 'e'), 'e', 's/2');
+r82 = sim(balle82, 'Solver', 'ode45', 'RelTol', 1e-10, 'AbsTol', 1e-12, 'MaxStep', 0.005, ...
+          'StopTime', 3.5);
+t1 = sqrt(2 * 10 / 9.81);
+apres82 = r82.tout > t1 + 0.1 & r82.tout < t1 + 2 * 0.8 * 9.81 * t1 / 9.81 - 0.1;
+assert(all(r82.yout(:, 1) >= -1e-9), 'la balle ne passe pas sous le sol');
+assert(abs(max(r82.yout(apres82, 1)) - 6.4) < 5e-3, ...
+       'apres le rebond, la balle remonte a 0,64 fois sa hauteur');
+% les conditions initiales lues sur leurs entrées, la remise au front montant
+c82 = new_system('externe82');
+c82 = add_block(c82, 'constant', 'u', 'Value', 0);
+c82 = add_block(c82, 'constant', 'x0', 'Value', 3);
+c82 = add_block(c82, 'constant', 'v0', 'Value', 2);
+c82 = add_block(c82, 'step', 'r', 'Time', 1);
+c82 = add_block(c82, 'secondorderintegrator', 's', 'ICSourceX', 'external', ...
+                'ICSourceDXDT', 'external', 'ExternalReset', 'rising');
+c82 = add_block(c82, 'outport', 'x');
+c82 = add_line(add_line(add_line(c82, 'u', 's/1'), 'x0', 's/2'), 'v0', 's/3');
+c82 = add_line(add_line(c82, 'r', 's/4'), 's/1', 'x');
+c82 = add_block(c82, 'terminator', 'fin');
+c82 = add_line(c82, 's/2', 'fin');
+r82 = sim(c82, precis82{:}, 'StopTime', 1.5);
+xr82 = @(t) interp1(r82.tout, r82.yout(:, 1), t);
+assert(abs(r82.yout(1, 1) - 3) < 1e-12 && abs(xr82(0.9) - (3 + 2 * 0.9)) < 1e-6 && ...
+       abs(r82.yout(end, 1) - (3 + 2 * 0.5)) < 1e-6, ...
+       'x0 et dx0 lus sur leurs entrees, et la remise au front les reprend');
+% une seule sortie : dx/dt
+u82 = set_param(m82, 's', 'ShowOutput', 'dxdt');
+u82 = delete_line(u82, 's/2', 'v');
+u82 = delete_block(u82, 'v');
+r82 = sim(u82, precis82{:}, 'StopTime', 1);
+assert(size(r82.yout, 2) == 1 && abs(r82.yout(end) + 1) < 1e-9, ...
+       'ShowOutput dxdt : une seule sortie, dx/dt');
+% l'état de fonctionnement d'un intégrateur borné reprend où il était
+reglage82 = {'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 3};
+entier82 = sim(b82, reglage82{:});
+a82 = sim(b82, reglage82{:}, 'StopTime', 1.7, 'SaveFinalState', 'on', 'SaveOperatingPoint', 'on');
+s82 = sim(b82, reglage82{:}, 'LoadInitialState', 'on', 'InitialState', a82.xFinal);
+garde82 = entier82.tout >= 1.7 - 1e-9;
+assert(max(max(abs(s82.yout - entier82.yout(garde82, :)))) < 1e-12, ...
+       'un Second-Order Integrator borne reprend son etat');
+% ce qui est refusé
+refus82 = {
+    {'LimitX', 'on', 'UpperLimitX', 0, 'LowerLimitX', 1}, 'Simulink:blocks:SecondOrderIntegratorLimits'
+    {'LimitX', 'on', 'LimitDXDT', 'on', 'UpperLimitDXDT', 0}, ...
+        'Simulink:blocks:SecondOrderIntegratorLimits'
+    {'WrapX', 'on', 'WrappedUpperValueX', -4}, 'Simulink:blocks:SecondOrderIntegratorLimits'
+    {'ICX', NaN}, 'Simulink:Parameters:InvalidValue'
+    {'ICX', [1 2], 'ICDXDT', [1 2 3]}, 'Simulink:Engine:DimensionMismatch'
+    };
+for q = 1:size(refus82, 1)
+    vu82 = '';
+    message82 = '';
+    try
+        sim(set_param(m82, 's', refus82{q, 1}{:}), precis82{:}, 'StopTime', 1);
+    catch err
+        vu82 = err.identifier;
+        message82 = err.message;
+    end
+    assert(strcmp(vu82, refus82{q, 2}) && ~isempty(strfind(message82, 'soi82/s')), ...
+           sprintf('Second-Order Integrator, refus %d : %s (%s)', q, vu82, message82));
+end
+fprintf('Second-Order Integrator complet : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

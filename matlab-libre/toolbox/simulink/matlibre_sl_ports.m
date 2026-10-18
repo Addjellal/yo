@@ -86,8 +86,13 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
         case 'xygraph'
             nEntrees = 2;
             nSorties = 0;
-        case 'secondorderintegrator'
-            nSorties = 2;   % x, dx/dt
+        case {'secondorderintegrator', 'secondorderintegratorlimited'}
+            % u, puis x0 et dx0 quand ils viennent d'une entrée, puis la
+            % remise ; x et dx/dt, ou l'un d'eux (ShowOutput)
+            nEntrees = 1 + strcmpi(char(lire(p, 'ICSourceX', 'internal')), 'external') + ...
+                       strcmpi(char(lire(p, 'ICSourceDXDT', 'internal')), 'external') + ...
+                       ~strcmpi(char(lire(p, 'ExternalReset', 'none')), 'none');
+            nSorties = 1 + strcmpi(char(lire(p, 'ShowOutput', 'both')), 'both');
         case 'foriterator'
             nEntrees = double(strcmpi(char(lire(p, 'IterationSource', 'internal')), 'external'));
             nSorties = double(strcmpi(char(lire(p, 'ShowIterationPort', 'on')), 'on'));

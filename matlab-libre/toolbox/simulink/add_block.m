@@ -255,7 +255,14 @@ function modele = add_block(modele, type, nom, varargin)
 %                  AntiWindupMode (back-calculation : Kb ; clamping) ; les
 %                  entrées : u, Reset, I0, D0 ; « Discrete PID Controller »
 %                  est réglé en Discrete-time
-%     secondorderintegrator ICX, ICDXDT         deux sorties : x et dx/dt
+%     secondorderintegrator ICX, ICDXDT, ICSourceX, ICSourceDXDT (internal,
+%                  external : une entrée x0, dx0), LimitX, UpperLimitX,
+%                  LowerLimitX, LimitDXDT, UpperLimitDXDT, LowerLimitDXDT,
+%                  WrapX, WrappedUpperValueX, WrappedLowerValueX,
+%                  ExternalReset (none, rising, falling, either),
+%                  ReinitDXDTwhenXreachesSaturation, ShowOutput (both, x,
+%                  dxdt) — x et dx/dt ; x à sa borne y tient, dx/dt nul
+%     secondorderintegratorlimited le même, x borné entre 0 et 1
 %
 %   Discret — ils ne calculent qu'aux instants de leur période :
 %     delay        InitialCondition, DelayLength, SampleTime ; aussi

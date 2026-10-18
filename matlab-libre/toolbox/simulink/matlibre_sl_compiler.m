@@ -679,6 +679,8 @@ function [type, p] = normaliser(type, p, chemin)
         case {'checkdiscretegradient', 'checkinputresolution'}
             p = struct('Script', scriptControle(type, p, chemin), 'SampleTime', -1);
             type = 'matlabfunction';
+        case 'secondorderintegratorlimited'
+            type = 'secondorderintegrator';   % le même bloc, ses bornes posées
         case 'descriptorstatespace'
             [A, B, C, D, x0] = descripteurVersEtat(p, chemin);
             p = struct('A', A, 'B', B, 'C', C, 'D', D, 'X0', x0);
@@ -1281,6 +1283,94 @@ function script = scriptControle(type, p, chemin)
     end
     script = strrep([entete '[t, ~, essai] = matlibre_sl_instant();\n' test echec fin], ...
                     '\n', char(10));
+end
+
+% Le Second-Order Integrator : x et dx/dt, chacun borné ou non, x enroulé
+% ou non, leurs conditions initiales données ou lues sur une entrée, la
+% remise par une entrée, la réinitialisation de dx/dt quand x atteint sa
+% borne, ce qu'il montre. Le segment :
+%   [w; bornéX; hautX; basX; bornéV; hautV; basV; enroulé; hautE; basE;
+%    réinit; remise; externeX; externeV; largeur de la remise; montreX;
+%    montreV]
+% et, s'il se remet, réinitialise ou lit ses conditions initiales, Z :
+% [amorcé; remise d'avant; x à sa borne au pas d'avant].
+function [seg, x0, z0] = segmentSOI(c, k, p, w, ch)
+    bX = strcmp(p.LimitX, 'on');
+    bV = strcmp(p.LimitDXDT, 'on');
+    enroule = strcmp(p.WrapX, 'on');
+    hautX = etendre(p.UpperLimitX, w, ch, 'UpperLimitX');
+    basX = etendre(p.LowerLimitX, w, ch, 'LowerLimitX');
+    hautV = etendre(p.UpperLimitDXDT, w, ch, 'UpperLimitDXDT');
+    basV = etendre(p.LowerLimitDXDT, w, ch, 'LowerLimitDXDT');
+    hautE = etendre(p.WrappedUpperValueX, w, ch, 'WrappedUpperValueX');
+    basE = etendre(p.WrappedLowerValueX, w, ch, 'WrappedLowerValueX');
+    if bX && any(basX >= hautX)
+        error('Simulink:blocks:SecondOrderIntegratorLimits', ...
+              ['La borne basse de x de ''%s'' doit etre strictement sous sa borne haute ' ...
+               '(LowerLimitX < UpperLimitX).'], ch);
+    end
+    if bV && any(basV >= hautV)
+        error('Simulink:blocks:SecondOrderIntegratorLimits', ...
+              ['La borne basse de dx/dt de ''%s'' doit etre strictement sous sa borne ' ...
+               'haute (LowerLimitDXDT < UpperLimitDXDT).'], ch);
+    end
+    if bX && bV && (any(hautV <= 0) || any(basV >= 0))
+        error('Simulink:blocks:SecondOrderIntegratorLimits', ...
+              ['x de ''%s'' est borne : les bornes de dx/dt doivent encadrer zero, la ' ...
+               'haute strictement positive et la basse strictement negative.'], ch);
+    end
+    if enroule && any(basE >= hautE)
+        error('Simulink:blocks:SecondOrderIntegratorLimits', ...
+              ['La valeur basse d''enroulement de x de ''%s'' doit etre strictement sous ' ...
+               'la haute (WrappedLowerValueX < WrappedUpperValueX).'], ch);
+    end
+    externeX = strcmp(p.ICSourceX, 'external');
+    externeV = strcmp(p.ICSourceDXDT, 'external');
+    cx = zeros(w, 1);
+    cv = zeros(w, 1);
+    if ~externeX
+        cx = etendre(p.ICX, w, ch, 'ICX');
+    end
+    if ~externeV
+        cv = etendre(p.ICDXDT, w, ch, 'ICDXDT');
+    end
+    if any(~isfinite([cx; cv]))
+        error('Simulink:Parameters:InvalidValue', ...
+              'Les conditions initiales de ''%s'' ne peuvent etre ni Inf ni NaN.', ch);
+    end
+    if bX
+        cx = min(max(cx, basX), hautX);
+    end
+    if bV
+        cv = min(max(cv, basV), hautV);
+    end
+    if enroule
+        cx = enroulerSOI(cx, basE, hautE);
+    end
+    remise = find(strcmp(p.ExternalReset, {'rising', 'falling', 'either'}));
+    if isempty(remise)
+        remise = 0;
+    end
+    wr = 0;
+    if remise > 0
+        wr = largeurEntree(c, k, 2 + externeX + externeV);
+    end
+    reinit = strcmp(p.ReinitDXDTwhenXreachesSaturation, 'on');
+    seg = [w; bX; hautX; basX; bV; hautV; basV; enroule; hautE; basE; reinit; remise; ...
+           externeX; externeV; wr; any(strcmp(p.ShowOutput, {'both', 'x'})); ...
+           any(strcmp(p.ShowOutput, {'both', 'dxdt'}))];
+    x0 = [cx; cv];
+    z0 = [];
+    if reinit || remise > 0 || externeX || externeV
+        z0 = [0; zeros(wr, 1); zeros(w, 1)];
+    end
+end
+
+% x ramené dans [bas, haut[, où ces valeurs sont finies.
+function x = enroulerSOI(x, bas, haut)
+    L = haut - bas;
+    j = isfinite(L) & (x >= haut | x < bas);
+    x(j) = bas(j) + mod(x(j) - bas(j), L(j));
 end
 
 % Le Descriptor State-Space, E dx/dt = A x + B u, y = C x + D u, ramené à une
@@ -3232,7 +3322,7 @@ function s = regleTraitement(c, k, dE, complet, forcer)
             if numel(p.ICDXDT) > 1 && prod(d) == 1
                 d = dimsDe(p.ICDXDT);
             end
-            s = {d, d};
+            s = repmat({d}, 1, c.nOut(k));
         case 'ratetransition'
             s = {dimsAvecEtat(dE, p.X0, complet, forcer)};
         case 'tappeddelay'
@@ -4607,10 +4697,9 @@ function c = abaisser(c, pas, tDebut)
                 end
                 seg = [numel(valeurs); valeurs];
                 z0 = 0;
-            case 'secondorderintegrator'  % [largeur]  états : [x; dx]
-                c = ajouterEtat(c, k, [etendre(p.ICX, w, ch, 'ICX'); ...
-                                       etendre(p.ICDXDT, w, ch, 'ICDXDT')]);
-                seg = w;
+            case 'secondorderintegrator'  % voir segmentSOI ; états : [x; dx/dt]
+                [seg, x0, z0] = segmentSOI(c, k, p, w, ch);
+                c = ajouterEtat(c, k, x0);
             case 'discretederivative'     % [K / Ts]  Z : [K u d'avant / Ts]
                 seg = etendre(p.gainval, w, ch, 'gainval') / c.cadence(k);
                 z0 = etendre(p.ICPrevScaledInput, w, ch, 'ICPrevScaledInput');
@@ -6352,7 +6441,7 @@ function zc = passagesParZero(c)
     zc = false(1, c.n);
     capables = {'abs', 'sign', 'comparetozero', 'comparetoconstant', 'relational', ...
                 'minmax', 'saturation', 'deadzone', 'relay', 'hitcrossing', 'switch', ...
-                'integrator', 'backlash', 'coulombfriction', 'garde'};
+                'integrator', 'backlash', 'coulombfriction', 'garde', 'secondorderintegrator'};
     controle = 'UseLocalSettings';
     if isstruct(c.config) && isfield(c.config, 'ZeroCrossControl')
         controle = char(c.config.ZeroCrossControl);
@@ -6373,6 +6462,13 @@ function zc = passagesParZero(c)
                 w = (numel(c.seg{k}) - 6) / 2;
                 remise = c.seg{k}(2 + 2 * w);
                 if c.seg{k}(1) == 0 && ~(remise >= 1 && remise <= 3)
+                    continue
+                end
+            case 'secondorderintegrator'
+                % les bornes de x et de dx/dt, les fronts de la remise
+                s = c.seg{k};
+                w = s(1);
+                if s(2) == 0 && s(3 + 2 * w) == 0 && s(6 + 6 * w) == 0
                     continue
                 end
             case 'minmax'

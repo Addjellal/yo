@@ -312,6 +312,14 @@ function T = preparer(c)
             T.reinit(end + 1) = k;
         end
     end
+    % un Second-Order Integrator qui se remet, lit ses conditions initiales
+    % ou réinitialise dx/dt quand x atteint sa borne
+    for k = find(strcmp(c.types, 'secondorderintegrator'))
+        w = c.seg{k}(1);
+        if any(c.seg{k}((5 + 6 * w):(8 + 6 * w)) ~= 0)
+            T.reinit(end + 1) = k;
+        end
+    end
     % Les intégrateurs discrets et les retards à remise ou à condition
     % initiale externe se remettent de même.
     for k = find(strcmp(c.types, 'discreteintegrator'))
@@ -552,6 +560,13 @@ function T = preparer(c)
     T.bornes = [];
     for k = find(strcmp(c.types, 'integrator'))
         if c.seg{k}(1) ~= 0
+            T.bornes(end + 1) = k;
+        end
+    end
+    % un Second-Order Integrator borné ou enroulé
+    for k = find(strcmp(c.types, 'secondorderintegrator'))
+        w = c.seg{k}(1);
+        if c.seg{k}(2) ~= 0 || c.seg{k}(3 + 2 * w) ~= 0 || c.seg{k}(4 + 4 * w) ~= 0
             T.bornes(end + 1) = k;
         end
     end
@@ -900,8 +915,88 @@ function x = borner(T, x)
         a = T.xA(k);
         b = T.xB(k);
         p = T.pA(k);
+        if T.code(k) == 77
+            x(a:b) = bornerSOI(parametresSOI(T, k), x(a:b));
+            continue
+        end
         w = b - a + 1;
         x(a:b) = min(max(x(a:b), T.P(p + 1 + w:p + 2 * w)), T.P(p + 1:p + w));
+    end
+end
+
+% Le Second-Order Integrator, ses paramètres lus dans son segment (voir
+% SEGMENTSOI dans la compilation).
+function S = parametresSOI(T, k)
+    p = T.pA(k);
+    w = T.P(p);
+    S.w = w;
+    S.bX = T.P(p + 1) ~= 0;
+    S.hautX = T.P(p + 2:p + 1 + w);
+    S.basX = T.P(p + 2 + w:p + 1 + 2 * w);
+    q = p + 2 + 2 * w;
+    S.bV = T.P(q) ~= 0;
+    S.hautV = T.P(q + 1:q + w);
+    S.basV = T.P(q + 1 + w:q + 2 * w);
+    r = q + 1 + 2 * w;
+    S.enroule = T.P(r) ~= 0;
+    S.hautE = T.P(r + 1:r + w);
+    S.basE = T.P(r + 1 + w:r + 2 * w);
+    s = r + 1 + 2 * w;
+    S.reinit = T.P(s) ~= 0;
+    S.remise = T.P(s + 1);
+    S.externeX = T.P(s + 2) ~= 0;
+    S.externeV = T.P(s + 3) ~= 0;
+    S.wr = T.P(s + 4);
+    S.montreX = T.P(s + 5) ~= 0;
+    S.montreV = T.P(s + 6) ~= 0;
+end
+
+% x tenu dans ses bornes : à sa borne, dx/dt qui pousse au-delà s'annule —
+% sauf à réinitialiser dx/dt, que la remise du pas majeur décide ; dx/dt
+% tenu dans les siennes ; x enroulé.
+function xs = bornerSOI(S, xs)
+    w = S.w;
+    xv = xs(1:w);
+    vv = xs(w + 1:2 * w);
+    if S.bX
+        haut = xv >= S.hautX;
+        bas = xv <= S.basX;
+        xv(haut) = S.hautX(haut);
+        xv(bas) = S.basX(bas);
+        if ~S.reinit
+            vv(haut & vv > 0) = 0;
+            vv(bas & vv < 0) = 0;
+        end
+    end
+    if S.bV
+        vv = min(max(vv, S.basV), S.hautV);
+    end
+    if S.enroule
+        xv = enroulerSOIx(xv, S.basE, S.hautE);
+    end
+    xs = [xv; vv];
+end
+
+function x = enroulerSOIx(x, bas, haut)
+    L = haut - bas;
+    j = isfinite(L) & (x >= haut | x < bas);
+    x(j) = bas(j) + mod(x(j) - bas(j), L(j));
+end
+
+% Ce que tient le Second-Order Integrator : x à sa borne, que dx/dt pousse
+% au-delà — ou nul, que u y pousse ; dx/dt, nul à la borne de x tant que u
+% y pousse, ou à sa propre borne.
+function [sx, sv] = saturesSOI(S, xv, vv, u)
+    sx = false(S.w, 1);
+    sv = false(S.w, 1);
+    if S.bX
+        haut = xv >= S.hautX;
+        bas = xv <= S.basX;
+        sx = (haut & (vv > 0 | (vv == 0 & u >= 0))) | (bas & (vv < 0 | (vv == 0 & u <= 0)));
+        sv = (haut & vv >= 0 & u > 0) | (bas & vv <= 0 & u < 0);
+    end
+    if S.bV
+        sv = sv | (vv >= S.hautV & u > 0) | (vv <= S.basV & u < 0);
     end
 end
 
@@ -1985,6 +2080,26 @@ function g = passagesZero(T, V, Z, x, t) %#ok<INUSD>
                     ut = V(T.eA(e + rang + 1):T.eB(e + rang + 1));
                     g = [g; ut(:)]; %#ok<AGROW>
                 end
+            case 77   % second-order integrator : bornes de x et de dx/dt, remise
+                S = parametresSOI(T, k);
+                xa = T.xA(k);
+                xv = x(xa:xa + S.w - 1);
+                vv = x(xa + S.w:xa + 2 * S.w - 1);
+                if S.bX
+                    g = [g; xv - S.hautX; xv - S.basX]; %#ok<AGROW>
+                end
+                if S.bV
+                    g = [g; vv - S.hautV; vv - S.basV]; %#ok<AGROW>
+                end
+                if (S.bX || S.bV) && isfield(T, 'satures')
+                    g = [g; (u(:) + zeros(S.w, 1)) .* ...
+                            T.satures(xa + S.w:xa + 2 * S.w - 1)]; %#ok<AGROW>
+                end
+                if S.remise > 0
+                    rang = 2 + S.externeX + S.externeV;
+                    r = V(T.eA(e + rang):T.eB(e + rang));
+                    g = [g; r(:)]; %#ok<AGROW>
+                end
             case 70   % intégrateur : ses bornes, sa dérivée s'il y est tenu, sa remise
                 if T.P(p) ~= 0
                     xk = x(T.xA(k):T.xB(k));
@@ -2013,8 +2128,16 @@ function T = figerBornes(T, V, x)
         a = T.xA(k);
         b = T.xB(k);
         p = T.pA(k);
-        w = b - a + 1;
         e = T.eD(k);
+        if T.code(k) == 77
+            S = parametresSOI(T, k);
+            u = V(T.eA(e + 1):T.eB(e + 1)) + zeros(S.w, 1);
+            [sx, sv] = saturesSOI(S, x(a:a + S.w - 1), x(a + S.w:b), u);
+            satures(a:a + S.w - 1) = sx;
+            satures(a + S.w:b) = sv;
+            continue
+        end
+        w = b - a + 1;
         u = V(T.eA(e + 1):T.eB(e + 1)) + zeros(w, 1);
         xk = x(a:b);
         satures(a:b) = (xk >= T.P(p + 1:p + w) & u > 0) | ...
@@ -2689,12 +2812,30 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                 end
             case 7
                 switch code(k)
-                    case 77   % second-order integrator : x, puis dx/dt
-                        w = T.P(p);
+                    case 77   % second-order integrator : x, puis dx/dt, ou l'un d'eux
+                        S = parametresSOI(T, k);
+                        w = S.w;
                         xa = T.xA(k);
-                        V(a:b) = x(xa:xa + w - 1);
-                        gp = T.pd(k) + 1;
-                        V(T.poA(gp):T.poB(gp)) = x(xa + w:xa + 2 * w - 1);
+                        xv = x(xa:xa + w - 1);
+                        vv = x(xa + w:xa + 2 * w - 1);
+                        if S.bX
+                            xv = min(max(xv, S.basX), S.hautX);
+                        end
+                        if S.enroule
+                            xv = enroulerSOIx(xv, S.basE, S.hautE);
+                        end
+                        if S.bV
+                            vv = min(max(vv, S.basV), S.hautV);
+                        end
+                        if S.montreX
+                            V(a:b) = xv;
+                            if S.montreV
+                                gp = T.pd(k) + 1;
+                                V(T.poA(gp):T.poB(gp)) = vv;
+                            end
+                        else
+                            V(a:b) = vv;
+                        end
                     case 70   % integrator
                         if T.P(p) == 0
                             V(a:b) = x(T.xA(k):T.xB(k));
@@ -3611,6 +3752,8 @@ function [x, Z, refaire] = remettre(T, V, Z, x, t)
                 tau = V(T.eA(T.eD(k) + 2));
                 remis = ~isequal(Z(z + 2), tau);
                 Z(z + 2) = tau;
+            case 77
+                [x, Z, remis] = remettreSOI(T, k, V, Z, x);
             otherwise
                 [x, Z, remis] = remettreIntegrateur(T, k, V, Z, x, t);
         end
@@ -3922,6 +4065,103 @@ end
 % condition initiale externe se lit aussi au premier instant. L'état
 % d'avant la remise est gardé : le port d'état le rend à l'instant même,
 % comme dans Simulink.
+% Le Second-Order Integrator au pas majeur : ses conditions initiales lues
+% sur leurs entrées au premier instant, ses états remis aux fronts de
+% l'entrée de remise, et dx/dt réinitialisé quand x vient d'atteindre sa
+% borne — à sa condition initiale si elle l'en fait repartir, à zéro
+% sinon (ReinitDXDTwhenXreachesSaturation).
+function [x, Z, remis] = remettreSOI(T, k, V, Z, x)
+    remis = false;
+    g = T.garde(k);
+    if g > 0 && V(T.oA(g)) == 0
+        return   % sous-système à l'arrêt : l'état tient
+    end
+    S = parametresSOI(T, k);
+    w = S.w;
+    a = T.xA(k);
+    ix = a:a + w - 1;
+    iv = a + w:a + 2 * w - 1;
+    z = T.zA(k);
+    e = T.eD(k);
+    rang = 2;
+    ciX = T.x0(ix);
+    ciV = T.x0(iv);
+    if S.externeX
+        ciX = V(T.eA(e + rang):T.eB(e + rang)) + zeros(w, 1);
+        rang = rang + 1;
+    end
+    if S.externeV
+        ciV = V(T.eA(e + rang):T.eB(e + rang)) + zeros(w, 1);
+        rang = rang + 1;
+    end
+    if S.bX
+        ciX = min(max(ciX, S.basX), S.hautX);
+    end
+    if S.bV
+        ciV = min(max(ciV, S.basV), S.hautV);
+    end
+    premier = Z(z) == 0;
+    masque = false(w, 1);
+    if S.remise > 0
+        r = V(T.eA(e + rang):T.eB(e + rang));
+        avant = Z(z + 1:z + S.wr);
+        if premier
+            avant = r;   % pas de front au premier instant
+        end
+        switch S.remise
+            case 1
+                d = (avant < 0 & r >= 0) | (avant == 0 & r > 0);
+            case 2
+                d = (avant > 0 & r <= 0) | (avant == 0 & r < 0);
+            otherwise
+                d = (avant < 0 & r >= 0) | (avant == 0 & r ~= 0) | (avant > 0 & r <= 0);
+        end
+        if numel(d) == w
+            masque = d(:);
+        else
+            masque(:) = any(d);
+        end
+        Z(z + 1:z + S.wr) = r;
+    end
+    if premier
+        Z(z) = 1;
+        if S.externeX
+            x(ix) = ciX;
+            remis = true;
+        end
+        if S.externeV
+            x(iv) = ciV;
+            remis = true;
+        end
+    end
+    if any(masque)
+        x(ix(masque)) = ciX(masque);
+        x(iv(masque)) = ciV(masque);
+        remis = true;
+    end
+    if S.bX
+        xv = x(ix);
+        vv = x(iv);
+        haut = xv >= S.hautX;
+        bas = xv <= S.basX;
+        tenu = haut | bas;
+        if S.reinit
+            avantTenu = Z(z + S.wr + 1:z + S.wr + w) ~= 0;
+            arrive = tenu & ~(avantTenu & ~premier) & ~masque;
+            repart = arrive & ((haut & ciV < 0) | (bas & ciV > 0));
+            % ce qui ne repart pas s'arrête à sa borne
+            arret = tenu & ~repart & ((haut & vv > 0) | (bas & vv < 0));
+            if any(repart) || any(arret)
+                vv(repart) = ciV(repart);
+                vv(arret) = 0;
+                x(iv) = vv;
+                remis = true;
+            end
+        end
+        Z(z + S.wr + 1:z + S.wr + w) = tenu;
+    end
+end
+
 function [x, Z, remis] = remettreIntegrateur(T, k, V, Z, x, t)
     remis = false;
     g = T.garde(k);
@@ -4904,10 +5144,28 @@ function dx = derivees(T, V, x, t)
             case 109   % S-function de niveau 2 : Derivatives
                 dx(a:b) = matlibre_sl_msfonction('derivees', T.objets{k}, t, ...
                                                  entreesNiveau2(T, k, V), x(a:b));
-            case 77   % second-order integrator : x' = dx, dx' = u
+            case 77   % second-order integrator : x' = dx, dx' = u, tenus à leurs bornes
                 w = (b - a + 1) / 2;
-                dx(a:a + w - 1) = x(a + w:b);
-                dx(a + w:b) = u + zeros(w, 1);
+                S = parametresSOI(T, k);
+                vv = x(a + w:b);
+                if S.bV
+                    vv = min(max(vv, S.basV), S.hautV);
+                end
+                uu = u + zeros(w, 1);
+                dxv = vv;
+                dvv = uu;
+                if S.bX || S.bV
+                    if isfield(T, 'satures')
+                        dxv(T.satures(a:a + w - 1)) = 0;
+                        dvv(T.satures(a + w:b)) = 0;
+                    else
+                        [sx, sv] = saturesSOI(S, x(a:a + w - 1), vv, uu);
+                        dxv(sx) = 0;
+                        dvv(sv) = 0;
+                    end
+                end
+                dx(a:a + w - 1) = dxv;
+                dx(a + w:b) = dvv;
             case 76   % PID : l'intégrale de I u, et le filtre de la dérivée
                 w = (b - a + 1) / 2;
                 dx(a:a + w - 1) = T.P(p + w:p + 2 * w - 1) .* u;
