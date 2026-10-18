@@ -377,6 +377,8 @@ const BlocBibliotheque blocs[] = {
      "'gradient', 1"},
     {"Sorties", "checkinputresolution",
      "Échoue quand l'entrée n'est pas un multiple de la résolution", "'resolution', 1"},
+    {"Sorties", "docblock", "Une note qui documente le modèle", ""},
+    {"Sorties", "modelinfo", "Montre des propriétés du modèle", ""},
     {"Sorties", "xygraph", "Relève y en fonction de x", ""},
     {"Sorties", "tofile", "Écrit le temps et le signal dans un fichier MAT",
      "'Filename', fullfile(tempdir, 'matlibre_tofile.mat'), 'MatrixName', 'donnees'"},

@@ -98,6 +98,7 @@ function modele = add_block(modele, type, nom, varargin)
 %                  vinit, RndMeth, DoSatur — la forme directe II
 %     datatypescalingstrip — l'entier stocké d'une virgule fixe
 %     functioncallsplit NumOutputPorts — l'appel d'un générateur partagé
+%     docblock DocumentType ; modelinfo — des notes, qui ne calculent rien
 %     checkdiscretegradient gradient ; checkinputresolution resolution —
 %                  enabled, callback, stopWhenAssertionFail, export
 %     transpose, hermitiantranspose, creatediagonalmatrix, extractdiagonal,

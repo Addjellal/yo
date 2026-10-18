@@ -11211,6 +11211,85 @@ for q = 1:size(refus83, 1)
 end
 fprintf('Transfer Fcn Direct Form II, Data Type Scaling Strip, Function-Call Split : ok\n');
 
+%% --------------------- 84. DocBlock, Model Info, et les nouveaux blocs en .slx
+% Un modèle de Simulink porte souvent un DocBlock ou un Model Info : des
+% notes, qui ne calculent rien. Un .slx qui en contient se lit et simule.
+% Les blocs de bibliothèque des derniers lots s'écrivent dans un .slx en
+% Reference, comme Simulink les range, et se relisent ; la variante bornée
+% du Second-Order Integrator y garde ses bornes.
+dossier84 = tempname();
+mkdir(fullfile(dossier84, 'simulink', 'systems'));
+mkdir(fullfile(dossier84, '_rels'));
+parties84 = {
+    '[Content_Types].xml', ['<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://' ...
+        'schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ' ...
+        'ContentType="application/vnd.mathworks.simulink.model+xml"/></Types>']
+    fullfile('simulink', 'blockdiagram.xml'), ['<?xml version="1.0" encoding="utf-8"?>' ...
+        '<ModelInformation Version="1.0"><Model Name="notes84"><P Name="Version">10.4</P>' ...
+        '<System Ref="system_root"/></Model></ModelInformation>']
+    fullfile('simulink', 'systems', 'system_root.xml'), ['<?xml version="1.0" encoding="utf-8"?>' ...
+        '<System><Block BlockType="Constant" Name="Constant" SID="1"><P Name="Value">3</P></Block>' ...
+        '<Block BlockType="Gain" Name="Gain" SID="2"><P Name="Gain">2</P></Block>' ...
+        '<Block BlockType="Outport" Name="Out1" SID="3"/>' ...
+        '<Block BlockType="Reference" Name="DocBlock" SID="4"><P Name="SourceBlock">' ...
+        'simulink/Model-Wide&#xA;Utilities/DocBlock</P><P Name="SourceType">DocBlock</P>' ...
+        '<P Name="DocumentType">Text</P></Block>' ...
+        '<Block BlockType="Reference" Name="Model Info" SID="5"><P Name="SourceBlock">' ...
+        'simulink/Model-Wide&#xA;Utilities/Model Info</P><P Name="SourceType">CMBlock</P>' ...
+        '</Block>' ...
+        '<Line><P Name="Src">1#out:1</P><P Name="Dst">2#in:1</P></Line>' ...
+        '<Line><P Name="Src">2#out:1</P><P Name="Dst">3#in:1</P></Line></System>']
+    };
+for q = 1:size(parties84, 1)
+    f84 = fopen(fullfile(dossier84, parties84{q, 1}), 'w');
+    fprintf(f84, '%s', parties84{q, 2});
+    fclose(f84);
+end
+fichier84 = [tempname() '.slx'];
+zip(fichier84, {'[Content_Types].xml', 'simulink'}, dossier84);
+if exist([fichier84 '.zip'], 'file')
+    movefile([fichier84 '.zip'], fichier84);
+end
+notes84 = load_system(fichier84);
+r84 = sim(notes84, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 1);
+assert(r84.yout(end) == 6 && strcmp(get_param(notes84, 'DocBlock', 'BlockType'), 'docblock') && ...
+       strcmp(get_param(notes84, 'Model Info', 'BlockType'), 'modelinfo'), ...
+       'un .slx qui porte un DocBlock et un Model Info se lit et simule');
+delete(fichier84);
+rmdir(dossier84, 's');
+% les nouveaux blocs s'écrivent en Reference, et se relisent
+n84 = new_system('nouveaux84');
+n84 = add_block(n84, 'constant', 'u', 'Value', [1 2; 3 4]);
+n84 = add_block(n84, 'transpose', 't');
+n84 = add_block(n84, 'incrementrealworld', 'i');
+n84 = add_block(n84, 'docblock', 'note');
+n84 = add_block(n84, 'constant', 'a', 'Value', 1);
+n84 = add_block(n84, 'secondorderintegratorlimited', 's');
+n84 = add_block(n84, 'outport', 'y');
+n84 = add_block(n84, 'outport', 'x');
+n84 = add_block(n84, 'terminator', 'fin');
+n84 = add_line(add_line(add_line(n84, 'u', 't'), 't', 'i'), 'i', 'y');
+n84 = add_line(add_line(add_line(n84, 'a', 's'), 's/1', 'x'), 's/2', 'fin');
+fichier84 = [tempname() '.slx'];
+save_system(n84, fichier84);
+dossier84 = tempname();
+unzip(fichier84, dossier84);
+xml84 = fileread(fullfile(dossier84, 'simulink', 'blockdiagram.xml'));
+assert(~isempty(strfind(xml84, 'simulink/Matrix Operations/Transpose')) && ...
+       ~isempty(strfind(xml84, 'Increment Real World')) && ...
+       ~isempty(strfind(xml84, 'simulink/Model-Wide Utilities/DocBlock')) && ...
+       ~isempty(strfind(xml84, '<P Name="LimitX">on</P>')), ...
+       'les blocs de bibliotheque s''ecrivent en Reference ; la variante bornee dit ses bornes');
+relu84 = load_system(fichier84);
+regle84 = {'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 2};
+avant84 = sim(n84, regle84{:});
+apres84 = sim(relu84, regle84{:});
+assert(isequal(avant84.yout, apres84.yout) && max(apres84.yout(:, end)) == 1, ...
+       'relu du .slx, le modele simule de meme, x tenu a sa borne 1');
+delete(fichier84);
+rmdir(dossier84, 's');
+fprintf('DocBlock, Model Info et nouveaux blocs en .slx : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
