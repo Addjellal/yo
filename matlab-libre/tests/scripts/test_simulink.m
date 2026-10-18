@@ -12538,10 +12538,8 @@ r96 = sim(q96, 'StopTime', 0.1);
 assert(isequal(r96.yout(end, :), [14 10 16]), 'les arguments rebatis du .m');
 save_system(parent96, fullfile(dossier96, 'parent96.slx'));
 p96 = load_system(fullfile(dossier96, 'parent96.slx'));
-J96 = 4;   % un .slx ne porte pas encore l'espace de travail du modele
 r96 = sim(p96, 'StopTime', 0.1);
-assert(isequal(r96.yout(end, :), [14 10 16]), 'les arguments relus du .slx');
-clear J96
+assert(isequal(r96.yout(end, :), [14 10 16]), 'les arguments relus du .slx, l''espace du parent compris');
 % une cellule mêlée s'écrit aussi en .m : les indices d'un Selector
 g96 = new_system('selecteur96');
 g96 = add_block(g96, 'constant', 'u', 'Value', magic(4));
@@ -12560,6 +12558,49 @@ assert(isequal(reshape(r96.yout(end, :), 4, 2), M96(:, [4 1])), ...
 cd(avant96);
 rmdir(dossier96, 's');
 fprintf('modeles references, espace et arguments : ok\n');
+
+%% ------------------------------------ 97. L'espace de travail du modèle dans un .slx
+% Un .slx écrit par MatLibre porte l'espace de travail du modèle — ses
+% variables, objets Simulink.Parameter compris, sa source et son code —,
+% et LOAD_SYSTEM le rend : le modèle relu se simule comme avant.
+e97 = new_system('espace97');
+e97 = add_block(e97, 'constant', 'c', 'Value', 'P');
+e97 = add_block(e97, 'gain', 'g', 'Gain', 'K');
+e97 = add_block(e97, 'outport', 'y');
+e97 = add_line(add_line(e97, 'c', 'g'), 'g', 'y');
+hws97 = get_param(e97, 'ModelWorkspace');
+assignin(hws97, 'K', 7);
+p97 = Simulink.Parameter(3);
+p97.DataType = 'int8';
+assignin(hws97, 'P', p97);
+assignin(hws97, 'S', struct('a', {1, 2}));
+r97 = sim(e97, 'StopTime', 0.1);
+assert(double(r97.yout(end)) == 21, 'avant : 3 fois 7');
+fichier97 = [tempname '.slx'];
+save_system(e97, fichier97);
+e97 = new_system('espace97');   % un modèle neuf du même nom : espace vide
+neuf97 = get_param(e97, 'ModelWorkspace');
+assert(isempty(fieldnames(neuf97.Donnees)), 'un espace neuf est vide');
+f97 = load_system(fichier97);
+delete(fichier97);
+hws97 = get_param(f97, 'ModelWorkspace');
+P97 = getVariable(hws97, 'P');
+S97 = getVariable(hws97, 'S');
+assert(getVariable(hws97, 'K') == 7 && isa(P97, 'Simulink.Parameter') && ...
+       strcmp(P97.DataType, 'int8') && S97(2).a == 2, 'les variables relues, objets compris');
+r97 = sim(f97, 'StopTime', 0.1);
+assert(double(r97.yout(end)) == 21 && isa(r97.yout, 'int8'), 'le modele relu se simule comme avant');
+% la source et le code de l'espace
+hws97.DataSource = 'MATLAB Code';
+hws97.MATLABCode = 'K = 2;';
+save_system(f97, fichier97);
+new_system('espace97');
+g97 = load_system(fichier97);
+delete(fichier97);
+h97 = get_param(g97, 'ModelWorkspace');
+assert(strcmp(h97.DataSource, 'MATLAB Code') && strcmp(h97.MATLABCode, 'K = 2;'), ...
+       'la source et le code de l''espace');
+fprintf('espace de travail dans le .slx : ok\n');
 
 disp('simulink : toutes les verifications passent');
 

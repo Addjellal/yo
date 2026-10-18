@@ -75,6 +75,43 @@ function modele = lire(fichier)
     if isfield(D, 'genre') && ~isempty(D.genre)
         modele.parametres.BlockDiagramType = D.genre;
     end
+    if isfield(D, 'espace') && isstruct(D.espace)
+        poserEspace(char(modele.nom), D.espace);
+    end
+end
+
+% L'espace de travail relu : sa source, son code, puis ses variables.
+function poserEspace(nom, donnees)
+    hws = matlibre_sl_espace('lire', nom);
+    for champ = {'DataSource', 'MATLABCode', 'FileName'}
+        cle = ['matlibre__' champ{1}];
+        if isfield(donnees, cle)
+            hws.(champ{1}) = donnees.(cle);
+            donnees = rmfield(donnees, cle);
+        end
+    end
+    for variable = fieldnames(donnees).'
+        assignin(hws, variable{1}, donnees.(variable{1}));
+    end
+end
+
+% L'espace de travail du modèle, ses variables et sa source, dans une
+% partie à part du .slx, en MAT : objets Simulink.Parameter compris.
+function ecrireEspace(modele, fichier)
+    nom = char(modele.nom);
+    if ~matlibre_sl_espace('existe', nom)
+        return
+    end
+    hws = matlibre_sl_espace('lire', nom);
+    donnees = hws.Donnees;
+    if isempty(fieldnames(donnees)) && strcmp(hws.DataSource, 'Model File') && ...
+       isempty(hws.MATLABCode)
+        return
+    end
+    donnees.matlibre__DataSource = hws.DataSource;
+    donnees.matlibre__MATLABCode = hws.MATLABCode;
+    donnees.matlibre__FileName = hws.FileName;
+    save(fichier, '-struct', 'donnees');
 end
 
 % Un .slx : l'archive s'ouvre dans un dossier temporaire, puis chaque
@@ -143,6 +180,11 @@ function D = lireSlxArchive(fichier, base)
         systeme = systemeFichier(dossierSystemes, reference);
     end
     D.systeme = systemeXml(systeme, dossierSystemes);
+    % l'espace de travail du modèle, qu'un fichier écrit par MatLibre porte
+    D.espace = [];
+    if exist(fullfile(dossier, 'matlibre', 'espace.mat'), 'file') == 2
+        D.espace = load(fullfile(dossier, 'matlibre', 'espace.mat'));
+    end
 end
 
 function s = systemeFichier(dossier, reference)
@@ -920,6 +962,7 @@ function ecrire(modele, fichier)
     mkdir(fullfile(dossier, 'matlibre'));
     ecrireTexte(fullfile(dossier, 'matlibre', 'auteur.xml'), ...
                 ['<?xml version="1.0" encoding="utf-8"?>' sprintf('\n') '<MatLibre Version="1"/>']);
+    ecrireEspace(modele, fullfile(dossier, 'matlibre', 'espace.mat'));
     if exist(fichier, 'file') == 2
         delete(fichier);
     end
