@@ -114,6 +114,15 @@ function varargout = sim(modele, varargin)
 %   et ses valeurs en timeseries. SignalLogging ('off') l'éteint, et
 %   SignalLoggingName renomme le champ.
 %
+%   Une mémoire partagée dont le Data Store Memory a DataLogging à 'on' —
+%   ou dont le Simulink.Signal, pour une mémoire globale, a
+%   LoggingInfo.DataLogging à true — journalise ses écritures :
+%   RESULTAT.dsmout est un Dataset de Simulink.SimulationData.
+%   DataStoreMemory, un élément par mémoire, avec chaque écriture — son
+%   instant, sa valeur dans le type de la mémoire, son écrivain
+%   (DSMWriters, DSMWriterBlockPaths). DSMLogging ('off') l'éteint, et
+%   DSMLoggingName renomme le champ.
+%
 %   LoadInitialState ('on') et InitialState (un vecteur, ou l'expression
 %   qui le donne) posent l'état continu de départ, dans l'ordre des
 %   colonnes de xout ; SaveFinalState ('on') range l'état final dans le
@@ -336,6 +345,13 @@ function varargout = sim(modele, varargin)
                 journalSignaux = [];
             end
         end
+        % Le journal des mémoires partagées : celles dont DataLogging est à
+        % 'on', chaque écriture avec son instant et son écrivain.
+        journalMemoires = [];
+        if strcmpi(config.DSMLogging, 'on') && ~isempty(T.memoiresJournal)
+            journalMemoires = memoiresJournalisees(c, T, J, char(config.DSMLoggingName));
+            resultat.(char(config.DSMLoggingName)) = journalMemoires;
+        end
     catch err
         matlibre_sl_rappel(modele, 'StopFcn');
         if strncmp(err.identifier, 'Simulink:', 9) || strncmp(err.identifier, 'Stateflow:', 10) || ...
@@ -392,9 +408,88 @@ function varargout = sim(modele, varargin)
             if ~isempty(journalSignaux)
                 assignin('base', char(config.SignalLoggingName), journalSignaux);
             end
+            if ~isempty(journalMemoires)
+                assignin('base', char(config.DSMLoggingName), journalMemoires);
+            end
         end
     else
         varargout{1} = sortie;
+    end
+end
+
+% Le journal des mémoires partagées, comme Simulink le range : un Dataset
+% dont chaque élément est un Simulink.SimulationData.DataStoreMemory — le
+% nom de la mémoire (ou DataLoggingName), le chemin de son bloc (vide pour
+% une mémoire globale), sa portée, ses écrivains, et dans Values chaque
+% écriture : son instant, la valeur dans le type de la mémoire, et le rang
+% de son écrivain dans DSMWriters. Un pas où la mémoire est écrite deux
+% fois n'en garde que la dernière écriture.
+function ds = memoiresJournalisees(c, T, J, nomJournal)
+    ds = Simulink.SimulationData.Dataset(nomJournal);
+    releve = J.memoires;
+    for M = T.memoiresJournal
+        m = M.bloc;
+        p = c.p{m};
+        D = releve(1 + M.lignes, :);
+        comptes = D(end, :);
+        garde = false(1, size(D, 2));
+        avant = NaN;
+        for j = 1:size(D, 2)
+            if ~isnan(releve(1, j)) && comptes(j) ~= avant
+                garde(j) = true;
+            end
+            avant = comptes(j);
+        end
+        rangs = find(garde);
+        if strcmp(p.DataLoggingDecimateData, 'on')
+            rangs = rangs(1:double(p.DataLoggingDecimation):end);
+        end
+        if strcmp(p.DataLoggingLimitDataPoints, 'on')
+            rangs = rangs(max(1, end - double(p.DataLoggingMaxPoints) + 1):end);
+        end
+        valeurs = forme(D(1:M.largeur, rangs), size(p.InitialValue), numel(rangs));
+        type = typeMemoire(c, m);
+        if type ~= 2
+            valeurs = matlibre_sl_types('convertir', type, valeurs);
+        end
+        nom = char(p.DataStoreName);
+        if strcmp(p.DataLoggingNameMode, 'Custom') && ~isempty(strtrim(char(p.DataLoggingName)))
+            nom = strtrim(char(p.DataLoggingName));
+        end
+        element = Simulink.SimulationData.DataStoreMemory;
+        element.Name = nom;
+        if c.globale(m)
+            element.Scope = 'global';
+        else
+            element.BlockPath = c.chemins{m};
+        end
+        ecrivains = find(strcmp(c.types, 'datastorewrite') & c.memoire == m);
+        element.DSMWriterBlockPaths = c.chemins(ecrivains).';
+        element.DSMWriters = uint32(D(M.largeur + 1, rangs).');
+        element.Values = timeseries(valeurs, releve(1, rangs), 'Name', char(p.DataStoreName));
+        ds = ds.addElement(element);
+    end
+end
+
+% Le type d'une mémoire : celui de sa valeur initiale, ou, double, celui de
+% ce qu'écrit son premier écrivain — la mémoire en hérite, comme dans
+% Simulink.
+function type = typeMemoire(c, m)
+    classe = class(c.p{m}.InitialValue);
+    if strcmp(classe, 'logical')
+        type = matlibre_sl_types('code', 'boolean');
+        return
+    end
+    if ~strcmp(classe, 'double')
+        type = matlibre_sl_types('code', classe);
+        if type > 0
+            return
+        end
+    end
+    type = 2;
+    ecrivain = find(strcmp(c.types, 'datastorewrite') & c.memoire == m, 1);
+    if ~isempty(ecrivain) && ~isempty(c.entrees{ecrivain}) && c.entrees{ecrivain}(1) > 0
+        type = c.typePort(c.entrees{ecrivain}(1));
     end
 end
 
@@ -1024,6 +1119,7 @@ function [instants, J] = sansFin(T, tDebut, pas, solveur, depart)
     tranche = 4096;
     releve = zeros(numel(T.journal), 0);
     etats = zeros(numel(T.x0), 0);
+    memoires = zeros(1 + numel(T.journalZ), 0);
     reprise = [];
     fait = 0;
     if nargin >= 5 && ~isempty(depart)
@@ -1042,6 +1138,7 @@ function [instants, J] = sansFin(T, tDebut, pas, solveur, depart)
         J = matlibre_sl_executer('simuler', T, morceau, solveur, reprise);
         releve = [releve, J.releve]; %#ok<AGROW>
         etats = [etats, J.etats]; %#ok<AGROW>
+        memoires = [memoires, J.memoires]; %#ok<AGROW>
         if J.arret
             instants = tDebut + (debut:fait + J.dernier - 1) * pas;
             break
@@ -1052,6 +1149,7 @@ function [instants, J] = sansFin(T, tDebut, pas, solveur, depart)
     end
     J.releve = releve;
     J.etats = etats;
+    J.memoires = memoires;
     J.dernier = size(releve, 2);
 end
 

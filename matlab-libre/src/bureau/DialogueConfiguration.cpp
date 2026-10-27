@@ -276,6 +276,11 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
            QStringLiteral("SignalLoggingName"), QStringLiteral("Journal des signaux"),
            QStringLiteral("Les signaux dont le port a DataLogging à « on », en Dataset"),
            QStringLiteral("    nom"), aideNom);
+    couple(formulaireRelever, QStringLiteral("DSMLogging"), QStringLiteral("DSMLoggingName"),
+           QStringLiteral("Mémoires partagées"),
+           QStringLiteral("Les écritures des mémoires partagées dont DataLogging est à « on », "
+                          "en Dataset de Simulink.SimulationData.DataStoreMemory"),
+           QStringLiteral("    nom"), aideNom);
     nouvelleListe(QStringLiteral("SaveFormat"), formulaireRelever, QStringLiteral("Format"),
                   {QStringLiteral("Array"), QStringLiteral("Structure"),
                    QStringLiteral("StructureWithTime"), QStringLiteral("Dataset")},

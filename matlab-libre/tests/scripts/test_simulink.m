@@ -13280,6 +13280,241 @@ rmdir(dossier104, 's');
 assert(isempty(echecs104), sprintf('chaque choix : %s', strjoin(echecs104, ' ; ')));
 fprintf('chaque choix de chaque bloc : %d essais, %d refus nommes\n', nEssais104, nRefus104);
 
+%% ------------------------------------- 105. Le journal des mémoires partagées
+% Un Data Store Memory dont DataLogging est à 'on' journalise ses écritures
+% dans dsmout (DSMLogging, DSMLoggingName) : un Dataset de
+% Simulink.SimulationData.DataStoreMemory — nom, chemin, portée, écrivains,
+% et chaque écriture avec son instant, sa valeur et son écrivain.
+bdclose('all');
+m105 = new_system('dsm105');
+m105 = add_block(m105, 'datastorememory', 'mem', 'DataStoreName', 'A', 'DataLogging', 'on');
+m105 = add_block(m105, 'clock', 't');
+m105 = add_block(m105, 'gain', 'g', 'Gain', 10);
+m105 = add_block(m105, 'constant', 'deux', 'Value', 20);
+m105 = add_block(m105, 'datastorewrite', 'w1', 'DataStoreName', 'A', 'SampleTime', [1 0]);
+m105 = add_block(m105, 'datastorewrite', 'w2', 'DataStoreName', 'A', 'SampleTime', [1 0.5]);
+m105 = add_block(m105, 'datastoreread', 'r', 'DataStoreName', 'A');
+m105 = add_block(m105, 'outport', 'y');
+m105 = add_line(m105, 't', 'g');
+m105 = add_line(m105, 'g', 'w1');
+m105 = add_line(m105, 'deux', 'w2');
+m105 = add_line(m105, 'r', 'y');
+m105 = set_param(m105, 'Solver', 'ode4', 'FixedStep', '0.25', 'StopTime', '2');
+out105 = sim(m105);
+ds105 = out105.dsmout;
+assert(isa(ds105, 'Simulink.SimulationData.Dataset') && strcmp(ds105.Name, 'dsmout') && ...
+       ds105.numElements == 1, 'DSMOUT : un Dataset, un element par memoire journalisee');
+e105 = ds105{1};
+assert(isa(e105, 'Simulink.SimulationData.DataStoreMemory') && strcmp(e105.Name, 'A') && ...
+       strcmp(e105.BlockPath, 'dsm105/mem') && strcmp(e105.Scope, 'local'), ...
+       'l''element : le nom de la memoire, le chemin de son bloc, sa portee');
+assert(isequal(e105.DSMWriterBlockPaths, {'dsm105/w1'; 'dsm105/w2'}), ...
+       'DSMWRITERBLOCKPATHS : les ecrivains, dans l''ordre du modele');
+assert(max(abs(e105.Values.Time(:).' - (0:0.5:2))) < 1e-12 && ...
+       isequal(e105.Values.Data(:).', [0 20 10 20 20]), ...
+       'VALUES : chaque ecriture, son instant et sa valeur');
+assert(isa(e105.DSMWriters, 'uint32') && isequal(e105.DSMWriters(:).', [1 2 1 2 1]), ...
+       'DSMWRITERS : le rang de l''ecrivain de chaque ecriture');
+assert(strcmp(e105.Values.Name, 'A'), 'la timeseries porte le nom de la memoire');
+texte105 = evalc('disp(ds105)');
+assert(~isempty(strfind(texte105, '[1x1 DataStoreMemory]')) && ~isempty(strfind(texte105, 'A')), ...
+       'le Dataset s''affiche avec la classe de ses elements');
+
+% Nom personnalisé, décimation, limite, nom du journal, extinction.
+m105 = set_param(m105, 'DSMLoggingName', 'ecrits');
+s105 = sim(m105);
+assert(isfield(s105, 'ecrits') && ~isfield(s105, 'dsmout'), 'DSMLOGGINGNAME : le champ du resultat');
+m105 = set_param(m105, 'DSMLoggingName', 'dsmout', 'DSMLogging', 'off');
+s105 = sim(m105);
+assert(~isfield(s105, 'dsmout'), 'DSMLOGGING a off : pas de journal des memoires');
+m105 = set_param(m105, 'DSMLogging', 'on');
+m105 = set_param(m105, 'dsm105/mem', 'DataLoggingNameMode', 'Custom', 'DataLoggingName', 'reserve');
+s105 = sim(m105);
+assert(strcmp(s105.dsmout{1}.Name, 'reserve') && strcmp(s105.dsmout{1}.Values.Name, 'A'), ...
+       'DATALOGGINGNAMEMODE Custom : l''element prend DataLoggingName');
+m105 = set_param(m105, 'dsm105/mem', 'DataLoggingDecimateData', 'on', 'DataLoggingDecimation', 2);
+s105 = sim(m105);
+assert(isequal(s105.dsmout{1}.Values.Data(:).', [0 10 20]) && ...
+       isequal(s105.dsmout{1}.DSMWriters(:).', [1 1 1]), ...
+       'DATALOGGINGDECIMATION : une ecriture sur deux');
+m105 = set_param(m105, 'dsm105/mem', 'DataLoggingDecimateData', 'off', ...
+                 'DataLoggingLimitDataPoints', 'on', 'DataLoggingMaxPoints', 2);
+s105 = sim(m105);
+assert(isequal(s105.dsmout{1}.Values.Data(:).', [20 20]) && ...
+       max(abs(s105.dsmout{1}.Values.Time(:).' - [1.5 2])) < 1e-12, ...
+       'DATALOGGINGMAXPOINTS : les dernieres ecritures');
+m105 = set_param(m105, 'dsm105/mem', 'DataLogging', 'off');
+s105 = sim(m105);
+assert(~isfield(s105, 'dsmout'), 'sans memoire journalisee, pas de dsmout');
+
+% Sans sortie et ReturnWorkspaceOutputs à 'off', dsmout va dans l'espace
+% de travail de base.
+m105 = set_param(m105, 'dsm105/mem', 'DataLogging', 'on', 'DataLoggingLimitDataPoints', 'off', ...
+                 'DataLoggingNameMode', 'SignalName');
+m105 = set_param(m105, 'ReturnWorkspaceOutputs', 'off');
+evalin('base', 'clear dsmout');
+sim(m105);
+assert(evalin('base', 'exist(''dsmout'', ''var'')') == 1 && ...
+       isequal(evalin('base', 'dsmout{1}.Values.Data(:).'''), [0 20 10 20 20]), ...
+       'sans sortie, dsmout va dans l''espace de travail');
+evalin('base', 'clear dsmout');
+
+% Une mémoire dans un sous-système, écrite de l'intérieur : son chemin.
+m105 = new_system('dsmsous105');
+m105 = add_block(m105, 'clock', 't');
+m105 = add_block(m105, 'subsystem', 'sous');
+interieur105 = new_system('i');
+interieur105 = add_block(interieur105, 'inport', 'u');
+interieur105 = add_block(interieur105, 'datastorememory', 'mem', 'DataStoreName', 'B', ...
+                         'DataLogging', 'on', 'InitialValue', 0);
+interieur105 = add_block(interieur105, 'datastorewrite', 'w', 'DataStoreName', 'B', ...
+                         'SampleTime', 0.5);
+interieur105 = add_line(interieur105, 'u', 'w');
+m105 = set_param(m105, 'sous', 'Model', interieur105);
+m105 = add_line(m105, 't', 'sous');
+m105 = set_param(m105, 'Solver', 'ode4', 'FixedStep', '0.5', 'StopTime', '1');
+lastwarn('');
+s105 = sim(m105);
+assert(isempty(lastwarn()), 'un sous-systeme sans sortie n''a pas d''entree non reliee');
+assert(strcmp(s105.dsmout{1}.BlockPath, 'dsmsous105/sous/mem') && ...
+       isequal(s105.dsmout{1}.DSMWriterBlockPaths, {'dsmsous105/sous/w'}) && ...
+       isequal(s105.dsmout{1}.Values.Data(:).', [0 0.5 1]), ...
+       'une memoire d''un sous-systeme : son chemin complet');
+
+% Une mémoire globale : le LoggingInfo de son Simulink.Signal.
+A105 = Simulink.Signal;
+A105.DataType = 'boolean';
+A105.InitialValue = '0';
+A105.LoggingInfo.DataLogging = true;
+A105.LoggingInfo.NameMode = true;
+A105.LoggingInfo.LoggingName = 'drapeau';
+assignin('base', 'G105', A105);
+m105 = new_system('dsmglob105');
+m105 = add_block(m105, 'clock', 't');
+m105 = add_block(m105, 'comparetoconstant', 'c', 'relop', '>=', 'const', 1);
+m105 = add_block(m105, 'datastorewrite', 'w', 'DataStoreName', 'G105', 'SampleTime', 0.5);
+m105 = add_line(m105, 't', 'c');
+m105 = add_line(m105, 'c', 'w');
+m105 = set_param(m105, 'Solver', 'ode4', 'FixedStep', '0.5', 'StopTime', '2');
+s105 = sim(m105);
+g105 = s105.dsmout{1};
+assert(strcmp(g105.Scope, 'global') && isempty(g105.BlockPath) && strcmp(g105.Name, 'drapeau') && ...
+       isequal(g105.DSMWriterBlockPaths, {'dsmglob105/w'}), ...
+       'une memoire globale : portee globale, sans bloc, sous LoggingName');
+assert(islogical(g105.Values.Data) && isequal(g105.Values.Data(:).', [false false true true true]), ...
+       'ses valeurs dans son type, booleen');
+A105.LoggingInfo.DataLogging = false;
+s105 = sim(m105);
+assert(~isfield(s105, 'dsmout'), 'LoggingInfo.DataLogging a false : rien');
+evalin('base', 'clear G105');
+
+% Les refus.
+info105 = Simulink.SimulationData.LoggingInfo;
+refus105 = {
+    @() setfield(info105, 'Decimation', 0), 'Simulink:Logging:InvalidLoggingInfo'
+    @() setfield(info105, 'MaxPoints', 2.5), 'Simulink:Logging:InvalidLoggingInfo'
+    @() setfield(info105, 'DataLogging', 'oui'), 'Simulink:Logging:InvalidLoggingInfo'
+    @() setfield(info105, 'LoggingName', 3), 'Simulink:Logging:InvalidLoggingInfo'
+    @() set_param(new_system('r105'), 'DSMLoggingName', '1abc'), 'Simulink:Config:InvalidValue'
+    @() sim(set_param(add_block(new_system('r105'), 'datastorememory', 'mem', ...
+                                'DataLogging', 'on', 'DataLoggingDecimation', 0), ...
+                      'StopTime', '1')), 'Simulink:Parameters:InvalidValue'
+    };
+for k = 1:size(refus105, 1)
+    vu105 = '';
+    try
+        refus105{k, 1}();
+    catch err
+        vu105 = err.identifier;
+    end
+    assert(strcmp(vu105, refus105{k, 2}), sprintf('refus %d : %s attendu, %s rendu', k, ...
+                                                  refus105{k, 2}, vu105));
+end
+signal105 = Simulink.Signal;
+vu105 = '';
+try
+    signal105.LoggingInfo = 3;
+catch err
+    vu105 = err.identifier;
+end
+assert(strcmp(vu105, 'Simulink:Data:InvalidLoggingInfo'), 'le LoggingInfo d''un signal est un LoggingInfo');
+copie105 = copy(A105);
+assert(copie105.LoggingInfo.NameMode && strcmp(copie105.LoggingInfo.LoggingName, 'drapeau'), ...
+       'COPY garde le LoggingInfo');
+
+% Batterie croisée : solveur (pas fixe, pas variable, discret) x portée
+% (locale, globale) x type (double, booléen, int8) x origine du type (la
+% valeur initiale, l'écrivain) — chaque fois les instants d'écriture, les
+% valeurs dans leur type, l'écrivain.
+solveurs105 = {'ode4', 'ode45', 'FixedStepDiscrete'};
+types105 = {'double', 'boolean', 'int8'};
+attendus105 = {[0 1 2 3 4], [false true true true true], int8([0 1 2 3 4])};
+nCas105 = 0;
+for kS = 1:numel(solveurs105)
+    for portee = {'locale', 'globale'}
+        for kT = 1:numel(types105)
+            for origine = {'initiale', 'ecrivain'}
+                if strcmp(portee{1}, 'globale') && strcmp(origine{1}, 'ecrivain')
+                    continue   % une mémoire globale dit son type
+                end
+                contexte105 = sprintf('%s, %s, %s, %s', solveurs105{kS}, portee{1}, ...
+                                      types105{kT}, origine{1});
+                b105 = new_system('bat105');
+                if strcmp(solveurs105{kS}, 'FixedStepDiscrete')
+                    b105 = add_block(b105, 'counterfreerunning', 't', 'SampleTime', 0.5);
+                    b105 = add_block(b105, 'gain', 'g', 'Gain', 1);
+                else
+                    b105 = add_block(b105, 'clock', 't');
+                    b105 = add_block(b105, 'gain', 'g', 'Gain', 2);
+                end
+                b105 = add_block(b105, 'datatypeconversion', 'conv', 'OutDataTypeStr', types105{kT});
+                b105 = add_block(b105, 'datastorewrite', 'w', 'DataStoreName', 'M105', ...
+                                 'SampleTime', 0.5);
+                b105 = add_line(b105, 't', 'g');
+                b105 = add_line(b105, 'g', 'conv');
+                b105 = add_line(b105, 'conv', 'w');
+                if strcmp(portee{1}, 'locale')
+                    initiale = 0;
+                    if strcmp(origine{1}, 'initiale')
+                        initiale = cast(0, strrep(types105{kT}, 'boolean', 'logical'));
+                    end
+                    b105 = add_block(b105, 'datastorememory', 'mem', 'DataStoreName', 'M105', ...
+                                     'InitialValue', initiale, 'DataLogging', 'on');
+                else
+                    sig105 = Simulink.Signal;
+                    sig105.DataType = types105{kT};
+                    sig105.LoggingInfo.DataLogging = true;
+                    assignin('base', 'M105', sig105);
+                end
+                if strcmp(solveurs105{kS}, 'ode45')
+                    b105 = add_block(b105, 'integrator', 'x');
+                    b105 = add_block(b105, 'outport', 'y');
+                    b105 = add_line(b105, 't', 'x');
+                    b105 = add_line(b105, 'x', 'y');
+                    b105 = set_param(b105, 'Solver', 'ode45', 'StopTime', '2');
+                else
+                    b105 = set_param(b105, 'Solver', solveurs105{kS}, 'FixedStep', '0.25', ...
+                                     'StopTime', '2');
+                end
+                r105 = sim(b105);
+                d105 = r105.dsmout{1};
+                assert(max(abs(d105.Values.Time(:).' - (0:0.5:2))) < 1e-9, ...
+                       [contexte105 ' : les instants d''ecriture']);
+                assert(isequal(class(d105.Values.Data), class(attendus105{kT})) && ...
+                       isequal(d105.Values.Data(:).', attendus105{kT}), ...
+                       [contexte105 ' : les valeurs dans leur type']);
+                assert(isequal(d105.DSMWriters(:).', uint32([1 1 1 1 1])), ...
+                       [contexte105 ' : l''ecrivain']);
+                assert(strcmp(d105.Scope, strrep(strrep(portee{1}, 'locale', 'local'), ...
+                                                 'globale', 'global')), [contexte105 ' : la portee']);
+                evalin('base', 'clear M105');
+                nCas105 = nCas105 + 1;
+            end
+        end
+    end
+end
+fprintf('journal des memoires partagees : %d cas croises\n', nCas105);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

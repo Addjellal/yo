@@ -712,8 +712,12 @@ int main(int argc, char** argv) {
             return n;
         };
 
+        // « Au large » : assez pour que rien ne se replie, quelle que soit
+        // la police du systeme — Inter, plus large que DejaVu Sans, replie
+        // deja des groupes a 1500 pixels.
+        const int large = 2600;
         QSize avant = fenetre.size();
-        fenetre.resize(1500, avant.height());
+        fenetre.resize(large, avant.height());
         QCoreApplication::processEvents();
         int repliesLarge = nombreReplies(fenetre);
         verifier(aucunLibelleRogne(fenetre), "au large, aucun libelle du ruban n'est rogne");
@@ -741,7 +745,7 @@ int main(int argc, char** argv) {
 
         // Reelargir doit rendre exactement l'etat de depart : le repli est
         // une fonction de la largeur, pas un chemin sans retour.
-        fenetre.resize(1500, avant.height());
+        fenetre.resize(large, avant.height());
         verifier(attendre([&] { return nombreReplies(fenetre) == repliesLarge; }, 4000),
                  "en reelargissant, le ruban se redeploie");
         verifier(aucunLibelleRogne(fenetre), "et rien n'est rogne au retour");
@@ -2558,6 +2562,31 @@ end
                 verifier(methode && !methode->isEnabled() &&
                              boite.champ(QStringLiteral("MaxOrder"))->isEnabled(),
                          "daessc choisi, son ordre maximal se regle, la methode d'odeN non");
+            }
+            {
+                // Le journal des memoires partagees, comme celui des
+                // signaux : son nom ne se regle que DSMLogging a « on ».
+                QMap<QString, QString> valeurs;
+                valeurs.insert(QStringLiteral("SolverType"), QStringLiteral("Fixed-step"));
+                valeurs.insert(QStringLiteral("Solver"), QStringLiteral("ode4"));
+                valeurs.insert(QStringLiteral("DSMLogging"), QStringLiteral("off"));
+                valeurs.insert(QStringLiteral("DSMLoggingName"), QStringLiteral("dsmout"));
+                DialogueConfiguration boite(QStringLiteral("m"), valeurs,
+                                            {QStringLiteral("ode4")}, {QStringLiteral("ode45")});
+                verifier(boite.liste(QStringLiteral("DSMLogging")) &&
+                             !boite.champ(QStringLiteral("DSMLoggingName"))->isEnabled(),
+                         "le journal des memoires eteint, son nom ne se regle pas");
+                QComboBox* memoires = boite.liste(QStringLiteral("DSMLogging"));
+                memoires->setCurrentIndex(memoires->findText(QStringLiteral("on")));
+                verifier(boite.champ(QStringLiteral("DSMLoggingName"))->isEnabled(),
+                         "le journal des memoires allume, son nom se regle");
+                boite.champ(QStringLiteral("DSMLoggingName"))->setText(QStringLiteral("ecrits"));
+                QStringList noms;
+                for (const auto& c : boite.changements())
+                    noms << c.first + QLatin1Char('=') + c.second;
+                verifier(noms == QStringList({QStringLiteral("DSMLogging=on"),
+                                              QStringLiteral("DSMLoggingName=ecrits")}),
+                         "le journal des memoires ressort en deux reglages");
             }
             {
                 // Le volet des donnees : un nom ne se regle que son

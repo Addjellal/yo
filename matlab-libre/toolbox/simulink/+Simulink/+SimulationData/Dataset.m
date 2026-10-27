@@ -3,7 +3,8 @@ classdef Dataset
 %   Quand SaveFormat vaut 'Dataset', la sortie de SIM porte dans yout un
 %   Dataset : un élément par sortie du modèle, dans l'ordre de leur
 %   paramètre Port, chacun un SIMULINK.SIMULATIONDATA.SIGNAL dont Values
-%   est une TIMESERIES.
+%   est une TIMESERIES. Le journal des mémoires partagées, dsmout, en est
+%   un de SIMULINK.SIMULATIONDATA.DATASTOREMEMORY.
 %
 %   DS{I} et GET(DS,I) rendent le I-ème élément ; GET(DS,NOM) et
 %   GETELEMENT(DS,NOM) celui qui porte ce nom ; NUMELEMENTS(DS) leur
@@ -100,7 +101,8 @@ classdef Dataset
             fprintf('  Simulink.SimulationData.Dataset ''%s'' with %d element(s)\n\n', ds.Name, ...
                     numel(ds.Elements));
             for k = 1:numel(ds.Elements)
-                fprintf('    %d  [1x1 Signal]  %s  %s\n', k, ds.Elements{k}.Name, ...
+                genre = regexprep(class(ds.Elements{k}), '^.*\.', '');
+                fprintf('    %d  [1x1 %s]  %s  %s\n', k, genre, ds.Elements{k}.Name, ...
                         ds.Elements{k}.BlockPath);
             end
             fprintf('\n');

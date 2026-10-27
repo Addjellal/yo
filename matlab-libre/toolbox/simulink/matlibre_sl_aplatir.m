@@ -687,7 +687,9 @@ function modele = deplier(modele, k)
     passePlat = bloc;
     passePlat.type = 'signalconversion';
     passePlat.parametres = struct();
-    if numel(sorties) > 1
+    if numel(sorties) ~= 1
+        % sans sortie, il n'a rien à passer : aucun port, que le
+        % diagnostic des entrées non reliées compterait
         passePlat.parametres.NombreDePorts = numel(sorties);
     end
     if isfield(bloc.parametres, 'Position')

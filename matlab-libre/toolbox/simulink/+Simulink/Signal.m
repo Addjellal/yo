@@ -13,6 +13,9 @@ classdef Signal < handle
 %                     est convertie
 %      Min, Max, Unit, Description, SampleTime (-1), Complexity
 %                     ('auto'), DimensionsMode ('auto'), CoderInfo
+%      LoggingInfo    un Simulink.SimulationData.LoggingInfo : son
+%                     DataLogging à true journalise les écritures de la
+%                     mémoire globale dans dsmout
 %   Un Data Store Memory du même nom, visible depuis le bloc, l'emporte
 %   sur l'objet.
 %
@@ -37,10 +40,20 @@ classdef Signal < handle
         Complexity = 'auto'
         SampleTime = -1
         InitialValue = ''
+        LoggingInfo = []
     end
     methods
         function obj = Signal()
             obj.CoderInfo = Simulink.CoderInfo;
+            obj.LoggingInfo = Simulink.SimulationData.LoggingInfo;
+        end
+        function set.LoggingInfo(obj, v)
+            if ~isa(v, 'Simulink.SimulationData.LoggingInfo')
+                error('Simulink:Data:InvalidLoggingInfo', ...
+                      ['Le LoggingInfo d''un Simulink.Signal est un ' ...
+                       'Simulink.SimulationData.LoggingInfo.']);
+            end
+            obj.LoggingInfo = v;
         end
         function set.DataType(obj, t)
             if isstring(t) && isscalar(t)
@@ -102,14 +115,15 @@ classdef Signal < handle
             c = Simulink.Signal;
             for nom = {'CoderInfo', 'Description', 'DataType', 'Min', 'Max', 'Unit', ...
                        'Dimensions', 'DimensionsMode', 'Complexity', 'SampleTime', ...
-                       'InitialValue'}
+                       'InitialValue', 'LoggingInfo'}
                 c.(nom{1}) = obj.(nom{1});
             end
         end
         function disp(obj)
             matlibre_sl_proprietes(obj, {'CoderInfo', 'Description', 'DataType', 'Min', ...
                                          'Max', 'Unit', 'Dimensions', 'DimensionsMode', ...
-                                         'Complexity', 'SampleTime', 'InitialValue'});
+                                         'Complexity', 'SampleTime', 'InitialValue', ...
+                                         'LoggingInfo'});
         end
     end
 end

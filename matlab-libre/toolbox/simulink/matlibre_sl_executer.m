@@ -568,6 +568,22 @@ function T = preparer(c)
         T.niveauxMemoire(m, :) = niveauxAcces(c, m);
     end
     T.accesMemoire = any(T.niveauxMemoire(:) > 0);
+    % Les mémoires journalisées (DataLogging) : leur valeur, le rang de
+    % leur dernier écrivain et le compte de leurs écritures, relevés dans Z
+    % à chaque pas majeur où elles ont été écrites.
+    T.journalZ = zeros(0, 1);
+    T.compteursJ = zeros(0, 1);
+    T.memoiresJournal = struct('bloc', {}, 'lignes', {}, 'largeur', {});
+    if isfield(c, 'journalMemoire')
+        for m = find(c.journalMemoire)
+            largeur = numel(c.z0{m}) - 2;
+            debut = numel(T.journalZ);
+            T.journalZ = [T.journalZ; (T.zA(m):T.zA(m) + largeur + 1).'];
+            T.compteursJ = [T.compteursJ; debut + largeur + 2];
+            T.memoiresJournal(end + 1) = struct('bloc', m, 'lignes', debut + (1:largeur + 2), ...
+                                                'largeur', largeur);
+        end
+    end
     T.bornes = [];
     for k = find(strcmp(c.types, 'integrator'))
         if c.seg{k}(1) ~= 0
@@ -819,6 +835,12 @@ function J = simuler(T, instants, solveur, reprise)
     touche = false(1, G);
     dernier = N;
     bornes = ~isempty(T.bornes);
+    % le relevé des mémoires journalisées part d'une colonne de base, sans
+    % instant : les comptes d'écritures d'où l'on part
+    memoires = ~isempty(T.journalZ);
+    releveM = [NaN; Z(T.journalZ)];
+    nM = 1;
+    vus = Z(T.journalZ(T.compteursJ));
     for r = 1:N
         t = instants(r);
         i = i0 + r - 1;
@@ -838,6 +860,9 @@ function J = simuler(T, instants, solveur, reprise)
         end
         if infini
             verifierFinitude(T, V, t);
+        end
+        if memoires
+            [releveM, nM, vus] = noterMemoires(T, Z, t, releveM, nM, vus);
         end
         releveV(:, r) = V(journal);
         etats(:, r) = x;
@@ -882,6 +907,23 @@ function J = simuler(T, instants, solveur, reprise)
     J = struct('releve', releveV(:, 1:dernier), 'etats', etats(:, 1:dernier), ...
                'dernier', dernier, 'arret', Z(1) ~= 0, 'V', V, 'Z', Z, 'x', x);
     J.tampons = T.tampons;
+    J.memoires = releveM(:, 1:nM);
+end
+
+% Un pas majeur où une mémoire journalisée a été écrite : l'instant, puis
+% ce que Z porte de chacune — valeur, écrivain, écritures. Une colonne
+% sans instant (NaN) donne les comptes d'où une tranche part.
+function [M, nM, vus] = noterMemoires(T, Z, t, M, nM, vus)
+    comptes = Z(T.journalZ(T.compteursJ));
+    if all(comptes == vus)
+        return
+    end
+    vus = comptes;
+    if nM >= size(M, 2)
+        M = [M, zeros(size(M, 1), size(M, 2) + 16)];
+    end
+    nM = nM + 1;
+    M(:, nM) = [t; Z(T.journalZ)];
 end
 
 % Les tampons des retards, hors de Z parce qu'ils grandissent : celui du
@@ -1234,6 +1276,17 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     if infini
         verifierFinitude(T, V, t);
     end
+    memoires = ~isempty(T.journalZ);
+    base = T.Z0;
+    if ~isempty(reprise)
+        base = reprise.Z;
+    end
+    releveM = [NaN; base(T.journalZ)];
+    nM = 1;
+    vus = base(T.journalZ(T.compteursJ));
+    if memoires
+        [releveM, nM, vus] = noterMemoires(T, Z, t, releveM, nM, vus);
+    end
     [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, V(T.journal), ...
                                                 x, imposes, iImpose, tous);
     T = figerBornes(T, V, x);
@@ -1515,6 +1568,9 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         if infini
             verifierFinitude(T, V, t);
         end
+        if memoires
+            [releveM, nM, vus] = noterMemoires(T, Z, t, releveM, nM, vus);
+        end
         if affiner > 1
             [temps, releveV, etats, n] = affinerPas(T, affinage, t, x, V, affiner, temps, ...
                                                     releveV, etats, n);
@@ -1550,6 +1606,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                'dernier', n, 'arret', arret, 'V', V, 'Z', Z, 'x', x);
     J.tampons = T.tampons;
     J.t = t;
+    J.memoires = releveM(:, 1:nM);
 end
 
 % Un instant relevé : tous, ou seulement les instants imposés. La
@@ -2898,6 +2955,12 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                             z = zA(T.P(p));
                             largeur = T.P(p + 1);
                             Z(z:z + largeur - 1) = V(eA(e + 1):eB(e + 1)) + zeros(largeur, 1);
+                            if T.P(p + 2) > 0
+                                % la mémoire se journalise : qui l'écrit, et
+                                % combien de fois
+                                Z(z + largeur) = T.P(p + 2);
+                                Z(z + largeur + 1) = Z(z + largeur + 1) + 1;
+                            end
                             if acces
                                 [ecrit, lu] = accesMemoire(T, k, T.P(p), true, ecrit, lu, t);
                             end

@@ -127,6 +127,10 @@ function c = compiler(modele, options)
     c.enroulement = cell(1, n);
     % La plage [OutMin, OutMax] de chaque bloc qui en dit une, vide sinon.
     c.plage = cell(1, n);
+    % Les mémoires globales, que définit un Simulink.Signal de l'espace de
+    % travail de base, et celles dont les écritures se journalisent.
+    c.globale = false(1, n);
+    c.journalMemoire = false(1, n);
 
     % --- 1. types et paramètres ---------------------------------------------
     enCours('modele', modele.blocs, cellfun(@(b) [nomModele '/' char(b.nom)], ...
@@ -153,6 +157,9 @@ function c = compiler(modele, options)
         end
         if isfield(bloc, 'signaux')
             c.signaux{k} = bloc.signaux;
+        end
+        if isfield(bloc, 'globale')
+            c.globale(k) = bloc.globale;
         end
         c.p{k} = lireParametres(entree, bloc, c.chemins{k});
         c.plage{k} = plageDeSortie(c.types{k}, c.p{k}, c.chemins{k});
@@ -2806,10 +2813,47 @@ function modele = memoiresGlobales(modele)
         end
         noms{end + 1} = bloc; %#ok<AGROW>
         % une mémoire globale : réglée sur place, ses accès ne se signalent
-        % pas, comme dans Simulink (UseLocalSettings)
+        % pas, comme dans Simulink (UseLocalSettings) ; elle se journalise
+        % comme le dit le LoggingInfo de son Simulink.Signal
+        journal = {};
+        if isprop(signal, 'LoggingInfo') && signal.LoggingInfo.DataLogging
+            info = signal.LoggingInfo;
+            modes = {'SignalName', 'Custom'};
+            oui = {'off', 'on'};
+            journal = {'DataLogging', 'on', 'DataLoggingNameMode', modes{info.NameMode + 1}, ...
+                       'DataLoggingName', info.LoggingName, ...
+                       'DataLoggingDecimateData', oui{info.DecimateData + 1}, ...
+                       'DataLoggingDecimation', info.Decimation, ...
+                       'DataLoggingLimitDataPoints', oui{info.LimitDataPoints + 1}, ...
+                       'DataLoggingMaxPoints', info.MaxPoints};
+        end
         modele = add_block(modele, 'datastorememory', bloc, 'DataStoreName', nom{1}, ...
-                           'InitialValue', double(valeur), 'ReadBeforeWriteMsg', 'none', ...
-                           'WriteAfterReadMsg', 'none', 'WriteAfterWriteMsg', 'none');
+                           'InitialValue', valeur, 'ReadBeforeWriteMsg', 'none', ...
+                           'WriteAfterReadMsg', 'none', 'WriteAfterWriteMsg', 'none', journal{:});
+        modele.blocs{end}.globale = true;
+    end
+end
+
+% Une mémoire se journalise si son DataLogging est à 'on' et que le modèle
+% journalise ses mémoires (DSMLogging).
+function oui = memoireJournalisee(c, m)
+    oui = strcmp(c.p{m}.DataLogging, 'on') && strcmpi(champ(c.config, 'DSMLogging', 'on'), 'on');
+end
+
+% Les blocs qui écrivent la mémoire M, dans l'ordre du modèle : le journal
+% désigne chacun par son rang (DSMWriters).
+function e = ecrivainsMemoire(c, m)
+    e = find(strcmp(c.types, 'datastorewrite') & c.memoire == m);
+end
+
+function verifierJournalMemoire(p, ch)
+    for nom = {'DataLoggingDecimation', 'DataLoggingMaxPoints'}
+        v = p.(nom{1});
+        if ~(isnumeric(v) && isscalar(v) && isreal(v) && v >= 1 && v == round(v))
+            error('Simulink:Parameters:InvalidValue', ...
+                  ['Le parametre %s du bloc ''%s'' est un entier positif : %s ne convient ' ...
+                   'pas.'], nom{1}, ch, mat2str(v));
+        end
     end
 end
 
@@ -4983,9 +5027,10 @@ function c = abaisser(c, pas, tDebut)
                 seg = largeurEntree(c, k, 1);
             case 'probe'                  % ses sorties, des constantes
                 seg = sonde(c, k, p);
-            case {'datastoreread', 'datastorewrite'}   % [mémoire; largeur]
+            case {'datastoreread', 'datastorewrite'}   % [mémoire; largeur; rang d'écrivain]
                 m = c.memoire(k);
                 largeur = numel(c.p{m}.InitialValue);
+                rang = 0;
                 if strcmp(c.types{k}, 'datastorewrite')
                     lue = largeurEntree(c, k, 1);
                     if ~any(lue == [1 largeur])
@@ -4993,10 +5038,20 @@ function c = abaisser(c, pas, tDebut)
                               ['''%s'' ecrit %d valeur(s) dans la memoire ''%s'', qui en ' ...
                                'porte %d.'], ch, lue, char(c.p{m}.DataStoreName), largeur);
                     end
+                    % une mémoire journalisée note qui l'écrit : son rang
+                    % parmi ses écrivains
+                    if memoireJournalisee(c, m)
+                        rang = find(ecrivainsMemoire(c, m) == k);
+                    end
                 end
-                seg = [m; largeur];
-            case 'datastorememory'
+                seg = [m; largeur; rang];
+            case 'datastorememory'        % Z : [valeur; écrivain; écritures] si journalisée
                 z0 = double(p.InitialValue(:));
+                if memoireJournalisee(c, k)
+                    verifierJournalMemoire(p, ch);
+                    c.journalMemoire(k) = true;
+                    z0 = [z0; 0; 0];
+                end
             case 'ratetransition'         % [mode; période de l'entrée; décalage]  Z : [tenue]
                 x0 = etendre(p.X0, w, ch, 'X0');
                 lent = c.cadence(k) > 0 && isfinite(c.cadence(k)) && ...
