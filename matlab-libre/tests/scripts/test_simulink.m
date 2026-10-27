@@ -14014,6 +14014,153 @@ for kP = 1:size(proprietaires107, 1)
 end
 fprintf('fonctions d''evenement : %d cas croises\n', nCas107);
 
+%% ---------------------------------------- 108. Les jeux de configuration
+% Un modèle porte des jeux de configuration — Simulink.ConfigSet — dont un
+% actif, que la simulation emploie : GETACTIVECONFIGSET, ATTACHCONFIGSET,
+% SETACTIVECONFIGSET, GETCONFIGSETS, GETCONFIGSET, DETACHCONFIGSET.
+bdclose('all');
+new_system('cfg108');
+add_block('built-in/Constant', 'cfg108/c', 'Value', '1');
+add_block('built-in/Integrator', 'cfg108/x');
+add_block('built-in/Outport', 'cfg108/y');
+add_line('cfg108', 'c/1', 'x/1');
+add_line('cfg108', 'x/1', 'y/1');
+cs108 = getActiveConfigSet('cfg108');
+assert(isa(cs108, 'Simulink.ConfigSet') && strcmp(cs108.Name, 'Configuration') && ...
+       cs108 == getActiveConfigSet('cfg108') && cs108 == getConfigSet('cfg108', 'Configuration'), ...
+       'le jeu actif, toujours la meme poignee');
+set_param(cs108, 'StopTime', '3', 'Solver', 'ode4', 'FixedStep', '0.5');
+assert(isequal(get_param('cfg108', 'Solver'), 'ode4') && ...
+       isequal(get_param('cfg108', 'StopTime'), get_param(cs108, 'StopTime')), ...
+       'le jeu actif regle le modele aussitot');
+r108 = sim('cfg108');
+assert(r108.tout(end) == 3 && numel(r108.tout) == 7, 'la simulation prend le jeu actif');
+rapide108 = Simulink.ConfigSet;
+rapide108.Name = 'Court';
+rapide108.Description = 'une seconde, au pas de 0.25';
+set_param(rapide108, 'Solver', 'ode4', 'FixedStep', '0.25', 'StopTime', '1');
+attachConfigSet('cfg108', rapide108);
+assert(isequal(getConfigSets('cfg108'), {'Configuration'; 'Court'}) && ...
+       getConfigSet('cfg108', 'Court') == rapide108 && isempty(getConfigSet('cfg108', 'Absent')), ...
+       'ATTACHCONFIGSET : le jeu s''ajoute, sans devenir actif');
+r108 = sim('cfg108');
+assert(r108.tout(end) == 3, 'un jeu attache n''est pas actif');
+setActiveConfigSet('cfg108', 'Court');
+r108 = sim('cfg108');
+assert(r108.tout(end) == 1 && numel(r108.tout) == 5 && getActiveConfigSet('cfg108') == rapide108, ...
+       'SETACTIVECONFIGSET : la simulation prend l''autre jeu');
+set_param(cs108, 'StopTime', '2');
+assert(isequal(get_param('cfg108', 'StopTime'), get_param(rapide108, 'StopTime')), ...
+       'un jeu inactif se regle sans toucher au modele');
+setActiveConfigSet('cfg108', 'Configuration');
+r108 = sim('cfg108');
+assert(r108.tout(end) == 2, 'le jeu reactive garde ses reglages');
+% Copie, renommage, détachement.
+copie108 = attachConfigSetCopy('cfg108', rapide108, true);
+assert(strcmp(copie108.Name, 'Court1') && copie108 ~= rapide108 && ...
+       isequal(get_param(copie108, 'FixedStep'), get_param(rapide108, 'FixedStep')), ...
+       'ATTACHCONFIGSETCOPY : une copie, renommee');
+copie108.Name = 'Copie';
+assert(isequal(getConfigSets('cfg108'), {'Configuration'; 'Court'; 'Copie'}), ...
+       'renommer un jeu attache le renomme dans le modele');
+libre108 = detachConfigSet('cfg108', 'Copie');
+assert(libre108 == copie108 && isequal(getConfigSets('cfg108'), {'Configuration'; 'Court'}), ...
+       'DETACHCONFIGSET rend le jeu, detache');
+set_param(libre108, 'StopTime', '9');
+assert(~isequal(get_param(rapide108, 'StopTime'), get_param(libre108, 'StopTime')), ...
+       'un jeu detache se regle seul');
+autre108 = copy(rapide108);
+assert(strcmp(autre108.Name, 'Court') && strcmp(autre108.Description, rapide108.Description) && ...
+       autre108 ~= rapide108, 'COPY : un autre jeu, detache');
+% Un modèle fermé laisse ses jeux détachés, avec leurs réglages.
+bdclose('cfg108');
+assert(isequal(get_param(rapide108, 'StopTime'), get_param(autre108, 'StopTime')), ...
+       'le modele ferme, ses jeux gardent leurs reglages');
+new_system('cfg108b');
+attachConfigSet('cfg108b', rapide108);
+assert(isequal(getConfigSets('cfg108b'), {'Configuration'; 'Court'}), ...
+       'un jeu libere s''attache a un autre modele');
+texte108 = evalc('disp(rapide108)');
+assert(~isempty(strfind(texte108, 'Court')) && ~isempty(strfind(texte108, 'cfg108b')), ...
+       'un jeu s''affiche avec son nom et son modele');
+
+% Les refus.
+new_system('refus108');
+add_block('built-in/Gain', 'refus108/g');
+pris108 = Simulink.ConfigSet;
+pris108.Name = 'Pris';
+attachConfigSet('refus108', pris108);
+homonyme108 = Simulink.ConfigSet;
+homonyme108.Name = 'Pris';
+refus108 = {
+    @() attachConfigSet('refus108', pris108), 'Simulink:ConfigSet:ConfigSetAlreadyAttached'
+    @() attachConfigSet('refus108', homonyme108), 'Simulink:ConfigSet:ConfigSetNameConflict'
+    @() attachConfigSet('refus108', 3), 'Simulink:ConfigSet:InvalidConfigSet'
+    @() attachConfigSetCopy('refus108', 'Pris'), 'Simulink:ConfigSet:InvalidConfigSet'
+    @() setActiveConfigSet('refus108', 'Absent'), 'Simulink:ConfigSet:ConfigSetNotFound'
+    @() detachConfigSet('refus108', 'Configuration'), 'Simulink:ConfigSet:CannotDetachActiveConfigSet'
+    @() detachConfigSet('refus108', 'Absent'), 'Simulink:ConfigSet:ConfigSetNotFound'
+    @() set_param(pris108, 'Inconnu', 1), 'Simulink:Commands:ParamUnknown'
+    @() set_param(pris108, 'Solver'), 'Simulink:Commands:ParamValuePairs'
+    @() set_param(homonyme108, 'SolverType', 'Parfois'), 'Simulink:Config:InvalidValue'
+    @() get_param(pris108, 'Inconnu'), 'Simulink:Commands:ParamUnknown'
+    @() getActiveConfigSet('absent108'), 'Simulink:Commands:InvSimulinkObjectName'
+    @() getConfigSets('refus108/g'), 'Simulink:ConfigSet:NotABlockDiagram'
+    };
+for k = 1:size(refus108, 1)
+    vu108 = '';
+    try
+        refus108{k, 1}();
+    catch err
+        vu108 = err.identifier;
+    end
+    assert(strcmp(vu108, refus108{k, 2}), sprintf('refus %d : %s attendu, %s rendu', k, ...
+                                                  refus108{k, 2}, vu108));
+end
+% les propriétés refusées
+proprietes108 = {'Name', '', 'Simulink:ConfigSet:InvalidName'
+                 'Name', 'Configuration', 'Simulink:ConfigSet:ConfigSetNameConflict'
+                 'Description', 3, 'Simulink:ConfigSet:InvalidDescription'};
+for k = 1:size(proprietes108, 1)
+    vu108 = '';
+    try
+        pris108.(proprietes108{k, 1}) = proprietes108{k, 2};
+    catch err
+        vu108 = err.identifier;
+    end
+    assert(strcmp(vu108, proprietes108{k, 3}), sprintf('propriete %d : %s attendu, %s rendu', ...
+                                                       k, proprietes108{k, 3}, vu108));
+end
+assert(strcmp(pris108.Name, 'Pris') && isequal(getConfigSets('refus108'), {'Configuration'; 'Pris'}), ...
+       'un nom refuse ne change rien');
+bdclose('all');
+
+% Batterie : chaque réglage du modèle, lu sur un jeu et posé sur un autre,
+% revient identique — sur un jeu détaché, attaché inactif, et actif, où il
+% se lit aussi sur le modèle.
+noms108 = fieldnames(matlibre_sl_config('defauts'));
+new_system('bat108');
+actif108 = getActiveConfigSet('bat108');
+inactif108 = Simulink.ConfigSet;
+inactif108.Name = 'Inactif';
+attachConfigSet('bat108', inactif108);
+detache108 = Simulink.ConfigSet;
+nCas108 = 0;
+for k = 1:numel(noms108)
+    nom108 = noms108{k};
+    valeur108 = get_param(actif108, nom108);
+    for cible108 = {detache108, inactif108, actif108}
+        set_param(cible108{1}, nom108, valeur108);
+        assert(isequal(get_param(cible108{1}, nom108), valeur108), ...
+               sprintf('%s : le reglage revient identique', nom108));
+        nCas108 = nCas108 + 1;
+    end
+    assert(isequal(get_param('bat108', nom108), valeur108), ...
+           sprintf('%s : le jeu actif est le modele', nom108));
+end
+bdclose('bat108');
+fprintf('jeux de configuration : %d reglages, %d allers-retours\n', numel(noms108), nCas108);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

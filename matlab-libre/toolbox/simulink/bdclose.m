@@ -22,8 +22,14 @@ function bdclose(nom)
     end
     nom = char(nom);
     if strcmpi(nom, 'all')
+        for charge = matlibre_sl_ouverts('noms')
+            matlibre_sl_jeux('oublier', charge{1});
+        end
         matlibre_sl_ouverts('vider');
         return
+    end
+    if matlibre_sl_ouverts('connu', nom)
+        matlibre_sl_jeux('oublier', nom);   % ses jeux de configuration se détachent
     end
     matlibre_sl_ouverts('retirer', nom);
     matlibre_sl_espace('oublier', nom);

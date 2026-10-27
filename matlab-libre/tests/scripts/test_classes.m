@@ -62,6 +62,16 @@ assert(compteurPartage.n == 2);
 autreVue = compteurPartage;
 autreVue.incrementer();
 assert(compteurPartage.n == 3);      % la meme chose, vue deux fois
+% Deux poignees sont egales quand elles designent le meme objet : == et
+% ~=, eq et ne comparent l'objet, non son etat.
+autreCompteur = CompteurAReference();
+autreCompteur.incrementer();
+autreCompteur.incrementer();
+autreCompteur.incrementer();
+assert(compteurPartage == autreVue && ~(compteurPartage ~= autreVue));
+assert(~(compteurPartage == autreCompteur) && compteurPartage ~= autreCompteur);
+assert(eq(autreVue, compteurPartage) && ne(autreCompteur, compteurPartage));
+assert(islogical(compteurPartage == autreVue));
 
 %% -------------------------------------------------------- inputParser
 analyseur = inputParser;

@@ -51,6 +51,9 @@ function close_system(modele, fichier)
             close(poignee);
         end
     end
+    if connu
+        matlibre_sl_jeux('oublier', nom);   % ses jeux de configuration se détachent
+    end
     matlibre_sl_ouverts('retirer', nom);
     matlibre_sl_espace('oublier', nom);
 end

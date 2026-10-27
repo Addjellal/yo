@@ -309,6 +309,15 @@ static bool scalaireSimple(const Valeur& v) {
 }
 
 Valeur operationBinaire(const std::string& op, const Valeur& ga, const Valeur& gb) {
+    // Deux poignées d'objet de classe handle sont égales quand elles
+    // désignent le même objet, comme dans MATLAB : une copie de la poignée
+    // partage l'état de l'objet.
+    if ((op == "==" || op == "~=" || op == "!=") && ga.classe == Classe::Objet &&
+        gb.classe == Classe::Objet && ga.poigneeObjet && gb.poigneeObjet &&
+        ga.nelem() == 1 && gb.nelem() == 1) {
+        const bool meme = ga.st == gb.st && ga.nomObjet == gb.nomObjet;
+        return Valeur::booleen(op == "==" ? meme : !meme);
+    }
     // Matrices creuses : les opérations qui gardent la structure creuse
     // sont traitées telles quelles ; les autres passent par le dense, ce
     // qui garantit un résultat identique quel que soit le stockage.
