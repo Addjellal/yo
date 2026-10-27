@@ -2,6 +2,7 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <ctime>
 #include <thread>
 
@@ -251,82 +252,201 @@ FONCTION(fnDatenum) {
     erreur("MATLAB:datenum:ConvertDateString", "Unable to convert the date string.");
 }
 
-// Une date mise en forme, selon le modele de MATLAB ou le format donne.
+// Les formats numeriques de DATESTR, de 0 a 31, comme dans MATLAB.
+static const char* formatNumero(int numero) {
+    static const char* formats[] = {
+        "dd-mmm-yyyy HH:MM:SS", "dd-mmm-yyyy", "mm/dd/yy", "mmm", "m", "mm", "mm/dd",
+        "dd", "ddd", "d", "yyyy", "yy", "mmmyy", "HH:MM:SS", "HH:MM:SS PM", "HH:MM",
+        "HH:MM PM", "QQ-YY", "QQ", "dd/mm", "dd/mm/yy", "mmm.dd,yyyy HH:MM:SS",
+        "mmm.dd,yyyy", "mm/dd/yyyy", "dd/mm/yyyy", "yy/mm/dd", "yyyy/mm/dd", "QQ-YYYY",
+        "mmmyyyy", "yyyy-mm-dd", "yyyymmddTHHMMSS", "yyyy-mm-dd HH:MM:SS"};
+    if (numero < 0 || numero > 31)
+        erreur("MATLAB:datestr:DateFormat",
+               formater("Le format de date %d n'existe pas : DATESTR prend les formats 0 a 31, "
+                        "ou un modele comme 'yyyy-mm-dd HH:MM:SS'.", numero));
+    return formats[numero];
+}
+
+// Une date mise en forme selon un modele de MATLAB : yyyy, yy, QQ, mmmm,
+// mmm, mm, m, dddd, ddd, dd, d, HH, MM, SS, FFF, AM ou PM. Les secondes
+// s'arrondissent a la milliseconde quand le modele montre FFF, a la
+// seconde sinon, la retenue passant aux minutes, aux heures et au jour.
+// AM ou PM font compter les heures de 1 a 12.
 std::string ecrireDate(double n, const std::string& format) {
-    int annee, mois, jour, heure, minute;
-    double seconde;
-    depuisDatenum(n, annee, mois, jour, heure, minute, seconde);
-    static const char* moisCourt[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    if (format.empty())
-        return formater("%02d-%s-%04d %02d:%02d:%02d", jour,
-                        moisCourt[std::max(0, std::min(11, mois - 1))], annee, heure, minute,
-                        (int)std::round(seconde));
+    static const char* moisLongs[] = {"January", "February", "March",     "April",
+                                      "May",     "June",     "July",      "August",
+                                      "September", "October", "November", "December"};
+    static const char* joursLongs[] = {"Sunday",   "Monday", "Tuesday", "Wednesday",
+                                       "Thursday", "Friday", "Saturday"};
+    if (!std::isfinite(n)) return "NaN";
+    const std::string modele = format.empty() ? std::string(formatNumero(0)) : format;
+    const bool millisecondes = modele.find("FFF") != std::string::npos;
+    const bool douzeHeures =
+        modele.find("AM") != std::string::npos || modele.find("PM") != std::string::npos;
+    long long jours = (long long)std::floor(n);
+    long long ms = std::llround((n - (double)jours) * 86400000.0);
+    if (!millisecondes) ms = std::llround((double)ms / 1000.0) * 1000;
+    if (ms >= 86400000LL) {
+        ms -= 86400000LL;
+        jours += 1;
+    }
+    int annee, mois, jour, h0, m0;
+    double s0;
+    depuisDatenum((double)jours, annee, mois, jour, h0, m0, s0);
+    const int heure = (int)(ms / 3600000LL);
+    const int minute = (int)((ms / 60000LL) % 60);
+    const int seconde = (int)((ms / 1000LL) % 60);
+    const int milli = (int)(ms % 1000LL);
+    // le jour de la semaine : 1 pour dimanche, comme WEEKDAY
+    const int semaine = (int)(((jours + 5) % 7 + 7) % 7);
+    const std::string nomMois = moisLongs[std::max(0, std::min(11, mois - 1))];
+    const std::string nomJour = joursLongs[semaine];
+    auto commence = [&](std::size_t k, const char* motif) {
+        return modele.compare(k, std::strlen(motif), motif) == 0;
+    };
     std::string r;
-    for (std::size_t k = 0; k < format.size();) {
-        if (format.compare(k, 4, "yyyy") == 0) { r += formater("%04d", annee); k += 4; }
-        else if (format.compare(k, 3, "mmm") == 0) {
-            r += moisCourt[std::max(0, std::min(11, mois - 1))];
+    for (std::size_t k = 0; k < modele.size();) {
+        if (commence(k, "yyyy") || commence(k, "YYYY")) {
+            r += formater("%04d", annee);
+            k += 4;
+        } else if (commence(k, "yy") || commence(k, "YY")) {
+            r += formater("%02d", ((annee % 100) + 100) % 100);
+            k += 2;
+        } else if (commence(k, "QQ")) {
+            r += formater("Q%d", (mois - 1) / 3 + 1);
+            k += 2;
+        } else if (commence(k, "mmmm")) {
+            r += nomMois;
+            k += 4;
+        } else if (commence(k, "mmm")) {
+            r += nomMois.substr(0, 3);
             k += 3;
-        }
-        else if (format.compare(k, 2, "mm") == 0) { r += formater("%02d", mois); k += 2; }
-        else if (format.compare(k, 2, "dd") == 0) { r += formater("%02d", jour); k += 2; }
-        else if (format.compare(k, 2, "HH") == 0) { r += formater("%02d", heure); k += 2; }
-        else if (format.compare(k, 2, "MM") == 0) { r += formater("%02d", minute); k += 2; }
-        else if (format.compare(k, 2, "SS") == 0) {
-            r += formater("%02d", (int)std::round(seconde));
+        } else if (commence(k, "mm")) {
+            r += formater("%02d", mois);
+            k += 2;
+        } else if (commence(k, "m")) {
+            r += nomMois.substr(0, 1);
+            k += 1;
+        } else if (commence(k, "dddd")) {
+            r += nomJour;
+            k += 4;
+        } else if (commence(k, "ddd")) {
+            r += nomJour.substr(0, 3);
+            k += 3;
+        } else if (commence(k, "dd")) {
+            r += formater("%02d", jour);
+            k += 2;
+        } else if (commence(k, "d")) {
+            r += nomJour.substr(0, 1);
+            k += 1;
+        } else if (commence(k, "HH")) {
+            int h = heure;
+            if (douzeHeures) {
+                h = heure % 12;
+                if (h == 0) h = 12;
+                r += formater("%2d", h);
+            } else {
+                r += formater("%02d", h);
+            }
+            k += 2;
+        } else if (commence(k, "MM")) {
+            r += formater("%02d", minute);
+            k += 2;
+        } else if (commence(k, "SS")) {
+            r += formater("%02d", seconde);
+            k += 2;
+        } else if (commence(k, "FFF")) {
+            r += formater("%03d", milli);
+            k += 3;
+        } else if (commence(k, "AM") || commence(k, "PM")) {
+            r += heure < 12 ? "AM" : "PM";
             k += 2;
         } else {
-            r += format[k++];
+            r += modele[k++];
         }
     }
     return r;
 }
 
+// Le modele que demande le deuxieme argument de DATESTR : un texte, ou un
+// numero de 0 a 31. Sans lui, le format 0, ou le format 1 si toutes les
+// dates tombent a minuit.
+static std::string modeleDatestr(const Arguments& args, const std::vector<double>& numeros) {
+    if (args.size() > 1 && (args[1].estTexte() || args[1].estChaine())) {
+        std::string f = args[1].versTexte();
+        if (f != "local") return f;
+    } else if (args.size() > 1 && args[1].estNumerique() && !args[1].estVide()) {
+        double numero = args[1].scal();
+        if (numero != std::floor(numero))
+            erreur("MATLAB:datestr:DateFormat", "Un format de date numerique est un entier.");
+        return formatNumero((int)numero);
+    }
+    bool minuit = true;
+    for (double n : numeros)
+        if (std::isfinite(n) && n != std::floor(n)) minuit = false;
+    return formatNumero(minuit ? 1 : 0);
+}
+
+// Une matrice numerique de 3 ou 6 colonnes dont les mois et les jours sont
+// plausibles est une suite de vecteurs de date, comme DATEVEC les rend.
+static bool estVecteurDeDate(const Valeur& v) {
+    if (v.dims.size() != 2) return false;
+    const int lignes = v.dims[0], colonnes = v.dims[1];
+    if (colonnes != 3 && colonnes != 6) return false;
+    for (int l = 0; l < lignes; ++l) {
+        double mois = v.re[(std::size_t)(l + lignes)], jour = v.re[(std::size_t)(l + 2 * lignes)];
+        if (mois < 1 || mois > 12 || mois != std::floor(mois) || jour < 1 || jour > 31)
+            return false;
+    }
+    return true;
+}
+
 FONCTION(fnDatestr) {
     INUTILISE
-    // Plusieurs dates donnent une matrice de caracteres, une ligne par
-    // date : c'est ce que rend MATLAB, et ce dont les echeanciers ont
-    // besoin.
-    if (!args.empty() && args[0].estNumerique() && args[0].nelem() > 1) {
-        std::string format;
-        if (args.size() > 1 && (args[1].estTexte() || args[1].estChaine()))
-            format = args[1].versTexte();
-        std::vector<std::string> lignes;
-        std::size_t largeur = 0;
-        for (std::size_t k = 0; k < args[0].nelem(); ++k) {
-            lignes.push_back(ecrireDate(args[0].re[k], format));
-            largeur = std::max(largeur, lignes.back().size());
-        }
-        Valeur sortie = Valeur::matrice((int)lignes.size(), (int)largeur, (double)' ');
-        sortie.classe = Classe::Caractere;
-        for (std::size_t l = 0; l < lignes.size(); ++l)
-            for (std::size_t c = 0; c < lignes[l].size(); ++c)
-                sortie.re[c * lignes.size() + l] = (double)(unsigned char)lignes[l][c];
-        return {sortie};
-    }
-    double n;
+    // Les numeros de serie : maintenant, ceux que lit DATENUM dans un
+    // texte, ceux de vecteurs de date, ou ceux qu'on donne.
+    std::vector<double> numeros;
     if (args.empty()) {
         std::vector<Valeur> aucun;
-        n = fnNow(it, aucun, 1)[0].scal();
+        numeros.push_back(fnNow(it, aucun, 1)[0].scal());
     } else if (args[0].estTexte() || args[0].estChaine() || args[0].estCellule()) {
         std::vector<Valeur> un{args[0]};
         Arguments passe(un);
-        n = fnDatenum(it, passe, 1)[0].scal();
+        Valeur v = fnDatenum(it, passe, 1)[0];
+        numeros.assign(v.re.begin(), v.re.end());
     } else {
-        n = args[0].scal();
+        exigerNumerique(args[0], "datestr");
+        const Valeur& v = args[0];
+        if (estVecteurDeDate(v)) {
+            const int lignes = v.dims[0], colonnes = v.dims[1];
+            for (int l = 0; l < lignes; ++l) {
+                auto champ = [&](int c) { return v.re[(std::size_t)(l + c * lignes)]; };
+                numeros.push_back(versDatenum((int)champ(0), (int)champ(1), (int)champ(2),
+                                              colonnes == 6 ? (int)champ(3) : 0,
+                                              colonnes == 6 ? (int)champ(4) : 0,
+                                              colonnes == 6 ? champ(5) : 0.0));
+            }
+        } else {
+            numeros.assign(v.re.begin(), v.re.end());
+        }
     }
-    int annee, mois, jour, heure, minute;
-    double seconde;
-    depuisDatenum(n, annee, mois, jour, heure, minute, seconde);
-    static const char* moisCourt[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    std::string sortie = formater("%02d-%s-%04d %02d:%02d:%02d", jour,
-                                  moisCourt[std::max(0, std::min(11, mois - 1))], annee, heure,
-                                  minute, (int)std::round(seconde));
-    if (args.size() > 1 && (args[1].estTexte() || args[1].estChaine()))
-        sortie = ecrireDate(n, args[1].versTexte());
-    return {Valeur::texte(sortie)};
+    const std::string modele = modeleDatestr(args, numeros);
+    // Plusieurs dates donnent une matrice de caracteres, une ligne par
+    // date, completee d'espaces : c'est ce que rend MATLAB, et ce dont les
+    // echeanciers ont besoin.
+    if (numeros.size() == 1) return {Valeur::texte(ecrireDate(numeros[0], modele))};
+    std::vector<std::string> lignes;
+    std::size_t largeur = 0;
+    for (double n : numeros) {
+        lignes.push_back(ecrireDate(n, modele));
+        largeur = std::max(largeur, lignes.back().size());
+    }
+    Valeur sortie = Valeur::matrice((int)lignes.size(), (int)largeur, (double)' ');
+    sortie.classe = Classe::Caractere;
+    for (std::size_t l = 0; l < lignes.size(); ++l)
+        for (std::size_t c = 0; c < lignes[l].size(); ++c)
+            sortie.re[c * lignes.size() + l] = (double)(unsigned char)lignes[l][c];
+    return {sortie};
 }
 
 FONCTION(fnDatevec) {

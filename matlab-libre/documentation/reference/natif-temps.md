@@ -74,16 +74,30 @@ DATENUM  Numéro de série d'une date.
 
 ```
 DATESTR  Écrit une date.
-    DATESTR(D) écrit le numéro de série D ; DATESTR(D,FORMAT) impose le
-    format, par exemple 'yyyy-mm-dd'.
+    DATESTR(D) écrit le numéro de série D — ou les vecteurs de date d'une
+    matrice à 3 ou 6 colonnes, ou un texte que DATENUM lit — au format 0,
+    'dd-mmm-yyyy HH:MM:SS', ou au format 1, 'dd-mmm-yyyy', si toutes les
+    dates tombent à minuit. Plusieurs dates donnent une matrice de
+    caractères, une ligne par date. DATESTR(D,FORMAT) impose le format :
+    un modèle fait de yyyy et yy (l'année), QQ (le trimestre, Q1), mmmm,
+    mmm, mm et m (le mois : March, Mar, 03, M), dddd, ddd, dd et d (le
+    jour : Tuesday, Tue, 05, T), HH, MM, SS et FFF (heures, minutes,
+    secondes, millisecondes), AM ou PM (les heures comptées de 1 à 12) ;
+    ou un numéro de format de 0 à 31, comme dans MATLAB (29 donne
+    'yyyy-mm-dd', 30 'yyyymmddTHHMMSS', 31 'yyyy-mm-dd HH:MM:SS'). Les
+    secondes s'arrondissent à la seconde, ou à la milliseconde avec FFF,
+    la retenue passant aux minutes, aux heures et au jour.
 
     Syntaxe
        s = datestr(d)
        s = datestr(d,format)
+       s = datestr(d,numero)
 
     Exemples
        datestr(datenum(2024,5,1), 'yyyy-mm-dd')
        ischar(datestr(now))
+       datestr(datenum(2024,3,5,14,7,9), 'dddd dd mmmm yyyy, HH:MM PM')
+       datestr([2024 3 5 0 0 0])
 
     Voir aussi DATENUM, DATEVEC, NOW, CLOCK.
 ```

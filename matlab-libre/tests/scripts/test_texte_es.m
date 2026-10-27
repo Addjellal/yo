@@ -343,6 +343,35 @@ assert(months(datenum(2024, 1, 15), datenum(2024, 3, 14)) == 1);
 % datestr ecrit « 31-Mar-2024 » : datenum doit savoir le relire.
 assert(datenum('31-Mar-2024') == datenum(2024, 3, 31));
 assert(strcmp(datestr(datenum('31-Mar-2024 13:45:00')), '31-Mar-2024 13:45:00'));
+% DATESTR en entier : les symboles de MATLAB, les formats numeriques, le
+% format 1 a minuit, l'arrondi qui retient, les vecteurs de date.
+instant = datenum(2024, 3, 5, 14, 7, 9.25);
+attendus = {'ddd', 'Tue'; 'dddd', 'Tuesday'; 'mmmm', 'March'; 'mmm', 'Mar'; 'm', 'M'; ...
+            'd', 'T'; 'yy', '24'; 'QQ-YY', 'Q1-24'; 'FFF', '250'; 'HH:MM PM', ' 2:07 PM'; ...
+            'yyyy-mm-dd HH:MM:SS.FFF', '2024-03-05 14:07:09.250'};
+for k = 1:size(attendus, 1)
+    assert(strcmp(datestr(instant, attendus{k, 1}), attendus{k, 2}), attendus{k, 1});
+end
+numeros = {0, '05-Mar-2024 14:07:09'; 1, '05-Mar-2024'; 2, '03/05/24'; 13, '14:07:09'; ...
+           14, ' 2:07:09 PM'; 17, 'Q1-24'; 21, 'Mar.05,2024 14:07:09'; 23, '03/05/2024'; ...
+           29, '2024-03-05'; 30, '20240305T140709'; 31, '2024-03-05 14:07:09'};
+for k = 1:size(numeros, 1)
+    assert(strcmp(datestr(instant, numeros{k, 1}), numeros{k, 2}), sprintf('format %d', numeros{k, 1}));
+end
+assert(strcmp(datestr(datenum(2024, 3, 5)), '05-Mar-2024'), 'a minuit, le format 1');
+assert(strcmp(datestr(datenum(2024, 3, 5, 23, 59, 59.6)), '06-Mar-2024 00:00:00'), ...
+       'la seconde arrondie retient jusqu''au jour');
+assert(strcmp(datestr(datenum(2024, 3, 5, 0, 30, 0), 'HH:MM AM'), '12:30 AM'), 'minuit et demi');
+assert(strcmp(datestr([2024 3 5 14 7 9]), '05-Mar-2024 14:07:09') && ...
+       strcmp(datestr([2024 3 5]), '05-Mar-2024'), 'les vecteurs de date');
+assert(isequal(datestr(datenum(2024, [1 2], 1), 'mmmm'), ['January '; 'February']), ...
+       'plusieurs dates : une ligne chacune, completee d''espaces');
+try
+    datestr(instant, 32);
+    error('datestr:essai', 'le format 32 aurait du etre refuse');
+catch err
+    assert(strcmp(err.identifier, 'MATLAB:datestr:DateFormat'));
+end
 
 %% ------------------------------- la famille moderne des chaines
 % ERASE, REPLACE, INSERTAFTER, INSERTBEFORE, EXTRACT* et COUNT : toutes
