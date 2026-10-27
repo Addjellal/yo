@@ -226,6 +226,12 @@ function varargout = add_block(modele, type, nom, varargin)
 %                  WriteAfterReadMsg, WriteAfterWriteMsg ; datastoreread et
 %                  datastorewrite DataStoreName — une mémoire partagée,
 %                  lue avant d'être écrite à chaque pas
+%     statereader  StateOwnerBlock (le chemin d'un bloc), SampleTime —
+%                  l'état d'un intégrateur, d'un retard (son tampon, depuis
+%                  la prochaine sortie), d'une mémoire, d'un intégrateur
+%                  discret, d'un filtre ou d'une représentation d'état
+%     statewriter  StateOwnerBlock — écrit son entrée dans cet état ; il se
+%                  pose dans une fonction d'événement
 %     ratetransition OutPortSampleTime, X0, Deterministic — tenue vers une
 %                  période plus lente, retard d'une période lente vers une
 %                  plus rapide
@@ -486,6 +492,13 @@ function varargout = add_block(modele, type, nom, varargin)
 %     switchcase   CaseConditions ('{1, [2 3]}', ou des membres pour une
 %                  entrée énumérée : '{Couleur.Rouge, Couleur.Vert}'),
 %                  ShowDefaultCase
+%     eventlistener EventType (Initialize, Terminate, Reset) — posé dans un
+%                  sous-système sans port, il en fait une fonction
+%                  d'événement, qui calcule une fois avant le premier pas
+%                  (Initialize) ou après le dernier (Terminate) ; une Reset
+%                  Function ne calcule pas, faute d'événement qui la
+%                  déclenche. 'Initialize Function', 'Terminate Function'
+%                  et 'Reset Function' de la bibliothèque en posent une
 %     modelreference ModelName             un autre modèle — variable,
 %                  fichier .m, .slx ou .mdl —, relu à chaque simulation,
 %                  dont les blocs ne voient que son espace de travail ;
@@ -733,6 +746,14 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
             controles = {'whileiterator', 'While Iterator'};
         case 'foreachsubsystem'
             controles = {'foreach', 'For Each'};
+        case {'initializefunction', 'terminatefunction', 'resetfunction'}
+            % une fonction d'événement : son Event Listener, sans port
+            types = struct('initializefunction', 'Initialize', 'terminatefunction', 'Terminate', ...
+                           'resetfunction', 'Reset');
+            gabarit = new_system(regexprep(nom, '[^A-Za-z0-9_]', '_'));
+            gabarit = add_block(gabarit, 'eventlistener', 'Event Listener', ...
+                                'EventType', types.(cle));
+            return
         case 'simulinkfunction'
             % y = f(u) : un Trigger qui en fait une fonction appelée par son
             % nom, un argument d'entrée u relié à l'argument de sortie y

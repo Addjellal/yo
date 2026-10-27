@@ -46,7 +46,7 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
               'pulsegenerator', 'ground', 'repeatingsequence', 'randomnumber', ...
               'uniformrandomnumber', 'inport', 'fromworkspace', 'from', 'chirp', ...
               'bandlimitedwhitenoise', 'counterfreerunning', 'counterlimited', ...
-              'signalgenerator', 'repeatingsequencestair', 'datastoreread'}
+              'signalgenerator', 'repeatingsequencestair', 'datastoreread', 'statereader'}
             nEntrees = 0;
         case {'saturationdynamic', 'deadzonedynamic'}
             nEntrees = 3;   % up, u, lo
@@ -112,10 +112,10 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nSorties = numel(matlibre_sl_variantes('liste', lire(p, 'VariantControls', {1, 2})));
         case 'manualswitch'
             nEntrees = 2;
-        case 'datastorememory'
+        case {'datastorememory', 'eventlistener'}
             nEntrees = 0;
             nSorties = 0;
-        case {'datastorewrite', 'tofile'}
+        case {'datastorewrite', 'tofile', 'statewriter'}
             nSorties = 0;
         case 'xygraph'
             nEntrees = 2;

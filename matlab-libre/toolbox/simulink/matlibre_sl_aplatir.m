@@ -659,9 +659,24 @@ function modele = deplier(modele, k)
     % période à ses blocs, emboîtés compris.
     periode = periodeImposee(bloc, chemin);
     types = cellfun(@(b) b.type, interne.blocs, 'UniformOutput', false);
+    % Une fonction d'événement — un Event Listener dedans — calcule une
+    % fois, au début (Initialize) ou à la fin (Terminate) : ses blocs le
+    % portent, emboîtés compris.
+    evenement = '';
+    if isfield(bloc, 'evenement')
+        evenement = bloc.evenement;
+    end
+    ecouteurs = find(strcmp(types, 'eventlistener'));
+    if ~isempty(ecouteurs)
+        evenement = evenementDe(interne, ecouteurs, entrees, sorties, controles, chemin, ...
+                                evenement, gardeParent);
+    end
     iterateurs = find(ismember(types, {'foriterator', 'whileiterator', 'foreach'}));
     if ~isempty(iterateurs)
         modele.blocs{k} = sousSystemeItere(bloc, interne, iterateurs, g, chemin);
+        if ~isempty(evenement)
+            modele.blocs{k}.evenement = evenement;
+        end
         return
     end
     % Un masque ouvre un espace : ses variables, évaluées dans l'espace de
@@ -711,6 +726,9 @@ function modele = deplier(modele, k)
         % Un bloc intérieur calcule sous la garde du sous-système, s'il est
         % conditionnel, sinon sous celle qui gardait le sous-système.
         enfant.garde = gardeParent;
+        if ~isempty(evenement)
+            enfant.evenement = evenement;
+        end
         if ~isempty(periode)
             enfant = imposerPeriode(enfant, periode, chemin);
         end
@@ -1380,4 +1398,43 @@ function indices = parRang(modele, type)
     end
     [~, ordre] = sort(rangs);
     indices = indices(ordre);
+end
+
+% L'événement d'une fonction d'événement : l'EventType de son seul Event
+% Listener. Elle n'a ni entrée ni sortie, et ne se pose ni dans une autre
+% fonction d'événement ni dans un sous-système conditionnel.
+function evenement = evenementDe(interne, ecouteurs, entrees, sorties, controles, chemin, ...
+                                 parent, gardeParent)
+    if numel(ecouteurs) > 1
+        error('Simulink:blocks:EventListenerMultiple', ...
+              ['Le sous-systeme ''%s'' porte %d blocs Event Listener : une fonction ' ...
+               'd''evenement n''en a qu''un.'], chemin, numel(ecouteurs));
+    end
+    if ~isempty(entrees) || ~isempty(sorties) || ~isempty(controles.ordre)
+        error('Simulink:blocks:EventFunctionPorts', ...
+              ['La fonction d''evenement ''%s'' a des ports : elle n''a ni entree ni ' ...
+               'sortie. Elle lit l''etat des blocs (State Reader, Data Store Read) et ' ...
+               'l''ecrit (State Writer, Data Store Write).'], chemin);
+    end
+    if ~isempty(parent) || gardeParent > 0
+        error('Simulink:blocks:EventFunctionNested', ...
+              ['La fonction d''evenement ''%s'' est dans une autre fonction d''evenement ou ' ...
+               'dans un sous-systeme conditionnel : elle se pose dans le modele, ou dans un ' ...
+               'sous-systeme qui calcule toujours.'], chemin);
+    end
+    p = interne.blocs{ecouteurs}.parametres;
+    evenement = 'Initialize';
+    for nom = fieldnames(p).'
+        if strcmpi(nom{1}, 'EventType')
+            evenement = char(p.(nom{1}));
+        end
+    end
+    choix = {'Initialize', 'Reset', 'Terminate'};
+    j = find(strcmpi(evenement, choix), 1);
+    if isempty(j)
+        error('Simulink:Parameters:InvalidValue', ...
+              'L''EventType de l''Event Listener de ''%s'' vaut Initialize, Reset ou Terminate.', ...
+              chemin);
+    end
+    evenement = choix{j};
 end

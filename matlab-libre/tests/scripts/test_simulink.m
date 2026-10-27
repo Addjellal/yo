@@ -13798,6 +13798,222 @@ assert(isempty(echecs106), sprintf('par les noms : %s', strjoin(echecs106, ' ; '
 fprintf('API par les noms : %d types de blocs batis des deux facons, %d refus identiques\n', ...
         nCas106, nRefus106);
 
+%% ------------------------------------------- 107. Les fonctions d'événement
+% Une Initialize Function calcule une fois avant le premier pas, une
+% Terminate Function une fois après le dernier : un Event Listener le dit.
+% State Writer y écrit l'état d'un bloc, State Reader le lit — partout.
+bdclose('all');
+new_system('ev107');
+add_block('built-in/Constant', 'ev107/un', 'Value', '1');
+add_block('built-in/UnitDelay', 'ev107/d', 'SampleTime', '0.5');
+add_block('built-in/Outport', 'ev107/y');
+add_line('ev107', 'un/1', 'd/1');
+add_line('ev107', 'd/1', 'y/1');
+add_block('simulink/User-Defined Functions/Initialize Function', 'ev107/init');
+add_block('built-in/Constant', 'ev107/init/cinq', 'Value', '5');
+add_block('built-in/StateWriter', 'ev107/init/w', 'StateOwnerBlock', 'ev107/d');
+add_line('ev107/init', 'cinq/1', 'w/1');
+add_block('simulink/User-Defined Functions/Terminate Function', 'ev107/fin');
+add_block('built-in/StateReader', 'ev107/fin/r', 'StateOwnerBlock', 'ev107/d');
+add_block('built-in/ToWorkspace', 'ev107/fin/tw', 'VariableName', 'etat107', ...
+          'SaveFormat', 'Timeseries');
+add_line('ev107/fin', 'r/1', 'tw/1');
+assert(strcmp(get_param('ev107/init/Event Listener', 'EventType'), 'Initialize') && ...
+       strcmp(get_param('ev107/fin/Event Listener', 'EventType'), 'Terminate'), ...
+       'les fonctions de la bibliotheque portent leur Event Listener');
+for solveur107 = {'FixedStepDiscrete', 'ode4', 'ode45'}
+    set_param('ev107', 'Solver', solveur107{1}, 'FixedStep', '0.5', 'StopTime', '2');
+    r107 = sim('ev107');
+    y107 = r107.yout;
+    assert(y107(1) == 5 && all(y107(r107.tout >= 0.5) == 1), ...
+           [solveur107{1} ' : la fonction Initialize ecrit l''etat avant le premier pas']);
+    e107 = r107.etat107;
+    assert(isa(e107, 'timeseries') && e107.Length == 1 && e107.Time == 2 && e107.Data == 1, ...
+           [solveur107{1} ' : la fonction Terminate lit l''etat au dernier instant']);
+end
+
+% Un intégrateur, un retard de trois pas : l'état continu, le tampon dans
+% l'ordre où il sortira, et State Reader hors de toute fonction.
+new_system('etats107');
+add_block('built-in/Constant', 'etats107/un', 'Value', '1');
+add_block('built-in/Integrator', 'etats107/x');
+add_block('built-in/Outport', 'etats107/yx');
+add_line('etats107', 'un/1', 'x/1');
+add_line('etats107', 'x/1', 'yx/1');
+add_block('built-in/Delay', 'etats107/d', 'DelayLength', '3', 'SampleTime', '0.5');
+add_block('built-in/Outport', 'etats107/yd');
+add_line('etats107', 'un/1', 'd/1');
+add_line('etats107', 'd/1', 'yd/1');
+add_block('built-in/StateReader', 'etats107/lit', 'StateOwnerBlock', 'etats107/d');
+add_block('built-in/Outport', 'etats107/tampon');
+add_line('etats107', 'lit/1', 'tampon/1');
+add_block('simulink/User-Defined Functions/Initialize Function', 'etats107/init');
+add_block('built-in/Constant', 'etats107/init/c', 'Value', '7');
+add_block('built-in/StateWriter', 'etats107/init/wx', 'StateOwnerBlock', 'etats107/x');
+add_line('etats107/init', 'c/1', 'wx/1');
+add_block('built-in/Constant', 'etats107/init/cd', 'Value', '[10 20 30]');
+add_block('built-in/StateWriter', 'etats107/init/wd', 'StateOwnerBlock', 'etats107/d');
+add_line('etats107/init', 'cd/1', 'wd/1');
+set_param('etats107', 'Solver', 'ode4', 'FixedStep', '0.5', 'StopTime', '2');
+r107 = sim('etats107');
+y107 = r107.yout;
+assert(max(abs(y107(:, 1) - (7 + r107.tout))) < 1e-12, 'l''integrateur part de l''etat ecrit');
+assert(isequal(y107(:, 2).', [10 20 30 1 1]), 'le retard sort son tampon ecrit, dans l''ordre');
+assert(isequal(y107(1, 3:5), [10 20 30]) && isequal(y107(2, 3:5), [20 30 1]), ...
+       'STATE READER lit le tampon, depuis la prochaine sortie');
+
+% Une mémoire partagée écrite au début et à la fin, et journalisée.
+new_system('mem107');
+add_block('built-in/DataStoreMemory', 'mem107/m', 'DataStoreName', 'A', 'DataLogging', 'on');
+add_block('built-in/DataStoreRead', 'mem107/lu', 'DataStoreName', 'A');
+add_block('built-in/Outport', 'mem107/y');
+add_line('mem107', 'lu/1', 'y/1');
+add_block('simulink/User-Defined Functions/Initialize Function', 'mem107/init');
+add_block('built-in/Constant', 'mem107/init/c', 'Value', '4');
+add_block('built-in/DataStoreWrite', 'mem107/init/w', 'DataStoreName', 'A');
+add_line('mem107/init', 'c/1', 'w/1');
+add_block('simulink/User-Defined Functions/Terminate Function', 'mem107/fin');
+add_block('built-in/Constant', 'mem107/fin/c', 'Value', '9');
+add_block('built-in/DataStoreWrite', 'mem107/fin/w', 'DataStoreName', 'A');
+add_line('mem107/fin', 'c/1', 'w/1');
+add_block('simulink/User-Defined Functions/Reset Function', 'mem107/remise');
+add_block('built-in/Constant', 'mem107/remise/c', 'Value', '-1');
+add_block('built-in/DataStoreWrite', 'mem107/remise/w', 'DataStoreName', 'A');
+add_line('mem107/remise', 'c/1', 'w/1');
+set_param('mem107', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', 'StopTime', '2');
+r107 = sim('mem107');
+assert(isequal(r107.yout.', [4 4 4]), 'la memoire ecrite au debut se lit des le premier pas');
+journal107 = r107.dsmout;
+d107 = journal107{1};
+assert(isequal(d107.Values.Data(:).', [4 9]) && isequal(d107.Values.Time(:).', [0 2]) && ...
+       isequal(d107.DSMWriterBlockPaths(d107.DSMWriters), {'mem107/init/w'; 'mem107/fin/w'}), ...
+       'ses ecritures au debut et a la fin se journalisent ; la Reset Function ne calcule pas');
+
+% Les refus.
+refus107 = {};
+m = new_system('r1');
+m = add_block(m, 'subsystem', 's', 'Model', add_block(add_block(new_system('i'), ...
+    'eventlistener', 'e1'), 'eventlistener', 'e2'));
+refus107(end + 1, :) = {m, 'Simulink:blocks:EventListenerMultiple'};
+i107 = add_block(add_block(new_system('i'), 'eventlistener', 'e'), 'inport', 'u');
+m = add_block(add_block(new_system('r2'), 'subsystem', 's', 'Model', i107), 'constant', 'c');
+m = add_line(m, 'c', 's');
+refus107(end + 1, :) = {m, 'Simulink:blocks:EventFunctionPorts'};
+interieur107 = add_block(new_system('i'), 'subsystem', 'f', 'Model', ...
+                         add_block(new_system('j'), 'eventlistener', 'e'));
+interieur107 = add_block(interieur107, 'enableport', 'Enable');
+m = add_block(add_block(new_system('r3'), 'subsystem', 's', 'Model', interieur107), ...
+              'constant', 'c');
+m = add_line(m, 'c', 's/Enable');
+refus107(end + 1, :) = {m, 'Simulink:blocks:EventFunctionNested'};
+m = add_block(add_block(add_block(new_system('r4'), 'constant', 'c'), 'unitdelay', 'd'), ...
+              'statewriter', 'w', 'StateOwnerBlock', 'r4/d');
+m = add_line(m, 'c', 'w');
+refus107(end + 1, :) = {m, 'Simulink:blocks:StateWriterOutsideEvent'};
+refus107(end + 1, :) = {add_block(new_system('r5'), 'statereader', 'r'), ...
+                        'Simulink:blocks:StateAccessorOwnerUnspecified'};
+refus107(end + 1, :) = {add_block(new_system('r6'), 'statereader', 'r', 'StateOwnerBlock', ...
+                                  'r6/absent'), 'Simulink:blocks:StateAccessorOwnerNotFound'};
+m = add_block(add_block(new_system('r7'), 'gain', 'g'), 'statereader', 'r', ...
+              'StateOwnerBlock', 'r7/g');
+refus107(end + 1, :) = {m, 'Simulink:blocks:StateAccessorOwnerNoState'};
+fonction107 = add_block(add_block(add_block(new_system('i'), 'eventlistener', 'e'), ...
+                                  'constant', 'c', 'Value', [1 2]), 'statewriter', 'w', ...
+                        'StateOwnerBlock', 'r8/d');
+fonction107 = add_line(fonction107, 'c', 'w');
+m = add_block(add_block(new_system('r8'), 'unitdelay', 'd'), 'subsystem', 'init', ...
+              'Model', fonction107);
+refus107(end + 1, :) = {m, 'Simulink:blocks:StateAccessorWidthMismatch'};
+fonction107 = add_block(add_block(new_system('i'), 'eventlistener', 'e'), 'integrator', 'x');
+refus107(end + 1, :) = {add_block(new_system('r9'), 'subsystem', 'init', 'Model', fonction107), ...
+                        'Simulink:blocks:EventFunctionContinuousStates'};
+fonction107 = add_block(add_block(new_system('i'), 'eventlistener', 'e'), 'unitdelay', 'd');
+m = add_block(add_block(new_system('r10'), 'subsystem', 'init', 'Model', fonction107), ...
+              'statereader', 'r', 'StateOwnerBlock', 'r10/init/d');
+refus107(end + 1, :) = {m, 'Simulink:blocks:StateAccessorOwnerInEvent'};
+fonction107 = add_block(new_system('i'), 'eventlistener', 'e', 'EventType', 'Parfois');
+refus107(end + 1, :) = {add_block(new_system('r11'), 'subsystem', 'f', 'Model', fonction107), ...
+                        'Simulink:Parameters:InvalidValue'};
+m = add_block(add_block(new_system('r12'), 'delay', 'd', 'DelayLength', 0), 'statereader', ...
+              'r', 'StateOwnerBlock', 'r12/d');
+refus107(end + 1, :) = {m, 'Simulink:blocks:StateAccessorOwnerNoState'};
+for k = 1:size(refus107, 1)
+    vu107 = '';
+    try
+        evalc('sim(refus107{k, 1}, ''StopTime'', ''1'');');
+    catch err
+        vu107 = err.identifier;
+    end
+    assert(strcmp(vu107, refus107{k, 2}), sprintf('refus %d : %s attendu, %s rendu', k, ...
+                                                  refus107{k, 2}, vu107));
+end
+
+% Batterie : pour chaque bloc à état, chaque solveur et deux entrées,
+% l'état écrit par State Writer au début donne la même simulation — et le
+% même état final, relu par une Terminate Function — que la condition
+% initiale posée sur le bloc.
+proprietaires107 = {
+    'unitdelay', {'SampleTime', 0.5}, 'InitialCondition', 3, true
+    'delay', {'DelayLength', 2, 'SampleTime', 0.5}, 'InitialCondition', 3, true
+    'memory', {}, 'InitialCondition', 3, true
+    'discreteintegrator', {'SampleTime', 0.5}, 'InitialCondition', 3, true
+    'discretestatespace', {'A', [0.5 0.1; 0 0.8], 'B', [1; 1], 'C', [1 1], 'D', 0, ...
+                           'SampleTime', 0.5}, 'X0', [3; -2], true
+    'integrator', {}, 'InitialCondition', 3, false
+    'statespace', {'A', [-1 0.5; 0 -2], 'B', [1; 1], 'C', [1 1], 'D', 0}, 'X0', [3; -2], false
+    };
+solveurs107 = {'ode4', 'ode45', 'FixedStepDiscrete'};
+nCas107 = 0;
+for kP = 1:size(proprietaires107, 1)
+    [type107, reglages107, nomCI107, ci107, discret107] = proprietaires107{kP, :};
+    for kS = 1:numel(solveurs107)
+        if ~discret107 && strcmp(solveurs107{kS}, 'FixedStepDiscrete')
+            continue
+        end
+        for entreeRampe = [false true]
+            resultats107 = cell(1, 2);
+            for variante = 1:2
+                b107 = new_system('bat107');
+                if entreeRampe
+                    b107 = add_block(b107, 'digitalclock', 'u', 'SampleTime', 0.5);
+                else
+                    b107 = add_block(b107, 'constant', 'u', 'Value', 1);
+                end
+                if variante == 1
+                    b107 = add_block(b107, type107, 'p', reglages107{:}, nomCI107, ci107);
+                else
+                    b107 = add_block(b107, type107, 'p', reglages107{:});
+                    f107 = add_block(new_system('init'), 'eventlistener', 'e');
+                    f107 = add_block(f107, 'constant', 'c', 'Value', ci107(:));
+                    f107 = add_block(f107, 'statewriter', 'w', 'StateOwnerBlock', 'bat107/p');
+                    f107 = add_line(f107, 'c', 'w');
+                    b107 = add_block(b107, 'subsystem', 'init', 'Model', f107);
+                end
+                t107 = add_block(new_system('fin'), 'eventlistener', 'e', 'EventType', 'Terminate');
+                t107 = add_block(t107, 'statereader', 'r', 'StateOwnerBlock', 'bat107/p');
+                t107 = add_block(t107, 'toworkspace', 'tw', 'VariableName', 'final107', ...
+                                 'SaveFormat', 'Array');
+                t107 = add_line(t107, 'r', 'tw');
+                b107 = add_block(b107, 'subsystem', 'fin', 'Model', t107);
+                b107 = add_block(b107, 'outport', 'y');
+                b107 = add_line(b107, 'u', 'p');
+                b107 = add_line(b107, 'p', 'y');
+                b107 = set_param(b107, 'Solver', solveurs107{kS}, 'FixedStep', '0.5', ...
+                                 'StopTime', '2');
+                r107 = sim(b107);
+                resultats107{variante} = {r107.yout, r107.final107};
+            end
+            contexte107 = sprintf('%s, %s, entree %d', type107, solveurs107{kS}, entreeRampe);
+            assert(max(abs(resultats107{1}{1}(:) - resultats107{2}{1}(:))) < 1e-9, ...
+                   [contexte107 ' : la meme simulation']);
+            assert(max(abs(resultats107{1}{2}(:) - resultats107{2}{2}(:))) < 1e-9, ...
+                   [contexte107 ' : le meme etat final']);
+            nCas107 = nCas107 + 1;
+        end
+    end
+end
+fprintf('fonctions d''evenement : %d cas croises\n', nCas107);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

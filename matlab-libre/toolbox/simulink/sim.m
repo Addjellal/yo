@@ -1132,6 +1132,7 @@ function [instants, J] = sansFin(T, tDebut, pas, solveur, depart)
     releve = zeros(numel(T.journal), 0);
     etats = zeros(numel(T.x0), 0);
     memoires = zeros(1 + numel(T.journalZ), 0);
+    vinit = [];
     reprise = [];
     fait = 0;
     if nargin >= 5 && ~isempty(depart)
@@ -1148,6 +1149,9 @@ function [instants, J] = sansFin(T, tDebut, pas, solveur, depart)
             reprise.premier = true;
         end
         J = matlibre_sl_executer('simuler', T, morceau, solveur, reprise);
+        if ~isempty(J.Vinit)
+            vinit = J.Vinit;
+        end
         releve = [releve, J.releve]; %#ok<AGROW>
         etats = [etats, J.etats]; %#ok<AGROW>
         memoires = [memoires, J.memoires]; %#ok<AGROW>
@@ -1162,6 +1166,7 @@ function [instants, J] = sansFin(T, tDebut, pas, solveur, depart)
     J.releve = releve;
     J.etats = etats;
     J.memoires = memoires;
+    J.Vinit = vinit;
     J.dernier = size(releve, 2);
 end
 
@@ -1317,19 +1322,38 @@ end
 % reste du programme la lira. C'est fait en dernier, pour qu'une
 % simulation interrompue par une erreur ne laisse pas une variable à
 % moitié remplie.
-function resultat = deposer(c, T, J, instants, resultat)
-    N = numel(instants);
+function resultat = deposer(c, T, J, instantsTout, resultat)
     for q = 1:numel(T.releves)
         R = T.releves(q);
         if strcmp(c.types{R.bloc}, 'tofile') && R.port == 1
-            ecrireFichier(c.p{R.bloc}, c.chemins{R.bloc}, instants, J.releve(R.lignes, :));
+            ecrireFichier(c.p{R.bloc}, c.chemins{R.bloc}, instantsTout, J.releve(R.lignes, :));
             continue
         end
         if ~strcmp(c.types{R.bloc}, 'toworkspace') || R.port ~= 1
             continue
         end
         p = c.p{R.bloc};
-        donnees = forme(J.releve(R.lignes, :), R.dims, N);
+        brut = J.releve(R.lignes, :);
+        instants = instantsTout;
+        if isfield(c, 'evenement') && ~isempty(c.evenement{R.bloc})
+            % un To Workspace d'une fonction d'événement : la valeur de sa
+            % passe, à son instant — le premier ou le dernier
+            V = [];
+            if strcmp(c.evenement{R.bloc}, 'Initialize') && isfield(J, 'Vinit')
+                V = J.Vinit;
+                instants = instantsTout(1);
+            elseif strcmp(c.evenement{R.bloc}, 'Terminate') && isfield(J, 'Vterm')
+                V = J.Vterm;
+                instants = instantsTout(end);
+            end
+            if isempty(V)
+                brut = zeros(numel(R.lignes), 0);
+                instants = instantsTout(1:0);
+            else
+                brut = V(T.journal(R.lignes));
+            end
+        end
+        donnees = forme(brut, R.dims, numel(instants));
         % la variable a la classe du signal : int8, single, logical...
         source = c.entrees{R.bloc}(1);
         if source > 0 && c.typePort(source) > 2

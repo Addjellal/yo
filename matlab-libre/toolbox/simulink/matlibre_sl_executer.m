@@ -425,7 +425,7 @@ function T = preparer(c)
                               'gototagvisibility', 'datatypeduplicate', 'foreach', ...
                               'docblock', 'modelinfo', ...
                               'xygraph', 'tofile', ...
-                              'datastorememory'});
+                              'datastorememory', 'eventlistener'});
     liste = [];
     numero = 0;
     for e = 1:numel(c.etapes)
@@ -452,6 +452,29 @@ function T = preparer(c)
     end
     T.listeMajeure = liste(garde);
     T.listeMineure = liste(mineure);
+    % Les fonctions d'événement calculent à part : Initialize avant le
+    % premier pas, Terminate après le dernier — Reset jamais, faute d'un
+    % événement qui la déclenche.
+    T.evenement = zeros(1, n);
+    if isfield(c, 'evenement')
+        T.evenement(strcmp(c.evenement, 'Initialize')) = 1;
+        T.evenement(strcmp(c.evenement, 'Terminate')) = 2;
+        T.evenement(strcmp(c.evenement, 'Reset')) = 3;
+    end
+    T.listeInit = liste(liste > 0 & T.evenement(max(liste, 1)) == 1);
+    T.listeTerm = liste(liste > 0 & T.evenement(max(liste, 1)) == 2);
+    ordinaire = @(L) L(L < 0 | T.evenement(max(L, 1)) == 0);
+    T.listeTout = ordinaire(T.listeTout);
+    T.listeMajeure = ordinaire(T.listeMajeure);
+    T.listeMineure = ordinaire(T.listeMineure);
+    % Les State Writer d'un état continu : ce que la passe d'événement y a
+    % rangé va dans x.
+    T.ecrituresX = zeros(0, 4);   % [bloc, début dans Z, début dans x, taille]
+    for k = find(strcmp(c.types, 'statewriter'))
+        if c.seg{k}(2) == 3
+            T.ecrituresX(end + 1, :) = [k, T.zA(k), c.seg{k}(4), c.seg{k}(3)];
+        end
+    end
 
     % Les blocs dont un état avance à chaque pas majeur, ou à chaque
     % instant de leur période.
@@ -492,6 +515,8 @@ function T = preparer(c)
                 end
         end
     end
+    % un bloc d'une fonction d'événement n'avance pas à chaque pas
+    T.aMettreAJour = T.aMettreAJour(T.evenement(T.aMettreAJour) == 0);
     T.continus = find(c.xA > 0);
 
     % Pour le pas variable : les blocs dont on surveille les passages par
@@ -841,6 +866,8 @@ function J = simuler(T, instants, solveur, reprise)
     releveM = [NaN; Z(T.journalZ)];
     nM = 1;
     vus = Z(T.journalZ(T.compteursJ));
+    Vinit = [];
+    Vterm = [];
     for r = 1:N
         t = instants(r);
         i = i0 + r - 1;
@@ -848,6 +875,9 @@ function J = simuler(T, instants, solveur, reprise)
             touche(g) = i >= decalages(g) && mod(i - decalages(g), periodes(g)) == 0;
         end
         if premier && r == 1
+            % la fonction Initialize, avant tout calcul
+            [V, Z, x] = passeEvenement(T, T.listeInit, V, Z, x, t);
+            Vinit = V;
             [V, Z] = passe(T, T.listeTout, V, Z, x, t, i, true, touche);
         else
             [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, i, true, touche);
@@ -904,10 +934,20 @@ function J = simuler(T, instants, solveur, reprise)
             end
         end
     end
+    if ~avancerApres || Z(1) ~= 0
+        % la fonction Terminate, au dernier instant
+        [V, Z, x] = passeEvenement(T, T.listeTerm, V, Z, x, instants(dernier));
+        Vterm = V;
+        if memoires && ~isempty(T.listeTerm)
+            [releveM, nM, vus] = noterMemoires(T, Z, instants(dernier), releveM, nM, vus);
+        end
+    end
     J = struct('releve', releveV(:, 1:dernier), 'etats', etats(:, 1:dernier), ...
                'dernier', dernier, 'arret', Z(1) ~= 0, 'V', V, 'Z', Z, 'x', x);
     J.tampons = T.tampons;
     J.memoires = releveM(:, 1:nM);
+    J.Vinit = Vinit;
+    J.Vterm = Vterm;
 end
 
 % Un pas majeur où une mémoire journalisée a été écrite : l'instant, puis
@@ -1260,8 +1300,12 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     x = T.xDepart;
     Z = T.Z0;
     touche = (abs(prochain - t) <= toleranceTemps(t)).';
+    Vinit = [];
     if isempty(reprise)
-        [V, Z] = passe(T, T.listeTout, T.V0, Z, x, t, 0, true, touche);
+        % la fonction Initialize, avant tout calcul
+        [V, Z, x] = passeEvenement(T, T.listeInit, T.V0, Z, x, t);
+        Vinit = V;
+        [V, Z] = passe(T, T.listeTout, V, Z, x, t, 0, true, touche);
     else
         x = reprise.x;
         Z = reprise.Z;
@@ -1602,11 +1646,18 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
             end
         end
     end
+    % la fonction Terminate, au dernier instant
+    [V, Z, x] = passeEvenement(T, T.listeTerm, V, Z, x, t);
+    if memoires && ~isempty(T.listeTerm)
+        [releveM, nM, vus] = noterMemoires(T, Z, t, releveM, nM, vus);
+    end
     J = struct('temps', temps(1:n), 'releve', releveV(:, 1:n), 'etats', etats(:, 1:n), ...
                'dernier', n, 'arret', arret, 'V', V, 'Z', Z, 'x', x);
     J.tampons = T.tampons;
     J.t = t;
     J.memoires = releveM(:, 1:nM);
+    J.Vinit = Vinit;
+    J.Vterm = V;
 end
 
 % Un instant relevé : tous, ou seulement les instants imposés. La
@@ -3176,6 +3227,24 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                             largeur = T.P(p + 2 * q);
                             V(debut:debut + largeur - 1) = V(eA(e + 1 + q):eB(e + 1 + q));
                         end
+                    case 123   % state writer : l'état de son propriétaire, aux pas majeurs
+                        if majeur
+                            o = T.P(p);
+                            n = T.P(p + 2);
+                            u = V(eA(e + 1):eB(e + 1)) + zeros(n, 1);
+                            switch T.P(p + 1)
+                                case 1
+                                    Z(zA(o):zA(o) + n - 1) = u;
+                                case 2
+                                    % le tampon d'un retard, dans l'ordre où il sortira
+                                    Z(zA(o)) = 1;
+                                    Z(zA(o) + 1:zA(o) + n) = u;
+                                otherwise
+                                    % un état continu : la fin de la passe le pose
+                                    Z(zA(k)) = 1;
+                                    Z(zA(k) + 1:zA(k) + n) = u;
+                            end
+                        end
                     case 120   % direct lookup : l'élément désigné, à partir de 0
                         lignes = T.P(p + 1);
                         u = V(eA(e + 1):eB(e + 1));
@@ -3206,6 +3275,19 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                     case 113   % garde d'un sous-système conditionnel
                         V(a) = double(gardeActive(T, k, V, Z, p, e));
+                    case 119   % state reader : l'état de son propriétaire
+                        o = T.P(p);
+                        n = T.P(p + 2);
+                        switch T.P(p + 1)
+                            case 1
+                                V(a:b) = Z(zA(o):zA(o) + n - 1);
+                            case 2
+                                % le tampon d'un retard, depuis la prochaine sortie
+                                V(a:b) = lireTampon(Z(zA(o) + 1:zA(o) + n), Z(zA(o)), ...
+                                                    oB(o) - oA(o) + 1);
+                            otherwise
+                                V(a:b) = x(T.P(p + 3):T.P(p + 3) + n - 1);
+                        end
                     case 118   % rate transition : tenue, ou retard d'une période lente
                         if sub(k) == 1
                             V(a:b) = V(eA(e + 1):eB(e + 1));
@@ -5606,5 +5688,32 @@ function k = enCours(k)
         courant = k;
     else
         k = courant;
+    end
+end
+
+% Le tampon d'un retard — W valeurs par case —, depuis la case TETE, celle
+% qui sortira la première.
+function v = lireTampon(cases, tete, w)
+    L = numel(cases) / w;
+    M = reshape(cases, w, L);
+    ordre = [tete:L, 1:tete - 1];
+    v = reshape(M(:, ordre), [], 1);
+end
+
+% Une passe d'événement — Initialize, Terminate — : chaque bloc de la
+% fonction calcule une fois, quelle que soit sa période, puis les State
+% Writer d'un état continu posent ce qu'ils ont écrit dans x.
+function [V, Z, x] = passeEvenement(T, liste, V, Z, x, t)
+    if isempty(liste)
+        return
+    end
+    [V, Z] = passe(T, liste, V, Z, x, t, 0, true, true(1, size(T.groupes, 1)));
+    for r = 1:size(T.ecrituresX, 1)
+        z = T.ecrituresX(r, 2);
+        if Z(z) ~= 0
+            n = T.ecrituresX(r, 4);
+            x(T.ecrituresX(r, 3):T.ecrituresX(r, 3) + n - 1) = Z(z + 1:z + n);
+            Z(z) = 0;
+        end
     end
 end

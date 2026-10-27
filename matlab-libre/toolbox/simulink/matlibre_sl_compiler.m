@@ -131,6 +131,9 @@ function c = compiler(modele, options)
     % travail de base, et celles dont les écritures se journalisent.
     c.globale = false(1, n);
     c.journalMemoire = false(1, n);
+    % La fonction d'événement où calcule chaque bloc : '' pour aucune,
+    % 'Initialize', 'Terminate' ou 'Reset'.
+    c.evenement = repmat({''}, 1, n);
 
     % --- 1. types et paramètres ---------------------------------------------
     enCours('modele', modele.blocs, cellfun(@(b) [nomModele '/' char(b.nom)], ...
@@ -160,6 +163,9 @@ function c = compiler(modele, options)
         end
         if isfield(bloc, 'globale')
             c.globale(k) = bloc.globale;
+        end
+        if isfield(bloc, 'evenement')
+            c.evenement{k} = bloc.evenement;
         end
         c.p{k} = lireParametres(entree, bloc, c.chemins{k});
         c.plage{k} = plageDeSortie(c.types{k}, c.p{k}, c.chemins{k});
@@ -292,6 +298,7 @@ function c = compiler(modele, options)
     % --- 4. Goto et From, mémoires partagées, appels de fonction -------------
     c = resoudreGoto(c);
     c = resoudreMemoires(c);
+    c = resoudreProprietaires(c);
     verifierAppels(c);
 
     % --- 5. transmission directe -------------------------------------------
@@ -395,6 +402,13 @@ function c = compiler(modele, options)
         c.pas = pas;
     end
     c = periodes(c, pas);
+    % Une fonction d'événement calcule une fois, quand vient son événement :
+    % ses blocs n'ont pas de période.
+    for k = find(~cellfun(@isempty, c.evenement))
+        c.cadence(k) = Inf;
+        c.decalage(k) = 0;
+        c.majeurSeul(k) = false;
+    end
     contrainteDesPeriodes(c, config, champ(options, 'pasAuto', false));
     c = transitionsDeCadence(c, config, silencieux, champ(options, 'transitionsPosees', false));
 
@@ -2583,7 +2597,8 @@ function x = codeDe(type)
                 'xygraph', 97; 'tofile', 98; ...
                 'datastorememory', 117; 'ratetransition', 118; ...
                 'iterateur', 105; 'foriterator', 106; 'whileiterator', 107; ...
-                'functioncallgenerator', 108; 'directlookup', 120};
+                'functioncallgenerator', 108; 'directlookup', 120; ...
+                'statereader', 119; 'statewriter', 123; 'eventlistener', 114};
         table = containers.Map(noms(:, 1)', noms(:, 2)');
     end
     x = table(type);
@@ -3179,8 +3194,10 @@ function dims = propagerDimensions(c)
                 continue
             end
             [dimsE, complet] = dimsEntrees(c, k, dims, connu);
-            if strcmp(c.types{k}, 'busselector')
-                c.dimsCourants = dims;   % il lit la forme du bus en amont
+            if any(strcmp(c.types{k}, {'busselector', 'statereader'}))
+                % il lit la forme du bus en amont, ou la sortie du bloc dont
+                % il lit l'état
+                c.dimsCourants = dims;
             end
             sortie = regleDims(c, k, dimsE, complet, forcer);
             if isempty(sortie) || any(cellfun(@isempty, sortie))
@@ -3344,6 +3361,11 @@ function s = regleDims(c, k, dE, complet, forcer)
                           {'Amplitude', 'Frequency'})};
         case 'datastoreread'
             s = {dimsDe(c.p{c.memoire(k)}.InitialValue)};
+        case 'statereader'
+            s = {dimsEtat(c, c.proprietaire(k), forcer)};
+            if isempty(s{1})
+                s = {};
+            end
         case {'foriterator', 'whileiterator', 'functioncallgenerator'}
             s = repmat({[1 1]}, 1, c.nOut(k));
         case 'iterateur'
@@ -3953,11 +3975,13 @@ function c = periodes(c, pas, verifier)
                 else
                     [c.cadence(k), c.decalage(k)] = lirePeriode(p.tsamp);
                 end
-            case 'datastoreread'
+            case {'datastoreread', 'statereader'}
                 c.cadence(k) = 0;
                 if p.SampleTime(1) > 0
                     [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
                 end
+            case 'statewriter'
+                c.majeurSeul(k) = true;
             case 'datastorewrite'
                 % L'écriture se fait aux pas majeurs, ou aux instants de sa
                 % période : un pas mineur ne touche pas à la mémoire.
@@ -5045,6 +5069,12 @@ function c = abaisser(c, pas, tDebut)
                     end
                 end
                 seg = [m; largeur; rang];
+            case {'statereader', 'statewriter'}   % [propriétaire; genre; taille; début dans x]
+                % posé après coup (ACCES_ETATS), quand tous les états sont rangés
+                seg = c.proprietaire(k);
+                if strcmp(c.types{k}, 'statewriter')
+                    z0 = 0;   % [écrit ; valeurs] pour un état continu, voir plus bas
+                end
             case 'datastorememory'        % Z : [valeur; écrivain; écritures] si journalisée
                 z0 = double(p.InitialValue(:));
                 if memoireJournalisee(c, k)
@@ -5525,6 +5555,148 @@ function c = abaisser(c, pas, tDebut)
         c.seg{k} = double(seg(:));
         c.sub(k) = sub;
         c.z0{k} = double(z0(:));
+    end
+    c = accesEtats(c);
+end
+
+% State Reader et State Writer : l'état de leur bloc propriétaire, une fois
+% tous les états rangés. Genre 1 : une tranche du vecteur Z ; 2 : le tampon
+% d'un retard, rendu dans l'ordre où il sortira ; 3 : les états continus.
+function c = accesEtats(c)
+    for k = find(~cellfun(@isempty, c.evenement) & c.xA > 0)
+        error('Simulink:blocks:EventFunctionContinuousStates', ...
+              ['Le bloc ''%s'' a des etats continus, mais il est dans une fonction ' ...
+               'd''evenement, qui ne calcule qu''une fois : prenez un bloc discret.'], ...
+              c.chemins{k});
+    end
+    for k = find(ismember(c.types, {'statereader', 'statewriter'}))
+        enCours('bloc', k);
+        o = c.proprietaire(k);
+        w = sortieLargeur(c, o);
+        debutX = 0;
+        switch c.types{o}
+            case {'integrator', 'statespace', 'transferfcn'}
+                genre = 3;
+                n = c.xB(o) - c.xA(o) + 1;
+                if strcmp(c.types{o}, 'integrator')
+                    n = w;
+                end
+                debutX = c.xA(o);
+            case 'delay'
+                L = c.seg{o}(1);
+                if L == 0
+                    error('Simulink:blocks:StateAccessorOwnerNoState', ...
+                          ['Le retard ''%s'', que designe ''%s'', est de longueur nulle : il ' ...
+                           'n''a pas d''etat.'], c.chemins{o}, c.chemins{k});
+                end
+                genre = 2;
+                n = w * L;
+            case {'memory', 'discreteintegrator'}
+                genre = 1;
+                n = w;
+            otherwise   % filtres et représentations d'état discrets
+                genre = 1;
+                n = numel(c.z0{o});
+        end
+        if strcmp(c.types{k}, 'statereader')
+            largeur = sortieLargeur(c, k);
+        else
+            largeur = largeurEntree(c, k, 1);
+        end
+        if ~(largeur == n || (strcmp(c.types{k}, 'statewriter') && largeur == 1))
+            error('Simulink:blocks:StateAccessorWidthMismatch', ...
+                  ['''%s'' porte %d valeur(s), et l''etat de ''%s'' en a %d : State Reader et ' ...
+                   'State Writer ont la largeur de l''etat qu''ils lisent ou ecrivent.'], ...
+                  c.chemins{k}, largeur, c.chemins{o}, n);
+        end
+        c.seg{k} = [o; genre; n; debutX];
+        if strcmp(c.types{k}, 'statewriter') && genre == 3
+            c.z0{k} = zeros(1 + n, 1);   % [écrit; valeurs], que la fin de la passe pose dans x
+        else
+            c.z0{k} = zeros(0, 1);
+        end
+    end
+end
+
+% Le bloc dont un State Reader ou un State Writer lit ou écrit l'état :
+% StateOwnerBlock, son chemin — complet, ou depuis le modèle.
+function c = resoudreProprietaires(c)
+    c.proprietaire = zeros(1, c.n);
+    admis = {'integrator', 'statespace', 'transferfcn', 'delay', 'memory', ...
+             'discreteintegrator', 'discretetransferfcn', 'discretefilter', ...
+             'discretestatespace'};
+    for k = find(ismember(c.types, {'statereader', 'statewriter'}))
+        p = c.p{k};
+        chemin = strtrim(char(p.StateOwnerBlock));
+        if isempty(chemin)
+            error('Simulink:blocks:StateAccessorOwnerUnspecified', ...
+                  ['''%s'' ne designe pas de bloc : StateOwnerBlock donne le chemin du bloc ' ...
+                   'dont il lit ou ecrit l''etat.'], c.chemins{k});
+        end
+        o = find(strcmp(c.chemins, chemin) | strcmp(c.chemins, [c.nom '/' chemin]), 1);
+        if isempty(o)
+            error('Simulink:blocks:StateAccessorOwnerNotFound', ...
+                  'Le bloc ''%s'', dont ''%s'' lit ou ecrit l''etat, n''existe pas.', ...
+                  chemin, c.chemins{k});
+        end
+        if ~any(strcmp(c.types{o}, admis))
+            error('Simulink:blocks:StateAccessorOwnerNoState', ...
+                  ['Le bloc ''%s'' (%s), que designe ''%s'', n''a pas d''etat qu''on lise ou ' ...
+                   'ecrive : integrateur, retard, memoire, integrateur discret, filtre ou ' ...
+                   'representation d''etat.'], c.chemins{o}, c.types{o}, c.chemins{k});
+        end
+        if ~isempty(c.evenement{o})
+            error('Simulink:blocks:StateAccessorOwnerInEvent', ...
+                  ['Le bloc ''%s'' est dans une fonction d''evenement : State Reader et State ' ...
+                   'Writer visent l''etat d''un bloc du modele.'], c.chemins{o});
+        end
+        if strcmp(c.types{k}, 'statewriter') && isempty(c.evenement{k})
+            error('Simulink:blocks:StateWriterOutsideEvent', ...
+                  ['Le State Writer ''%s'' n''est pas dans une fonction d''evenement : il se ' ...
+                   'pose dans une Initialize Function, une Terminate Function ou une Reset ' ...
+                   'Function.'], c.chemins{k});
+        end
+        c.proprietaire(k) = o;
+    end
+    % une fonction d'événement n'a pas d'état continu : elle ne calcule
+    % qu'une fois
+end
+
+% Les dimensions de l'état d'un bloc, d'après sa sortie : vide tant
+% qu'elle n'est pas connue.
+function d = dimsEtat(c, o, forcer)
+    d = [];
+    po = c.portDebut(o);
+    sortie = [];
+    if c.nOut(o) >= 1 && numel(c.dimsCourants) >= po
+        sortie = c.dimsCourants{po};
+    end
+    if isempty(sortie)
+        if forcer
+            sortie = [1 1];
+        else
+            return
+        end
+    end
+    w = prod(sortie);
+    p = c.p{o};
+    switch c.types{o}
+        case {'integrator', 'memory', 'discreteintegrator'}
+            d = sortie;
+        case 'delay'
+            L = double(p.DelayLength);
+            if strcmp(p.DelayLengthSource, 'Input port')
+                L = double(p.DelayLengthUpperLimit);
+            end
+            if L <= 1
+                d = sortie;
+            else
+                d = [w * L, 1];
+            end
+        case {'statespace', 'discretestatespace'}
+            d = [size(p.A, 1), 1];
+        otherwise   % fonctions de transfert, filtres
+            d = [max(numel(p.Denominator) - 1, 1) * w, 1];
     end
 end
 
