@@ -14418,6 +14418,161 @@ bdclose('all');
 rmdir(dossier110, 's');
 fprintf('fiche du modele : %d reglages relus, 10 enregistrements de suite\n', nCas110);
 
+%% ------------------------------------------------ 111. Les outils de schéma
+% Simulink.BlockDiagram.deleteContents et Simulink.SubSystem.deleteContents
+% vident, copyContentsToSubsystem remplit un sous-système d'un modèle,
+% expandSubsystem déplie un sous-système virtuel, createSubsystem réunit
+% des blocs en un sous-système, arrangeSystem range : la simulation n'en
+% change pas.
+bdclose('all');
+new_system('outil111');
+add_block('built-in/Constant', 'outil111/c', 'Value', '3');
+add_block('simulink/Ports & Subsystems/Subsystem', 'outil111/s');
+add_block('built-in/Gain', 'outil111/s/k', 'Gain', '2');
+delete_line('outil111/s', 'In1/1', 'Out1/1');
+add_line('outil111/s', 'In1/1', 'k/1');
+add_line('outil111/s', 'k/1', 'Out1/1');
+add_block('built-in/Outport', 'outil111/y');
+add_line('outil111', 'c/1', 's/1');
+add_line('outil111', 's/1', 'y/1');
+set_param('outil111', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', 'StopTime', '1');
+out111 = sim('outil111');
+Simulink.BlockDiagram.expandSubsystem('outil111/s');
+assert(isequal(sort(find_system('outil111', 'Type', 'block')), {'outil111/c'; 'outil111/k'; 'outil111/y'}), ...
+       'EXPANDSUBSYSTEM : le gain vient dans le modele, les ports s''effacent');
+deplie111 = sim('outil111');
+assert(isequal(deplie111.yout, out111.yout) && deplie111.yout(end) == 6, ...
+       'le modele deplie simule pareil');
+Simulink.BlockDiagram.createSubsystem({'outil111/k'}, 'Name', 'double');
+assert(isequal(sort(find_system('outil111/double', 'SearchDepth', 1)), ...
+               {'outil111/double'; 'outil111/double/In1'; 'outil111/double/Out1'; 'outil111/double/k'}) && ...
+       isequal(get_param('outil111/double', 'Ports'), [1 1 0 0 0 0 0 0]), ...
+       'CREATESUBSYSTEM : le bloc, un Inport, un Outport');
+groupe111 = sim('outil111');
+assert(isequal(groupe111.yout, out111.yout), 'le modele groupe simule pareil');
+% vider, remplir
+Simulink.SubSystem.deleteContents('outil111/double');
+assert(isequal(find_system('outil111/double'), {'outil111/double'}) && ...
+       isequal(get_param('outil111/double', 'Ports'), [0 0 0 0 0 0 0 0]), ...
+       'SIMULINK.SUBSYSTEM.DELETECONTENTS : plus de bloc, plus de port');
+new_system('source111');
+add_block('built-in/Inport', 'source111/u');
+add_block('built-in/Gain', 'source111/g', 'Gain', '5');
+add_block('built-in/Outport', 'source111/v');
+add_line('source111', 'u/1', 'g/1');
+add_line('source111', 'g/1', 'v/1');
+Simulink.BlockDiagram.copyContentsToSubsystem('source111', 'outil111/double');
+add_line('outil111', 'c/1', 'double/1');
+add_line('outil111', 'double/1', 'y/1');
+copie111 = sim('outil111');
+assert(copie111.yout(end) == 15, 'COPYCONTENTSTOSUBSYSTEM : le modele recopie dans le sous-systeme');
+Simulink.BlockDiagram.arrangeSystem('outil111');
+positions111 = get_param(find_system('outil111', 'SearchDepth', 1, 'Type', 'block'), 'Position');
+assert(all(cellfun(@numel, positions111) == 4), 'ARRANGESYSTEM : chaque bloc a sa place');
+range111 = sim('outil111');
+assert(isequal(range111.yout, copie111.yout), 'ranger ne change rien a la simulation');
+Simulink.BlockDiagram.deleteContents('outil111');
+assert(isempty(find_system('outil111', 'Type', 'block')) && ...
+       strcmp(get_param('outil111', 'Solver'), 'FixedStepDiscrete'), ...
+       'SIMULINK.BLOCKDIAGRAM.DELETECONTENTS : plus de bloc, les reglages restent');
+vide111 = Simulink.BlockDiagram.deleteContents(add_block(new_system('valeur111'), 'gain', 'g'));
+assert(isempty(vide111.blocs), 'un modele par sa valeur, rendu vide');
+
+% Les refus, nommés.
+new_system('refus111');
+add_block('built-in/Constant', 'refus111/c');
+add_block('simulink/Ports & Subsystems/Enabled Subsystem', 'refus111/e');
+add_block('built-in/Subsystem', 'refus111/m', 'Mask', 'on', 'MaskVariables', 'K=@1;', ...
+          'MaskValueString', '2');
+add_block('simulink/Ports & Subsystems/Subsystem', 'refus111/s');
+add_block('built-in/Gain', 'refus111/s/k');
+refus111 = {
+    @() Simulink.BlockDiagram.expandSubsystem('refus111/c'), 'Simulink:Commands:ExpandSubsystemNotSubsystem'
+    @() Simulink.BlockDiagram.expandSubsystem('refus111/e'), 'Simulink:Commands:ExpandSubsystemNotVirtual'
+    @() Simulink.BlockDiagram.expandSubsystem('refus111/m'), 'Simulink:Commands:ExpandSubsystemNotVirtual'
+    @() Simulink.BlockDiagram.expandSubsystem('refus111'), 'Simulink:Commands:ExpandSubsystemNotSubsystem'
+    @() Simulink.BlockDiagram.createSubsystem({'refus111/c', 'refus111/s/k'}), ...
+        'Simulink:Commands:CreateSubsystemDifferentSystems'
+    @() Simulink.BlockDiagram.createSubsystem({}), 'Simulink:Commands:CreateSubsystemArguments'
+    @() Simulink.BlockDiagram.createSubsystem({'refus111/c'}, 'Nom', 'x'), ...
+        'Simulink:Commands:CreateSubsystemArguments'
+    @() Simulink.BlockDiagram.copyContentsToSubsystem('source111', 'refus111/s'), ...
+        'Simulink:Commands:CopyContentsSubsystemNotEmpty'
+    @() Simulink.BlockDiagram.copyContentsToSubsystem('source111', 'refus111/c'), ...
+        'Simulink:Commands:CopyContentsNotSubsystem'
+    @() Simulink.SubSystem.deleteContents('refus111'), 'Simulink:Commands:DeleteContentsNotSubsystem'
+    @() Simulink.SubSystem.deleteContents('refus111/c'), 'Simulink:Commands:DeleteContentsNotSubsystem'
+    @() Simulink.BlockDiagram.deleteContents('refus111/s'), ...
+        'Simulink:Commands:DeleteContentsNotBlockDiagram'
+    @() Simulink.BlockDiagram.createSubsystem({'refus111/absent'}), ...
+        'Simulink:Commands:InvSimulinkObjectName'
+    };
+for k111 = 1:size(refus111, 1)
+    vu111 = '';
+    try
+        refus111{k111, 1}();
+    catch err
+        vu111 = err.identifier;
+    end
+    assert(strcmp(vu111, refus111{k111, 2}), sprintf('refus %d : %s attendu, %s rendu', ...
+                                                     k111, refus111{k111, 2}, vu111));
+end
+bdclose('all');
+
+% Batterie : chaque groupe de un à trois blocs d'un modèle mixte —
+% continu, discret, boucle, deux sorties —, réuni en un sous-système puis
+% redéplié : la simulation reste la même à chaque étape, sans boucle
+% algébrique.
+blocs111 = {'g', 'somme', 'x', 'd', 'sat', 'p'};
+groupes111 = {};
+for taille = 1:3
+    combinaisons111 = nchoosek(1:numel(blocs111), taille);
+    for r = 1:size(combinaisons111, 1)
+        groupes111{end + 1} = blocs111(combinaisons111(r, :)); %#ok<SAGROW>
+    end
+end
+nCas111 = 0;
+for kG = 1:numel(groupes111)
+    new_system('bat111');
+    add_block('built-in/Clock', 'bat111/t');
+    add_block('built-in/Gain', 'bat111/g', 'Gain', '0.5');
+    add_block('built-in/Sum', 'bat111/somme', 'Inputs', '+-');
+    add_block('built-in/Integrator', 'bat111/x');
+    add_block('built-in/UnitDelay', 'bat111/d', 'SampleTime', '0.1');
+    add_block('built-in/Saturate', 'bat111/sat', 'UpperLimit', '0.3', 'LowerLimit', '-0.3');
+    add_block('built-in/Product', 'bat111/p');
+    add_block('built-in/Outport', 'bat111/y1');
+    add_block('built-in/Outport', 'bat111/y2');
+    add_line('bat111', 't/1', 'g/1');
+    add_line('bat111', 'g/1', 'somme/1');
+    add_line('bat111', 'x/1', 'somme/2');
+    add_line('bat111', 'somme/1', 'x/1');
+    add_line('bat111', 'x/1', 'd/1');
+    add_line('bat111', 'd/1', 'sat/1');
+    add_line('bat111', 'x/1', 'p/1');
+    add_line('bat111', 'sat/1', 'p/2');
+    add_line('bat111', 'p/1', 'y1/1');
+    add_line('bat111', 'd/1', 'y2/1');
+    set_param('bat111', 'Solver', 'ode4', 'FixedStep', '0.05', 'StopTime', '1');
+    reference111 = sim('bat111');
+    chemins111 = strcat('bat111/', groupes111{kG});
+    Simulink.BlockDiagram.createSubsystem(chemins111, 'Name', 'groupe');
+    lastwarn('');
+    groupe111 = sim('bat111');
+    contexte111 = strjoin(groupes111{kG}, '+');
+    assert(isempty(lastwarn()), [contexte111 ' : un sous-systeme virtuel ne fait pas de boucle algebrique']);
+    assert(max(abs(groupe111.yout(:) - reference111.yout(:))) < 1e-12, ...
+           [contexte111 ' : groupe, la meme simulation']);
+    Simulink.BlockDiagram.expandSubsystem('bat111/groupe');
+    deplie111 = sim('bat111');
+    assert(max(abs(deplie111.yout(:) - reference111.yout(:))) < 1e-12 && ...
+           numel(find_system('bat111', 'Type', 'block')) == 9, ...
+           [contexte111 ' : redeplie, la meme simulation et les memes blocs']);
+    bdclose('bat111');
+    nCas111 = nCas111 + 1;
+end
+fprintf('outils de schema : %d groupes reunis puis deplies, sans ecart\n', nCas111);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

@@ -711,6 +711,12 @@ function modele = deplier(modele, k)
         passePlat.parametres.Position = bloc.parametres.Position;
     end
     passePlat.garde = gardeParent;
+    % Un sous-système virtuel — ni atomique, ni conditionnel, ni référence
+    % de modèle — n'est qu'un regroupement graphique : ce qui lit sa sortie
+    % lit l'Outport du dedans, et une boucle ne passe par lui que si elle
+    % passe par ses blocs.
+    passePlat.virtuel = strcmp(bloc.type, 'subsystem') && g == 0 && ...
+        ~strcmpi(char(lireParametre(bloc.parametres, 'TreatAsAtomicUnit', 'off')), 'on');
     modele.blocs{k} = passePlat;
 
     % Les blocs intérieurs viennent à la suite, sous le nom

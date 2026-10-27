@@ -134,6 +134,8 @@ function c = compiler(modele, options)
     % La fonction d'événement où calcule chaque bloc : '' pour aucune,
     % 'Initialize', 'Terminate' ou 'Reset'.
     c.evenement = repmat({''}, 1, n);
+    % Les passe-plats des sous-systèmes virtuels, que la lecture traverse.
+    c.virtuel = false(1, n);
 
     % --- 1. types et paramètres ---------------------------------------------
     enCours('modele', modele.blocs, cellfun(@(b) [nomModele '/' char(b.nom)], ...
@@ -166,6 +168,9 @@ function c = compiler(modele, options)
         end
         if isfield(bloc, 'evenement')
             c.evenement{k} = bloc.evenement;
+        end
+        if isfield(bloc, 'virtuel')
+            c.virtuel(k) = bloc.virtuel;
         end
         c.p{k} = lireParametres(entree, bloc, c.chemins{k});
         c.plage{k} = plageDeSortie(c.types{k}, c.p{k}, c.chemins{k});
@@ -300,6 +305,7 @@ function c = compiler(modele, options)
     c = resoudreMemoires(c);
     c = resoudreProprietaires(c);
     verifierAppels(c);
+    c = traverserVirtuels(c);
 
     % --- 5. transmission directe -------------------------------------------
     c.direct = true(1, n);
@@ -5559,6 +5565,29 @@ function c = abaisser(c, pas, tDebut)
     c = accesEtats(c);
 end
 
+% Ce qui lit la sortie d'un sous-système virtuel lit le port de l'Outport
+% du dedans, qui la nourrit : le passe-plat n'est plus qu'une copie que
+% personne n'attend, et l'ordre de calcul suit les blocs du dedans, port
+% par port — un sous-système dont une sortie dépend d'une entrée et
+% l'autre d'un retard ne fait plus de boucle factice.
+function c = traverserVirtuels(c)
+    for k = 1:c.n
+        e = c.entrees{k};
+        for j = 1:numel(e)
+            gp = e(j);
+            for pas = 1:c.n
+                if gp == 0 || ~c.virtuel(c.proprio(gp))
+                    break
+                end
+                a = c.proprio(gp);
+                gp = c.entrees{a}(c.rang(gp));
+            end
+            e(j) = gp;
+        end
+        c.entrees{k} = e;
+    end
+end
+
 % State Reader et State Writer : l'état de leur bloc propriétaire, une fois
 % tous les états rangés. Genre 1 : une tranche du vecteur Z ; 2 : le tampon
 % d'un retard, rendu dans l'ordre où il sortira ; 3 : les états continus.
@@ -7155,6 +7184,14 @@ function diagnostiquer(c)
         for k = 1:c.n
             e = c.entrees{k};
             lus(e(e > 0)) = true;
+        end
+        % la sortie d'un sous-système virtuel, que ses lecteurs traversent,
+        % est lue dès que l'Outport du dedans l'est
+        for k = find(c.virtuel)
+            e = c.entrees{k};
+            for q = find(e > 0 & lus(max(e, 1)))
+                lus(c.portDebut(k) + q - 1) = true;
+            end
         end
         for gp = find(~lus)
             k = c.proprio(gp);
