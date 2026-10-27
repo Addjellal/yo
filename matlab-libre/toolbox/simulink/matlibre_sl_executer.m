@@ -3283,8 +3283,8 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                                 V(a:b) = Z(zA(o):zA(o) + n - 1);
                             case 2
                                 % le tampon d'un retard, depuis la prochaine sortie
-                                V(a:b) = lireTampon(Z(zA(o) + 1:zA(o) + n), Z(zA(o)), ...
-                                                    oB(o) - oA(o) + 1);
+                                V(a:b) = tamponOrdonne(Z(zA(o) + 1:zA(o) + n), Z(zA(o)), ...
+                                                       oB(o) - oA(o) + 1);
                             otherwise
                                 V(a:b) = x(T.P(p + 3):T.P(p + 3) + n - 1);
                         end
@@ -5693,7 +5693,7 @@ end
 
 % Le tampon d'un retard — W valeurs par case —, depuis la case TETE, celle
 % qui sortira la première.
-function v = lireTampon(cases, tete, w)
+function v = tamponOrdonne(cases, tete, w)
     L = numel(cases) / w;
     M = reshape(cases, w, L);
     ordre = [tete:L, 1:tete - 1];
