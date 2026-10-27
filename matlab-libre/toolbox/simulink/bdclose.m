@@ -5,7 +5,9 @@ function bdclose(nom)
 %
 %   Fermer ne détruit pas la valeur : la variable qui porte le modèle
 %   reste, et un nouvel OPEN_SYSTEM le rouvre. C'est le registre de la
-%   session qui se vide, celui que lisent GCS et BDISLOADED.
+%   session qui se vide, celui que lisent GCS et BDISLOADED. Les rappels
+%   de fermeture s'exécutent : ModelCloseFcn des blocs, CloseFcn du
+%   modèle, DestroyFcn des blocs.
 %
 %   Exemple :
 %      m = new_system('essai');
@@ -23,14 +25,28 @@ function bdclose(nom)
     nom = char(nom);
     if strcmpi(nom, 'all')
         for charge = matlibre_sl_ouverts('noms')
-            matlibre_sl_jeux('oublier', charge{1});
+            fermer(charge{1});
         end
         matlibre_sl_ouverts('vider');
         return
     end
     if matlibre_sl_ouverts('connu', nom)
-        matlibre_sl_jeux('oublier', nom);   % ses jeux de configuration se détachent
+        fermer(nom);
     end
     matlibre_sl_ouverts('retirer', nom);
     matlibre_sl_espace('oublier', nom);
+end
+
+% Les rappels de fermeture, puis les jeux de configuration détachés. Un
+% rappel qui échoue n'empêche pas de fermer.
+function fermer(nom)
+    modele = matlibre_sl_ouverts('lire', nom);
+    try
+        matlibre_sl_rappel('blocs', modele, 'ModelCloseFcn');
+        matlibre_sl_rappel(modele, 'CloseFcn');
+        matlibre_sl_rappel('blocs', modele, 'DestroyFcn');
+    catch err
+        warning('Simulink:Engine:CallbackEvalErr', '%s', err.message);
+    end
+    matlibre_sl_jeux('oublier', nom);   % ses jeux de configuration se détachent
 end

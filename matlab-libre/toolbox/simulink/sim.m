@@ -178,6 +178,7 @@ function varargout = sim(modele, varargin)
 %      abs(r.signaux.integ(end) - 2) < 1e-9       % exact : l'état est une droite
 %
 %   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SET_PARAM, SIMSET, LINMOD.
+    charge = '';   % le nom du modèle chargé qu'on simule, s'il en est un
     if isa(modele, 'Simulink.SimulationInput')
         % Chaque SimulationInput nomme son modèle : une variable de
         % l'appelant qui en porte le nom d'abord, comme pour SIM(NOM).
@@ -212,6 +213,7 @@ function varargout = sim(modele, varargin)
         if isempty(modele) && matlibre_sl_ouverts('connu', nom)
             % le modèle chargé : NEW_SYSTEM, LOAD_SYSTEM, OPEN_SYSTEM
             modele = matlibre_sl_ouverts('lire', nom);
+            charge = nom;
         end
         if isempty(modele)
             modele = chargerModele(nom);
@@ -238,8 +240,13 @@ function varargout = sim(modele, varargin)
                'et simulez le modele.'], char(modele.nom), char(modele.nom));
     end
     % InitFcn d'abord : les variables qu'il pose servent aux réglages et
-    % aux blocs, comme dans Simulink.
+    % aux blocs, comme dans Simulink — celui du modèle, puis ceux des
+    % blocs. Un modèle chargé se relit ensuite : un rappel a pu le régler.
     matlibre_sl_rappel(modele, 'InitFcn');
+    matlibre_sl_rappel('blocs', modele, 'InitFcn');
+    if ~isempty(charge) && matlibre_sl_ouverts('connu', charge)
+        modele = matlibre_sl_ouverts('lire', charge);
+    end
     [config, imposes, externe, tousLesPas] = lireArguments(matlibre_sl_config('lire', modele), ...
                                                            varargin);
     nomModele = char(modele.nom);
@@ -340,6 +347,7 @@ function varargout = sim(modele, varargin)
     % StartFcn quand la simulation commence, StopFcn quand elle s'achève —
     % sur une erreur aussi.
     matlibre_sl_rappel(modele, 'StartFcn');
+    matlibre_sl_rappel('blocs', modele, 'StartFcn');
     deroulement = {c, config, variable, solveur, tDebut, tFinal, pas, sortie, nomModele};
     try
         [T, J, instants] = derouler(deroulement{:}, false);
@@ -365,6 +373,7 @@ function varargout = sim(modele, varargin)
             resultat.(char(config.DSMLoggingName)) = journalMemoires;
         end
     catch err
+        matlibre_sl_rappel('blocs', modele, 'StopFcn');
         matlibre_sl_rappel(modele, 'StopFcn');
         if strncmp(err.identifier, 'Simulink:', 9) || strncmp(err.identifier, 'Stateflow:', 10) || ...
            strncmp(err.identifier, 'Simscape:', 9)
@@ -372,6 +381,7 @@ function varargout = sim(modele, varargin)
         end
         throw(localiser(err, deroulement));
     end
+    matlibre_sl_rappel('blocs', modele, 'StopFcn');
     matlibre_sl_rappel(modele, 'StopFcn');
     % L'état final, pour reprendre plus tard là où l'on s'arrête : les
     % états continus au dernier instant, dans l'ordre des colonnes de xout

@@ -53,6 +53,9 @@ function retirerParNom(designes)
               ['''%s'' est un modele, non un bloc : BDCLOSE le decharge, ' ...
                'SIMULINK.BLOCKDIAGRAM.DELETECONTENTS le vide.'], chemin);
     end
+    bloc = matlibre_sl_memoire('bloc', chemin);
+    matlibre_sl_rappel('bloc', chemin, bloc, 'PreDeleteFcn');
+    matlibre_sl_rappel('bloc', chemin, bloc, 'DeleteFcn');
     matlibre_sl_memoire('appliquer', parent, @(s) delete_block(s, feuille));
 end
 

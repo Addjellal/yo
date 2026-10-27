@@ -50,8 +50,10 @@ function fichier = save_system(modele, fichier)
     fichier = char(fichier);
     [~, ~, extension] = fileparts(fichier);
     matlibre_sl_rappel(modele, 'PreSaveFcn');
+    matlibre_sl_rappel('blocs', modele, 'PreSaveFcn');
     if strcmpi(extension, '.slx')
         matlibre_sl_slx('ecrire', modele, fichier);
+        matlibre_sl_rappel('blocs', modele, 'PostSaveFcn');
         matlibre_sl_rappel(modele, 'PostSaveFcn');
         return
     end
@@ -88,6 +90,7 @@ function fichier = save_system(modele, fichier)
         fprintf(identifiantFichier, '%s\n', lignes{k});
     end
     fclose(identifiantFichier);
+    matlibre_sl_rappel('blocs', modele, 'PostSaveFcn');
     matlibre_sl_rappel(modele, 'PostSaveFcn');
 end
 

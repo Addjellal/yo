@@ -19,6 +19,9 @@ function h = open_system(modele)
 %   OPEN_SYSTEM(NOM) rouvre un modèle déjà inscrit, ou exécute le
 %   fichier NOM.m qui le rend.
 %
+%   OPEN_SYSTEM('modele/bloc'), sur un modèle chargé, exécute le rappel
+%   OpenFcn du bloc, comme un double clic dans Simulink.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -35,6 +38,17 @@ function h = open_system(modele)
 %   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, CLOSE_SYSTEM, GCS, SIM.
     if nargin < 1
         error('MATLAB:minrhs', 'OPEN_SYSTEM attend un modèle.');
+    end
+    if ((ischar(modele) || isstring(modele)) && any(char(modele) == '/')) || isnumeric(modele)
+        % un bloc d'un modèle chargé : son OpenFcn, comme un double clic
+        chemin = matlibre_sl_memoire('chemin', modele);
+        morceaux = matlibre_sl_memoire('morceaux', chemin);
+        if matlibre_sl_ouverts('connu', morceaux{1}) && ...
+           strcmp(matlibre_sl_memoire('genre', chemin), 'bloc')
+            matlibre_sl_rappel('bloc', chemin, matlibre_sl_memoire('bloc', chemin), 'OpenFcn');
+            h = [];
+            return
+        end
     end
     if ischar(modele) || isstring(modele)
         modele = matlibre_sl_modele(modele);

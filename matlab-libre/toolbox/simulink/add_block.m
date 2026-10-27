@@ -611,10 +611,24 @@ function h = ajouterParNom(source, destination, reglages)
        isempty(gabaritDeSousSysteme(source, feuille))
         reglages(end + 1:end + 2) = {'Model', new_system(regexprep(feuille, '[^A-Za-z0-9_]', '_'))};
     end
+    % un bloc d'un modèle chargé, recopié : ses rappels de copie
+    copie = false;
+    try
+        racine = matlibre_sl_memoire('morceaux', source);
+        copie = numel(racine) > 1 && matlibre_sl_ouverts('connu', racine{1}) && ...
+                strcmp(matlibre_sl_memoire('genre', source), 'bloc');
+    catch
+    end
+    if copie
+        matlibre_sl_rappel('bloc', source, matlibre_sl_memoire('bloc', source), 'PreCopyFcn');
+    end
     systeme = matlibre_sl_memoire('appliquer', parent, @(s) add_block(s, type, feuille, ...
                                                                       reglages{:}));
-    h = matlibre_sl_memoire('poignee', matlibre_sl_memoire('joindre', parent, ...
-                                                           systeme.blocs{end}.nom));
+    chemin = matlibre_sl_memoire('joindre', parent, systeme.blocs{end}.nom);
+    h = matlibre_sl_memoire('poignee', chemin);
+    if copie
+        matlibre_sl_rappel('bloc', chemin, systeme.blocs{end}, 'CopyFcn');
+    end
 end
 
 function modele = ajouter(modele, type, nom, varargin)

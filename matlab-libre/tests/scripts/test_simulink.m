@@ -14161,6 +14161,146 @@ end
 bdclose('bat108');
 fprintf('jeux de configuration : %d reglages, %d allers-retours\n', numel(noms108), nCas108);
 
+%% ----------------------------------------------- 109. Les rappels des blocs
+% Chaque bloc porte ses rappels — InitFcn, StartFcn, StopFcn, CopyFcn,
+% DeleteFcn, NameChangeFcn, MoveFcn, LoadFcn, PreSaveFcn, PostSaveFcn,
+% OpenFcn, ModelCloseFcn, DestroyFcn — ; pendant l'un d'eux, GCB, GCBH et
+% GCS désignent le bloc et son système.
+bdclose('all');
+evalin('base', 'journal109 = {};');
+note109 = @(t) ['journal109{end + 1} = ' t ';'];
+new_system('rap109');
+set_param('rap109', 'InitFcn', note109('''modele init'''), 'StartFcn', note109('''modele start'''), ...
+          'StopFcn', note109('''modele stop'''));
+add_block('built-in/Constant', 'rap109/c', 'Value', '1', 'InitFcn', note109('[''init '' gcb]'), ...
+          'StartFcn', note109('[''start '' gcs]'), 'StopFcn', note109('''stop c'''));
+add_block('built-in/Gain', 'rap109/g', 'Gain', '1', ...
+          'InitFcn', ['set_param(gcb, ''Gain'', ''5''); ' note109('''init g''')]);
+add_block('simulink/Ports & Subsystems/Subsystem', 'rap109/s');
+set_param('rap109/s/In1', 'InitFcn', note109('[''init '' gcb '' dans '' gcs]'));
+add_block('built-in/Outport', 'rap109/y');
+add_line('rap109', 'c/1', 'g/1');
+add_line('rap109', 'g/1', 's/1');
+add_line('rap109', 's/1', 'y/1');
+set_param('rap109', 'Solver', 'ode4', 'FixedStep', '1', 'StopTime', '1');
+r109 = sim('rap109');
+assert(isequal(evalin('base', 'journal109'), {'modele init', 'init rap109/c', 'init g', ...
+                                              'init rap109/s/In1 dans rap109/s', 'modele start', ...
+                                              'start rap109', 'stop c', 'modele stop'}), ...
+       'InitFcn du modele puis des blocs, StartFcn, puis StopFcn des blocs puis du modele');
+assert(all(r109.yout == 5) && strcmp(get_param('rap109/g', 'Gain'), '5'), ...
+       'un InitFcn qui regle son bloc vaut pour la simulation');
+assert(isempty(gcb()) && gcbh() == -1 && strcmp(gcs(), 'rap109') && ...
+       isempty(get_param('rap109/y', 'InitFcn')), ...
+       'hors de tout rappel, aucun bloc n''est courant ; un rappel non pose est vide');
+% Les rappels de l'édition.
+evalin('base', 'journal109 = {};');
+add_block('built-in/Gain', 'rap109/k', 'CopyFcn', note109('[''copie '' gcb]'), ...
+          'PreCopyFcn', note109('[''avant copie '' gcb]'), ...
+          'NameChangeFcn', note109('[''nom '' get_param(gcbh, ''Name'')]'), ...
+          'MoveFcn', note109('''deplace'''), 'DeleteFcn', note109('[''efface '' gcb]'), ...
+          'PreDeleteFcn', note109('''avant effacement'''), ...
+          'OpenFcn', note109('[''ouvert '' gcb]'));
+add_block('rap109/k', 'rap109/k2');
+set_param('rap109/k2', 'Name', 'k3');
+set_param('rap109/k3', 'Position', [10 10 40 40]);
+open_system('rap109/k3');
+delete_block('rap109/k3');
+assert(isequal(evalin('base', 'journal109'), {'avant copie rap109/k', 'copie rap109/k2', ...
+                                              'nom k3', 'deplace', 'ouvert rap109/k3', ...
+                                              'avant effacement', 'efface rap109/k3'}), ...
+       'PreCopyFcn, CopyFcn, NameChangeFcn, MoveFcn, OpenFcn, PreDeleteFcn, DeleteFcn');
+% Enregistrer, charger, fermer.
+evalin('base', 'journal109 = {};');
+set_param('rap109/c', 'PreSaveFcn', note109('''avant sauvegarde'''), ...
+          'PostSaveFcn', note109('''apres sauvegarde'''), 'LoadFcn', note109('[''charge '' gcb]'), ...
+          'ModelCloseFcn', note109('''fermeture'''), 'DestroyFcn', note109('''detruit'''));
+fichier109 = [tempname() '.slx'];
+save_system('rap109', fichier109);
+bdclose('rap109');
+relu109 = load_system(fichier109);
+bdclose(relu109.nom);
+delete(fichier109);
+assert(isequal(evalin('base', 'journal109'), {'avant sauvegarde', 'apres sauvegarde', ...
+                                              'fermeture', 'detruit', ...
+                                              ['charge ' relu109.nom '/c'], 'fermeture', 'detruit'}), ...
+       'PreSaveFcn, PostSaveFcn, ModelCloseFcn, DestroyFcn, LoadFcn');
+
+% Les refus : une erreur dans un rappel nomme le rappel et le bloc ; la
+% simulation qui échoue exécute encore les StopFcn.
+new_system('err109');
+add_block('built-in/Constant', 'err109/c', 'InitFcn', 'error(''non'')');
+vu109 = '';
+try
+    sim('err109');
+catch err
+    vu109 = err;
+end
+assert(strcmp(vu109.identifier, 'Simulink:Engine:CallbackEvalErr') && ...
+       ~isempty(strfind(vu109.message, 'InitFcn')) && ~isempty(strfind(vu109.message, 'err109/c')), ...
+       'un rappel en erreur se nomme, avec son bloc');
+assert(isempty(gcb()), 'apres l''erreur, aucun bloc ne reste courant');
+evalin('base', 'journal109 = {};');
+set_param('err109/c', 'InitFcn', '', 'StopFcn', note109('''arret'''));
+add_block('built-in/Assertion', 'err109/a');
+add_line('err109', 'c/1', 'a/1');
+set_param('err109/c', 'Value', '0');
+try
+    sim('err109');
+catch
+end
+assert(isequal(evalin('base', 'journal109'), {'arret'}), 'StopFcn s''execute quand la simulation echoue');
+vu109 = '';
+try
+    add_block('built-in/Gain', 'err109/g', 'CopyFcn', 'error(''x'')');
+    add_block('err109/g', 'err109/g2');
+catch err
+    vu109 = err.identifier;
+end
+assert(strcmp(vu109, 'Simulink:Engine:CallbackEvalErr'), 'un CopyFcn en erreur se nomme');
+bdclose('all');
+evalin('base', 'clear journal109');
+
+% Batterie : chaque rappel de la simulation sur chaque genre de bloc —
+% source, calcul, sortie, sous-système et l'intérieur de celui-ci —, pour
+% trois solveurs : chacun s'exécute une fois, à son tour, son bloc courant.
+genres109 = {'built-in/Constant', 'built-in/Gain', 'built-in/Outport', ...
+             'simulink/Ports & Subsystems/Subsystem'};
+nCas109 = 0;
+for solveur109 = {'ode4', 'ode45', 'FixedStepDiscrete'}
+    for kG = 1:numel(genres109)
+        for rappel109 = {'InitFcn', 'StartFcn', 'StopFcn'}
+            evalin('base', 'journal109 = {};');
+            new_system('bat109');
+            add_block('built-in/Constant', 'bat109/u', 'Value', '2');
+            add_block(genres109{kG}, 'bat109/b', rappel109{1}, note109('gcb'));
+            if kG ~= 1
+                add_line('bat109', 'u/1', 'b/1');
+            end
+            if kG ~= 3
+                add_block('built-in/Outport', 'bat109/y');
+                add_line('bat109', 'b/1', 'y/1');
+            end
+            if kG == 4
+                set_param('bat109/b/In1', rappel109{1}, note109('gcs'));
+            end
+            set_param('bat109', 'Solver', solveur109{1}, 'FixedStep', '0.5', 'StopTime', '1');
+            sim('bat109');
+            attendu109 = {'bat109/b'};
+            if kG == 4
+                attendu109{2} = 'bat109/b';
+            end
+            assert(isequal(evalin('base', 'journal109'), attendu109), ...
+                   sprintf('%s, %s, %s : le rappel une fois, son bloc courant', solveur109{1}, ...
+                           genres109{kG}, rappel109{1}));
+            bdclose('bat109');
+            nCas109 = nCas109 + 1;
+        end
+    end
+end
+evalin('base', 'clear journal109');
+fprintf('rappels des blocs : %d cas croises\n', nCas109);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

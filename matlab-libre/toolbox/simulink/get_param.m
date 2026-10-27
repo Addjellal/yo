@@ -201,6 +201,10 @@ function valeur = get_param(modele, nom, parametre)
         valeur = bloc.parametres.(canon);
         return
     end
+    if any(strcmp(canon, matlibre_sl_rappel('noms')))
+        valeur = '';   % un rappel qu'on n'a pas posé
+        return
+    end
     for k = 1:size(entree.params, 1)
         if strcmp(entree.params{k, 1}, canon)
             valeur = entree.params{k, 2};

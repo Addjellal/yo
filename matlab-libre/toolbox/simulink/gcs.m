@@ -5,7 +5,8 @@ function nom = gcs()
 %
 %   Dans MATLAB, GCS rend le système courant, celui dont la fenêtre a le
 %   focus. Il n'y a pas de fenêtre ici, et la notion la plus proche est
-%   celle du dernier modèle ouvert : c'est ce que rend GCS.
+%   celle du dernier modèle ouvert : c'est ce que rend GCS — sauf pendant
+%   un rappel de bloc, où il rend le système qui contient ce bloc.
 %
 %   Exemple :
 %      bdclose('all');
@@ -15,5 +16,8 @@ function nom = gcs()
 %      bdclose('all');
 %
 %   Voir aussi OPEN_SYSTEM, CLOSE_SYSTEM, BDROOT, BDISLOADED.
-    nom = matlibre_sl_ouverts('dernier');
+    nom = matlibre_sl_courant('systeme');
+    if isempty(nom)
+        nom = matlibre_sl_ouverts('dernier');
+    end
 end

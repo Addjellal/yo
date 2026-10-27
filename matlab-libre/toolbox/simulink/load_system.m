@@ -60,5 +60,6 @@ end
 function charge(modele)
     matlibre_sl_rappel(modele, 'PreLoadFcn');
     matlibre_sl_ouverts('inscrire', modele.nom, modele, 0);
+    matlibre_sl_rappel('blocs', modele, 'LoadFcn');
     matlibre_sl_rappel(modele, 'PostLoadFcn');
 end

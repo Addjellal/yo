@@ -119,9 +119,19 @@ function reglerParNom(cible, couples)
     end
     [parent, feuille] = matlibre_sl_memoire('decouper', chemin);
     matlibre_sl_memoire('appliquer', parent, @(s) set_param(s, feuille, couples{:}));
+    renomme = false;
     for k = find(strcmpi(couples(1:2:end), 'Name'))
         matlibre_sl_memoire('renommer', chemin, char(couples{2 * k}));
         chemin = matlibre_sl_memoire('joindre', parent, char(couples{2 * k}));
+        renomme = true;
+    end
+    % les rappels du bloc : renommé, déplacé
+    bloc = matlibre_sl_memoire('bloc', chemin);
+    if renomme
+        matlibre_sl_rappel('bloc', chemin, bloc, 'NameChangeFcn');
+    end
+    if any(strcmpi(couples(1:2:end), 'Position'))
+        matlibre_sl_rappel('bloc', chemin, bloc, 'MoveFcn');
     end
 end
 
