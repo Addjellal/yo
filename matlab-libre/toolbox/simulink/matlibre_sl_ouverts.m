@@ -10,7 +10,9 @@ function sortie = matlibre_sl_ouverts(action, nom, modele, numeroFigure)
 %   fermer.
 %
 %   Actions : 'inscrire', 'retirer', 'vider', 'lire', 'figure', 'connu',
-%   'noms', 'dernier'.
+%   'noms', 'dernier', et 'ecrire', qui remplace un modèle chargé sur
+%   place — l'API par les noms (ADD_BLOCK('m/k'), SET_PARAM('m/k',...))
+%   y range ce qu'elle change.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
@@ -58,6 +60,8 @@ function sortie = matlibre_sl_ouverts(action, nom, modele, numeroFigure)
             figures = {};
         case 'lire'
             sortie = modeles{exiger(noms, char(nom))};
+        case 'ecrire'
+            modeles{exiger(noms, char(nom))} = modele;
         case 'figure'
             sortie = figures{exiger(noms, char(nom))};
         case 'connu'

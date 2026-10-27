@@ -1,4 +1,4 @@
-function modele = delete_line(modele, source, destination, entree, sortie)
+function varargout = delete_line(modele, source, destination, entree, sortie)
 %DELETE_LINE Supprime le lien qui va d'un bloc à un autre.
 %   MODELE = DELETE_LINE(MODELE,SOURCE,DESTINATION) supprime le lien
 %   allant d'une sortie du premier bloc à une entrée du second.
@@ -7,6 +7,10 @@ function modele = delete_line(modele, source, destination, entree, sortie)
 %   DELETE_LINE(MODELE,SOURCE,DESTINATION,E,S) précise aussi la sortie.
 %   La syntaxe de Simulink, « 'demux/2' », désigne un port comme dans
 %   ADD_LINE.
+%
+%   DELETE_LINE(SYSTEME,'source/1','destination/1') est la forme de
+%   Simulink, sur un modèle chargé — les ports se désignent aussi par
+%   leurs poignées —, et DELETE_LINE(H) retire la ligne de poignée H.
 %
 %   Un lien qui n'existe pas lève une erreur qui nomme les deux blocs,
 %   plutôt que de laisser croire à une suppression qui n'a pas eu lieu.
@@ -20,6 +24,44 @@ function modele = delete_line(modele, source, destination, entree, sortie)
 %      isempty(m.liens)                 % vrai
 %
 %   Voir aussi ADD_LINE, DELETE_BLOCK, NEW_SYSTEM.
+    if nargin == 1
+        L = matlibre_sl_memoire('ligne', modele);
+        matlibre_sl_memoire('appliquer', L.systeme, ...
+                            @(s) delete_line(s, L.source, L.destination, L.portDestination, ...
+                                             L.portSource));
+        return
+    end
+    if ~isstruct(modele)
+        systeme = matlibre_sl_memoire('chemin', modele);
+        source = parPoignee(systeme, source);
+        destination = parPoignee(systeme, destination);
+        matlibre_sl_memoire('appliquer', systeme, @(s) delete_line(s, source, destination));
+        return
+    end
+    if nargin < 4
+        entree = [];
+    end
+    if nargin < 5
+        sortie = [];
+    end
+    varargout{1} = retirerLien(modele, source, destination, entree, sortie);
+end
+
+function texte = parPoignee(systeme, port)
+    if ~isnumeric(port)
+        texte = char(port);
+        return
+    end
+    [chemin, ~, rang] = matlibre_sl_memoire('objet', port);
+    [parent, nom] = matlibre_sl_memoire('decouper', chemin);
+    if ~strcmp(parent, systeme)
+        error('Simulink:Commands:DeleteLineNoLine', ...
+              'Le port de ''%s'' n''est pas dans le systeme ''%s''.', chemin, systeme);
+    end
+    texte = sprintf('%s/%d', nom, rang);
+end
+
+function modele = retirerLien(modele, source, destination, entree, sortie)
     physique = @(t) (ischar(t) || isstring(t)) && ...
                     ~isempty(regexp(char(t), '/(LConn|RConn)\d+$', 'once', 'ignorecase'));
     if physique(source) && physique(destination) && isfield(modele, 'connexions')
@@ -38,11 +80,11 @@ function modele = delete_line(modele, source, destination, entree, sortie)
     end
     [a, portSortie, sortieDite] = designer(modele, source);
     [b, portEntree, entreeDite] = designer(modele, destination);
-    if nargin >= 4 && ~isempty(entree)
+    if ~isempty(entree)
         portEntree = entree;
         entreeDite = true;
     end
-    if nargin >= 5 && ~isempty(sortie)
+    if ~isempty(sortie)
         portSortie = sortie;
         sortieDite = true;
     end

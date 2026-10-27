@@ -39,6 +39,16 @@ function valeur = get_param(modele, nom, parametre)
 %   du signal qui part de ce port — Name, DataLogging... — ou PortType,
 %   PortNumber, Parent.
 %
+%   V = GET_PARAM(OBJET,'Param') est la forme de Simulink, sur un modèle
+%   chargé : OBJET est le chemin d'un bloc ('modele/sousSysteme/bloc'),
+%   celui du modèle, ou une poignée de bloc, de modèle, de port ou de
+%   ligne — plusieurs dans une cellule ou un vecteur, et V est une
+%   cellule. Chaque objet a en plus Handle, sa poignée ; Name ; Parent,
+%   le chemin du système qui le contient ; Type, 'block' ou
+%   'block_diagram'. Un bloc a BlockType, son type dans Simulink
+%   ('Gain'), PortHandles et LineHandles ; une ligne SrcBlockHandle,
+%   DstBlockHandle, SrcPortHandle, DstPortHandle et Name.
+%
 %   C'est le pendant de SET_PARAM. Un paramètre que le bloc n'a pas lève
 %   une erreur qui le nomme, plutôt que de rendre une valeur vide dont on
 %   ne saurait pas si elle est le réglage ou son absence.
@@ -56,6 +66,15 @@ function valeur = get_param(modele, nom, parametre)
 %
 %   Voir aussi SET_PARAM, ADD_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
     % Une poignée de port : les réglages du signal qui en part.
+    if ~isstruct(modele)
+        % GET_PARAM(OBJET,'Param') : la forme de Simulink, sur un modèle chargé
+        if nargin ~= 2
+            error('Simulink:Commands:GetParamArguments', ...
+                  'GET_PARAM(OBJET,''Param'') : un objet, et le nom d''un reglage.');
+        end
+        valeur = lireParNom(modele, nom);
+        return
+    end
     if isnumeric(nom)
         if nargin < 3
             error('Simulink:Commands:GetParamArguments', ...
@@ -381,4 +400,145 @@ function [parent, feuille] = decouper(modele, nom)
     barre = find(nom == '/', 1, 'last');
     parent = nom(1:barre - 1);
     feuille = nom(barre + 1:end);
+end
+
+% GET_PARAM sur un modèle chargé : l'objet désigné par son chemin ou sa
+% poignée — plusieurs dans une cellule ou un vecteur, et la réponse est une
+% cellule.
+function valeur = lireParNom(cible, parametre)
+    if iscell(cible) || (isnumeric(cible) && numel(cible) > 1)
+        valeur = cell(size(cible));
+        for k = 1:numel(cible)
+            if iscell(cible)
+                valeur{k} = lireParNom(cible{k}, parametre);
+            else
+                valeur{k} = lireParNom(cible(k), parametre);
+            end
+        end
+        return
+    end
+    if isstring(parametre) && isscalar(parametre)
+        parametre = char(parametre);
+    end
+    if ~ischar(parametre)
+        error('Simulink:Commands:GetParamArguments', 'Un reglage se designe par son nom.');
+    end
+    if isnumeric(cible)
+        [chemin, genre] = matlibre_sl_memoire('objet', cible);
+        if strcmp(genre, 'ligne')
+            valeur = lireLigne(cible, parametre);
+            return
+        end
+        if ~any(strcmp(genre, {'bloc', 'modele'}))
+            morceaux = matlibre_sl_memoire('morceaux', chemin);
+            valeur = matlibre_sl_signaux('lire', matlibre_sl_ouverts('lire', morceaux{1}), ...
+                                         cible, parametre);
+            return
+        end
+    end
+    chemin = matlibre_sl_memoire('chemin', cible);
+    genre = matlibre_sl_memoire('genre', chemin);
+    [parent, nomObjet] = matlibre_sl_memoire('decouper', chemin);
+    morceaux = matlibre_sl_memoire('morceaux', chemin);
+    racine = matlibre_sl_ouverts('lire', morceaux{1});
+    switch lower(parametre)
+        case 'handle'
+            valeur = matlibre_sl_memoire('poignee', chemin);
+            return
+        case 'type'
+            valeur = 'block';
+            if strcmp(genre, 'modele')
+                valeur = 'block_diagram';
+            end
+            return
+        case 'name'
+            valeur = nomObjet;
+            return
+        case {'parent', 'path'}
+            valeur = parent;
+            return
+    end
+    if strcmp(genre, 'modele')
+        valeur = get_param(racine, parametre);
+        return
+    end
+    relatif = strjoin(cellfun(@(n) strrep(n, '/', '//'), morceaux(2:end), ...
+                              'UniformOutput', false), '/');
+    bloc = matlibre_sl_memoire('bloc', chemin);
+    switch lower(parametre)
+        case 'blocktype'
+            entree = matlibre_sl_catalogue('type', bloc.type);
+            valeur = entree.simulink;
+            return
+        case 'porthandles'
+            valeur = matlibre_sl_signaux('poignees', racine, relatif);
+            return
+        case 'linehandles'
+            valeur = poigneesLignes(parent, nomObjet, bloc);
+            return
+    end
+    if numel(morceaux) == 2
+        valeur = get_param(racine, nomObjet, parametre);
+    elseif strncmpi(parametre, 'Compiled', 8)
+        valeur = get_param(racine, relatif, parametre);
+    else
+        valeur = get_param(matlibre_sl_memoire('systeme', parent), nomObjet, parametre);
+    end
+end
+
+% Les lignes d'un bloc : une poignée par entrée reliée, et par sortie d'où
+% part une ligne ; -1 pour un port libre.
+function L = poigneesLignes(parent, nomBloc, bloc)
+    s = matlibre_sl_memoire('systeme', parent);
+    b = matlibre_sl_indice(s, nomBloc);
+    liens = matlibre_sl_liens(s);
+    [ne, ns] = matlibre_sl_ports(bloc);
+    ne(isnan(ne)) = 0;
+    ns(isnan(ns)) = 0;
+    L = struct('Inport', -ones(1, ne), 'Outport', -ones(1, ns));
+    for k = 1:ne
+        if any(liens(:, 2) == b & liens(:, 3) == k)
+            L.Inport(k) = matlibre_sl_memoire('poigneeligne', parent, nomBloc, k);
+        end
+    end
+    for q = 1:ns
+        r = find(liens(:, 1) == b & liens(:, 4) == q, 1);
+        if ~isempty(r)
+            L.Outport(q) = matlibre_sl_memoire('poigneeligne', parent, ...
+                                               s.blocs{liens(r, 2)}.nom, liens(r, 3));
+        end
+    end
+end
+
+% Ce qu'on lit d'une ligne : ses deux bouts, ses ports, son signal.
+function valeur = lireLigne(h, parametre)
+    L = matlibre_sl_memoire('ligne', h);
+    source = matlibre_sl_memoire('joindre', L.systeme, L.source);
+    destination = matlibre_sl_memoire('joindre', L.systeme, L.destination);
+    switch lower(parametre)
+        case 'handle'
+            valeur = h;
+        case 'type'
+            valeur = 'line';
+        case 'parent'
+            valeur = L.systeme;
+        case 'srcblockhandle'
+            valeur = matlibre_sl_memoire('poignee', source);
+        case 'dstblockhandle'
+            valeur = matlibre_sl_memoire('poignee', destination);
+        case 'srcporthandle'
+            ph = lireParNom(source, 'PortHandles');
+            valeur = ph.Outport(L.portSource);
+        case 'dstporthandle'
+            ph = lireParNom(destination, 'PortHandles');
+            valeur = ph.Inport(L.portDestination);
+        case 'name'
+            ph = lireParNom(source, 'PortHandles');
+            valeur = lireParNom(ph.Outport(L.portSource), 'Name');
+        otherwise
+            error('Simulink:Commands:ParamUnknown', ...
+                  ['Une ligne n''a pas de reglage ''%s'' ; elle a Name, Type, Parent, ' ...
+                   'Handle, SrcBlockHandle, DstBlockHandle, SrcPortHandle et ' ...
+                   'DstPortHandle.'], parametre);
+    end
 end

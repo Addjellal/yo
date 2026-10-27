@@ -1,4 +1,4 @@
-function modele = add_line(modele, source, destination, entree, sortie)
+function varargout = add_line(modele, source, destination, entree, sortie)
 %ADD_LINE Relie une sortie d'un bloc à une entrée d'un autre.
 %   MODELE = ADD_LINE(MODELE,'source','destination') relie la première
 %   sortie du premier bloc à la première entrée du second.
@@ -28,6 +28,13 @@ function modele = add_line(modele, source, destination, entree, sortie)
 %   sens : les deux ports, et tous ceux qu'on relie à eux, font un même
 %   nœud. Un port physique ne se relie qu'à un port physique.
 %
+%   H = ADD_LINE(SYSTEME,'source/1','destination/1') est la forme de
+%   Simulink, sur un modèle chargé : SYSTEME est le chemin du modèle ou du
+%   sous-système, ou sa poignée ; les ports se désignent aussi par leurs
+%   poignées (PortHandles). H est la poignée de la ligne, que GET_PARAM
+%   lit (SrcBlockHandle, DstPortHandle...) et que DELETE_LINE(H) retire.
+%   L'option 'autorouting' ('on', 'off', 'smart') est acceptée.
+%
 %   Une boucle peut passer par un bloc à état — intégrateur, retard —, qui
 %   la coupe. Une boucle qui n'en contient pas est algébrique : SIM la
 %   résout à chaque pas, et le signale selon le réglage AlgebraicLoopMsg
@@ -45,16 +52,87 @@ function modele = add_line(modele, source, destination, entree, sortie)
 %      m = add_line(m, 'gain', 'sortie');
 %
 %   Voir aussi ADD_BLOCK, DELETE_LINE, NEW_SYSTEM, SIM.
+    if ~isstruct(modele)
+        options = {};
+        if nargin >= 4
+            options = {entree};
+        end
+        if nargin >= 5
+            options{end + 1} = sortie;
+        end
+        varargout{1} = relierParNom(modele, source, destination, options);
+        return
+    end
+    if nargin < 4
+        entree = [];
+    end
+    if nargin < 5
+        sortie = [];
+    end
+    varargout{1} = relier(modele, source, destination, entree, sortie);
+end
+
+% ADD_LINE(SYSTEME, SOURCE, DESTINATION) sur un modèle chargé : la ligne
+% posée, sa poignée — -1 pour une connexion physique, qui n'en a pas.
+function h = relierParNom(systeme, source, destination, options)
+    systeme = matlibre_sl_memoire('chemin', systeme);
+    if mod(numel(options), 2) ~= 0
+        error('Simulink:Commands:ParamValuePairs', ...
+              'Les options de ADD_LINE se donnent par paires : ''autorouting'', ''on''.');
+    end
+    for k = 1:2:numel(options)
+        if ~strcmpi(char(options{k}), 'autorouting') || ...
+           ~any(strcmpi(char(options{k + 1}), {'on', 'off', 'smart'}))
+            error('Simulink:Commands:InvalidArgument', ...
+                  ['ADD_LINE n''a que l''option ''autorouting'', qui vaut ''on'', ''off'' ' ...
+                   'ou ''smart''.']);
+        end
+    end
+    source = designerPort(systeme, source, 'outport');
+    destination = designerPort(systeme, destination, 'inport');
+    avant = matlibre_sl_liens(matlibre_sl_memoire('systeme', systeme));
+    s = matlibre_sl_memoire('appliquer', systeme, @(s) add_line(s, source, destination));
+    liens = matlibre_sl_liens(s);
+    h = -1;
+    if size(liens, 1) > size(avant, 1)
+        h = matlibre_sl_memoire('poigneeligne', systeme, s.blocs{liens(end, 2)}.nom, ...
+                                liens(end, 3));
+    end
+end
+
+% Un port désigné par sa poignée devient « bloc/rang » ; il doit être du
+% système où l'on relie.
+function texte = designerPort(systeme, port, genre)
+    if ~isnumeric(port)
+        texte = char(port);
+        return
+    end
+    [chemin, g, rang] = matlibre_sl_memoire('objet', port);
+    if ~strcmp(g, genre)
+        error('Simulink:Commands:AddLineInvalidPort', ...
+              ['La poignee %s designe un port %s : une ligne part d''un port de sortie ' ...
+               '(outport) et arrive a un port d''entree (inport).'], num2str(port, 10), g);
+    end
+    [parent, nom] = matlibre_sl_memoire('decouper', chemin);
+    if ~strcmp(parent, systeme)
+        error('Simulink:Commands:AddLineDifferentSystems', ...
+              ['Le port de ''%s'' n''est pas dans le systeme ''%s'' : une ligne relie ' ...
+               'deux blocs d''un meme systeme.'], chemin, systeme);
+    end
+    texte = sprintf('%s/%d', nom, rang);
+end
+
+function modele = relier(modele, source, destination, entree, sortie)
     if estPhysique(source) || estPhysique(destination)
         modele = lienPhysique(modele, source, destination);
         return
     end
     [a, portSortie] = designer(modele, source, 'source');
     [b, portEntree] = designer(modele, destination, 'destination');
-    if nargin >= 4 && ~isempty(entree)
+    if ~isempty(entree)
         portEntree = entree;
     end
-    if nargin >= 5 && ~isempty(sortie)
+    if ~isempty(sortie)
         portSortie = sortie;
     end
     portEntree = numeroDePort(portEntree, 'd''entree');

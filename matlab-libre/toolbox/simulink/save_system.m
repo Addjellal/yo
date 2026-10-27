@@ -6,6 +6,9 @@ function fichier = save_system(modele, fichier)
 %   SAVE_SYSTEM(MODELE,'nom.slx') écrit au format de Simulink, une
 %   archive de fichiers XML que LOAD_SYSTEM relit (voir MATLIBRE_SL_SLX).
 %
+%   SAVE_SYSTEM('nom') ou SAVE_SYSTEM(H) enregistre le modèle chargé de ce
+%   nom ou de cette poignée.
+%
 %   Le fichier produit est un programme : une fonction sans argument qui
 %   appelle NEW_SYSTEM, ADD_BLOCK et ADD_LINE, et rend le modèle.
 %   LOAD_SYSTEM le relit, et SIM l'accepte par son nom. C'est un format
@@ -31,6 +34,12 @@ function fichier = save_system(modele, fichier)
 %      delete(chemin);
 %
 %   Voir aussi LOAD_SYSTEM, NEW_SYSTEM, ADD_BLOCK, ADD_LINE, CLOSE_SYSTEM.
+    if isnumeric(modele) || ((ischar(modele) || isstring(modele)) && ...
+                             matlibre_sl_ouverts('connu', char(modele)))
+        chemin = matlibre_sl_memoire('chemin', modele);
+        morceaux = matlibre_sl_memoire('morceaux', chemin);
+        modele = matlibre_sl_ouverts('lire', morceaux{1});
+    end
     if ~isstruct(modele) || ~isfield(modele, 'blocs')
         error('Simulink:Commands:InvalidModel', ...
               'SAVE_SYSTEM attend un modele bati par NEW_SYSTEM.');

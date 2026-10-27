@@ -1,4 +1,4 @@
-function modele = add_block(modele, type, nom, varargin)
+function varargout = add_block(modele, type, nom, varargin)
 %ADD_BLOCK Ajoute un bloc au modèle.
 %   MODELE = ADD_BLOCK(MODELE,TYPE,NOM,'Param',VALEUR,...) ajoute au
 %   modèle un bloc du TYPE donné, nommé NOM. Le type se désigne par son nom
@@ -523,6 +523,15 @@ function modele = add_block(modele, type, nom, varargin)
 %   d'une sommation). Deux blocs du même modèle ne portent pas le même
 %   nom ; ADD_BLOCK(...,'MakeNameUnique','on') en choisit un libre.
 %
+%   H = ADD_BLOCK(SOURCE,DESTINATION,'Param',VALEUR,...) est la forme de
+%   Simulink, sur un modèle chargé (NEW_SYSTEM sans sortie, LOAD_SYSTEM,
+%   OPEN_SYSTEM) : SOURCE est 'built-in/Gain', un chemin de la
+%   bibliothèque ('simulink/Math Operations/Gain') ou un bloc d'un modèle
+%   chargé, recopié ; DESTINATION est le chemin du nouveau bloc,
+%   'modele/sousSysteme/nom'. H est la poignée du bloc posé. Le Subsystem
+%   de la bibliothèque arrive garni d'une entrée reliée à une sortie ;
+%   'built-in/Subsystem' est vide.
+%
 %   Tout bloc accepte en outre POSITION, [gauche haut droite bas] comme
 %   dans Simulink : il garde alors la place qu'on lui donne, au lieu
 %   d'être rangé par couches.
@@ -544,6 +553,58 @@ function modele = add_block(modele, type, nom, varargin)
 %      get_param(m, 'integ', 'BlockType')         % 'integrator'
 %
 %   Voir aussi NEW_SYSTEM, ADD_LINE, SET_PARAM, DELETE_BLOCK, SIM, OPEN_SYSTEM.
+    if ~isstruct(modele)
+        % ADD_BLOCK(SOURCE, DESTINATION, ...) : la forme de Simulink, sur un
+        % modèle chargé
+        reglages = {};
+        if nargin >= 3
+            reglages = [{nom}, varargin];
+        end
+        varargout{1} = ajouterParNom(modele, type, reglages);
+        return
+    end
+    varargout{1} = ajouter(modele, type, nom, varargin{:});
+end
+
+function h = ajouterParNom(source, destination, reglages)
+    if isstring(source) && isscalar(source)
+        source = char(source);
+    end
+    if ~ischar(source)
+        error('Simulink:Commands:InvalidModel', ...
+              ['ADD_BLOCK attend un modele bati par NEW_SYSTEM, ou la forme de Simulink : ' ...
+               'ADD_BLOCK(SOURCE, ''modele/bloc'').']);
+    end
+    destination = matlibre_sl_memoire('chemin', destination);
+    [parent, feuille] = matlibre_sl_memoire('decouper', destination);
+    if isempty(parent)
+        error('Simulink:Commands:InvSimulinkObjectName', ...
+              ['La destination ''%s'' de ADD_BLOCK nomme un modele : un bloc se pose ' ...
+               'sous un chemin ''modele/bloc''.'], destination);
+    end
+    type = source;
+    if strncmpi(type, 'built-in/', 9)
+        type = type(10:end);
+    end
+    % 'built-in/Subsystem' est un sous-système vide, qui se simule : il
+    % porte un modèle sans bloc, que ses chemins garniront
+    try
+        entree = matlibre_sl_catalogue('type', type);
+    catch
+        entree = [];
+    end
+    if ~isempty(entree) && strcmp(entree.type, 'subsystem') && ...
+       ~any(strcmpi(reglages(1:2:end), 'Model') | strcmpi(reglages(1:2:end), 'Modele')) && ...
+       isempty(gabaritDeSousSysteme(source, feuille))
+        reglages(end + 1:end + 2) = {'Model', new_system(regexprep(feuille, '[^A-Za-z0-9_]', '_'))};
+    end
+    systeme = matlibre_sl_memoire('appliquer', parent, @(s) add_block(s, type, feuille, ...
+                                                                      reglages{:}));
+    h = matlibre_sl_memoire('poignee', matlibre_sl_memoire('joindre', parent, ...
+                                                           systeme.blocs{end}.nom));
+end
+
+function modele = ajouter(modele, type, nom, varargin)
     nom = char(nom);
     % « bibliotheque/bloc » : un bloc d'une bibliothèque de l'utilisateur,
     % ou d'un autre modèle, recopié — et lié s'il vient d'une bibliothèque.
@@ -647,6 +708,10 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
         texte = texte(barre + 1:end);
     end
     cle = lower(regexprep(texte, '\s', ''));
+    if strcmp(cle, 'subsystem') && ~isempty(barre) && ~strncmpi(char(designation), 'built-in/', 9)
+        % le Subsystem de la bibliothèque : une entrée reliée à une sortie
+        cle = 'atomicsubsystem';
+    end
     switch cle
         case 'enabledsubsystem'
             controles = {'enableport', 'Enable'};

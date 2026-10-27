@@ -13515,6 +13515,289 @@ for kS = 1:numel(solveurs105)
 end
 fprintf('journal des memoires partagees : %d cas croises\n', nCas105);
 
+%% --------------------------------- 106. L'API par les noms et les poignées
+% Un modèle chargé — NEW_SYSTEM sans sortie, LOAD_SYSTEM, OPEN_SYSTEM — se
+% bâtit, se règle, se lit et se simule par les chemins de ses blocs et par
+% leurs poignées, comme dans Simulink.
+bdclose('all');
+new_system('api106');
+hc106 = add_block('built-in/Constant', 'api106/c', 'Value', '3');
+add_block('simulink/Math Operations/Gain', 'api106/g', 'Gain', '2');
+add_block('built-in/Outport', 'api106/y');
+hl106 = add_line('api106', 'c/1', 'g/1');
+add_line('api106', 'g/1', 'y/1', 'autorouting', 'on');
+set_param('api106', 'Solver', 'ode4', 'FixedStep', '0.5', 'StopTime', '1');
+assert(isnumeric(hc106) && isscalar(hc106) && strcmp(get_param(hc106, 'Name'), 'c') && ...
+       strcmp(getfullname(hc106), 'api106/c'), 'ADD_BLOCK rend la poignee du bloc pose');
+assert(strcmp(get_param('api106/g', 'Gain'), '2') && strcmp(get_param('api106/g', 'BlockType'), 'Gain') && ...
+       strcmp(get_param('api106/g', 'Type'), 'block') && strcmp(get_param('api106', 'Type'), 'block_diagram') && ...
+       strcmp(get_param('api106/g', 'Parent'), 'api106') && isempty(get_param('api106', 'Parent')) && ...
+       strcmp(get_param('api106', 'Solver'), 'ode4'), 'GET_PARAM par le chemin');
+r106 = sim('api106');
+assert(r106.yout(end) == 6, 'SIM(''nom'') simule le modele charge');
+assert(isequal(find_system('api106'), {'api106'; 'api106/c'; 'api106/g'; 'api106/y'}) && ...
+       isequal(find_system('api106', 'BlockType', 'Gain'), {'api106/g'}) && ...
+       isequal(find_system('api106', 'Type', 'block_diagram'), {'api106'}), ...
+       'FIND_SYSTEM : le systeme, puis ses blocs, en chemins complets');
+assert(isequal(get_param({'api106/c', 'api106/g'}, 'Name'), {'c', 'g'}) && ...
+       isequal(getSimulinkBlockHandle({'api106/c', 'api106/absent'}), [hc106 -1]), ...
+       'plusieurs objets a la fois ; -1 pour un chemin qui ne mene a rien');
+assert(strcmp(bdroot('api106/g'), 'api106') && strcmp(bdroot(hc106), 'api106'), ...
+       'BDROOT remonte au modele');
+% La poignée suit le bloc renommé, ses ports aussi.
+hg106 = getSimulinkBlockHandle('api106/g');
+ph106 = get_param(hg106, 'PortHandles');
+set_param(hg106, 'Name', 'k');
+assert(strcmp(getfullname(hg106), 'api106/k') && strcmp(get_param(hg106, 'Gain'), '2'), ...
+       'un bloc renomme garde sa poignee');
+ph106b = get_param('api106/k', 'PortHandles');
+assert(isequal(ph106b.Inport, ph106.Inport) && isequal(ph106b.Outport, ph106.Outport), ...
+       'et ses ports gardent les leurs');
+% Le signal : par la poignée de port, ou par celle de la ligne.
+set_param(ph106.Outport(1), 'Name', 'sortie', 'DataLogging', 'on');
+set_param(hl106, 'Name', 'consigne');
+assert(strcmp(get_param(ph106.Outport(1), 'Name'), 'sortie') && ...
+       strcmp(get_param(hl106, 'Name'), 'consigne') && ...
+       get_param(hl106, 'SrcBlockHandle') == hc106 && get_param(hl106, 'DstBlockHandle') == hg106 && ...
+       get_param(hl106, 'DstPortHandle') == ph106.Inport(1) && strcmp(get_param(hl106, 'Type'), 'line'), ...
+       'la ligne : ses deux bouts, ses ports, son signal');
+r106 = sim('api106');
+journal106 = r106.logsout;
+signal106 = journal106{1};
+donnees106 = signal106.Values.Data;
+assert(strcmp(signal106.Name, 'sortie') && donnees106(end) == 6, ...
+       'le signal nomme par sa poignee se journalise');
+lh106 = get_param('api106/k', 'LineHandles');
+assert(lh106.Inport == hl106 && lh106.Outport > 0, 'LINEHANDLES : les lignes du bloc');
+delete_line(hl106);
+lh106 = get_param('api106/k', 'LineHandles');
+assert(lh106.Inport == -1, 'DELETE_LINE(H) retire la ligne');
+phc106 = get_param('api106/c', 'PortHandles');
+add_line('api106', phc106.Outport(1), ph106.Inport(1));
+lh106 = get_param('api106/k', 'LineHandles');
+assert(lh106.Inport > 0, 'ADD_LINE par les poignees de ports');
+% Nom unique, recopie, barre doublée dans un nom.
+h1 = add_block('built-in/Gain', 'api106/k', 'MakeNameUnique', 'on');
+assert(strcmp(getfullname(h1), 'api106/k1'), 'MAKENAMEUNIQUE choisit un nom libre');
+add_block('api106/k', 'api106/copie');
+assert(strcmp(get_param('api106/copie', 'Gain'), '2'), 'un bloc d''un modele charge se recopie');
+hb106 = add_block('built-in/Gain', 'api106/a//b');
+assert(strcmp(get_param(hb106, 'Name'), 'a/b') && strcmp(getfullname(hb106), 'api106/a//b') && ...
+       any(strcmp(find_system('api106'), 'api106/a//b')), 'une barre dans un nom se double dans le chemin');
+delete_block({'api106/k1', 'api106/a//b'});
+delete_block(getSimulinkBlockHandle('api106/copie'));
+assert(numel(find_system('api106')) == 4, 'DELETE_BLOCK d''une cellule, d''une poignee');
+% Sous-systèmes : le Subsystem de la bibliothèque garni, built-in/Subsystem vide.
+add_block('simulink/Ports & Subsystems/Subsystem', 'api106/s');
+assert(isequal(find_system('api106/s'), {'api106/s'; 'api106/s/In1'; 'api106/s/Out1'}), ...
+       'le Subsystem de la bibliotheque : une entree reliee a une sortie');
+add_block('built-in/Subsystem', 'api106/vide');
+assert(isequal(find_system('api106/vide'), {'api106/vide'}), 'built-in/Subsystem est vide');
+delete_line('api106/s', 'In1/1', 'Out1/1');
+add_block('built-in/Gain', 'api106/s/g', 'Gain', '10');
+add_line('api106/s', 'In1/1', 'g/1');
+add_line('api106/s', 'g/1', 'Out1/1');
+add_block('built-in/Outport', 'api106/z');
+add_line('api106', 'c/1', 's/1');
+add_line('api106', 's/1', 'z/1');
+r106 = sim('api106');
+assert(r106.yout(end, 2) == 30 && strcmp(get_param('api106/s/g', 'Parent'), 'api106/s'), ...
+       'un sous-systeme se garnit par ses chemins');
+assert(isequal(find_system('api106', 'SearchDepth', 1, 'BlockType', 'Gain'), {'api106/k'}) && ...
+       isequal(find_system('api106', 'BlockType', 'Gain'), {'api106/k'; 'api106/s/g'}) && ...
+       isequal(find_system('api106', 'RegExp', 'on', 'Name', '^[gk]$'), {'api106/k'; 'api106/s/g'}) && ...
+       isequal(find_system('api106', 'CaseSensitive', 'off', 'BlockType', 'gain'), ...
+               {'api106/k'; 'api106/s/g'}) && ...
+       isequal(find_system('api106', 'Gain', '10'), {'api106/s/g'}), ...
+       'FIND_SYSTEM : profondeur, expressions, casse, parametres');
+h106 = find_system('api106', 'FindAll', 'on', 'Name', 'g');
+assert(isnumeric(h106) && numel(h106) == 1 && strcmp(getfullname(h106), 'api106/s/g'), ...
+       'FINDALL rend les poignees');
+% Un sous-système masqué de paramètres ne s'ouvre qu'avec LookUnderMasks.
+add_block('built-in/Subsystem', 'api106/m', 'Mask', 'on', 'MaskVariables', 'K=@1;', ...
+          'MaskValueString', '2');
+add_block('built-in/Gain', 'api106/m/cache');
+assert(~any(strcmp(find_system('api106'), 'api106/m/cache')) && ...
+       any(strcmp(find_system('api106', 'LookUnderMasks', 'all'), 'api106/m/cache')), ...
+       'LOOKUNDERMASKS ouvre les masques');
+remplaces106 = replace_block('api106', 'Gain', 'built-in/Abs', 'noprompt');
+assert(isequal(sort(remplaces106), sort({'api106/k'; 'api106/m/cache'; 'api106/s/g'})) && ...
+       strcmp(get_param('api106/s/g', 'BlockType'), 'Abs'), ...
+       'REPLACE_BLOCK remplace dans tout le modele, et rend les chemins');
+% Le modèle chargé s'écrit et se relit, et SIM le préfère à une variable
+% qui n'est pas un modèle.
+fichier106 = [tempname() '.m'];
+save_system('api106', fichier106);
+api106 = 5; %#ok<NASGU>
+r106 = sim('api106');
+assert(r106.yout(end, 1) == 3, 'une variable qui n''est pas un modele ne masque pas le modele charge');
+clear api106
+relu106 = load_system(fichier106);
+delete(fichier106);
+assert(numel(relu106.blocs) == 7, 'SAVE_SYSTEM(''nom'') ecrit le modele charge');
+bdclose('api106');
+assert(getSimulinkBlockHandle('api106/c') == -1, 'un modele decharge n''a plus de blocs');
+
+% Les refus, nommés.
+new_system('refus106');
+add_block('built-in/Constant', 'refus106/c');
+add_block('built-in/Gain', 'refus106/g');
+add_line('refus106', 'c/1', 'g/1');
+add_block('built-in/Subsystem', 'refus106/s');
+add_block('built-in/Gain', 'refus106/s/k');
+phk106 = get_param('refus106/s/k', 'PortHandles');
+phg106 = get_param('refus106/g', 'PortHandles');
+refus106 = {
+    @() add_block('built-in/Gain', 'absent106/g'), 'Simulink:Commands:InvSimulinkObjectName'
+    @() add_block('built-in/Gain', 'refus106'), 'Simulink:Commands:InvSimulinkObjectName'
+    @() add_block('built-in/Gain', 'refus106/g'), 'Simulink:Commands:AddBlockCantAdd'
+    @() add_block('built-in/Gain', 'refus106/g/x'), 'Simulink:Commands:InvSimulinkObjectName'
+    @() add_block('built-in/Introuvable', 'refus106/x'), 'Simulink:Commands:InvalidBlockType'
+    @() new_system('refus106'), 'Simulink:Commands:NewSysAlreadyExists'
+    @() new_system('1abc'), 'Simulink:LoadSave:InvalidBlockDiagramName'
+    @() get_param('refus106/absent', 'Gain'), 'Simulink:Commands:InvSimulinkObjectName'
+    @() get_param('refus106/g', 'Absent'), 'Simulink:Commands:ParamUnknown'
+    @() get_param('refus106/g'), 'Simulink:Commands:GetParamArguments'
+    @() set_param('refus106/g', 'Absent', 1), 'Simulink:Commands:ParamUnknown'
+    @() set_param('refus106/g', 'Gain'), 'Simulink:Commands:ParamValuePairs'
+    @() set_param('refus106/g', 'Name', 'c'), 'Simulink:Commands:SetParamNameExists'
+    @() set_param('refus106', 'Name', 'autre'), 'Simulink:Commands:SetParamReadOnly'
+    @() set_param(phg106.Inport(1), 'Name', 'x'), 'Simulink:Commands:ParamReadOnly'
+    @() delete_block('refus106'), 'Simulink:Commands:DeleteBlockDiagram'
+    @() delete_block('refus106/absent'), 'Simulink:Commands:InvSimulinkObjectName'
+    @() add_line('refus106', 'c/1', 'g/1'), 'Simulink:Commands:AddLineDestConnected'
+    @() add_line('refus106', 'c/1', 'g/1', 'autorouting', 'peutetre'), 'Simulink:Commands:InvalidArgument'
+    @() add_line('refus106', phk106.Outport(1), phg106.Inport(1)), 'Simulink:Commands:AddLineDifferentSystems'
+    @() add_line('refus106', phg106.Inport(1), phg106.Inport(1)), 'Simulink:Commands:AddLineInvalidPort'
+    @() delete_line('refus106', 'g/1', 'c/1'), 'Simulink:Commands:DeleteLineNoLine'
+    @() get_param(123456.5, 'Name'), 'Simulink:Commands:InvSimulinkObjHandle'
+    @() find_system('refus106', 'SearchDepth', -1), 'Simulink:Commands:FindSystemInvalidOption'
+    @() find_system('refus106', 'LookUnderMasks', 'parfois'), 'Simulink:Commands:FindSystemInvalidOption'
+    @() find_system('refus106', 'Name'), 'Simulink:Commands:FindSystemArguments'
+    @() replace_block('refus106', 'built-in/Abs'), 'Simulink:Commands:ReplaceBlockArguments'
+    @() getfullname('refus106/absent'), 'Simulink:Commands:InvSimulinkObjectName'
+    };
+for k = 1:size(refus106, 1)
+    vu106 = '';
+    try
+        refus106{k, 1}();
+    catch err
+        vu106 = err.identifier;
+    end
+    assert(strcmp(vu106, refus106{k, 2}), sprintf('refus %d : %s attendu, %s rendu', k, ...
+                                                  refus106{k, 2}, vu106));
+end
+vu106 = '';
+try
+    add_line('refus106', 'g/1', 'c/1');
+catch err
+    vu106 = err.identifier;
+end
+assert(strcmp(vu106, 'Simulink:Commands:AddLineInvalidPort'), 'une source n''a pas d''entree');
+bdclose('all');
+
+% Batterie : chaque type de bloc du catalogue, posé seul entre des
+% constantes et des sorties, bâti une fois par les valeurs et une fois par
+% les noms — même schéma, même simulation, ou même refus.
+catalogue106 = matlibre_sl_catalogue();
+regle106 = {'Solver', 'ode4', 'FixedStep', 0.1, 'StopTime', 0.3};
+dossier106 = tempname();
+mkdir(dossier106);
+avant106 = pwd();
+cd(dossier106);
+nCas106 = 0;
+nRefus106 = 0;
+echecs106 = {};
+for kT = 1:numel(catalogue106)
+    entree106 = catalogue106(kT);
+    if strcmp(entree106.famille, 'Interne')
+        continue
+    end
+    try
+        [v106, ok106] = allerModele(entree106.type, {}, 0.5);
+    catch
+        continue
+    end
+    if ~ok106
+        continue
+    end
+    % la source : le type de Simulink s'il désigne ce bloc, sinon son chemin
+    % dans la bibliothèque, sinon son nom MatLibre
+    source106 = ['built-in/' entree106.simulink];
+    try
+        retour106 = matlibre_sl_catalogue('type', entree106.simulink);
+        if ~strcmp(retour106.type, entree106.type)
+            source106 = '';
+        end
+    catch
+        source106 = '';
+    end
+    if isempty(source106)
+        source106 = ['built-in/' entree106.type];
+    end
+    try
+        new_system('nom106');
+        for b = 1:numel(v106.blocs)
+            bloc106 = v106.blocs{b};
+            couples106 = [fieldnames(bloc106.parametres).'; struct2cell(bloc106.parametres).'];
+            if b == 1
+                add_block(source106, ['nom106/' bloc106.nom], couples106{:});
+            else
+                add_block(['built-in/' bloc106.type], ['nom106/' bloc106.nom], couples106{:});
+            end
+        end
+        for l = 1:size(v106.liens, 1)
+            lien106 = v106.liens(l, :);
+            add_line('nom106', sprintf('%s/%d', v106.blocs{lien106(1)}.nom, lien106(4)), ...
+                     sprintf('%s/%d', v106.blocs{lien106(2)}.nom, lien106(3)));
+        end
+    catch err
+        echecs106{end + 1} = sprintf('%s : construction par les noms, %s : %s', ...
+                                     entree106.type, err.identifier, err.message); %#ok<SAGROW>
+        bdclose('nom106');
+        continue
+    end
+    parValeur106 = '';
+    parNom106 = '';
+    yv106 = [];
+    yn106 = [];
+    try
+        evalc('rv106 = sim(v106, regle106{:});');
+        yv106 = rv106.yout;
+    catch err
+        parValeur106 = err.identifier;
+    end
+    try
+        evalc('rn106 = sim(''nom106'', regle106{:});');
+        yn106 = rn106.yout;
+    catch err
+        parNom106 = err.identifier;
+    end
+    bdclose('nom106');
+    nCas106 = nCas106 + 1;
+    if strcmp(entree106.type, 'subsystem')
+        % un sous-système sans modèle est refusé ; 'built-in/Subsystem'
+        % en porte un, vide, qui se simule
+        if ~(strcmp(parValeur106, 'Simulink:Commands:SousSystemeVide') && isempty(parNom106))
+            echecs106{end + 1} = 'subsystem : built-in/Subsystem vide doit se simuler'; %#ok<SAGROW>
+        end
+    elseif ~strcmp(parValeur106, parNom106)
+        echecs106{end + 1} = sprintf('%s : par les valeurs ''%s'', par les noms ''%s''', ...
+                                     entree106.type, parValeur106, parNom106); %#ok<SAGROW>
+    elseif isempty(parValeur106)
+        if ~isequaln(double(yv106), double(yn106))
+            echecs106{end + 1} = sprintf('%s : les simulations different', entree106.type); %#ok<SAGROW>
+        end
+    else
+        nRefus106 = nRefus106 + 1;
+    end
+end
+cd(avant106);
+rmdir(dossier106, 's');
+assert(isempty(echecs106), sprintf('par les noms : %s', strjoin(echecs106, ' ; ')));
+fprintf('API par les noms : %d types de blocs batis des deux facons, %d refus identiques\n', ...
+        nCas106, nRefus106);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

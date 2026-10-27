@@ -190,6 +190,9 @@ function varargout = sim(modele, varargin)
                     modeles{k} = candidat;
                 end
             end
+            if isempty(modeles{k}) && matlibre_sl_ouverts('connu', nom)
+                modeles{k} = matlibre_sl_ouverts('lire', nom);
+            end
         end
         varargout{1} = matlibre_sl_lot('sim', modele, modeles, varargin{:});
         return
@@ -199,9 +202,18 @@ function varargout = sim(modele, varargin)
         % « evalin('caller') » depuis une sous-fonction ne verrait que
         % l'espace de SIM lui-même.
         nom = char(modele);
+        modele = [];
         if isvarname(nom) && evalin('caller', sprintf('exist(''%s'', ''var'')', nom)) == 1
-            modele = evalin('caller', nom);
-        else
+            candidat = evalin('caller', nom);
+            if isstruct(candidat) && isfield(candidat, 'blocs')
+                modele = candidat;
+            end
+        end
+        if isempty(modele) && matlibre_sl_ouverts('connu', nom)
+            % le modèle chargé : NEW_SYSTEM, LOAD_SYSTEM, OPEN_SYSTEM
+            modele = matlibre_sl_ouverts('lire', nom);
+        end
+        if isempty(modele)
             modele = chargerModele(nom);
         end
     end

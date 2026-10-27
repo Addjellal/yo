@@ -55,6 +55,20 @@ function varargout = matlibre_sl_signaux(action, varargin)
             % R = MATLIBRE_SL_SIGNAUX('reglage',BLOC,PORT) : tous les
             % réglages du signal qui part du port de sortie PORT.
             varargout{1} = reglageDe(varargin{1}, varargin{2});
+        case 'numero'
+            % H = MATLIBRE_SL_SIGNAUX('numero',MODELE,CHEMIN,GENRE,RANG) : la
+            % poignée d'un objet — bloc, modèle, ligne, port —, la même toute
+            % la session.
+            varargout{1} = numero(varargin{:});
+        case 'cle'
+            % CLE = MATLIBRE_SL_SIGNAUX('cle',H) : « modele|chemin|genre|rang »,
+            % '' pour un nombre qui n'est pas une poignée.
+            varargout{1} = registre('cle', varargin{1});
+        case 'renommer'
+            % MATLIBRE_SL_SIGNAUX('renommer',MODELE,ANCIEN,NOUVEAU) : les
+            % poignées du bloc ANCIEN et de ce qu'il contient suivent son
+            % nouveau chemin.
+            registre('renommer', varargin);
         case 'bloc'
             % BLOC = MATLIBRE_SL_SIGNAUX('bloc',BLOC,PORT,REGLAGE) : les champs
             % de la structure REGLAGE, posés sur le port de sortie PORT.
@@ -104,6 +118,21 @@ function sortie = registre(action, argument)
             sortie = '';
             if isKey(parNumero, argument)
                 sortie = parNumero(argument);
+            end
+        case 'renommer'
+            [nomModele, ancien, nouveau] = argument{:};
+            tete = [nomModele '|' ancien];
+            for cle = keys(parCle)
+                texte = cle{1};
+                if ~(strncmp(texte, [tete '|'], numel(tete) + 1) || ...
+                     strncmp(texte, [tete '/'], numel(tete) + 1))
+                    continue
+                end
+                h = parCle(texte);
+                autre = [nomModele '|' nouveau texte(numel(tete) + 1:end)];
+                remove(parCle, texte);
+                parCle(autre) = h;
+                parNumero(h) = autre;
             end
     end
 end

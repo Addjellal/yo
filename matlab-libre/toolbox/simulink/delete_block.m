@@ -1,4 +1,4 @@
-function modele = delete_block(modele, nom)
+function varargout = delete_block(modele, nom)
 %DELETE_BLOCK Retire un bloc du modèle, et les liens qui y touchent.
 %   MODELE = DELETE_BLOCK(MODELE,NOM) enlève le bloc nommé. Les liens qui
 %   partaient de lui ou arrivaient à lui disparaissent avec lui : laisser
@@ -12,6 +12,10 @@ function modele = delete_block(modele, nom)
 %   l'ancien intact : un modèle est ici une valeur, non une référence.
 %   Dans MATLAB, DELETE_BLOCK modifie le modèle ouvert et ne rend rien.
 %
+%   DELETE_BLOCK(BLOC) est la forme de Simulink, sur un modèle chargé : BLOC
+%   est un chemin 'modele/bloc', une poignée, ou plusieurs dans une cellule
+%   ou un vecteur.
+%
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'constant', 'c', 'Value', 1);
@@ -22,6 +26,37 @@ function modele = delete_block(modele, nom)
 %      isempty(m.liens)                     % le lien est parti avec le bloc
 %
 %   Voir aussi ADD_BLOCK, DELETE_LINE, REPLACE_BLOCK, FIND_SYSTEM.
+    if nargin == 1
+        retirerParNom(modele);
+        return
+    end
+    varargout{1} = retirer(modele, nom);
+end
+
+function retirerParNom(designes)
+    if iscell(designes)
+        for k = 1:numel(designes)
+            retirerParNom(designes{k});
+        end
+        return
+    end
+    if isnumeric(designes) && numel(designes) > 1
+        for k = 1:numel(designes)
+            retirerParNom(designes(k));
+        end
+        return
+    end
+    chemin = matlibre_sl_memoire('chemin', designes);
+    [parent, feuille] = matlibre_sl_memoire('decouper', chemin);
+    if isempty(parent)
+        error('Simulink:Commands:DeleteBlockDiagram', ...
+              ['''%s'' est un modele, non un bloc : BDCLOSE le decharge, ' ...
+               'SIMULINK.BLOCKDIAGRAM.DELETECONTENTS le vide.'], chemin);
+    end
+    matlibre_sl_memoire('appliquer', parent, @(s) delete_block(s, feuille));
+end
+
+function modele = retirer(modele, nom)
     k = matlibre_sl_indice(modele, nom);
     modele.blocs(k) = [];
     if ~isempty(modele.liens)

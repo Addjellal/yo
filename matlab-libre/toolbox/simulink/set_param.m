@@ -1,4 +1,4 @@
-function modele = set_param(modele, nom, varargin)
+function varargout = set_param(modele, nom, varargin)
 %SET_PARAM Modifie les paramètres d'un bloc, ou les réglages du modèle.
 %   MODELE = SET_PARAM(MODELE,BLOC,'Param',VALEUR,...) change un ou
 %   plusieurs paramètres du bloc nommé, sans toucher aux autres ni au
@@ -43,6 +43,13 @@ function modele = set_param(modele, nom, varargin)
 %   instant sur N, DataLoggingLimitDataPoints et DataLoggingMaxPoints
 %   les derniers.
 %
+%   SET_PARAM(OBJET,'Param',VALEUR,...) est la forme de Simulink, sur un
+%   modèle chargé (NEW_SYSTEM sans sortie, LOAD_SYSTEM, OPEN_SYSTEM) :
+%   OBJET est le chemin d'un bloc, 'modele/sousSysteme/bloc', celui du
+%   modèle — ses réglages —, ou une poignée de bloc, de modèle, de port de
+%   sortie ou de ligne (le signal qui la parcourt). Rien n'est rendu : le
+%   modèle chargé change. Un bloc renommé garde sa poignée.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -63,6 +70,62 @@ function modele = set_param(modele, nom, varargin)
 %      get_param(m, 'Solver')                   % 'ode4'
 %
 %   Voir aussi GET_PARAM, ADD_PARAM, ADD_BLOCK, SIM, REPLACE_BLOCK.
+    if ~isstruct(modele)
+        if nargin < 2
+            error('Simulink:Commands:ParamValuePairs', ...
+                  'SET_PARAM(OBJET,''Param'',VALEUR,...) : les reglages vont par paires.');
+        end
+        reglerParNom(modele, [{nom}, varargin]);
+        return
+    end
+    varargout{1} = regler(modele, nom, varargin{:});
+end
+
+% SET_PARAM sur un modèle chargé : l'objet désigné par son chemin ou sa
+% poignée change sur place.
+function reglerParNom(cible, couples)
+    if mod(numel(couples), 2) ~= 0
+        error('Simulink:Commands:ParamValuePairs', ...
+              'SET_PARAM(OBJET,''Param'',VALEUR,...) : les reglages vont par paires.');
+    end
+    if isnumeric(cible) && isscalar(cible)
+        [chemin, genre] = matlibre_sl_memoire('objet', cible);
+        switch genre
+            case {'bloc', 'modele'}
+            case 'ligne'
+                % une ligne : le signal qui part de sa source
+                L = matlibre_sl_memoire('ligne', cible);
+                source = matlibre_sl_memoire('joindre', L.systeme, L.source);
+                ph = get_param(source, 'PortHandles');
+                reglerParNom(ph.Outport(L.portSource), couples);
+                return
+            otherwise
+                % un port : le signal, réglé dans le modèle qui le porte
+                morceaux = matlibre_sl_memoire('morceaux', chemin);
+                matlibre_sl_memoire('appliquer', morceaux{1}, ...
+                                    @(m) matlibre_sl_signaux('poser', m, cible, couples{:}));
+                return
+        end
+    end
+    chemin = matlibre_sl_memoire('chemin', cible);
+    if strcmp(matlibre_sl_memoire('genre', chemin), 'modele')
+        if any(strcmpi(couples(1:2:end), 'Name'))
+            error('Simulink:Commands:SetParamReadOnly', ...
+                  ['Un modele charge garde son nom : SAVE_SYSTEM l''ecrit sous un autre ' ...
+                   'fichier, que LOAD_SYSTEM charge sous ce nom.']);
+        end
+        matlibre_sl_memoire('appliquer', chemin, @(m) set_param(m, couples{:}));
+        return
+    end
+    [parent, feuille] = matlibre_sl_memoire('decouper', chemin);
+    matlibre_sl_memoire('appliquer', parent, @(s) set_param(s, feuille, couples{:}));
+    for k = find(strcmpi(couples(1:2:end), 'Name'))
+        matlibre_sl_memoire('renommer', chemin, char(couples{2 * k}));
+        chemin = matlibre_sl_memoire('joindre', parent, char(couples{2 * k}));
+    end
+end
+
+function modele = regler(modele, nom, varargin)
     % Une poignée de port : le signal qui en part, son nom et son journal.
     if isnumeric(nom)
         modele = matlibre_sl_signaux('poser', modele, nom, varargin{:});
