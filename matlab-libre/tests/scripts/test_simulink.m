@@ -12594,6 +12594,9 @@ assert(double(r97.yout(end)) == 21 && isa(r97.yout, 'int8'), 'le modele relu se 
 hws97.DataSource = 'MATLAB Code';
 hws97.MATLABCode = 'K = 2;';
 save_system(f97, fichier97);
+% un modèle chargé ne se recrée pas sous son nom : on le décharge, ce qui
+% oublie son espace de travail, que le .slx doit rendre
+bdclose('espace97');
 new_system('espace97');
 g97 = load_system(fichier97);
 delete(fichier97);
