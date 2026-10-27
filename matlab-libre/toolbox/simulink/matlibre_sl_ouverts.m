@@ -12,7 +12,9 @@ function sortie = matlibre_sl_ouverts(action, nom, modele, numeroFigure)
 %   Actions : 'inscrire', 'retirer', 'vider', 'lire', 'figure', 'connu',
 %   'noms', 'dernier', et 'ecrire', qui remplace un modèle chargé sur
 %   place — l'API par les noms (ADD_BLOCK('m/k'), SET_PARAM('m/k',...))
-%   y range ce qu'elle change.
+%   y range ce qu'elle change. 'reference' et 'poserreference' gardent le
+%   modèle tel qu'on l'a chargé, créé ou écrit : GET_PARAM(M,'Dirty') l'y
+%   compare.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
@@ -23,11 +25,12 @@ function sortie = matlibre_sl_ouverts(action, nom, modele, numeroFigure)
 %      matlibre_sl_ouverts('vider');
 %
 %   Voir aussi OPEN_SYSTEM, CLOSE_SYSTEM, GCS, BDISLOADED, LOAD_SYSTEM.
-    persistent noms modeles figures
+    persistent noms modeles figures references
     if isempty(noms)
         noms = {};
         modeles = {};
         figures = {};
+        references = {};
     end
     sortie = [];
     switch lower(char(action))
@@ -43,25 +46,35 @@ function sortie = matlibre_sl_ouverts(action, nom, modele, numeroFigure)
                 noms(k) = [];
                 modeles(k) = [];
                 figures(k) = [];
+                references(k) = [];
             end
             noms{end + 1} = nom;
             modeles{end + 1} = modele;
             figures{end + 1} = numeroFigure;
+            references{end + 1} = modele;   % le modèle tel qu'on l'inscrit : Dirty 'off'
         case 'retirer'
             k = trouver(noms, char(nom));
             if k > 0
                 noms(k) = [];
                 modeles(k) = [];
                 figures(k) = [];
+                references(k) = [];
             end
         case 'vider'
             noms = {};
             modeles = {};
             figures = {};
+            references = {};
         case 'lire'
             sortie = modeles{exiger(noms, char(nom))};
         case 'ecrire'
             modeles{exiger(noms, char(nom))} = modele;
+        case 'reference'
+            % le modèle tel qu'on l'a chargé, créé ou écrit : un modèle qui
+            % en diffère a changé (Dirty)
+            sortie = references{exiger(noms, char(nom))};
+        case 'poserreference'
+            references{exiger(noms, char(nom))} = modele;
         case 'figure'
             sortie = figures{exiger(noms, char(nom))};
         case 'connu'

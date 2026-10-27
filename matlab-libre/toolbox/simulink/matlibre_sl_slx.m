@@ -72,6 +72,15 @@ function modele = lire(fichier)
                'fausserait.'], D.nom, numel(refuses), strjoin(refuses, ', '));
     end
     modele = poserConfiguration(modele, D.config);
+    % la fiche que le fichier porte, sinon une fiche aux dates inconnues
+    if isfield(modele, 'fiche')
+        modele = rmfield(modele, 'fiche');
+    end
+    for nom = matlibre_sl_fiche('noms')
+        if isfield(D.config, nom{1}) && ~any(strcmp(nom{1}, {'FileName', 'Dirty'}))
+            modele = matlibre_sl_fiche('poser', modele, nom{1}, char(D.config.(nom{1})));
+        end
+    end
     if isfield(D, 'genre') && ~isempty(D.genre)
         modele.parametres.BlockDiagramType = D.genre;
     end
@@ -954,6 +963,16 @@ function ecrire(modele, fichier)
         end
         lignes{end + 1} = sprintf('    <P Name="%s">%s</P>', nom{1}, ...
                                   matlibre_xml_echapper(texte)); %#ok<AGROW>
+    end
+    % la fiche du modèle, hors FileName et Dirty, que le chargement pose
+    if isfield(modele, 'fiche') && isstruct(modele.fiche)
+        for nom = fieldnames(modele.fiche).'
+            if any(strcmp(nom{1}, {'FileName', 'Dirty'}))
+                continue
+            end
+            lignes{end + 1} = sprintf('    <P Name="%s">%s</P>', nom{1}, ...
+                                      matlibre_xml_echapper(char(modele.fiche.(nom{1})))); %#ok<AGROW>
+        end
     end
     compteur = 0;
     [lignes, ~] = ecrireSysteme(modele, lignes, '    ', compteur);

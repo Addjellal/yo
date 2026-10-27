@@ -51,6 +51,8 @@ function varargout = new_system(nom, genre)
     modele.blocs = {};
     modele.liens = [];
     modele.parametres = struct();
+    % sa fiche : créé maintenant, par l'utilisateur, en version 1.0
+    modele.fiche = matlibre_sl_fiche('nouvelle');
     if nargin >= 2
         switch lower(char(genre))
             case 'library'

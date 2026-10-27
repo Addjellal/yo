@@ -24,7 +24,7 @@ function modele = load_system(nom)
     nom = char(nom);
     [dossier, base, extension] = fileparts(nom);
     if strcmpi(extension, '.slx') || strcmpi(extension, '.mdl')
-        modele = matlibre_sl_slx('lire', nom);
+        modele = matlibre_sl_fiche('charger', matlibre_sl_slx('lire', nom), nom);
         charge(modele);
         return
     end
@@ -33,6 +33,7 @@ function modele = load_system(nom)
         for autre = {'.slx', '.mdl'}
             if exist(fullfile(dossier, [base autre{1}]), 'file') == 2
                 modele = matlibre_sl_slx('lire', fullfile(dossier, [base autre{1}]));
+                modele = matlibre_sl_fiche('charger', modele, fullfile(dossier, [base autre{1}]));
                 charge(modele);
                 return
             end
@@ -52,6 +53,7 @@ function modele = load_system(nom)
         error('Simulink:Commands:InvalidModel', ...
               'Le fichier ''%s'' ne rend pas un modele.', chemin);
     end
+    modele = matlibre_sl_fiche('charger', modele, which(base));
     charge(modele);
 end
 

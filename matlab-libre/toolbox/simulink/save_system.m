@@ -7,7 +7,10 @@ function fichier = save_system(modele, fichier)
 %   archive de fichiers XML que LOAD_SYSTEM relit (voir MATLIBRE_SL_SLX).
 %
 %   SAVE_SYSTEM('nom') ou SAVE_SYSTEM(H) enregistre le modèle chargé de ce
-%   nom ou de cette poignée.
+%   nom ou de cette poignée, dans le fichier d'où il vient (FileName) s'il
+%   en vient d'un. Chaque enregistrement fait avancer ModelVersion d'un
+%   cran, pose LastModifiedDate et LastModifiedBy, et le modèle chargé n'a
+%   plus changé (Dirty à 'off').
 %
 %   Le fichier produit est un programme : une fonction sans argument qui
 %   appelle NEW_SYSTEM, ADD_BLOCK et ADD_LINE, et rend le modèle.
@@ -45,10 +48,23 @@ function fichier = save_system(modele, fichier)
               'SAVE_SYSTEM attend un modele bati par NEW_SYSTEM.');
     end
     if nargin < 2
-        fichier = [modele.nom '.m'];
+        % le fichier d'où vient le modèle, ou où il a été écrit
+        fichier = matlibre_sl_fiche('lire', modele, 'FileName');
+        if isempty(fichier)
+            fichier = [modele.nom '.m'];
+        end
     end
     fichier = char(fichier);
     [~, ~, extension] = fileparts(fichier);
+    if ~strcmpi(extension, '.slx') && ~strcmpi(extension, '.m')
+        fichier = [fichier '.m'];
+    end
+    % la fiche : la version avance, la date et l'auteur de la modification
+    modele = matlibre_sl_fiche('enregistrer', modele, fichier);
+    if matlibre_sl_ouverts('connu', char(modele.nom))
+        matlibre_sl_ouverts('ecrire', char(modele.nom), modele);
+        matlibre_sl_ouverts('poserreference', char(modele.nom), modele);
+    end
     matlibre_sl_rappel(modele, 'PreSaveFcn');
     matlibre_sl_rappel('blocs', modele, 'PreSaveFcn');
     if strcmpi(extension, '.slx')
@@ -133,6 +149,17 @@ function [lignes, compteur] = batir(modele, cible, lignes, compteur)
                                     cible, cible, citer(champs{j}), ...
                                     ecrireValeur(modele.parametres.(champs{j}), ...
                                                  modele.nom, champs{j}));   %#ok<AGROW>
+        end
+    end
+    % la fiche du modèle — non celle d'un sous-système —, hors FileName et
+    % Dirty, que le chargement pose
+    if strcmp(cible, 'm') && isfield(modele, 'fiche') && isstruct(modele.fiche)
+        for champ = fieldnames(modele.fiche).'
+            if any(strcmp(champ{1}, {'FileName', 'Dirty'}))
+                continue
+            end
+            lignes{end+1} = sprintf('    %s = set_param(%s, %s, %s);', cible, cible, ...
+                                    citer(champ{1}), citer(modele.fiche.(champ{1})));   %#ok<AGROW>
         end
     end
     % Les signaux réglés — nom, journalisation — se reposent par les

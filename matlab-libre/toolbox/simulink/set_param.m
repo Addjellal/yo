@@ -222,6 +222,10 @@ function modele = reglerModele(modele, couples)
             commander(modele, valeur);
             continue
         end
+        if any(strcmpi(nom, matlibre_sl_fiche('noms')))
+            modele = matlibre_sl_fiche('poser', modele, nom, valeur);   % la fiche du modèle
+            continue
+        end
         canon = matlibre_sl_config('nom', nom);
         if ~isempty(canon)
             modele.parametres.(canon) = matlibre_sl_config('valider', canon, valeur);

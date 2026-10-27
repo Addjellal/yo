@@ -33,7 +33,11 @@ function valeur = get_param(modele, nom, parametre)
 %   GET_PARAM(MODELE,'Reglage') rend un réglage du modèle : Name, Blocks,
 %   et ceux de la boîte « Paramètres de configuration » — StopTime,
 %   Solver, FixedStep... —, avec leur valeur par défaut quand on ne les a
-%   pas posés. Un réglage posé par ADD_PARAM se lit de même.
+%   pas posés. Un réglage posé par ADD_PARAM se lit de même, comme la
+%   fiche du modèle : Created, Creator, LastModifiedDate, LastModifiedBy,
+%   ModelVersion, ModelVersionFormat, ModifiedComment, FileName — le
+%   fichier d'où il vient — et Dirty, 'on' quand un modèle chargé a changé
+%   depuis qu'on l'a chargé, créé ou écrit.
 %
 %   GET_PARAM(MODELE,H,'Reglage'), H une poignée de port, rend un réglage
 %   du signal qui part de ce port — Name, DataLogging... — ou PortType,
@@ -349,6 +353,10 @@ function [trouve, valeur] = reglageModele(modele, nom)
     end
     if strcmpi(nom, 'ModelWorkspace')
         valeur = matlibre_sl_espace('lire', char(modele.nom));
+        return
+    end
+    if any(strcmpi(nom, matlibre_sl_fiche('noms')))
+        valeur = matlibre_sl_fiche('lire', modele, nom);   % la fiche du modèle
         return
     end
     switch lower(nom)

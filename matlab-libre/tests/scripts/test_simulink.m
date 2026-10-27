@@ -14304,6 +14304,120 @@ end
 evalin('base', 'clear journal109');
 fprintf('rappels des blocs : %d cas croises\n', nCas109);
 
+%% --------------------------------------------------- 110. La fiche du modèle
+% Created, Creator, LastModifiedDate, LastModifiedBy, ModelVersion,
+% FileName, Dirty... : la fiche d'un modèle se lit et se règle, avance à
+% chaque enregistrement, et voyage dans les .slx et les .m.
+bdclose('all');
+new_system('fiche110');
+cree110 = get_param('fiche110', 'Created');
+assert(numel(regexp(cree110, '^[A-Z][a-z]{2} [A-Z][a-z]{2} \d\d \d\d:\d\d:\d\d \d{4}$')) == 1 && ...
+       strcmp(get_param('fiche110', 'ModelVersion'), '1.0') && ...
+       strcmp(get_param('fiche110', 'Creator'), get_param('fiche110', 'LastModifiedBy')) && ...
+       isempty(get_param('fiche110', 'FileName')) && strcmp(get_param('fiche110', 'Dirty'), 'off') && ...
+       strcmp(get_param('fiche110', 'ConfigurationManager'), 'None'), ...
+       'NEW_SYSTEM : la fiche neuve, un modele qui n''a pas change');
+add_block('built-in/Gain', 'fiche110/g');
+assert(strcmp(get_param('fiche110', 'Dirty'), 'on'), 'un bloc pose, le modele a change');
+dossier110 = tempname();
+mkdir(dossier110);
+fichier110 = fullfile(dossier110, 'fiche110.slx');
+save_system('fiche110', fichier110);
+assert(strcmp(get_param('fiche110', 'Dirty'), 'off') && ...
+       strcmp(get_param('fiche110', 'ModelVersion'), '1.1') && ...
+       strcmp(get_param('fiche110', 'FileName'), fichier110) && ...
+       strcmp(get_param('fiche110', 'ModelVersionFormat'), '1.%<AutoIncrement:1>'), ...
+       'SAVE_SYSTEM : la version avance, le fichier est celui du modele');
+set_param('fiche110/g', 'Gain', '3');
+set_param('fiche110', 'ModifiedComment', 'gain a 3', 'Creator', 'Ada');
+save_system('fiche110');
+assert(strcmp(get_param('fiche110', 'ModelVersion'), '1.2'), ...
+       'SAVE_SYSTEM(NOM) ecrit dans le fichier du modele');
+bdclose('fiche110');
+relu110 = load_system(fichier110);
+assert(strcmp(get_param('fiche110', 'ModelVersion'), '1.2') && ...
+       strcmp(get_param('fiche110', 'ModifiedComment'), 'gain a 3') && ...
+       strcmp(get_param('fiche110', 'Creator'), 'Ada') && strcmp(get_param('fiche110', 'Created'), cree110) && ...
+       strcmp(get_param('fiche110', 'Dirty'), 'off') && strcmp(get_param('fiche110', 'FileName'), fichier110) && ...
+       strcmp(get_param(relu110, 'ModelVersion'), '1.2'), ...
+       'la fiche se relit du .slx ; FileName est le fichier lu');
+set_param('fiche110', 'Dirty', 'on');
+assert(strcmp(get_param('fiche110', 'Dirty'), 'on'), 'Dirty se pose a on');
+set_param('fiche110', 'Dirty', 'off');
+assert(strcmp(get_param('fiche110', 'Dirty'), 'off'), 'et a off');
+programme110 = fullfile(dossier110, 'fiche110prog.m');
+save_system('fiche110', programme110);
+bdclose('fiche110');
+relu110 = load_system(programme110);
+assert(strcmp(get_param(relu110, 'ModelVersion'), '1.3') && ...
+       strcmp(get_param(relu110, 'Creator'), 'Ada') && ...
+       strcmp(get_param(relu110, 'FileName'), programme110), 'la fiche se relit du .m');
+bdclose('all');
+rmdir(dossier110, 's');
+
+% Les refus.
+new_system('refus110');
+refus110 = {
+    @() set_param('refus110', 'FileName', 'x.slx'), 'Simulink:Commands:SetParamReadOnly'
+    @() set_param('refus110', 'Dirty', 'parfois'), 'Simulink:Commands:SetParamInvalidArgumentValue'
+    @() set_param('refus110', 'ModelVersion', 3), 'Simulink:Commands:SetParamInvalidArgumentType'
+    @() set_param('refus110', 'Created'), 'Simulink:Commands:ParamValuePairs'
+    };
+for k = 1:size(refus110, 1)
+    vu110 = '';
+    try
+        refus110{k, 1}();
+    catch err
+        vu110 = err.identifier;
+    end
+    assert(strcmp(vu110, refus110{k, 2}), sprintf('refus %d : %s attendu, %s rendu', k, ...
+                                                  refus110{k, 2}, vu110));
+end
+bdclose('all');
+
+% Batterie : chaque réglage de la fiche qui se règle, posé, écrit dans un
+% .slx et dans un .m, puis relu ; et dix enregistrements de suite, la
+% version avançant d'un cran à chacun.
+reglables110 = setdiff(matlibre_sl_fiche('noms'), {'FileName', 'Dirty'});
+dossier110 = tempname();
+mkdir(dossier110);
+nCas110 = 0;
+for k = 1:numel(reglables110)
+    for extension110 = {'.slx', '.m'}
+        new_system('bat110');
+        valeur110 = sprintf('valeur %d de %s', k, reglables110{k});
+        set_param('bat110', reglables110{k}, valeur110);
+        fichier110 = fullfile(dossier110, ['bat110' extension110{1}]);
+        save_system('bat110', fichier110);
+        bdclose('bat110');
+        relu110 = load_system(fichier110);
+        lu110 = get_param(relu110, reglables110{k});
+        if strcmp(reglables110{k}, 'ModelVersion')
+            attendu110 = matlibre_sl_fiche('version', valeur110);   % l'enregistrement l'avance
+        elseif any(strcmp(reglables110{k}, {'LastModifiedDate', 'LastModifiedBy'}))
+            attendu110 = lu110;   % l'enregistrement les pose
+            assert(~strcmp(lu110, valeur110), [reglables110{k} ' : l''enregistrement le pose']);
+        else
+            attendu110 = valeur110;
+        end
+        assert(strcmp(lu110, attendu110), sprintf('%s, %s : relu', reglables110{k}, extension110{1}));
+        bdclose('all');
+        nCas110 = nCas110 + 1;
+    end
+end
+new_system('suite110');
+fichier110 = fullfile(dossier110, 'suite110.slx');
+for k = 1:10
+    set_param('suite110', 'ModifiedComment', sprintf('tour %d', k));
+    assert(strcmp(get_param('suite110', 'Dirty'), 'on'), 'le modele a change');
+    save_system('suite110', fichier110);
+    assert(strcmp(get_param('suite110', 'ModelVersion'), sprintf('1.%d', k)) && ...
+           strcmp(get_param('suite110', 'Dirty'), 'off'), sprintf('enregistrement %d', k));
+end
+bdclose('all');
+rmdir(dossier110, 's');
+fprintf('fiche du modele : %d reglages relus, 10 enregistrements de suite\n', nCas110);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
