@@ -26,7 +26,8 @@ function noms = find_system(modele, varargin)
 %                       'none', 'functional' ou 'all'
 %      FollowLinks      'off' : ne descend pas dans un bloc lié à une
 %                       bibliothèque ; 'on' : y descend
-%      FindAll          'on' : rend les poignées au lieu des chemins
+%      FindAll          'on' : rend les poignées au lieu des chemins, ce
+%                       que fait aussi un SYSTEME donné par sa poignée
 %      CaseSensitive    'on' ; 'off' compare sans égard à la casse
 %      RegExp           'on' : chaque valeur cherchée est une expression
 %                       régulière
@@ -80,6 +81,9 @@ end
 % --- la forme de Simulink --------------------------------------------------------
 
 function trouves = chercherParNom(args)
+    % un système désigné par sa poignée : la réponse est en poignées,
+    % comme dans Simulink
+    parPoignee = ~isempty(args) && isnumeric(args{1}) && ~isempty(args{1});
     if ~isempty(args) && (mod(numel(args), 2) == 1 || iscell(args{1}) || isnumeric(args{1}) || ...
                           estCharge(args{1}))
         x = args{1};
@@ -139,7 +143,7 @@ function trouves = chercherParNom(args)
         trouves = visiter(trouves, chemin, bloc, 0, o, criteres);
     end
     trouves = trouves(:);
-    if o.tous
+    if o.tous || parPoignee
         h = zeros(numel(trouves), 1);
         for k = 1:numel(trouves)
             h(k) = matlibre_sl_memoire('poignee', trouves{k});

@@ -18,6 +18,10 @@ function varargout = matlibre_sl_espace(action, varargin)
 %   OUI = MATLIBRE_SL_ESPACE('base',CHEMIN) dit si les blocs du modèle
 %   lisent l'espace de travail de base : non quand le modèle a un
 %   dictionnaire et EnableAccessToBaseWorkspace à 'off'.
+%   [OUI,V] = MATLIBRE_SL_ESPACE('valeur',CHEMIN,NOM) cherche la variable
+%   NOM comme la lit un bloc : l'espace du modèle, son dictionnaire, puis
+%   l'espace de base s'il lui est ouvert ; une variable du dictionnaire
+%   que l'espace de base porte aussi est refusée.
 %   MATLIBRE_SL_ESPACE('lier',NOM,DICTIONNAIRE,ACCES), que fait la
 %   compilation, retient ces deux réglages pour un modèle qui n'est pas
 %   chargé ; ceux d'un modèle chargé se lisent sur lui.
@@ -74,6 +78,11 @@ function varargout = matlibre_sl_espace(action, varargin)
             dictionnaire = lien(liens, nom);
             if ~isempty(dictionnaire)
                 [nomsD, valeursD] = matlibre_sl_dictionnaire('variables', dictionnaire);
+                nomsD = reshape(nomsD, 1, []);
+                valeursD = reshape(valeursD, 1, []);
+                noms = reshape(noms, 1, []);
+                valeurs = reshape(valeurs, 1, []);
+                dico = reshape(dico, 1, []);
                 garder = ~ismember(nomsD, noms);
                 noms = [noms, nomsD(garder)];
                 valeurs = [valeurs, valeursD(garder)];
@@ -89,6 +98,29 @@ function varargout = matlibre_sl_espace(action, varargin)
             end
             [dictionnaire, acces] = lien(liens, nom);
             varargout{1} = isempty(dictionnaire) || ~strcmpi(acces, 'off');
+        case 'valeur'
+            [chemin, nomVariable] = varargin{1:2};
+            chemin = char(chemin);
+            nomVariable = char(nomVariable);
+            [noms, valeurs, dico] = matlibre_sl_espace('variables', chemin);
+            base = matlibre_sl_espace('base', chemin);
+            j = find(strcmp(noms, nomVariable), 1);
+            dansBase = base && isvarname(nomVariable) && ...
+                       evalin('base', sprintf('exist(''%s'', ''var'')', nomVariable)) == 1;
+            if ~isempty(j)
+                if dico(j) && dansBase
+                    error('Simulink:Data:DuplicateDefinition', ...
+                          ['La variable ''%s'', que lit ''%s'', est definie a la fois dans le ' ...
+                           'dictionnaire de donnees du modele et dans l''espace de travail de ' ...
+                           'base : retirez-la de l''un des deux, ou posez ' ...
+                           'EnableAccessToBaseWorkspace a ''off''.'], nomVariable, chemin);
+                end
+                varargout = {true, valeurs{j}};
+            elseif dansBase
+                varargout = {true, evalin('base', nomVariable)};
+            else
+                varargout = {false, []};
+            end
         case 'lier'
             [nom, dictionnaire, acces] = varargin{1:3};
             nom = char(nom);

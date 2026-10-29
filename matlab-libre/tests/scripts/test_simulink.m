@@ -15169,6 +15169,393 @@ Simulink.data.dictionary.closeAll('-discard');
 rmdir(dossier113, 's');
 fprintf('dictionnaires de donnees : %d cas croises\n', nCas113);
 
+%% ------------------------- 114. Les objets de table et la recherche des blocs
+% Simulink.LookupTable et Simulink.Breakpoint portent la table et les
+% points de rupture hors des blocs : n-D Lookup Table (DataSpecification
+% 'Lookup table object'), Prelookup (BreakpointsSpecification 'Breakpoint
+% object') et Interpolation Using Prelookup les lisent comme une variable.
+% Simulink.findBlocks et Simulink.findBlocksOfType rendent des poignées.
+bdclose('all');
+Simulink.data.dictionary.closeAll('-discard');
+lut114 = Simulink.LookupTable;
+assert(isa(lut114.Table, 'Simulink.lookuptable.Table') && ...
+       isa(lut114.Breakpoints, 'Simulink.lookuptable.Breakpoint') && ...
+       strcmp(lut114.BreakpointsSpecification, 'Explicit values') && isempty(lut114.Table.Value), ...
+       'SIMULINK.LOOKUPTABLE : une table vide, des points explicites');
+lut114.Table.Value = [1 2 3; 4 5 6];
+lut114.Breakpoints(1).Value = [0 1];
+lut114.Breakpoints(2).Value = [10 20 30];
+assert(numel(lut114.Breakpoints) == 2 && isequal(lut114.Breakpoints(2).Value, [10 20 30]), ...
+       'les points d''une dimension de plus s''ajoutent par leur indice');
+lut114.BreakpointsSpecification = 'Even spacing';
+assert(isa(lut114.Breakpoints, 'Simulink.lookuptable.Evenspacing') && numel(lut114.Breakpoints) == 2, ...
+       'changer de specification remplace les points, un par dimension');
+lut114.BreakpointsSpecification = 'Reference';
+assert(iscell(lut114.Breakpoints) && numel(lut114.Breakpoints) == 2, ...
+       'Reference : des noms de Simulink.Breakpoint');
+copie114 = copy(lut114);
+copie114.Table.Value = 0;
+assert(isequal(lut114.Table.Value, [1 2 3; 4 5 6]), 'COPY fait un autre objet');
+bp114 = Simulink.Breakpoint;
+bp114.Breakpoints.Value = [0 10 20];
+assert(isa(bp114.Breakpoints, 'Simulink.lookuptable.Breakpoint'), 'SIMULINK.BREAKPOINT');
+% les refus des objets eux-mêmes
+objets114 = {
+    @() poserPropriete(Simulink.LookupTable, 'BreakpointsSpecification', 'Uneven'), 'Simulink:Data:LookupTableInvalidSpecification'
+    @() poserPropriete(Simulink.LookupTable, 'Breakpoints', 3), 'Simulink:Data:LookupTableInvalidBreakpoints'
+    @() poserPropriete(Simulink.LookupTable, 'Table', [1 2]), 'Simulink:Data:LookupTableInvalidValue'
+    @() poserPropriete(Simulink.lookuptable.Table, 'Value', 'abc'), 'Simulink:Data:LookupTableInvalidValue'
+    @() poserPropriete(Simulink.lookuptable.Breakpoint, 'Value', [1 2; 3 4]), 'Simulink:Data:BreakpointInvalidValue'
+    @() poserPropriete(Simulink.lookuptable.Evenspacing, 'Spacing', 0), 'Simulink:Data:EvenSpacingInvalidValue'
+    @() poserPropriete(Simulink.lookuptable.Evenspacing, 'FirstPoint', Inf), 'Simulink:Data:EvenSpacingInvalidValue'
+    @() poserPropriete(Simulink.Breakpoint, 'Breakpoints', [1 2 3]), 'Simulink:Data:BreakpointInvalidValue'
+    @() Simulink.FindOptions('Profondeur', 2), 'Simulink:Commands:FindOptionsUnknown'
+    @() Simulink.FindOptions('SearchDepth', 0), 'Simulink:Commands:FindOptionsInvalid'
+    @() Simulink.FindOptions('LookUnderMasks', 'partout'), 'Simulink:Commands:FindOptionsInvalid'
+    @() Simulink.allBlockDiagrams('diagramme'), 'Simulink:Commands:InvalidBlockDiagramType'
+    };
+for k = 1:size(objets114, 1)
+    vu114 = '';
+    try
+        objets114{k, 1}();
+    catch err
+        vu114 = err.identifier;
+    end
+    assert(strcmp(vu114, objets114{k, 2}), sprintf('objet %d : %s attendu, %s rendu', k, ...
+                                                   objets114{k, 2}, vu114));
+end
+
+% La chaîne Prelookup -> Interpolation Using Prelookup, ses points et sa
+% table dans des objets que référence un Simulink.LookupTable.
+bx114 = Simulink.Breakpoint;
+bx114.Breakpoints.Value = [0 1 3];
+by114 = Simulink.Breakpoint;
+by114.Breakpoints.Value = [0 2];
+[X114, Y114] = ndgrid([0 1 3], [0 2]);
+lutp114 = Simulink.LookupTable;
+lutp114.Table.Value = 2 * X114 + 5 * Y114 + 1;
+lutp114.BreakpointsSpecification = 'Reference';
+lutp114.Breakpoints = {'bx114', 'by114'};
+assignin('base', 'bx114', bx114);
+assignin('base', 'by114', by114);
+assignin('base', 'lutp114', lutp114);
+new_system('pre114');
+add_block('built-in/Constant', 'pre114/x', 'Value', '2');
+add_block('built-in/Constant', 'pre114/y', 'Value', '0.5');
+add_block('simulink/Lookup Tables/Prelookup', 'pre114/px', ...
+          'BreakpointsSpecification', 'Breakpoint object', 'BreakpointObject', 'bx114');
+add_block('simulink/Lookup Tables/Prelookup', 'pre114/py', ...
+          'BreakpointsSpecification', 'Breakpoint object', 'BreakpointObject', 'by114');
+add_block('simulink/Lookup Tables/Interpolation Using Prelookup', 'pre114/i', ...
+          'TableSpecification', 'Lookup table object', 'LookupTableObject', 'lutp114');
+add_block('built-in/Outport', 'pre114/o');
+add_line('pre114', 'x/1', 'px/1');
+add_line('pre114', 'y/1', 'py/1');
+add_line('pre114', 'px/1', 'i/1');
+add_line('pre114', 'px/2', 'i/2');
+add_line('pre114', 'py/1', 'i/3');
+add_line('pre114', 'py/2', 'i/4');
+add_line('pre114', 'i/1', 'o/1');
+set_param('pre114', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', 'StopTime', '0');
+r114 = sim('pre114');
+assert(abs(r114.yout(1) - 7.5) < 1e-12, 'Prelookup et Interpolation Using Prelookup par objets');
+bx114.Breakpoints.Value = [0 2 6];
+r114 = sim('pre114');
+assert(abs(r114.yout(1) - (2 * 1 + 5 * 0.5 + 1)) < 1e-12, ...
+       'un Simulink.Breakpoint change : la simulation suivante le lit');
+set_param('pre114/px', 'BreakpointsSpecification', 'Even spacing', 'BreakpointsFirstPoint', '0', ...
+          'BreakpointsSpacing', '1', 'BreakpointsNumPoints', '3');
+r114 = sim('pre114');
+assert(abs(r114.yout(1) - (2 * 3 + 5 * 0.5 + 1)) < 1e-12, ...
+       'Prelookup a points regulierement espaces : 0, 1, 2 lus comme 0, 1, 3');
+bdclose('pre114');
+evalin('base', 'clear bx114 by114 lutp114');
+
+% Simulink.findBlocks, findBlocksOfType, FindOptions, allBlockDiagrams ;
+% find_system à partir d'une poignée rend des poignées.
+new_system('cherche114');
+add_block('built-in/Gain', 'cherche114/g1');
+add_block('simulink/Ports & Subsystems/Subsystem', 'cherche114/s');
+add_block('built-in/Gain', 'cherche114/s/g2', 'Gain', '3');
+new_system('biblio114', 'Library');
+h114 = Simulink.findBlocks('cherche114');
+assert(isnumeric(h114) && size(h114, 2) == 1 && numel(h114) == 5 && ...
+       ~any(h114 == get_param('cherche114', 'Handle')), ...
+       'FINDBLOCKS : les cinq blocs, en poignees, sans le modele');
+assert(isequal(sort(getfullname(Simulink.findBlocksOfType('cherche114', 'Gain'))), ...
+               {'cherche114/g1'; 'cherche114/s/g2'}), 'FINDBLOCKSOFTYPE');
+assert(strcmp(getfullname(Simulink.findBlocks('cherche114', 'Gain', '3')), 'cherche114/s/g2'), ...
+       'FINDBLOCKS avec un critere');
+assert(numel(Simulink.findBlocks('cherche114', Simulink.FindOptions('SearchDepth', 1))) == 2, ...
+       'FINDOPTIONS SearchDepth 1 : le systeme seul');
+assert(numel(Simulink.findBlocks('cherche114/s')) == 3, 'un sous-systeme : ce qu''il contient');
+assert(numel(Simulink.findBlocks(get_param('cherche114', 'Handle'), 'Name', '^g\d$', ...
+                                 Simulink.FindOptions('RegExp', true))) == 2, ...
+       'FINDBLOCKS par une poignee, avec une expression reguliere');
+assert(isempty(Simulink.findBlocksOfType('cherche114', 'Integrator')), 'rien a trouver : vide');
+assert(isnumeric(find_system(get_param('cherche114', 'Handle'), 'BlockType', 'Gain')), ...
+       'FIND_SYSTEM a partir d''une poignee rend des poignees');
+tous114 = Simulink.allBlockDiagrams();
+assert(numel(tous114) == 2 && ...
+       strcmp(getfullname(Simulink.allBlockDiagrams('library')), 'biblio114') && ...
+       strcmp(getfullname(Simulink.allBlockDiagrams('model')), 'cherche114'), ...
+       'ALLBLOCKDIAGRAMS : tous, ou d''un genre');
+recherche114 = {
+    @() Simulink.findBlocks('absent114'), 'Simulink:Commands:InvSimulinkObjectName'
+    @() Simulink.findBlocks('cherche114', 'BlockType'), 'Simulink:Commands:FindBlocksArguments'
+    @() Simulink.findBlocks('cherche114', 3, 'Gain'), 'Simulink:Commands:FindBlocksArguments'
+    @() Simulink.findBlocksOfType('cherche114'), 'Simulink:Commands:FindBlocksArguments'
+    };
+for k = 1:size(recherche114, 1)
+    vu114 = '';
+    try
+        recherche114{k, 1}();
+    catch err
+        vu114 = err.identifier;
+    end
+    assert(strcmp(vu114, recherche114{k, 2}), sprintf('recherche %d : %s attendu, %s rendu', k, ...
+                                                      recherche114{k, 2}, vu114));
+end
+bdclose('all');
+
+% Batterie : une table à 1, 2 ou 3 dimensions, ses points donnés dans un
+% objet — explicites, régulièrement espacés, ou par des Simulink.Breakpoint
+% — rangé dans l'espace de base, celui du modèle ou un dictionnaire, ou
+% donnés dans le bloc — explicites ou régulièrement espacés. La table est
+% affine en chaque coordonnée : l'interpolation la rend exactement.
+dossier114 = tempname();
+mkdir(dossier114);
+dico114 = fullfile(dossier114, 'tables114.sldd');
+dd114 = Simulink.data.dictionary.create(dico114);
+sd114 = getSection(dd114, 'Design Data');
+pointsExplicites114 = {[0 1 3 4], [-2 0 5], [1 2 3]};
+coefficients114 = [2, -3, 0.5];
+requetes114 = [2.5, 1, 1.5];
+cas114 = {};
+for n = 1:3
+    for spec = {'Explicit values', 'Even spacing', 'Reference'}
+        for ou = {'base', 'modele', 'dictionnaire'}
+            cas114(end + 1, :) = {n, spec{1}, ou{1}}; %#ok<SAGROW>
+        end
+    end
+    cas114(end + 1, :) = {n, 'bloc explicite', ''}; %#ok<SAGROW>
+    cas114(end + 1, :) = {n, 'bloc espace', ''}; %#ok<SAGROW>
+end
+for kC = 1:size(cas114, 1)
+    [n, spec, ou] = cas114{kC, :};
+    if any(strcmp(spec, {'Even spacing', 'bloc espace'}))
+        points = {0:3, -2:2:4, 1:0.5:2};
+    else
+        points = pointsExplicites114;
+    end
+    points = points(1:n);
+    grilles = cell(1, n);
+    [grilles{:}] = ndgrid(points{:});
+    table = 7;
+    for d = 1:n
+        table = table + coefficients114(d) * grilles{d};
+    end
+    attendu = 7 + sum(coefficients114(1:n) .* requetes114(1:n));
+    new_system('bat114');
+    set_param('bat114', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', 'StopTime', '0', ...
+              'DataDictionary', dico114);
+    for d = 1:n
+        add_block('built-in/Constant', sprintf('bat114/u%d', d), 'Value', ...
+                  num2str(requetes114(d)));
+    end
+    add_block('simulink/Lookup Tables/n-D Lookup Table', 'bat114/t', ...
+              'NumberOfTableDimensions', num2str(n));
+    add_block('built-in/Outport', 'bat114/y');
+    for d = 1:n
+        add_line('bat114', sprintf('u%d/1', d), sprintf('t/%d', d));
+    end
+    add_line('bat114', 't/1', 'y/1');
+    switch spec
+        case 'bloc explicite'
+            set_param('bat114/t', 'Table', mat2str(table), 'BreakpointsForDimension1', ...
+                      mat2str(points{1}));
+            for d = 2:n
+                set_param('bat114/t', sprintf('BreakpointsForDimension%d', d), mat2str(points{d}));
+            end
+            if n == 3
+                set_param('bat114/t', 'Table', sprintf('reshape(%s, %s)', mat2str(table(:).'), ...
+                                                       mat2str(size(table))));
+            end
+        case 'bloc espace'
+            set_param('bat114/t', 'BreakpointsSpecification', 'Even spacing', 'Table', ...
+                      sprintf('reshape(%s, %s)', mat2str(table(:).'), mat2str(size(table))));
+            for d = 1:n
+                set_param('bat114/t', sprintf('BreakpointsForDimension%dFirstPoint', d), ...
+                          num2str(points{d}(1)), sprintf('BreakpointsForDimension%dSpacing', d), ...
+                          num2str(points{d}(2) - points{d}(1)));
+            end
+        otherwise
+            lut = Simulink.LookupTable;
+            lut.Table.Value = table;
+            lut.BreakpointsSpecification = spec;
+            noms = {};
+            for d = 1:n
+                switch spec
+                    case 'Explicit values'
+                        lut.Breakpoints(d).Value = points{d};
+                    case 'Even spacing'
+                        lut.Breakpoints(d).FirstPoint = points{d}(1);
+                        lut.Breakpoints(d).Spacing = points{d}(2) - points{d}(1);
+                    otherwise
+                        bp = Simulink.Breakpoint;
+                        bp.Breakpoints.Value = points{d};
+                        noms{d} = sprintf('bp114_%d', d); %#ok<SAGROW>
+                        ranger114(ou, noms{d}, bp, sd114);
+                end
+            end
+            if strcmp(spec, 'Reference')
+                lut.Breakpoints = noms;
+            end
+            ranger114(ou, 'lut114', lut, sd114);
+            set_param('bat114/t', 'DataSpecification', 'Lookup table object', ...
+                      'LookupTableObject', 'lut114');
+    end
+    contexte114 = sprintf('%d dimension(s), %s, %s', n, spec, ou);
+    r114 = sim('bat114');
+    assert(abs(r114.yout(1) - attendu) < 1e-9, sprintf('%s : %g attendu, %g rendu', contexte114, ...
+                                                      attendu, r114.yout(1)));
+    bdclose('bat114');
+    evalin('base', 'clear lut114 bp114_1 bp114_2 bp114_3');
+    for nom = {'lut114', 'bp114_1', 'bp114_2', 'bp114_3'}
+        if exist(sd114, nom{1})
+            deleteEntry(sd114, nom{1});
+        end
+    end
+end
+fprintf('objets de table : %d cas croises\n', size(cas114, 1));
+
+% Les refus, chacun avec son identifiant et le nom du bloc : l'objet
+% absent, d'une autre classe, ses dimensions, ses tailles, ses points, ses
+% références.
+bonne114 = Simulink.LookupTable;
+bonne114.Table.Value = [1 2 3; 4 5 6];
+bonne114.Breakpoints(1).Value = [0 1];
+bonne114.Breakpoints(2).Value = [0 1 2];
+mauvais114 = {
+    'absente', '', 'Simulink:blocks:LookupTableObjectNotSpecified'
+    'inconnue', 'personne114', 'Simulink:blocks:LookupTableObjectNotFound'
+    'classe', 'nombre114', 'Simulink:blocks:LookupTableObjectInvalidClass'
+    'dimensions', 'ligne114', 'Simulink:blocks:LookupTableObjectDimensionMismatch'
+    'tailles', 'tailles114', 'Simulink:blocks:LookupTableObjectSizeMismatch'
+    'points', 'desordre114', 'Simulink:blocks:LookupBreakpointsNotMonotonic'
+    'vide', 'vide114', 'Simulink:blocks:LookupTableObjectEmpty'
+    'reference', 'reference114', 'Simulink:blocks:LookupTableObjectNotFound'
+    'referenceClasse', 'referenceClasse114', 'Simulink:blocks:LookupTableObjectInvalidClass'
+    'nombreDePoints', 'deuxPoints114', 'Simulink:blocks:LookupTableObjectDimensionMismatch'
+    };
+assignin('base', 'nombre114', 3);
+ligne114 = Simulink.LookupTable;
+ligne114.Table.Value = [1 2 3];
+ligne114.Breakpoints(1).Value = [0 1 2];
+assignin('base', 'ligne114', ligne114);
+tailles114 = copy(bonne114);
+tailles114.Breakpoints(2).Value = [0 1];
+assignin('base', 'tailles114', tailles114);
+desordre114 = copy(bonne114);
+desordre114.Breakpoints(2).Value = [0 2 1];
+assignin('base', 'desordre114', desordre114);
+assignin('base', 'vide114', Simulink.LookupTable);
+reference114 = copy(bonne114);
+reference114.BreakpointsSpecification = 'Reference';
+reference114.Breakpoints = {'bpAbsent114', 'bpAbsent114'};
+assignin('base', 'reference114', reference114);
+referenceClasse114 = copy(reference114);
+referenceClasse114.Breakpoints = {'nombre114', 'nombre114'};
+assignin('base', 'referenceClasse114', referenceClasse114);
+deuxPoints114 = copy(bonne114);
+deuxPoints114.Breakpoints(3).Value = [0 1];
+assignin('base', 'deuxPoints114', deuxPoints114);
+for k = 1:size(mauvais114, 1)
+    new_system('refus114');
+    add_block('built-in/Constant', 'refus114/a');
+    add_block('built-in/Constant', 'refus114/b');
+    add_block('simulink/Lookup Tables/n-D Lookup Table', 'refus114/t', ...
+              'NumberOfTableDimensions', '2', 'DataSpecification', 'Lookup table object', ...
+              'LookupTableObject', mauvais114{k, 2});
+    add_block('built-in/Outport', 'refus114/y');
+    add_line('refus114', 'a/1', 't/1');
+    add_line('refus114', 'b/1', 't/2');
+    add_line('refus114', 't/1', 'y/1');
+    vu114 = [];
+    try
+        sim('refus114');
+    catch err
+        vu114 = err;
+    end
+    assert(isa(vu114, 'MException') && strcmp(vu114.identifier, mauvais114{k, 3}) && ...
+           ~isempty(strfind(vu114.message, 'refus114/t')), ...
+           sprintf('refus ''%s'' : %s attendu, rendu %s', mauvais114{k, 1}, mauvais114{k, 3}, ...
+                   texteErreur114(vu114)));
+    bdclose('refus114');
+end
+% des points régulièrement espacés mal réglés dans le bloc, un Prelookup
+% au nombre de points faux
+espaces114 = {
+    'n-D Lookup Table', {'BreakpointsSpecification', 'Even spacing', ...
+                         'BreakpointsForDimension1Spacing', '0'}, 'Simulink:blocks:LookupEvenSpacingInvalid'
+    'n-D Lookup Table', {'BreakpointsSpecification', 'Even spacing', ...
+                         'BreakpointsForDimension1FirstPoint', '[1 2]'}, 'Simulink:blocks:LookupEvenSpacingInvalid'
+    'Prelookup', {'BreakpointsSpecification', 'Even spacing', 'BreakpointsNumPoints', '1'}, 'Simulink:blocks:LookupEvenSpacingInvalid'
+    'Prelookup', {'BreakpointsSpecification', 'Even spacing', 'BreakpointsNumPoints', '2.5'}, 'Simulink:blocks:LookupEvenSpacingInvalid'
+    'Prelookup', {'BreakpointsSpecification', 'Breakpoint object', 'BreakpointObject', 'ligne114'}, 'Simulink:blocks:LookupTableObjectInvalidClass'
+    'Prelookup', {'BreakpointsSpecification', 'Breakpoint object'}, 'Simulink:blocks:LookupTableObjectNotSpecified'
+    };
+for k = 1:size(espaces114, 1)
+    new_system('refus114');
+    add_block('built-in/Constant', 'refus114/a');
+    add_block(['simulink/Lookup Tables/' espaces114{k, 1}], 'refus114/t', espaces114{k, 2}{:});
+    add_line('refus114', 'a/1', 't/1');
+    add_block('built-in/Terminator', 'refus114/fin');
+    add_line('refus114', 't/1', 'fin/1');
+    if strcmp(espaces114{k, 1}, 'Prelookup')
+        add_block('built-in/Terminator', 'refus114/fin2');
+        add_line('refus114', 't/2', 'fin2/1');
+    end
+    vu114 = [];
+    try
+        sim('refus114');
+    catch err
+        vu114 = err;
+    end
+    assert(isa(vu114, 'MException') && strcmp(vu114.identifier, espaces114{k, 3}) && ...
+           ~isempty(strfind(vu114.message, 'refus114/t')), ...
+           sprintf('espacement %d : %s attendu, rendu %s', k, espaces114{k, 3}, texteErreur114(vu114)));
+    bdclose('refus114');
+end
+% un objet défini dans le dictionnaire et dans l'espace de base est ambigu
+addEntry(sd114, 'tailles114', bonne114);
+new_system('double114');
+set_param('double114', 'DataDictionary', dico114);
+add_block('built-in/Constant', 'double114/a');
+add_block('built-in/Constant', 'double114/b');
+add_block('simulink/Lookup Tables/n-D Lookup Table', 'double114/t', ...
+          'NumberOfTableDimensions', '2', 'DataSpecification', 'Lookup table object', ...
+          'LookupTableObject', 'tailles114');
+add_block('built-in/Outport', 'double114/y');
+add_line('double114', 'a/1', 't/1');
+add_line('double114', 'b/1', 't/2');
+add_line('double114', 't/1', 'y/1');
+vu114 = '';
+try
+    sim('double114');
+catch err
+    vu114 = err.identifier;
+end
+assert(strcmp(vu114, 'Simulink:Data:DuplicateDefinition'), ...
+       'un objet de table dans le dictionnaire et dans l''espace de base');
+evalin('base', 'clear tailles114');
+r114 = sim('double114');
+assert(r114.yout(1) == 5, 'l''objet du dictionnaire seul : la table lue au point (1, 1)');
+bdclose('all');
+evalin('base', 'clear nombre114 ligne114 desordre114 vide114 reference114 referenceClasse114 deuxPoints114');
+Simulink.data.dictionary.closeAll('-discard');
+rmdir(dossier114, 's');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -15759,5 +16146,24 @@ function b = lineaireAuHasard(discret, strict, Ts)
                 b.parametres = {};
                 b.reponse = @(s) 1 ./ s;
             end
+    end
+end
+
+function ranger114(ou, nom, valeur, section)
+    switch ou
+        case 'base'
+            assignin('base', nom, valeur);
+        case 'modele'
+            assignin(get_param('bat114', 'ModelWorkspace'), nom, valeur);
+        otherwise
+            assignin(section, nom, valeur);
+    end
+end
+
+function t = texteErreur114(e)
+    if isa(e, 'MException')
+        t = sprintf('%s (%s)', e.identifier, e.message);
+    else
+        t = 'aucune erreur';
     end
 end

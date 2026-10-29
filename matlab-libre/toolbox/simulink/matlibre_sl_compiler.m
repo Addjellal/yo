@@ -603,6 +603,9 @@ function [type, p] = normaliser(type, p, chemin)
                        'SampleTime', Ts);
             type = 'randomnumber';
         case 'lookup'
+            % un objet Simulink.LookupTable, ou des points régulièrement
+            % espacés, deviennent une table et des points explicites
+            p = matlibre_sl_tables('lookup', p, chemin);
             dimensions = double(p.NumberOfTableDimensions);
             if dimensions == 2
                 p = struct('BreakpointsForDimension1', p.BreakpointsData, ...
@@ -790,9 +793,11 @@ function [type, p] = normaliser(type, p, chemin)
             p = struct('Script', scriptTableDynamique(p, chemin), 'SampleTime', p.SampleTime);
             type = 'matlabfunction';
         case 'prelookup'
+            p = matlibre_sl_tables('prelookup', p, chemin);
             p = struct('Script', scriptPrerecherche(p, chemin), 'SampleTime', p.SampleTime);
             type = 'matlabfunction';
         case 'interpolationusingprelookup'
+            p = matlibre_sl_tables('interpolationusingprelookup', p, chemin);
             p = struct('Script', scriptInterpolationPrerecherche(p, chemin), ...
                        'SampleTime', p.SampleTime);
             type = 'matlabfunction';

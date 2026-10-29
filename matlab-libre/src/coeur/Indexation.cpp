@@ -192,8 +192,18 @@ std::vector<Valeur> Interpreteur::indexerListe(const Valeur& base, std::vector<V
         // par un vecteur — l'orientation de la source l'emporte alors. Un
         // scalaire n'a pas d'orientation : « a(ones(3,1)) » est une colonne.
         const bool sourceVecteur = base.estVecteur() && !base.estScalaire();
+        // Un vide 1 x 0 ou 0 x 1 a la forme d'un vecteur : « a(masque) »,
+        // a et masque tous deux 1 x 0, rend un 1 x 0, comme dans MATLAB.
+        auto formeDeVecteur = [](const Valeur& v) {
+            return v.dims.size() == 2 && (v.dims[0] == 1 || v.dims[1] == 1);
+        };
+        const bool sourceEnVecteur =
+            sourceVecteur || (base.nelem() == 0 && formeDeVecteur(base));
         if (estColonMagique(idx[0])) {
             formeResultat = {(int)p.size(), 1};
+        } else if (idx[0].classe == Classe::Logique && idx[0].nelem() == 0 &&
+                   formeDeVecteur(idx[0]) && sourceEnVecteur) {
+            formeResultat = base.estLigne() ? Dims{1, 0} : Dims{0, 1};
         } else if (idx[0].classe == Classe::Logique) {
             // Un masque logique équivaut à find(masque) : un masque en
             // matrice donne une colonne, un masque en ligne une ligne, et

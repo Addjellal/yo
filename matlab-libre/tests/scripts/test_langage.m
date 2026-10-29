@@ -974,6 +974,15 @@ assert(toc(debut) < 20 && somme == 5000050000, 'le lire aussi');
 % 0 x 1, et se concatene a une colonne.
 assert(isequal(size(colonne(1:0)), [0 1]) && isequal(size(x(1:0)), [1 0]));
 assert(size([5; colonne(1:0)], 1) == 1);
+% un vide 1 x 0 indexé par un masque 1 x 0 reste 1 x 0, et se concatène
+% en ligne ; un vide 0 x 1 reste 0 x 1
+videLigne = cell(1, 0);
+assert(isequal(size(videLigne(true(1, 0))), [1 0]) && ...
+       isequal(size(videLigne(~ismember(videLigne, {'a'}))), [1 0]) && ...
+       isequal(size(zeros(0, 1)), size(zeros(0, 1) + 0)) && ...
+       isequal(size(subsref(zeros(0, 1), substruct('()', {false(0, 1)}))), [0 1]));
+assert(isequal([{'a', 'b'}, videLigne(true(1, 0))], {'a', 'b'}), ...
+       'un vide en ligne, indexe par un masque vide, se concatene en ligne');
 % Un deux-points sur une dimension vide : une source non scalaire en
 % donne la taille, un scalaire non — sauf sur la matrice nulle 0 x 0.
 sansLigne = zeros(0, 4);
