@@ -18,6 +18,19 @@ function valeur = get_param(modele, nom, parametre)
 %                   Parent, BlockType, Ports... —, leur type, leurs valeurs
 %                   admises et s'ils se règlent (Attributes)
 %     Mask, MaskType  'off' et '' pour un bloc sans masque
+%     Position      [gauche haut droite bas] : celle qu'on a posée, ou celle
+%                   que le rangement en couches lui donne ; Orientation,
+%                   ForegroundColor, BackgroundColor, ShowName... leurs
+%                   valeurs par défaut quand on ne les a pas posées
+%     PortConnectivity  une structure par port, entrées puis sorties :
+%                   Type ('1', '2'... ou 'enable', 'trigger', 'ifaction',
+%                   'Reset', 'state'), Position, SrcBlock et SrcPort (la
+%                   poignée du bloc qui alimente une entrée, -1 si elle est
+%                   libre, et son port compté de 0), DstBlock et DstPort
+%                   (les blocs qu'une sortie alimente)
+%     Object        l'objet du bloc, un Simulink.Block — Simulink.BlockDiagram
+%                   pour un modèle, Simulink.Line pour une ligne,
+%                   Simulink.Port pour un port —, le même à chaque fois
 %     CompiledSampleTime  sa période, [période décalage], une fois le
 %                   modèle compilé : [0 0] continue, [0 1] continue fixée
 %                   aux pas mineurs, [Inf 0] constante
@@ -226,6 +239,21 @@ function valeur = get_param(modele, nom, parametre)
     end
     if any(strcmp(canon, matlibre_sl_rappel('noms')))
         valeur = '';   % un rappel qu'on n'a pas posé
+        return
+    end
+    if strcmp(canon, 'Position')
+        % la place que le rangement en couches lui donne
+        g = matlibre_sl_geometrie(modele);
+        valeur = [g.blocs(i).gauche, g.blocs(i).haut, g.blocs(i).droite, g.blocs(i).bas];
+        return
+    end
+    communs = struct('Orientation', 'right', 'ForegroundColor', 'black', ...
+                     'BackgroundColor', 'white', 'ShowName', 'on', 'Description', '', ...
+                     'Tag', '', 'Priority', '', 'NamePlacement', 'normal', 'FontSize', -1, ...
+                     'FontName', 'auto', 'DropShadow', 'off', 'AttributesFormatString', '', ...
+                     'UserData', []);
+    if isfield(communs, canon)
+        valeur = communs.(canon);   % un réglage graphique qu'on n'a pas posé
         return
     end
     for k = 1:size(entree.params, 1)
@@ -454,6 +482,15 @@ function valeur = lireParNom(cible, parametre)
     if ~ischar(parametre)
         error('Simulink:Commands:GetParamArguments', 'Un reglage se designe par son nom.');
     end
+    if strcmpi(parametre, 'Object')
+        if isnumeric(cible)
+            h = cible;
+        else
+            h = matlibre_sl_memoire('poignee', matlibre_sl_memoire('chemin', cible));
+        end
+        valeur = matlibre_sl_objet('obtenir', h);
+        return
+    end
     if isnumeric(cible)
         [chemin, genre] = matlibre_sl_memoire('objet', cible);
         if strcmp(genre, 'ligne')
@@ -507,6 +544,9 @@ function valeur = lireParNom(cible, parametre)
         case 'linehandles'
             valeur = poigneesLignes(parent, nomObjet, bloc);
             return
+        case 'portconnectivity'
+            valeur = connectivite(parent, nomObjet, bloc, chemin);
+            return
     end
     if numel(morceaux) == 2
         valeur = get_param(racine, nomObjet, parametre);
@@ -538,6 +578,73 @@ function L = poigneesLignes(parent, nomBloc, bloc)
             L.Outport(q) = matlibre_sl_memoire('poigneeligne', parent, ...
                                                s.blocs{liens(r, 2)}.nom, liens(r, 3));
         end
+    end
+end
+
+% Ce que relie chaque port d'un bloc, comme le PortConnectivity de
+% Simulink : les entrées puis les sorties, les ports comptés de 0.
+function C = connectivite(parent, nomBloc, bloc, chemin)
+    s = matlibre_sl_memoire('systeme', parent);
+    b = matlibre_sl_indice(s, nomBloc);
+    liens = matlibre_sl_liens(s);
+    [ne, ns] = matlibre_sl_ports(bloc);
+    ne(isnan(ne)) = 0;
+    ns(isnan(ns)) = 0;
+    cadre = double(lireParNom(chemin, 'Position'));
+    [typesE, typesS] = typesDesPorts(bloc, ne, ns);
+    C = struct('Type', {}, 'Position', {}, 'SrcBlock', {}, 'SrcPort', {}, 'DstBlock', {}, ...
+               'DstPort', {});
+    poigneeDe = @(j) matlibre_sl_memoire('poignee', matlibre_sl_memoire('joindre', parent, ...
+                                                                       s.blocs{j}.nom));
+    for k = 1:ne
+        y = cadre(2) + (cadre(4) - cadre(2)) * (k - 0.5) / ne;
+        r = find(liens(:, 2) == b & liens(:, 3) == k, 1);
+        source = -1;
+        portSource = 0;
+        if ~isempty(r)
+            source = poigneeDe(liens(r, 1));
+            portSource = liens(r, 4) - 1;
+        end
+        C(end + 1, 1) = struct('Type', typesE{k}, 'Position', [cadre(1), y], ...
+                               'SrcBlock', source, 'SrcPort', portSource, ...
+                               'DstBlock', zeros(1, 0), 'DstPort', zeros(1, 0)); %#ok<AGROW>
+    end
+    for q = 1:ns
+        y = cadre(2) + (cadre(4) - cadre(2)) * (q - 0.5) / ns;
+        rangs = find(liens(:, 1) == b & liens(:, 4) == q);
+        cibles = zeros(1, numel(rangs));
+        for j = 1:numel(rangs)
+            cibles(j) = poigneeDe(liens(rangs(j), 2));
+        end
+        C(end + 1, 1) = struct('Type', typesS{q}, 'Position', [cadre(3), y], ...
+                               'SrcBlock', [], 'SrcPort', [], 'DstBlock', cibles, ...
+                               'DstPort', reshape(liens(rangs, 3), 1, []) - 1); %#ok<AGROW>
+    end
+end
+
+% Le nom des ports : leur numéro, sauf les ports de contrôle d'un
+% sous-système — après ses entrées, Enable, Trigger, Ifaction, Reset — et
+% le port d'état d'un intégrateur.
+function [typesE, typesS] = typesDesPorts(bloc, ne, ns)
+    typesE = arrayfun(@(k) sprintf('%d', k), 1:ne, 'UniformOutput', false);
+    typesS = arrayfun(@(k) sprintf('%d', k), 1:ns, 'UniformOutput', false);
+    if strcmp(bloc.type, 'subsystem') && isfield(bloc.parametres, 'Model')
+        interne = bloc.parametres.Model;
+        if isstruct(interne) && isfield(interne, 'blocs')
+            types = cellfun(@(x) x.type, interne.blocs, 'UniformOutput', false);
+            rang = sum(strcmp(types, 'inport'));
+            controles = {'enableport', 'enable'; 'triggerport', 'trigger'; ...
+                         'actionport', 'ifaction'; 'resetport', 'Reset'};
+            for c = 1:size(controles, 1)
+                if any(strcmp(types, controles{c, 1})) && rang < ne
+                    rang = rang + 1;
+                    typesE{rang} = controles{c, 2};
+                end
+            end
+        end
+    end
+    if strcmp(bloc.type, 'integrator') && ns > 1
+        typesS{ns} = 'state';
     end
 end
 

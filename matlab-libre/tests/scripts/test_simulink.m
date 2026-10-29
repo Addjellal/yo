@@ -15556,6 +15556,188 @@ evalin('base', 'clear nombre114 ligne114 desordre114 vide114 reference114 refere
 Simulink.data.dictionary.closeAll('-discard');
 rmdir(dossier114, 's');
 
+%% ------------- 115. Les objets de bloc, la place des blocs et la connectivité
+% GET_PARAM(OBJET,'Object') rend l'objet d'un bloc, d'un modèle, d'une
+% ligne ou d'un port : ses propriétés se lisent et se posent comme par
+% GET_PARAM et SET_PARAM. Position et les autres réglages graphiques ont
+% une valeur sans qu'on les pose, et PortConnectivity dit ce que relie
+% chaque port.
+bdclose('all');
+new_system('obj115');
+add_block('built-in/Constant', 'obj115/c', 'Value', '2');
+add_block('built-in/Gain', 'obj115/g', 'Gain', '3');
+add_block('built-in/Outport', 'obj115/y1');
+add_block('built-in/Outport', 'obj115/y2');
+add_block('built-in/Sum', 'obj115/s', 'Inputs', '++');
+add_block('built-in/Terminator', 'obj115/fin');
+add_line('obj115', 'c/1', 'g/1');
+add_line('obj115', 'g/1', 'y1/1');
+add_line('obj115', 'g/1', 'y2/1');
+add_line('obj115', 'c/1', 's/1');
+add_line('obj115', 's/1', 'fin/1');
+hc115 = getSimulinkBlockHandle('obj115/c');
+hg115 = getSimulinkBlockHandle('obj115/g');
+% la place et les réglages graphiques
+p115 = get_param('obj115/g', 'Position');
+assert(isnumeric(p115) && numel(p115) == 4 && p115(1) < p115(3) && p115(2) < p115(4), ...
+       'POSITION : [gauche haut droite bas], calculee sans qu''on la pose');
+set_param('obj115/g', 'Position', [10 2 12 3]);
+assert(isequal(get_param('obj115/g', 'Position'), [10 2 12 3]), 'POSITION posee se relit');
+graphiques115 = {'Orientation', 'right'; 'ForegroundColor', 'black'; 'BackgroundColor', 'white'; ...
+                 'ShowName', 'on'; 'NamePlacement', 'normal'; 'DropShadow', 'off'; ...
+                 'FontSize', -1; 'FontName', 'auto'; 'Tag', ''; 'Description', ''};
+for k = 1:size(graphiques115, 1)
+    assert(isequal(get_param('obj115/s', graphiques115{k, 1}), graphiques115{k, 2}), ...
+           sprintf('%s : sa valeur par defaut', graphiques115{k, 1}));
+end
+set_param('obj115/s', 'Orientation', 'left', 'BackgroundColor', 'yellow');
+assert(strcmp(get_param('obj115/s', 'Orientation'), 'left') && ...
+       strcmp(get_param('obj115/s', 'BackgroundColor'), 'yellow'), 'un reglage graphique pose');
+% PortConnectivity
+pc115 = get_param('obj115/g', 'PortConnectivity');
+assert(isstruct(pc115) && isequal(size(pc115), [2 1]) && ...
+       isequal(fieldnames(pc115).', {'Type', 'Position', 'SrcBlock', 'SrcPort', 'DstBlock', 'DstPort'}), ...
+       'PORTCONNECTIVITY : une structure par port, en colonne');
+assert(strcmp(pc115(1).Type, '1') && pc115(1).SrcBlock == hc115 && pc115(1).SrcPort == 0 && ...
+       isempty(pc115(1).DstBlock), 'l''entree : le bloc qui l''alimente, son port compte de 0');
+assert(isequal(sort(pc115(2).DstBlock), sort([getSimulinkBlockHandle('obj115/y1'), ...
+                                               getSimulinkBlockHandle('obj115/y2')])) && ...
+       isequal(pc115(2).DstPort, [0 0]) && isempty(pc115(2).SrcBlock), ...
+       'la sortie : les deux blocs qu''elle alimente');
+assert(pc115(1).Position(1) == 10 && pc115(2).Position(1) == 12 && ...
+       pc115(1).Position(2) == 2.5, 'la place des ports : sur les bords du bloc, au milieu');
+pcs115 = get_param('obj115/s', 'PortConnectivity');
+assert(numel(pcs115) == 3 && pcs115(1).SrcBlock == hc115 && pcs115(2).SrcBlock == -1 && ...
+       pcs115(3).DstBlock == getSimulinkBlockHandle('obj115/fin'), ...
+       'une entree libre : SrcBlock vaut -1');
+% les ports de contrôle et le port d'état
+add_block('simulink/Ports & Subsystems/Enabled Subsystem', 'obj115/e');
+add_block('simulink/Ports & Subsystems/Triggered Subsystem', 'obj115/t');
+add_block('built-in/Integrator', 'obj115/i', 'ShowStatePort', 'on');
+add_line('obj115', 'c/1', 'e/Enable');
+pce115 = get_param('obj115/e', 'PortConnectivity');
+pct115 = get_param('obj115/t', 'PortConnectivity');
+pci115 = get_param('obj115/i', 'PortConnectivity');
+assert(isequal({pce115.Type}, {'1', 'enable', '1'}) && pce115(2).SrcBlock == hc115 && ...
+       isequal({pct115.Type}, {'1', 'trigger', '1'}) && isequal({pci115.Type}, {'1', '1', 'state'}), ...
+       'les ports de controle et le port d''etat se nomment');
+% les objets
+o115 = get_param('obj115/g', 'Object');
+assert(isa(o115, 'Simulink.Block') && o115 == get_param(hg115, 'Object') && ...
+       o115.Handle == hg115 && strcmp(o115.getFullName(), 'obj115/g') && ...
+       strcmp(o115.BlockType, 'Gain') && strcmp(o115.Gain, '3'), ...
+       'SIMULINK.BLOCK : le meme objet, ses proprietes, son chemin');
+o115.Gain = '4';
+set(o115, 'SampleTime', '0.5');
+assert(strcmp(get_param('obj115/g', 'Gain'), '4') && strcmp(get(o115, 'SampleTime'), '0.5'), ...
+       'une propriete posee par l''objet, par SET, se relit par GET_PARAM et GET');
+o115.Name = 'gain';
+assert(strcmp(o115.getFullName(), 'obj115/gain') && o115.Handle == hg115, ...
+       'l''objet suit son bloc renomme');
+m115 = get_param('obj115', 'Object');
+assert(isa(m115, 'Simulink.BlockDiagram') && isa(o115.getParent(), 'Simulink.BlockDiagram') && ...
+       o115.getParent() == m115, 'GETPARENT : l''objet du modele');
+enfants115 = m115.getChildren();
+assert(isa(enfants115, 'Simulink.Block') && numel(enfants115) == 9, ...
+       'GETCHILDREN : les blocs du modele');
+assert(numel(get_param('obj115/e', 'Object').getChildren()) == 3 && isempty(o115.getChildren()), ...
+       'GETCHILDREN : ce que contient un sous-systeme ; rien dans un gain');
+m115.Solver = 'ode45';
+assert(strcmp(get_param('obj115', 'Solver'), 'ode45'), 'un reglage du modele pose par son objet');
+ph115 = o115.PortHandles;
+port115 = get_param(ph115.Outport, 'Object');
+assert(isa(port115, 'Simulink.Port') && strcmp(port115.PortType, 'outport'), 'SIMULINK.PORT');
+lh115 = o115.LineHandles;
+ligne115 = get_param(lh115.Inport, 'Object');
+assert(isa(ligne115, 'Simulink.Line') && ligne115.SrcBlockHandle == hc115, 'SIMULINK.LINE');
+assert(isequal(o115.PortConnectivity, get_param(hg115, 'PortConnectivity')), ...
+       'les proprietes calculees se lisent aussi par l''objet');
+% les refus
+refus115 = {
+    @() poserPropriete(o115, 'Handle', 3), 'Simulink:Commands:SetParamReadOnly'
+    @() o115.ParametreInconnu, 'Simulink:Commands:ParamUnknown'
+    @() poserPropriete(o115, 'Gain', 'texte ('), ''
+    @() get_param(-42, 'Object'), 'Simulink:Commands:InvSimulinkObjHandle'
+    };
+for k = 1:size(refus115, 1)
+    vu115 = '';
+    try
+        refus115{k, 1}();
+    catch err
+        vu115 = err.identifier;
+    end
+    assert(strcmp(vu115, refus115{k, 2}), sprintf('refus %d : ''%s'' attendu, ''%s'' rendu', k, ...
+                                                  refus115{k, 2}, vu115));
+end
+delete_block('obj115/gain');
+vu115 = '';
+try
+    o115.Gain; %#ok<VUNUS>
+catch err
+    vu115 = err.identifier;
+end
+assert(strcmp(vu115, 'Simulink:Commands:InvSimulinkObjHandle'), ...
+       'l''objet d''un bloc supprime ne se lit plus');
+bdclose('all');
+
+% Batterie : chaque type de bloc, ses entrées reliées une sur deux à une
+% constante, ses sorties à des terminaisons une sur deux : la
+% connectivité de chaque port, la place du bloc, et son objet.
+catalogue115 = matlibre_sl_catalogue();
+nTypes115 = 0;
+nPorts115 = 0;
+for kT = 1:numel(catalogue115)
+    if strcmp(catalogue115(kT).famille, 'Interne')
+        continue
+    end
+    type115 = catalogue115(kT).type;
+    new_system('bat115');
+    add_block(type115, 'bat115/b');
+    ports115 = get_param('bat115/b', 'Ports');
+    if any(isnan(ports115(1:2)))
+        bdclose('bat115');
+        continue
+    end
+    sources115 = -ones(1, ports115(1));
+    for k = 1:ports115(1)
+        if mod(k, 2) == 1
+            add_block('built-in/Constant', sprintf('bat115/c%d', k));
+            add_line('bat115', sprintf('c%d/1', k), sprintf('b/%d', k));
+            sources115(k) = getSimulinkBlockHandle(sprintf('bat115/c%d', k));
+        end
+    end
+    cibles115 = cell(1, ports115(2));
+    for q = 1:ports115(2)
+        cibles115{q} = zeros(1, 0);
+        if mod(q, 2) == 0 || ports115(2) == 1
+            add_block('built-in/Terminator', sprintf('bat115/t%d', q));
+            add_line('bat115', sprintf('b/%d', q), sprintf('t%d/1', q));
+            cibles115{q} = getSimulinkBlockHandle(sprintf('bat115/t%d', q));
+        end
+    end
+    pc115 = get_param('bat115/b', 'PortConnectivity');
+    contexte115 = sprintf('%s (%d entrees, %d sorties)', type115, ports115(1), ports115(2));
+    assert(numel(pc115) == ports115(1) + ports115(2), [contexte115 ' : un element par port']);
+    for k = 1:ports115(1)
+        assert(isequal(pc115(k).SrcBlock, sources115(k)) && isempty(pc115(k).DstBlock), ...
+               sprintf('%s : entree %d', contexte115, k));
+    end
+    for q = 1:ports115(2)
+        e115 = pc115(ports115(1) + q);
+        assert(isequal(e115.DstBlock, cibles115{q}) && isempty(e115.SrcBlock), ...
+               sprintf('%s : sortie %d', contexte115, q));
+    end
+    position115 = get_param('bat115/b', 'Position');
+    objet115 = get_param('bat115/b', 'Object');
+    assert(numel(position115) == 4 && isa(objet115, 'Simulink.Block') && ...
+           strcmp(objet115.BlockType, get_param('bat115/b', 'BlockType')) && ...
+           isequal(objet115.Ports, ports115), [contexte115 ' : la place et l''objet']);
+    nTypes115 = nTypes115 + 1;
+    nPorts115 = nPorts115 + numel(pc115);
+    bdclose('bat115');
+end
+fprintf('objets et connectivite : %d types, %d ports verifies\n', nTypes115, nPorts115);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

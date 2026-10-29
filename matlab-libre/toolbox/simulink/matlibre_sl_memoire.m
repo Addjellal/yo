@@ -284,6 +284,22 @@ function [chemin, g, port] = objet(h)
     if ~isempty(rel)
         chemin = [nomModele '/' rel];
     end
+    if ~any(strcmp(g, {'modele', 'ligne'}))
+        % la poignée d'un bloc supprimé, ou d'un de ses ports, ne désigne
+        % plus rien
+        [parent, nomBloc] = decouper(chemin);
+        trouve = false;
+        try
+            s = systeme(parent);
+            trouve = any(cellfun(@(b) strcmp(b.nom, nomBloc), s.blocs));
+        catch
+        end
+        if ~trouve
+            error('Simulink:Commands:InvSimulinkObjHandle', ...
+                  'Poignee d''objet Simulink invalide : %s (''%s'' n''existe plus).', ...
+                  num2str(h, 10), chemin);
+        end
+    end
 end
 
 % La ligne d'une poignée : celle qui arrive à l'entrée qu'elle désigne,
