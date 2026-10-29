@@ -229,12 +229,6 @@ function modele = lienPhysique(modele, source, destination)
     modele.connexions = [connexions; a, pa, b, pb];
 end
 
-function type = typeCanonique(type)
-    entree = matlibre_sl_catalogue('type', type);
-    if ~isempty(entree)
-        type = entree.type;
-    end
-end
 
 % Le bloc et le port physique que désigne « bloc/LConn1 » : +1, ou -1 pour
 % RConn1. Un port de signal en face d'un port physique est refusé.

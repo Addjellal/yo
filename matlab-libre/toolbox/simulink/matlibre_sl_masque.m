@@ -24,6 +24,21 @@ function varargout = matlibre_sl_masque(action, varargin)
 %   expression : les variables du masque d'abord, puis celles de l'espace
 %   de travail.
 %
+%   Chaque paramètre a aussi son genre (MaskStyles : 'edit',
+%   'checkbox', 'popup(a|b|c)', 'radiobutton(...)', 'combobox(...)'), sa
+%   visibilité (MaskVisibilities), son activation (MaskEnables), son
+%   réglage en cours de simulation (MaskTunableValues) et son rappel
+%   (MaskCallbacks). Une case à cocher évaluée vaut 1 ou 0, un menu évalué
+%   le rang du choix — tel quel, le texte du choix. Le code
+%   d'initialisation (MaskInitialization) s'exécute dans l'espace du
+%   masque, après ses variables : ce qu'il pose sert aux blocs du dedans.
+%   S = MATLIBRE_SL_MASQUE('parametres',BLOC) rend les paramètres, un
+%   élément par variable — Name, Prompt, Type, TypeOptions, Value,
+%   Evaluate, Tunable, Visible, Enabled, Callback — ; BLOC =
+%   MATLIBRE_SL_MASQUE('ecrire',BLOC,S) les écrit ;
+%   MATLIBRE_SL_MASQUE('modifier',CHEMIN,F) applique F au bloc d'un modèle
+%   chargé.
+%
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
 %   Exemple :
@@ -46,6 +61,23 @@ function varargout = matlibre_sl_masque(action, varargin)
             varargout{1} = espace(varargin{:});
         case 'evaluer'
             varargout{1} = evaluer(varargin{:});
+        case 'parametres'
+            varargout{1} = parametres(varargin{1});
+        case 'ecrire'
+            varargout{1} = ecrire(varargin{:});
+        case 'modifier'
+            [chemin, f] = varargin{:};
+            [parent, feuille] = matlibre_sl_memoire('decouper', chemin);
+            matlibre_sl_memoire('appliquer', parent, @(s) modifierBloc(s, feuille, f));
+        case 'estmasque'
+            varargout{1} = masque(varargin{1});
+        case 'ouvreespace'
+            % un masque ouvre un espace s'il a des variables ou un code
+            % d'initialisation
+            b = varargin{1};
+            varargout{1} = ~isempty(variables(b)) || ...
+                (masque(b) && isfield(b.parametres, 'MaskInitialization') && ...
+                 ~isempty(strtrim(char(b.parametres.MaskInitialization))));
         otherwise
             error('Simulink:Masque:Action', 'Action inconnue : %s.', char(action));
     end
@@ -122,6 +154,8 @@ function bloc = poser(bloc, nom, v)
         error('Simulink:Masks:InvalidValue', ...
               'La valeur d''une variable de masque ne porte pas de « | », qui les separe.');
     end
+    S = parametres(bloc);
+    verifierValeur(S(rang), v, bloc.nom);
     valeurs = valeursDe(bloc);
     valeurs(end + 1:details(rang).rang) = {''};
     valeurs{details(rang).rang} = v;
@@ -138,6 +172,7 @@ function W = espace(bloc, parent, chemin)
     W = parent;
     [noms, details] = variables(bloc);
     valeurs = valeursDe(bloc);
+    S = parametres(bloc);
     for k = 1:numel(noms)
         texte = '';
         if details(k).rang <= numel(valeurs)
@@ -147,12 +182,56 @@ function W = espace(bloc, parent, chemin)
             W.(noms{k}) = texte;
             continue
         end
+        % une case évaluée vaut 1 ou 0, un menu évalué le rang de son choix
+        switch S(k).Type
+            case 'checkbox'
+                W.(noms{k}) = double(strcmp(texte, 'on'));
+                continue
+            case {'popup', 'radiobutton'}
+                rang = find(strcmp(S(k).TypeOptions, texte), 1);
+                if isempty(rang)
+                    error('Simulink:Masks:InvalidPopupValue', ...
+                          ['Le parametre de masque ''%s'' du bloc ''%s'' vaut ''%s'', qui ' ...
+                           'n''est aucun de ses choix : %s.'], noms{k}, chemin, texte, ...
+                          strjoin(S(k).TypeOptions, ', '));
+                end
+                W.(noms{k}) = rang;
+                continue
+        end
         if isempty(texte)
             error('Simulink:Masks:EmptyValue', ...
                   'La variable de masque ''%s'' du bloc ''%s'' n''a pas de valeur.', ...
                   noms{k}, chemin);
         end
         W.(noms{k}) = evaluerBrut(texte, parent, chemin, noms{k});
+    end
+    code = '';
+    if isfield(bloc.parametres, 'MaskInitialization')
+        code = char(bloc.parametres.MaskInitialization);
+    end
+    if ~isempty(strtrim(code))
+        W = initialiser(W, code, chemin);
+    end
+end
+
+% Le code d'initialisation du masque, dans l'espace du masque : ce qu'il
+% pose y reste.
+function matlibre__W = initialiser(matlibre__W, matlibre__code, matlibre__chemin)
+    matlibre__noms = fieldnames(matlibre__W);
+    for matlibre__k = 1:numel(matlibre__noms)
+        eval([matlibre__noms{matlibre__k} ' = matlibre__W.(matlibre__noms{matlibre__k});']);
+    end
+    try
+        eval(matlibre__code);
+    catch matlibre__err
+        error('Simulink:Masks:InitializationError', ...
+              'Erreur dans l''initialisation du masque de ''%s'' : %s', matlibre__chemin, ...
+              matlibre__err.message);
+    end
+    for matlibre__v = who().'
+        if ~strncmp(matlibre__v{1}, 'matlibre__', 10)
+            matlibre__W.(matlibre__v{1}) = eval(matlibre__v{1});
+        end
     end
 end
 
@@ -216,4 +295,116 @@ function matlibre__v = evaluerBrut(matlibre__texte, matlibre__W, matlibre__chemi
                's''evalue ni dans l''espace du masque ni dans l''espace de travail : %s'], ...
               matlibre__nom, matlibre__chemin, matlibre__texte, matlibre__err.message);
     end
+end
+
+% --- les paramètres du masque, un par variable ----------------------------------------
+
+function S = parametres(bloc)
+    S = struct('Name', {}, 'Prompt', {}, 'Type', {}, 'TypeOptions', {}, 'Value', {}, ...
+               'Evaluate', {}, 'Tunable', {}, 'Visible', {}, 'Enabled', {}, 'Callback', {});
+    [noms, details] = variables(bloc);
+    valeurs = valeursDe(bloc);
+    n = numel(noms);
+    p = bloc.parametres;
+    invites = liste(p, 'MaskPrompts', n, '');
+    styles = liste(p, 'MaskStyles', n, 'edit');
+    visibles = liste(p, 'MaskVisibilities', n, 'on');
+    actifs = liste(p, 'MaskEnables', n, 'on');
+    reglables = liste(p, 'MaskTunableValues', n, 'on');
+    rappels = liste(p, 'MaskCallbacks', n, '');
+    oui = {'off', 'on'};
+    for k = 1:n
+        [genre, choix] = lireStyle(styles{k});
+        v = '';
+        if details(k).rang <= numel(valeurs)
+            v = valeurs{details(k).rang};
+        end
+        S(k) = struct('Name', noms{k}, 'Prompt', invites{k}, 'Type', genre, ...
+                      'TypeOptions', {choix}, 'Value', v, ...
+                      'Evaluate', oui{details(k).evalue + 1}, 'Tunable', reglables{k}, ...
+                      'Visible', visibles{k}, 'Enabled', actifs{k}, 'Callback', rappels{k});
+    end
+end
+
+% Un réglage du masque, une cellule par paramètre ; un texte « a|b » vaut
+% aussi.
+function c = liste(p, nom, n, defaut)
+    c = repmat({defaut}, 1, n);
+    if ~isfield(p, nom)
+        return
+    end
+    v = p.(nom);
+    if ischar(v) || isstring(v)
+        v = strsplit(char(v), '|');
+        if isempty(p.(nom))
+            v = {};
+        end
+    end
+    for k = 1:min(n, numel(v))
+        c{k} = char(v{k});
+    end
+end
+
+function [genre, choix] = lireStyle(style)
+    choix = {};
+    jetons = regexp(char(style), '^(\w+)\((.*)\)$', 'tokens', 'once');
+    if isempty(jetons)
+        genre = lower(strtrim(char(style)));
+    else
+        genre = lower(jetons{1});
+        choix = strsplit(jetons{2}, '|');
+    end
+end
+
+function bloc = ecrire(bloc, S)
+    vars = '';
+    valeurs = cell(1, numel(S));
+    for k = 1:numel(S)
+        signe = '@';
+        if strcmp(S(k).Evaluate, 'off')
+            signe = '&';
+        end
+        vars = [vars sprintf('%s=%s%d;', S(k).Name, signe, k)]; %#ok<AGROW>
+        valeurs{k} = char(S(k).Value);
+    end
+    styles = cell(1, numel(S));
+    for k = 1:numel(S)
+        styles{k} = S(k).Type;
+        if any(strcmp(S(k).Type, {'popup', 'radiobutton', 'combobox'}))
+            styles{k} = sprintf('%s(%s)', S(k).Type, strjoin(S(k).TypeOptions, '|'));
+        end
+    end
+    bloc.parametres.Mask = 'on';
+    bloc.parametres.MaskVariables = vars;
+    bloc.parametres.MaskValueString = strjoin(valeurs, '|');
+    bloc.parametres.MaskPrompts = {S.Prompt};
+    bloc.parametres.MaskStyles = styles;
+    bloc.parametres.MaskVisibilities = {S.Visible};
+    bloc.parametres.MaskEnables = {S.Enabled};
+    bloc.parametres.MaskTunableValues = {S.Tunable};
+    bloc.parametres.MaskCallbacks = {S.Callback};
+end
+
+% La valeur d'une case vaut 'on' ou 'off', celle d'un menu l'un de ses
+% choix.
+function verifierValeur(P, v, nomBloc)
+    switch P.Type
+        case 'checkbox'
+            if ~any(strcmp(v, {'on', 'off'}))
+                error('Simulink:Masks:InvalidCheckboxValue', ...
+                      ['Le parametre de masque ''%s'' du bloc ''%s'' est une case a cocher : ' ...
+                       'il vaut ''on'' ou ''off'', non ''%s''.'], P.Name, nomBloc, v);
+            end
+        case {'popup', 'radiobutton'}
+            if ~any(strcmp(P.TypeOptions, v))
+                error('Simulink:Masks:InvalidPopupValue', ...
+                      ['Le parametre de masque ''%s'' du bloc ''%s'' vaut l''un de ses choix ' ...
+                       '(%s), non ''%s''.'], P.Name, nomBloc, strjoin(P.TypeOptions, ', '), v);
+            end
+    end
+end
+
+function s = modifierBloc(s, nom, f)
+    k = matlibre_sl_indice(s, nom);
+    s.blocs{k} = f(s.blocs{k});
 end

@@ -151,6 +151,25 @@ function valeur = get_param(modele, nom, parametre)
         valeur = matlibre_sl_masque('lire', bloc, champ);
         return
     end
+    % ce que le masque dit de ses paramètres : leurs noms, leurs valeurs,
+    % et l'espace qu'ils font
+    switch lower(champ)
+        case 'masknames'
+            valeur = matlibre_sl_masque('variables', bloc);
+            return
+        case 'maskvalues'
+            S = matlibre_sl_masque('parametres', bloc);
+            valeur = {S.Value};
+            return
+        case 'maskwsvariables'
+            W = matlibre_sl_masque('espace', bloc, struct(), char(bloc.nom));
+            noms = fieldnames(W);
+            valeur = struct('Name', noms(:).', 'Value', cell(1, numel(noms)));
+            for k = 1:numel(noms)
+                valeur(k).Value = W.(noms{k});
+            end
+            return
+    end
     switch lower(champ)
         case 'referenceblock'
             valeur = '';

@@ -14573,6 +14573,208 @@ for kG = 1:numel(groupes111)
 end
 fprintf('outils de schema : %d groupes reunis puis deplies, sans ecart\n', nCas111);
 
+%% ------------------------------------------------- 112. L'API des masques
+% Simulink.Mask.create et Simulink.Mask.get masquent un sous-système par
+% programme ; ADDPARAMETER pose ses paramètres — champ, case à cocher,
+% menu —, que les blocs du dedans lisent, et son code d'initialisation
+% calcule dans l'espace du masque avant la simulation.
+bdclose('all');
+new_system('masque112');
+add_block('built-in/Constant', 'masque112/c', 'Value', '1');
+add_block('simulink/Ports & Subsystems/Subsystem', 'masque112/s');
+delete_line('masque112/s', 'In1/1', 'Out1/1');
+add_block('built-in/Gain', 'masque112/s/g', 'Gain', 'G');
+add_line('masque112/s', 'In1/1', 'g/1');
+add_line('masque112/s', 'g/1', 'Out1/1');
+add_block('built-in/Outport', 'masque112/y');
+add_line('masque112', 'c/1', 's/1');
+add_line('masque112', 's/1', 'y/1');
+set_param('masque112', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', 'StopTime', '1');
+assert(isempty(Simulink.Mask.get('masque112/s')), 'SIMULINK.MASK.GET : [] sans masque');
+m112 = Simulink.Mask.create('masque112/s');
+assert(isa(m112, 'Simulink.Mask') && isa(Simulink.Mask.get('masque112/s'), 'Simulink.Mask') && ...
+       strcmp(get_param('masque112/s', 'Mask'), 'on') && isempty(m112.Parameters), ...
+       'SIMULINK.MASK.CREATE : un masque sans parametre');
+k112 = m112.addParameter('Name', 'K', 'Prompt', 'Gain', 'Value', '3');
+d112 = m112.addParameter('Name', 'doubler', 'Prompt', 'Doubler', 'Type', 'checkbox', 'Value', 'on');
+mode112 = m112.addParameter('Name', 'mode', 'Type', 'popup', 'TypeOptions', {'un', 'dix'}, ...
+                            'Value', 'dix');
+nom112 = m112.addParameter('Name', 'etiquette', 'Evaluate', 'off', 'Value', 'gain');
+m112.Initialization = 'G = K * (1 + doubler) * 10 ^ (mode - 1);';
+m112.Type = 'Gain masque';
+m112.Description = 'un gain, double ou non, a l''unite ou a la dizaine';
+assert(isequal(get_param('masque112/s', 'MaskNames'), {'K', 'doubler', 'mode', 'etiquette'}) && ...
+       isequal(get_param('masque112/s', 'MaskValues'), {'3', 'on', 'dix', 'gain'}) && ...
+       isequal(get_param('masque112/s', 'MaskPrompts'), {'Gain', 'Doubler', '', ''}) && ...
+       strcmp(get_param('masque112/s', 'MaskType'), 'Gain masque') && ...
+       strcmp(m112.Description, get_param('masque112/s', 'MaskDescription')), ...
+       'les parametres du masque, sur le bloc');
+r112 = sim('masque112');
+assert(all(r112.yout == 60), 'le code d''initialisation calcule G pour le gain du dedans');
+espace112 = m112.getWorkspaceVariables();
+assert(isequal({espace112.Name}, {'K', 'doubler', 'mode', 'etiquette', 'G'}) && ...
+       espace112(2).Value == 1 && espace112(3).Value == 2 && strcmp(espace112(4).Value, 'gain') && ...
+       espace112(5).Value == 60, ...
+       'l''espace du masque : case 1, menu 2, texte tel quel, et ce que l''initialisation pose');
+ws112 = get_param('masque112/s', 'MaskWSVariables');
+assert(isequal({ws112.Name}, {espace112.Name}), 'MASKWSVARIABLES : le meme espace');
+% Régler : par le paramètre, par SET_PARAM.
+k112.Value = '1';
+d112.Value = 'off';
+set_param('masque112/s', 'mode', 'un');
+r112 = sim('masque112');
+assert(all(r112.yout == 1) && strcmp(get_param('masque112/s', 'K'), '1'), ...
+       'une valeur posee par le parametre ou par SET_PARAM vaut pour la simulation');
+k112.Prompt = 'Le gain';
+mode112.TypeOptions = {'un', 'dix', 'cent'};
+mode112.Value = 'cent';
+r112 = sim('masque112');
+P112 = m112.Parameters;
+assert(all(r112.yout == 100) && numel(P112) == 4 && strcmp(P112(1).Prompt, 'Le gain') && ...
+       strcmp(P112(3).Type, 'popup') && isequal(P112(3).TypeOptions, {'un', 'dix', 'cent'}), ...
+       'les proprietes d''un parametre se reglent');
+m112.removeParameter('etiquette');
+assert(isequal(get_param('masque112/s', 'MaskNames'), {'K', 'doubler', 'mode'}) && ...
+       isempty(m112.getParameter('etiquette')) && isa(m112.getParameter('K'), 'Simulink.MaskParameter'), ...
+       'REMOVEPARAMETER, GETPARAMETER');
+% Le masque voyage dans les .slx et les .m.
+dossier112 = tempname();
+mkdir(dossier112);
+for extension112 = {'.slx', '.m'}
+    fichier112 = fullfile(dossier112, ['masque112' extension112{1}]);
+    save_system('masque112', fichier112);
+    relu112 = load_system(fichier112);
+    assert(all(sim(relu112).yout == 100), [extension112{1} ' : le masque se relit et simule pareil']);
+end
+rmdir(dossier112, 's');
+m112.removeAllParameters();
+m112.Initialization = 'G = 7;';
+r112 = sim('masque112');
+assert(all(r112.yout == 7) && isempty(m112.Parameters), 'REMOVEALLPARAMETERS');
+m112.delete();
+assert(strcmp(get_param('masque112/s', 'Mask'), 'off') && isempty(Simulink.Mask.get('masque112/s')), ...
+       'DELETE demasque le bloc');
+
+% Les refus.
+new_system('refus112');
+add_block('built-in/Gain', 'refus112/g');
+add_block('simulink/Ports & Subsystems/Subsystem', 'refus112/s');
+mr112 = Simulink.Mask.create('refus112/s');
+mr112.addParameter('Name', 'K', 'Value', '1');
+pr112 = mr112.addParameter('Name', 'choix', 'Type', 'popup', 'TypeOptions', {'a', 'b'});
+cr112 = mr112.addParameter('Name', 'coche', 'Type', 'checkbox');
+refus112 = {
+    @() Simulink.Mask.create('refus112/g'), 'Simulink:Masking:CannotMaskBlock'
+    @() Simulink.Mask.create('refus112'), 'Simulink:Masking:CannotMaskBlockDiagram'
+    @() Simulink.Mask.create('refus112/s'), 'Simulink:Masking:MaskAlreadyExists'
+    @() mr112.addParameter('Name', 'K'), 'Simulink:Masking:DuplicateParameterName'
+    @() mr112.addParameter('Name', '1x'), 'Simulink:Masking:InvalidParameterName'
+    @() mr112.addParameter('Name', 'x', 'Type', 'curseur'), 'Simulink:Masking:InvalidParameterType'
+    @() mr112.addParameter('Name', 'x', 'Type', 'popup'), 'Simulink:Masking:MissingTypeOptions'
+    @() mr112.addParameter('Name', 'x', 'Couleur', 'rouge'), 'Simulink:Masking:InvalidArguments'
+    @() mr112.addParameter('Name'), 'Simulink:Masking:InvalidArguments'
+    @() mr112.addParameter('Name', 'x', 'Type', 'checkbox', 'Value', 'oui'), 'Simulink:Masks:InvalidCheckboxValue'
+    @() mr112.addParameter('Name', 'x', 'Type', 'popup', 'TypeOptions', {'a'}, 'Value', 'b'), ...
+        'Simulink:Masks:InvalidPopupValue'
+    @() mr112.removeParameter('absent'), 'Simulink:Masking:ParameterNotFound'
+    @() set_param('refus112/s', 'choix', 'c'), 'Simulink:Masks:InvalidPopupValue'
+    @() set_param('refus112/s', 'coche', 'peutetre'), 'Simulink:Masks:InvalidCheckboxValue'
+    };
+for k = 1:size(refus112, 1)
+    vu112 = '';
+    try
+        refus112{k, 1}();
+    catch err
+        vu112 = err.identifier;
+    end
+    assert(strcmp(vu112, refus112{k, 2}), sprintf('refus %d : %s attendu, %s rendu', k, ...
+                                                  refus112{k, 2}, vu112));
+end
+proprietes112 = {pr112, 'Evaluate', 'parfois', 'Simulink:Masking:InvalidPropertyValue'
+                 pr112, 'Type', 'curseur', 'Simulink:Masking:InvalidParameterType'
+                 pr112, 'TypeOptions', {}, 'Simulink:Masking:InvalidPropertyValue'
+                 mr112, 'SelfModifiable', 'peutetre', 'Simulink:Masking:InvalidPropertyValue'
+                 mr112, 'Type', 3, 'Simulink:Masking:InvalidPropertyValue'};
+for k = 1:size(proprietes112, 1)
+    vu112 = '';
+    objet112 = proprietes112{k, 1};
+    try
+        objet112.(proprietes112{k, 2}) = proprietes112{k, 3};
+    catch err
+        vu112 = err.identifier;
+    end
+    assert(strcmp(vu112, proprietes112{k, 4}), sprintf('propriete %d : %s attendu, %s rendu', ...
+                                                       k, proprietes112{k, 4}, vu112));
+end
+add_block('built-in/Constant', 'refus112/c');
+add_line('refus112', 'c/1', 's/1');
+mr112.Initialization = 'error(''non'')';
+vu112 = '';
+try
+    sim('refus112');
+catch err
+    vu112 = err;
+end
+assert(strcmp(vu112.identifier, 'Simulink:Masks:InitializationError') && ...
+       ~isempty(strfind(vu112.message, 'refus112/s')), ...
+       'une initialisation en erreur se nomme, avec son bloc');
+bdclose('all');
+
+% Batterie : chaque genre de paramètre — champ, case, menu, bouton radio,
+% liste — évalué ou non, pour chacune de ses valeurs : la variable du
+% masque, et le gain du dedans quand elle est un nombre.
+cas112 = {
+    'edit', {}, {'2', '0.5', '-3', '[1 2]'}
+    'checkbox', {}, {'on', 'off'}
+    'popup', {'a', 'b', 'c'}, {'a', 'b', 'c'}
+    'radiobutton', {'x', 'y'}, {'x', 'y'}
+    'combobox', {'1', '4'}, {'1', '4'}
+    };
+nCas112 = 0;
+for kC = 1:size(cas112, 1)
+    [genre112, choix112, valeurs112] = cas112{kC, :};
+    for evaluer112 = {'on', 'off'}
+        for kV = 1:numel(valeurs112)
+            new_system('bat112');
+            add_block('built-in/Constant', 'bat112/c', 'Value', '1');
+            add_block('simulink/Ports & Subsystems/Subsystem', 'bat112/s');
+            add_block('built-in/Outport', 'bat112/y');
+            add_line('bat112', 'c/1', 's/1');
+            add_line('bat112', 's/1', 'y/1');
+            mb112 = Simulink.Mask.create('bat112/s');
+            mb112.addParameter('Name', 'P', 'Type', genre112, 'TypeOptions', choix112, ...
+                               'Evaluate', evaluer112{1}, 'Value', valeurs112{kV});
+            ws112 = mb112.getWorkspaceVariables();
+            lu112 = ws112(1).Value;
+            switch genre112
+                case 'checkbox'
+                    attendu112 = double(strcmp(valeurs112{kV}, 'on'));
+                case {'popup', 'radiobutton'}
+                    attendu112 = find(strcmp(choix112, valeurs112{kV}));
+                otherwise
+                    attendu112 = str2num(valeurs112{kV}); %#ok<ST2NM>
+            end
+            if strcmp(evaluer112{1}, 'off')
+                attendu112 = valeurs112{kV};
+            end
+            contexte112 = sprintf('%s, evalue %s, %s', genre112, evaluer112{1}, valeurs112{kV});
+            assert(isequal(lu112, attendu112), [contexte112 ' : la variable du masque']);
+            if isnumeric(attendu112)
+                delete_line('bat112/s', 'In1/1', 'Out1/1');
+                add_block('built-in/Gain', 'bat112/s/g', 'Gain', 'P');
+                add_line('bat112/s', 'In1/1', 'g/1');
+                add_line('bat112/s', 'g/1', 'Out1/1');
+                set_param('bat112', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', 'StopTime', '0');
+                rb112 = sim('bat112');
+                assert(isequal(rb112.yout(1, :), attendu112(:).'), [contexte112 ' : le gain du dedans']);
+            end
+            bdclose('bat112');
+            nCas112 = nCas112 + 1;
+        end
+    end
+end
+fprintf('API des masques : %d cas croises\n', nCas112);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

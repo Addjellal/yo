@@ -307,41 +307,65 @@ function P = parametresP(noeud)
     end
 end
 
-% Le masque d'un bloc : chaque MaskParameter porte son nom, son libellé et
-% sa valeur. Ils deviennent les réglages Mask, MaskVariables,
-% MaskValueString et MaskPrompts, ceux que MatLibre lit.
+% Le masque d'un bloc : son type, sa description, son code
+% d'initialisation, et chaque MaskParameter — son nom, son genre, s'il
+% s'évalue, son libellé, sa valeur, ses choix, son rappel. Ils deviennent
+% les réglages Mask, MaskVariables, MaskValueString, MaskPrompts,
+% MaskStyles... que MatLibre lit.
 function P = parametresMasque(masque)
     P = struct();
-    noms = {};
-    valeurs = {};
-    libelles = {};
+    S = struct('Name', {}, 'Prompt', {}, 'Type', {}, 'TypeOptions', {}, 'Value', {}, ...
+               'Evaluate', {}, 'Tunable', {}, 'Visible', {}, 'Enabled', {}, 'Callback', {});
+    reglages = {'Type', 'MaskType'; 'Description', 'MaskDescription'; 'Help', 'MaskHelp'; ...
+                'Initialization', 'MaskInitialization'; 'Display', 'MaskDisplay'; ...
+                'SelfModifiable', 'MaskSelfModifiable'};
     for k = 1:numel(masque.Children)
         e = masque.Children{k};
+        j = find(strcmp(reglages(:, 1), e.Name), 1);
+        if ~isempty(j)
+            P.(reglages{j, 2}) = e.Text;
+            continue
+        end
         if ~strcmp(e.Name, 'MaskParameter') || ~isfield(e.Attributes, 'Name')
             continue
         end
-        valeur = enfant(e, 'Value');
-        libelle = enfant(e, 'Prompt');
-        noms{end + 1} = e.Attributes.Name; %#ok<AGROW>
-        if isempty(valeur)
-            valeurs{end + 1} = ''; %#ok<AGROW>
-        else
-            valeurs{end + 1} = valeur.Text; %#ok<AGROW>
+        p = struct('Name', e.Attributes.Name, 'Prompt', e.Attributes.Name, ...
+                   'Type', attribut(e, 'Type', 'edit'), 'TypeOptions', {{}}, 'Value', '', ...
+                   'Evaluate', attribut(e, 'Evaluate', 'on'), ...
+                   'Tunable', attribut(e, 'Tunable', 'on'), ...
+                   'Visible', attribut(e, 'Visible', 'on'), ...
+                   'Enabled', attribut(e, 'Enabled', 'on'), 'Callback', '');
+        champs = {'Value', 'Value'; 'Prompt', 'Prompt'; 'Callback', 'Callback'};
+        for c = 1:size(champs, 1)
+            f = enfant(e, champs{c, 1});
+            if ~isempty(f)
+                p.(champs{c, 2}) = f.Text;
+            end
         end
-        if isempty(libelle)
-            libelles{end + 1} = e.Attributes.Name; %#ok<AGROW>
-        else
-            libelles{end + 1} = libelle.Text; %#ok<AGROW>
+        options = enfant(e, 'TypeOptions');
+        if ~isempty(options)
+            for o = 1:numel(options.Children)
+                if strcmp(options.Children{o}.Name, 'Option')
+                    p.TypeOptions{end + 1} = options.Children{o}.Text;
+                end
+            end
         end
+        S(end + 1) = p; %#ok<AGROW>
     end
-    if isempty(noms)
+    if isempty(S) && isempty(fieldnames(P))
         return
     end
-    P.Mask = 'on';
-    P.MaskVariables = strjoin(arrayfun(@(k) sprintf('%s=@%d;', noms{k}, k), ...
-                                       1:numel(noms), 'UniformOutput', false), '');
-    P.MaskValueString = strjoin(valeurs, '|');
-    P.MaskPrompts = libelles;
+    b = matlibre_sl_masque('ecrire', struct('nom', '', 'parametres', struct()), S);
+    for nom = fieldnames(b.parametres).'
+        P.(nom{1}) = b.parametres.(nom{1});
+    end
+end
+
+function v = attribut(e, nom, defaut)
+    v = defaut;
+    if isfield(e.Attributes, nom)
+        v = e.Attributes.(nom);
+    end
 end
 
 function defauts = defautsXml(noeud)
@@ -1039,11 +1063,10 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
             lignes{end + 1} = sprintf('%s    <P Name="IsBusElementPort">on</P>', marge); %#ok<AGROW>
         end
         champs = fieldnames(b.parametres);
-        variablesMasque = matlibre_sl_masque('variables', b);
+        masque = matlibre_sl_masque('estmasque', b) && strcmp(entree.type, 'subsystem');
         for j = 1:numel(champs)
             valeur = b.parametres.(champs{j});
-            if strcmp(champs{j}, 'Model') || ...
-               (~isempty(variablesMasque) && strncmp(champs{j}, 'Mask', 4))
+            if strcmp(champs{j}, 'Model') || (masque && strncmp(champs{j}, 'Mask', 4))
                 continue   % le masque s'écrit à part, comme Simulink le range
             end
             if strcmp(champs{j}, 'Position')
@@ -1060,21 +1083,8 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
             lignes{end + 1} = sprintf('%s    <P Name="%s">%s</P>', marge, champs{j}, ...
                                       matlibre_xml_echapper(texte)); %#ok<AGROW>
         end
-        if ~isempty(variablesMasque)
-            libelles = variablesMasque;
-            if isfield(b.parametres, 'MaskPrompts') && iscell(b.parametres.MaskPrompts) && ...
-               numel(b.parametres.MaskPrompts) == numel(variablesMasque)
-                libelles = b.parametres.MaskPrompts;
-            end
-            lignes{end + 1} = [marge '    <Mask>']; %#ok<AGROW>
-            for j = 1:numel(variablesMasque)
-                lignes{end + 1} = sprintf(['%s      <MaskParameter Name="%s" Type="edit">' ...
-                    '<Prompt>%s</Prompt><Value>%s</Value></MaskParameter>'], marge, ...
-                    variablesMasque{j}, matlibre_xml_echapper(char(libelles{j})), ...
-                    matlibre_xml_echapper(matlibre_sl_masque('lire', b, ...
-                                                             variablesMasque{j}))); %#ok<AGROW>
-            end
-            lignes{end + 1} = [marge '    </Mask>']; %#ok<AGROW>
+        if matlibre_sl_masque('estmasque', b) && strcmp(entree.type, 'subsystem')
+            lignes = ecrireMasque(b, lignes, marge);
         end
         if isfield(b, 'signaux')
             % Les signaux qui partent du bloc, comme Simulink les range :
@@ -1326,4 +1336,41 @@ function ecrireTexte(chemin, texte)
     end
     fprintf(f, '%s', texte);
     fclose(f);
+end
+
+% Le masque d'un sous-système, comme Simulink le range : ses réglages,
+% puis un MaskParameter par paramètre.
+function lignes = ecrireMasque(b, lignes, marge)
+    lignes{end + 1} = [marge '    <Mask>'];
+    reglages = {'MaskType', 'Type'; 'MaskDescription', 'Description'; 'MaskHelp', 'Help'; ...
+                'MaskInitialization', 'Initialization'; 'MaskDisplay', 'Display'; ...
+                'MaskSelfModifiable', 'SelfModifiable'};
+    for j = 1:size(reglages, 1)
+        if isfield(b.parametres, reglages{j, 1}) && ~isempty(b.parametres.(reglages{j, 1}))
+            lignes{end + 1} = sprintf('%s      <%s>%s</%s>', marge, reglages{j, 2}, ...
+                                      matlibre_xml_echapper(char(b.parametres.(reglages{j, 1}))), ...
+                                      reglages{j, 2}); %#ok<AGROW>
+        end
+    end
+    S = matlibre_sl_masque('parametres', b);
+    for j = 1:numel(S)
+        p = S(j);
+        options = '';
+        if ~isempty(p.TypeOptions)
+            options = ['<TypeOptions>' strjoin(cellfun(@(o) ['<Option>' ...
+                       matlibre_xml_echapper(o) '</Option>'], p.TypeOptions, ...
+                       'UniformOutput', false), '') '</TypeOptions>'];
+        end
+        rappel = '';
+        if ~isempty(p.Callback)
+            rappel = ['<Callback>' matlibre_xml_echapper(p.Callback) '</Callback>'];
+        end
+        lignes{end + 1} = sprintf(['%s      <MaskParameter Name="%s" Type="%s" Evaluate="%s" ' ...
+                                   'Tunable="%s" Visible="%s" Enabled="%s"><Prompt>%s</Prompt>' ...
+                                   '<Value>%s</Value>%s%s</MaskParameter>'], marge, p.Name, ...
+                                  p.Type, p.Evaluate, p.Tunable, p.Visible, p.Enabled, ...
+                                  matlibre_xml_echapper(p.Prompt), ...
+                                  matlibre_xml_echapper(p.Value), options, rappel); %#ok<AGROW>
+    end
+    lignes{end + 1} = [marge '    </Mask>'];
 end

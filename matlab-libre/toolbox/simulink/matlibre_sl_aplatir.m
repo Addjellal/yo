@@ -114,7 +114,7 @@ function iterateur = sousSystemeItere(bloc, interne, iterateurs, g, chemin)
     if isfield(bloc, 'espace')
         espace = bloc.espace;
     end
-    if ~isempty(matlibre_sl_masque('variables', bloc))
+    if matlibre_sl_masque('ouvreespace', bloc)
         espace = matlibre_sl_masque('espace', bloc, espace, chemin);
     end
     if ~isempty(fieldnames(espace))
@@ -686,7 +686,7 @@ function modele = deplier(modele, k)
         espaceParent = bloc.espace;
     end
     espaceInterieur = espaceParent;
-    if ~isempty(matlibre_sl_masque('variables', bloc))
+    if matlibre_sl_masque('ouvreespace', bloc)
         espaceInterieur = matlibre_sl_masque('espace', bloc, espaceParent, chemin);
     end
     if strcmp(bloc.type, 'modelreference')
