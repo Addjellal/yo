@@ -9,7 +9,18 @@ function varargout = matlibre_sl_espace(action, varargin)
 %   [NOMS,VALEURS] = MATLIBRE_SL_ESPACE('variables',CHEMIN) rend les
 %   variables de l'espace du modèle dont CHEMIN — « modele/bloc » — est
 %   un bloc : ce que les paramètres de ses blocs lisent avant l'espace de
-%   travail de base.
+%   travail de base. Viennent ensuite celles de la section 'Design Data'
+%   du dictionnaire de données du modèle (DataDictionary), qui ne
+%   remplacent pas une variable de même nom de l'espace du modèle.
+%   [NOMS,VALEURS,DICO] = MATLIBRE_SL_ESPACE('variables',CHEMIN) dit en
+%   plus lesquelles viennent du dictionnaire.
+%
+%   OUI = MATLIBRE_SL_ESPACE('base',CHEMIN) dit si les blocs du modèle
+%   lisent l'espace de travail de base : non quand le modèle a un
+%   dictionnaire et EnableAccessToBaseWorkspace à 'off'.
+%   MATLIBRE_SL_ESPACE('lier',NOM,DICTIONNAIRE,ACCES), que fait la
+%   compilation, retient ces deux réglages pour un modèle qui n'est pas
+%   chargé ; ceux d'un modèle chargé se lisent sur lui.
 %
 %   D = MATLIBRE_SL_ESPACE('executer',D,CODE,NOM) exécute CODE dans un
 %   espace où les champs de la structure D sont des variables, et rend
@@ -24,9 +35,12 @@ function varargout = matlibre_sl_espace(action, varargin)
 %      matlibre_sl_espace('oublier', 'essaiEspace');
 %
 %   Voir aussi SIMULINK.MODELWORKSPACE, GET_PARAM.
-    persistent espaces
+    persistent espaces liens
     if isempty(espaces)
         espaces = containers.Map('KeyType', 'char', 'ValueType', 'any');
+        % le dictionnaire de chaque modèle compilé, et l'accès à l'espace
+        % de base : ce que vaut un modèle simulé sans être chargé
+        liens = containers.Map('KeyType', 'char', 'ValueType', 'any');
     end
     switch action
         case 'lire'
@@ -56,11 +70,69 @@ function varargout = matlibre_sl_espace(action, varargin)
                 noms = fieldnames(donnees).';
                 valeurs = cellfun(@(n) donnees.(n), noms, 'UniformOutput', false);
             end
-            varargout = {noms, valeurs};
+            dico = false(size(noms));
+            dictionnaire = lien(liens, nom);
+            if ~isempty(dictionnaire)
+                [nomsD, valeursD] = matlibre_sl_dictionnaire('variables', dictionnaire);
+                garder = ~ismember(nomsD, noms);
+                noms = [noms, nomsD(garder)];
+                valeurs = [valeurs, valeursD(garder)];
+                dico = [dico, true(1, nnz(garder))];
+            end
+            varargout = {noms, valeurs, dico};
+        case 'base'
+            chemin = char(varargin{1});
+            barre = find(chemin == '/', 1);
+            nom = chemin;
+            if ~isempty(barre)
+                nom = chemin(1:barre - 1);
+            end
+            [dictionnaire, acces] = lien(liens, nom);
+            varargout{1} = isempty(dictionnaire) || ~strcmpi(acces, 'off');
+        case 'lier'
+            [nom, dictionnaire, acces] = varargin{1:3};
+            nom = char(nom);
+            dictionnaire = char(dictionnaire);
+            if isempty(dictionnaire)
+                if isKey(liens, nom)
+                    remove(liens, nom);
+                end
+                return
+            end
+            try
+                matlibre_sl_dictionnaire('variables', dictionnaire);
+            catch err
+                error('SLDD:sldd:DictionaryNotFound', ...
+                      ['Le modele ''%s'' a pour dictionnaire de donnees ''%s'' ' ...
+                       '(DataDictionary) : %s'], nom, dictionnaire, err.message);
+            end
+            liens(nom) = struct('dictionnaire', dictionnaire, 'acces', char(acces));
         case 'executer'
             varargout{1} = executer(varargin{:});
         otherwise
             error('Simulink:Data:Action', 'Action inconnue : %s.', char(action));
+    end
+end
+
+% Le dictionnaire d'un modèle et son accès à l'espace de base : ceux du
+% modèle chargé, sinon ceux de sa dernière compilation.
+function [dictionnaire, acces] = lien(liens, nom)
+    dictionnaire = '';
+    acces = 'on';
+    if matlibre_sl_ouverts('connu', nom)
+        t = matlibre_sl_ouverts('lire', nom);
+        if isfield(t, 'parametres') && isstruct(t.parametres)
+            if isfield(t.parametres, 'DataDictionary')
+                dictionnaire = char(t.parametres.DataDictionary);
+            end
+            if isfield(t.parametres, 'EnableAccessToBaseWorkspace')
+                acces = char(t.parametres.EnableAccessToBaseWorkspace);
+            end
+        end
+    elseif isKey(liens, nom)
+        l = liens(nom);
+        dictionnaire = l.dictionnaire;
+        acces = l.acces;
     end
 end
 

@@ -2132,8 +2132,17 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     args = evaluerListe(n->acces[segments].args);
                     debut = segments + 1;
                 }
+                // Comme pour une fonction au nom simple, l'appel en
+                // instruction ne demande aucune sortie : « paquet.f(...) »
+                // y voit nargout valoir 0.
                 courant = appeler(compose, args,
-                                  debut < n->acces.size() ? 1 : std::max(nargout, 1));
+                                  debut < n->acces.size() ? 1 : (nargout < 0 ? 1 : nargout));
+                if (courant.empty()) {
+                    if (multi) { multi->clear(); return Valeur::vide(); }
+                    erreur("MATLAB:maxlhs",
+                           "Too many output arguments: function '" + compose +
+                               "' returned nothing.");
+                }
             }
         } else if (!n->acces.empty() && n->acces[0].genre == '.' &&
                    n->acces[0].nom == "empty" && classeVide(nom) &&
@@ -2336,6 +2345,18 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     bool tableau = nb > 1 && !estCarte(base) && base.st &&
                                    base.st->champs.count(nom) &&
                                    base.st->champs.at(nom).size() == nb;
+                    if (!tableau && nb > 1 && !estCarte(base) && base.st &&
+                        !base.st->champs.empty() &&
+                        base.st->champs.begin()->second.size() == nb) {
+                        // Une propriété dépendante n'a pas de champ : son
+                        // accesseur get se lit élément par élément, quand
+                        // les éléments sont rangés un à un.
+                        auto defT = classeDe(base);
+                        tableau = defT && (std::find(defT->dependantes.begin(),
+                                                     defT->dependantes.end(),
+                                                     nom) != defT->dependantes.end() ||
+                                           defT->aMethode("get." + nom));
+                    }
                     if (!tableau) {
                         suivant.push_back(lireProprieteObjet(base, nom));
                     } else {

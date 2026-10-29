@@ -94,6 +94,10 @@ function c = compiler(modele, options)
     end
 
     nomModele = char(modele.nom);
+    % le dictionnaire de données du modèle : ses variables valent pour les
+    % paramètres des blocs, ouvert dès maintenant
+    matlibre_sl_espace('lier', nomModele, champ(config, 'DataDictionary', ''), ...
+                       champ(config, 'EnableAccessToBaseWorkspace', 'on'));
     modele = matlibre_sl_aplatir(modele);
     modele = memoiresGlobales(modele);
     modele = variantesDeSignal(modele, nomModele);

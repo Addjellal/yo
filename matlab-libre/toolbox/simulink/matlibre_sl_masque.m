@@ -263,13 +263,24 @@ function matlibre__v = evaluerBrut(matlibre__texte, matlibre__W, matlibre__chemi
     if isfield(matlibre__W, 'matlibre__modele')
         matlibre__source = matlibre__W.matlibre__modele;
     end
-    [matlibre__nomsM, matlibre__valeursM] = matlibre_sl_espace('variables', matlibre__source);
+    [matlibre__nomsM, matlibre__valeursM, matlibre__dico] = ...
+        matlibre_sl_espace('variables', matlibre__source);
+    matlibre__base = matlibre_sl_espace('base', matlibre__source);
     for matlibre__k = 1:numel(matlibre__ids)
         matlibre__id = matlibre__ids{matlibre__k};
         if any(strcmp(matlibre__noms, matlibre__id)) || strncmp(matlibre__id, 'matlibre__', 10)
             continue
         end
         matlibre__j = find(strcmp(matlibre__nomsM, matlibre__id), 1);
+        if ~isempty(matlibre__j) && matlibre__dico(matlibre__j) && matlibre__base && ...
+           evalin('base', sprintf('exist(''%s'', ''var'')', matlibre__id)) == 1
+            error('Simulink:Data:DuplicateDefinition', ...
+                  ['La variable ''%s'', que lit le parametre ''%s'' du bloc ''%s'', est definie ' ...
+                   'a la fois dans le dictionnaire de donnees du modele et dans l''espace de ' ...
+                   'travail de base : retirez-la de l''un des deux, ou posez ' ...
+                   'EnableAccessToBaseWorkspace a ''off''.'], matlibre__id, matlibre__nom, ...
+                  matlibre__chemin);
+        end
         if ~isempty(matlibre__j)
             matlibre__x = matlibre__valeursM{matlibre__j};
             if isa(matlibre__x, 'Simulink.Parameter')
@@ -277,7 +288,7 @@ function matlibre__v = evaluerBrut(matlibre__texte, matlibre__W, matlibre__chemi
                                                     matlibre__chemin, matlibre__nom);
             end
             eval([matlibre__id ' = matlibre__x;']);
-        elseif evalin('base', sprintf('exist(''%s'', ''var'')', matlibre__id)) == 1
+        elseif matlibre__base && evalin('base', sprintf('exist(''%s'', ''var'')', matlibre__id)) == 1
             matlibre__x = evalin('base', matlibre__id);
             % un Simulink.Parameter y vaut sa valeur, comme hors masque
             if isa(matlibre__x, 'Simulink.Parameter')
@@ -290,6 +301,14 @@ function matlibre__v = evaluerBrut(matlibre__texte, matlibre__W, matlibre__chemi
     try
         matlibre__v = eval(matlibre__texte);
     catch matlibre__err
+        if ~matlibre__base
+            error('Simulink:Data:BaseWorkspaceAccessDisabled', ...
+                  ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'', et cette expression ne ' ...
+                   's''evalue ni dans l''espace du masque, ni dans celui du modele, ni dans son ' ...
+                   'dictionnaire de donnees ; l''espace de travail de base lui est ferme ' ...
+                   '(EnableAccessToBaseWorkspace vaut ''off'') : %s'], matlibre__nom, ...
+                  matlibre__chemin, matlibre__texte, matlibre__err.message);
+        end
         error('Simulink:Commands:ParametreNonEvalue', ...
               ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'', et cette expression ne ' ...
                's''evalue ni dans l''espace du masque ni dans l''espace de travail : %s'], ...

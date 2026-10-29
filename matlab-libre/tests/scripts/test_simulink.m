@@ -14775,6 +14775,400 @@ for kC = 1:size(cas112, 1)
 end
 fprintf('API des masques : %d cas croises\n', nCas112);
 
+%% --------------------------------------------- 113. Les dictionnaires de données
+% Un dictionnaire de données (.sldd) range les variables d'un modèle hors
+% de l'espace de travail de base, par sections, et en référence d'autres.
+% Le modèle le désigne par DataDictionary ; EnableAccessToBaseWorkspace à
+% 'off' ferme l'espace de base à ses blocs.
+bdclose('all');
+Simulink.data.dictionary.closeAll('-discard');
+dossier113 = tempname();
+mkdir(dossier113);
+haut113 = fullfile(dossier113, 'haut113.sldd');
+ref113 = fullfile(dossier113, 'ref113.sldd');
+dd113 = Simulink.data.dictionary.create(haut113);
+assert(isa(dd113, 'Simulink.data.Dictionary') && strcmp(dd113.Filepath, haut113) && ...
+       dd113.NumberOfEntries == 0 && ~dd113.HasUnsavedChanges && isempty(dd113.DataSources) && ...
+       exist(haut113, 'file') == 2, 'CREATE : un dictionnaire vide, ecrit');
+s113 = getSection(dd113, 'Design Data');
+e113 = addEntry(s113, 'K', 2);
+assert(isa(e113, 'Simulink.data.dictionary.Entry') && strcmp(e113.Name, 'K') && ...
+       e113.Value == 2 && strcmp(e113.Status, 'New') && strcmp(e113.DataSource, 'haut113.sldd') && ...
+       ~isempty(e113.LastModified) && dd113.HasUnsavedChanges && dd113.NumberOfEntries == 1, ...
+       'ADDENTRY : une entree neuve, non ecrite');
+saveChanges(dd113);
+assert(~dd113.HasUnsavedChanges && strcmp(e113.Status, 'Unchanged'), 'SAVECHANGES ecrit');
+setValue(e113, 5);
+assert(e113.Value == 5 && strcmp(e113.Status, 'Modified') && dd113.HasUnsavedChanges, ...
+       'SETVALUE change la valeur, non ecrite');
+discardChanges(e113);
+assert(e113.Value == 2 && strcmp(e113.Status, 'Unchanged'), ...
+       'DISCARDCHANGES d''une entree lui rend sa valeur ecrite');
+e113.Value = 3;
+assert(getValue(getEntry(s113, 'K')) == 3, 'E.VALUE se pose comme SETVALUE');
+discardChanges(dd113);
+assert(getValue(e113) == 2 && ~dd113.HasUnsavedChanges, 'DISCARDCHANGES du dictionnaire');
+% EVALIN, ASSIGNIN, EXIST, FIND
+assert(evalin(s113, 'K * 10') == 20, 'EVALIN rend la valeur d''une expression');
+evalin(s113, 'L = K + 1;');
+assignin(s113, 'M', [1 2 3]);
+assert(exist(s113, 'L') && getValue(getEntry(s113, 'L')) == 3 && ...
+       isequal(getValue(getEntry(s113, 'M')), [1 2 3]) && ~exist(s113, 'absent'), ...
+       'EVALIN affecte, ASSIGNIN cree, EXIST le dit');
+f113 = find(s113, '-regexp', 'Name', '^[LM]$');
+assert(numel(f113) == 2 && isequal(sort({f113.Name}), {'L', 'M'}), 'FIND avec -regexp');
+f113 = find(s113, 'Name', 'K');
+assert(numel(f113) == 1 && f113(1).Value == 2, 'FIND par la valeur d''une propriete');
+f113 = find(s113, 'Status', 'New');
+assert(numel(f113) == 2, 'FIND par le statut : les entrees neuves');
+e113 = getEntry(s113, 'L');
+e113.Name = 'L2';
+assert(~exist(s113, 'L') && getValue(getEntry(s113, 'L2')) == 3, 'une entree se renomme');
+deleteEntry(s113, 'L2');
+deleteEntry(getEntry(s113, 'M'));
+assert(dd113.NumberOfEntries == 1, 'DELETEENTRY, par la section ou par l''entree');
+% Les configurations et les autres données
+cs113 = Simulink.ConfigSet;
+cs113.Name = 'Rapide113';
+addEntry(getSection(dd113, 'Configurations'), 'Rapide113', cs113);
+addEntry(getSection(dd113, 'Other Data'), 'note', 'texte libre');
+assert(dd113.NumberOfEntries == 3 && ...
+       isa(getValue(getEntry(getSection(dd113, 'Configurations'), 'Rapide113')), ...
+           'Simulink.ConfigSet'), 'les trois sections');
+saveChanges(dd113);
+
+% La hiérarchie : un dictionnaire en référence un autre, dont il voit les
+% entrées ; une entrée de la référence se change dans la référence.
+dr113 = Simulink.data.dictionary.create(ref113);
+addEntry(getSection(dr113, 'Design Data'), 'R', 7);
+saveChanges(dr113);
+addDataSource(dd113, 'ref113.sldd');
+assert(isequal(dd113.DataSources, {'ref113.sldd'}) && dd113.NumberOfEntries == 4 && ...
+       exist(s113, 'R') && getValue(getEntry(s113, 'R')) == 7, ...
+       'ADDDATASOURCE : les entrees de la reference se voient');
+eR113 = getEntry(s113, 'R');
+assert(strcmp(eR113.DataSource, 'ref113.sldd'), 'DATASOURCE nomme le dictionnaire qui la definit');
+setValue(eR113, 8);
+assert(dr113.HasUnsavedChanges && dd113.HasUnsavedChanges && ...
+       getValue(getEntry(getSection(dr113, 'Design Data'), 'R')) == 8, ...
+       'une entree de la reference se change dans la reference');
+saveChanges(dd113);
+assert(~dr113.HasUnsavedChanges, 'SAVECHANGES ecrit aussi les references');
+
+% Le modèle lié : ses blocs lisent le dictionnaire, ses références, et
+% l'espace de base quand il leur est ouvert.
+new_system('dico113');
+add_block('built-in/Constant', 'dico113/c', 'Value', 'K + R');
+add_block('built-in/Outport', 'dico113/y');
+add_line('dico113', 'c/1', 'y/1');
+set_param('dico113', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', 'StopTime', '1', ...
+          'DataDictionary', haut113);
+assert(strcmp(get_param('dico113', 'DataDictionary'), haut113) && ...
+       strcmp(get_param('dico113', 'EnableAccessToBaseWorkspace'), 'on'), ...
+       'DATADICTIONARY et ENABLEACCESSTOBASEWORKSPACE se lisent');
+r113 = sim('dico113');
+assert(all(r113.yout == 10), 'le modele lit K et R dans le dictionnaire et sa reference');
+setValue(getEntry(s113, 'K'), 12);
+r113 = sim('dico113');
+assert(all(r113.yout == 20), 'un changement non ecrit vaut aussitot pour le modele');
+% un Simulink.Parameter du dictionnaire vaut sa valeur, dans son type
+p113 = Simulink.Parameter;
+p113.Value = 2.7;
+p113.DataType = 'int8';
+etat113 = warning('off', 'Simulink:Data:ParameterPrecisionLoss');
+assignin(s113, 'P113', p113);
+add_block('built-in/Gain', 'dico113/g', 'Gain', 'P113');
+add_block('built-in/Constant', 'dico113/un', 'Value', '1');
+add_block('built-in/Outport', 'dico113/y2');
+add_line('dico113', 'un/1', 'g/1');
+add_line('dico113', 'g/1', 'y2/1');
+r113 = sim('dico113');
+assert(all(r113.yout(:, 2) == 3), 'un Simulink.Parameter du dictionnaire, converti en int8');
+assert(Simulink.data.existsInGlobal('dico113', 'R') && ...
+       ~Simulink.data.existsInGlobal('dico113', 'absent113') && ...
+       Simulink.data.evalinGlobal('dico113', 'K + R') == 20, ...
+       'EXISTSINGLOBAL et EVALINGLOBAL voient le dictionnaire et ses references');
+Simulink.data.assigninGlobal('dico113', 'R', 1);
+assert(getValue(getEntry(getSection(dr113, 'Design Data'), 'R')) == 1, ...
+       'ASSIGNINGLOBAL change la variable la ou elle est definie');
+Simulink.data.evalinGlobal('dico113', 'K = 4;');
+r113 = sim('dico113');
+assert(all(r113.yout(:, 1) == 5), 'EVALINGLOBAL affecte dans le dictionnaire');
+% l'espace du modèle passe avant le dictionnaire
+hws113 = get_param('dico113', 'ModelWorkspace');
+assignin(hws113, 'K', 100);
+r113 = sim('dico113');
+assert(all(r113.yout(:, 1) == 101), 'l''espace du modele passe avant le dictionnaire');
+clear(hws113, 'K');
+% le modèle s'enregistre avec son dictionnaire
+fichier113 = fullfile(dossier113, 'dico113.slx');
+save_system('dico113', fichier113);
+bdclose('dico113');
+load_system(fichier113);
+assert(strcmp(get_param('dico113', 'DataDictionary'), haut113), ...
+       'DATADICTIONARY s''enregistre avec le modele');
+r113 = sim('dico113');
+assert(all(r113.yout(:, 1) == 5), 'le modele recharge lit encore son dictionnaire');
+
+% Les conflits : une variable du dictionnaire que l'espace de base porte
+% aussi est ambiguë ; l'espace de base fermé, elle ne l'est plus.
+assignin('base', 'K', 1000);
+vu113 = '';
+try
+    sim('dico113');
+catch err
+    vu113 = err;
+end
+assert(isa(vu113, 'MException') && strcmp(vu113.identifier, 'Simulink:Data:DuplicateDefinition') && ...
+       ~isempty(strfind(vu113.message, '''K''')) && ~isempty(strfind(vu113.message, 'dico113/c')), ...
+       'une variable definie deux fois se nomme, avec son bloc');
+set_param('dico113', 'EnableAccessToBaseWorkspace', 'off');
+r113 = sim('dico113');
+assert(all(r113.yout(:, 1) == 5), 'l''espace de base ferme : le dictionnaire seul');
+evalin('base', 'clear K');
+set_param('dico113', 'EnableAccessToBaseWorkspace', 'on');
+% IMPORTFROMBASEWORKSPACE
+assignin('base', 'imp113a', 1);
+assignin('base', 'imp113b', 2);
+assignin('base', 'K', -1);
+[ok113, ko113] = importFromBaseWorkspace(dd113, 'varList', {'imp113a', 'imp113b', 'K', 'nul113'});
+assert(isequal(ok113, {'imp113a'; 'imp113b'}) && numel(ko113) == 2 && ...
+       isequal({ko113.name}, {'K', 'nul113'}) && getValue(getEntry(s113, 'K')) == 4, ...
+       'IMPORTFROMBASEWORKSPACE : K existe deja et se garde, nul113 n''existe pas');
+importFromBaseWorkspace(dd113, 'varList', {'K'}, 'existingVarsAction', 'overwrite', ...
+                        'clearWorkspaceVars', true);
+assert(getValue(getEntry(s113, 'K')) == -1 && evalin('base', 'exist(''K'', ''var'')') == 0, ...
+       'existingVarsAction overwrite, clearWorkspaceVars');
+evalin('base', 'clear imp113a imp113b');
+% EXPORTTOFILE et IMPORTFROMFILE
+mat113 = fullfile(dossier113, 'export113.mat');
+exportToFile(s113, mat113);
+contenu113 = load(mat113);
+assert(isfield(contenu113, 'K') && isfield(contenu113, 'R') && contenu113.K == -1, ...
+       'EXPORTTOFILE ecrit les entrees, celles des references comprises');
+deleteEntry(s113, 'imp113a');
+importFromFile(s113, mat113);
+assert(exist(s113, 'imp113a') && getValue(getEntry(s113, 'K')) == -1, 'IMPORTFROMFILE');
+% Le dictionnaire se ferme, se rouvre, garde ce qu'on a écrit.
+close(dd113, '-save');
+assert(~any(strcmp(Simulink.data.dictionary.getOpenDictionaryPaths, haut113)), ...
+       'CLOSE le retire des dictionnaires ouverts');
+dd113 = Simulink.data.dictionary.open(haut113);
+s113 = getSection(dd113, 'Design Data');
+assert(getValue(getEntry(s113, 'K')) == -1 && isequal(dd113.DataSources, {'ref113.sldd'}) && ...
+       numel(Simulink.data.dictionary.getOpenDictionaryPaths('haut113.sldd')) == 1, ...
+       'le dictionnaire rouvert : ses entrees et ses references');
+autre113 = Simulink.data.dictionary.open(haut113);
+setValue(getEntry(getSection(autre113, 'Design Data'), 'K'), 6);
+assert(getValue(getEntry(s113, 'K')) == 6, 'deux ouvertures rendent le meme dictionnaire');
+removeDataSource(dd113, 'ref113.sldd');
+assert(isempty(dd113.DataSources) && ~exist(s113, 'R'), 'REMOVEDATASOURCE');
+discardChanges(dd113);
+assert(isequal(dd113.DataSources, {'ref113.sldd'}) && getValue(getEntry(s113, 'K')) == -1, ...
+       'DISCARDCHANGES rend aussi les references');
+% le nom seul se cherche sur le chemin
+addpath(dossier113);
+set_param('dico113', 'DataDictionary', 'haut113.sldd');
+r113 = sim('dico113');
+assert(all(r113.yout(:, 1) == 0), 'un dictionnaire nomme sans dossier se cherche sur le chemin');
+rmpath(dossier113);
+set_param('dico113', 'DataDictionary', haut113);
+
+warning(etat113);
+
+% Les refus, comme les ferait Simulink : chacun avec son identifiant.
+faux113 = fullfile(dossier113, 'faux113.sldd');
+bidon113 = struct('a', 1); %#ok<NASGU>
+save(faux113, '-struct', 'bidon113');
+new_system('vide113');
+refus113 = {
+    @() Simulink.data.dictionary.create(haut113), 'SLDD:sldd:DictionaryAlreadyExists'
+    @() Simulink.data.dictionary.open(fullfile(dossier113, 'absent.sldd')), 'SLDD:sldd:DictionaryNotFound'
+    @() Simulink.data.dictionary.create(fullfile(dossier113, 'x.mat')), 'SLDD:sldd:InvalidFileName'
+    @() Simulink.data.dictionary.open(faux113), 'SLDD:sldd:InvalidDictionary'
+    @() getSection(dd113, 'Embedded Coder'), 'SLDD:sldd:InvalidSection'
+    @() addEntry(s113, 'K', 1), 'SLDD:sldd:DuplicateEntry'
+    @() addEntry(s113, '1K', 1), 'SLDD:sldd:InvalidEntryName'
+    @() getEntry(s113, 'absent'), 'SLDD:sldd:EntryNotFound'
+    @() deleteEntry(s113, 'absent'), 'SLDD:sldd:EntryNotFound'
+    @() addEntry(getSection(dd113, 'Configurations'), 'pasUnJeu', 3), 'SLDD:sldd:InvalidConfigurationEntry'
+    @() evalin(s113, 'K +* 2'), 'SLDD:sldd:EvalError'
+    @() find(s113, 'Couleur', 'rouge'), 'SLDD:sldd:InvalidArguments'
+    @() close(dd113, '-jamais'), 'SLDD:sldd:InvalidCloseOption'
+    @() addDataSource(dd113, haut113), 'SLDD:sldd:CircularReference'
+    @() addDataSource(dd113, 'absent113.sldd'), 'SLDD:sldd:DictionaryNotFound'
+    @() removeDataSource(dd113, 'inconnu113.sldd'), 'SLDD:sldd:DataSourceNotFound'
+    @() importFromBaseWorkspace(dd113, 'varList', {'K'}, 'existingVarsAction', 'peut-etre'), 'SLDD:sldd:InvalidArguments'
+    @() set_param('vide113', 'DataDictionary', fullfile(dossier113, 'absent.sldd')), 'SLDD:sldd:DictionaryNotFound'
+    @() set_param('vide113', 'DataDictionary', 'donnees.mat'), 'Simulink:Config:InvalidValue'
+    @() set_param('vide113', 'EnableAccessToBaseWorkspace', 'parfois'), 'Simulink:Config:InvalidValue'
+    @() Simulink.data.evalinGlobal('pasCharge113', 'K'), 'Simulink:Commands:InvalidModel'
+    @() Simulink.data.assigninGlobal('dico113', '2x', 1), 'Simulink:Data:InvalidVariableName'
+    };
+for k = 1:size(refus113, 1)
+    vu113 = '';
+    try
+        refus113{k, 1}();
+    catch err
+        vu113 = err.identifier;
+    end
+    assert(strcmp(vu113, refus113{k, 2}), sprintf('refus %d : %s attendu, %s rendu', k, ...
+                                                  refus113{k, 2}, vu113));
+end
+% un dictionnaire aux changements non écrits ne se ferme pas sans dire
+% ce qu'il en advient ; une fois fermé, il ne sert plus
+setValue(getEntry(s113, 'K'), 9);
+vu113 = '';
+try
+    close(dd113);
+catch err
+    vu113 = err.identifier;
+end
+assert(strcmp(vu113, 'SLDD:sldd:DictionaryNotSaved'), 'CLOSE refuse des changements non ecrits');
+vu113 = '';
+try
+    Simulink.data.dictionary.closeAll();
+catch err
+    vu113 = err.identifier;
+end
+assert(strcmp(vu113, 'SLDD:sldd:DictionaryNotSaved'), 'CLOSEALL aussi');
+close(dd113, '-discard');
+vu113 = '';
+try
+    getSection(dd113, 'Design Data');
+catch err
+    vu113 = err.identifier;
+end
+assert(strcmp(vu113, 'SLDD:sldd:DictionaryNotOpen'), 'un dictionnaire ferme ne rend plus de section');
+dd113 = Simulink.data.dictionary.open(haut113);
+assert(getValue(getEntry(getSection(dd113, 'Design Data'), 'K')) == -1, ...
+       'CLOSE -discard n''a rien ecrit');
+% le fichier du dictionnaire a disparu : le modèle ne se simule plus
+Simulink.data.dictionary.closeAll('-discard');
+movefile(haut113, [haut113 '.cache']);
+vu113 = '';
+try
+    sim('dico113');
+catch err
+    vu113 = err;
+end
+assert(isa(vu113, 'MException') && strcmp(vu113.identifier, 'SLDD:sldd:DictionaryNotFound') && ...
+       ~isempty(strfind(vu113.message, 'dico113')), ...
+       'un dictionnaire introuvable : la simulation le dit, avec le modele');
+movefile([haut113 '.cache'], haut113);
+bdclose('all');
+
+% Batterie : où vit la variable — espace du modèle, dictionnaire,
+% dictionnaire référencé, espace de base —, l'espace de base ouvert ou
+% fermé, et qui la lit — une constante, un gain, un sous-système masqué :
+% la valeur lue, ou l'erreur que Simulink donnerait.
+Simulink.data.dictionary.closeAll('-discard');
+dd113 = Simulink.data.dictionary.open(haut113);
+dr113 = Simulink.data.dictionary.open(ref113);
+lecteurs113 = {'constante', 'gain', 'masque'};
+nCas113 = 0;
+for modeleW = [false, true]
+    for ouDico = {'aucun', 'haut', 'ref'}
+        for enBase = [false, true]
+            for acces113 = {'on', 'off'}
+                for kL = 1:numel(lecteurs113)
+                    sh113 = getSection(dd113, 'Design Data');
+                    sr113 = getSection(dr113, 'Design Data');
+                    if exist(sh113, 'V113'), deleteEntry(sh113, 'V113'); end
+                    if exist(sr113, 'V113'), deleteEntry(sr113, 'V113'); end
+                    evalin('base', 'clear V113');
+                    new_system('bat113');
+                    set_param('bat113', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', ...
+                              'StopTime', '0', 'DataDictionary', haut113, ...
+                              'EnableAccessToBaseWorkspace', acces113{1});
+                    switch lecteurs113{kL}
+                        case 'constante'
+                            add_block('built-in/Constant', 'bat113/c', 'Value', 'V113');
+                            add_block('built-in/Outport', 'bat113/y');
+                            add_line('bat113', 'c/1', 'y/1');
+                            fautif113 = 'bat113/c';
+                        case 'gain'
+                            add_block('built-in/Constant', 'bat113/c', 'Value', '1');
+                            add_block('built-in/Gain', 'bat113/g', 'Gain', 'V113');
+                            add_block('built-in/Outport', 'bat113/y');
+                            add_line('bat113', 'c/1', 'g/1');
+                            add_line('bat113', 'g/1', 'y/1');
+                            fautif113 = 'bat113/g';
+                        case 'masque'
+                            add_block('built-in/Constant', 'bat113/c', 'Value', '1');
+                            add_block('simulink/Ports & Subsystems/Subsystem', 'bat113/s');
+                            delete_line('bat113/s', 'In1/1', 'Out1/1');
+                            add_block('built-in/Gain', 'bat113/s/g', 'Gain', 'P');
+                            add_line('bat113/s', 'In1/1', 'g/1');
+                            add_line('bat113/s', 'g/1', 'Out1/1');
+                            mk113 = Simulink.Mask.create('bat113/s');
+                            mk113.addParameter('Name', 'P', 'Value', 'V113');
+                            add_block('built-in/Outport', 'bat113/y');
+                            add_line('bat113', 'c/1', 's/1');
+                            add_line('bat113', 's/1', 'y/1');
+                            fautif113 = 'bat113/s';
+                    end
+                    if modeleW
+                        assignin(get_param('bat113', 'ModelWorkspace'), 'V113', 1);
+                    end
+                    switch ouDico{1}
+                        case 'haut'
+                            assignin(sh113, 'V113', 2);
+                        case 'ref'
+                            assignin(sr113, 'V113', 3);
+                    end
+                    if enBase
+                        assignin('base', 'V113', 4);
+                    end
+                    ouvert113 = strcmp(acces113{1}, 'on');
+                    if modeleW
+                        attendu113 = 1;
+                    elseif ~strcmp(ouDico{1}, 'aucun')
+                        if enBase && ouvert113
+                            attendu113 = 'Simulink:Data:DuplicateDefinition';
+                        else
+                            attendu113 = 2 + strcmp(ouDico{1}, 'ref');
+                        end
+                    elseif enBase && ouvert113
+                        attendu113 = 4;
+                    elseif ouvert113
+                        attendu113 = 'Simulink:Commands:ParametreNonEvalue';
+                    else
+                        attendu113 = 'Simulink:Data:BaseWorkspaceAccessDisabled';
+                    end
+                    contexte113 = sprintf('%s, espace du modele %d, dictionnaire %s, base %d, acces %s', ...
+                                          lecteurs113{kL}, modeleW, ouDico{1}, enBase, acces113{1});
+                    vu113 = [];
+                    try
+                        rb113 = sim('bat113');
+                        vu113 = rb113.yout(1);
+                    catch err
+                        vu113 = err;
+                    end
+                    if ischar(attendu113)
+                        assert(isa(vu113, 'MException'), [contexte113 ' : erreur attendue']);
+                        assert(strcmp(vu113.identifier, attendu113), ...
+                               sprintf('%s : %s attendu, %s rendu (%s)', contexte113, attendu113, ...
+                                       vu113.identifier, vu113.message));
+                        assert(~isempty(strfind(vu113.message, fautif113)) || ...
+                               ~isempty(strfind(vu113.message, 'V113')), ...
+                               [contexte113 ' : le message nomme le bloc ou la variable']);
+                    else
+                        assert(isnumeric(vu113) && isequal(vu113, attendu113), ...
+                               sprintf('%s : %g attendu', contexte113, attendu113));
+                    end
+                    bdclose('bat113');
+                    nCas113 = nCas113 + 1;
+                end
+            end
+        end
+    end
+end
+evalin('base', 'clear V113');
+Simulink.data.dictionary.closeAll('-discard');
+rmdir(dossier113, 's');
+fprintf('dictionnaires de donnees : %d cas croises\n', nCas113);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

@@ -229,6 +229,17 @@ function modele = reglerModele(modele, couples)
         canon = matlibre_sl_config('nom', nom);
         if ~isempty(canon)
             modele.parametres.(canon) = matlibre_sl_config('valider', canon, valeur);
+            if strcmp(canon, 'DataDictionary') && ~isempty(modele.parametres.DataDictionary)
+                % le dictionnaire doit exister : il s'ouvre avec le modèle
+                try
+                    matlibre_sl_dictionnaire('ouvrir', modele.parametres.DataDictionary);
+                catch err
+                    error('SLDD:sldd:DictionaryNotFound', ...
+                          ['Le modele ''%s'' ne peut prendre pour dictionnaire ''%s'' : %s ' ...
+                           'SIMULINK.DATA.DICTIONARY.CREATE le cree.'], char(modele.nom), ...
+                          modele.parametres.DataDictionary, err.message);
+                end
+            end
             % Le solveur et son type vont ensemble, comme dans Simulink :
             % le type suit le solveur, et un type qui ne convient plus au
             % solveur le remplace par le solveur automatique de ce type.

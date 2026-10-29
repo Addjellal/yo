@@ -558,4 +558,26 @@ assert(isequal([u1 u2 u3], [1 2 3]), 'subsref rend la liste des champs');
 assert(isequal(subsref(tableau(2), substruct('.', 'v')), 2), 'subsref d''un seul element');
 disp('numArgumentsFromSubscript : ok');
 
+% Une propriété dépendante, dans un tableau d'objets : la liste de ses
+% valeurs, une par objet, comme pour une propriété rangée.
+mesures = [MesureEssai(2), MesureEssai(3), MesureEssai(4)];
+assert(isequal({mesures.Carre}, {4, 9, 16}) && isequal([mesures.Carre], [4 9 16]) && ...
+       isequal([mesures.Valeur], [2 3 4]), 'la liste d''une propriete dependante');
+[c1, c2] = mesures(2:3).Carre;
+assert(c1 == 9 && c2 == 16, 'deux sorties d''une propriete dependante');
+seule = MesureEssai(5);
+assert(isequal({seule.Carre}, {25}), 'un seul objet : une seule valeur');
+% Une fonction de paquet appelée en instruction ne se voit demander
+% aucune sortie ; en expression, une ; et autant qu'on en affecte.
+paquetessai.sorties();
+assert(evalin('base', 'sortiesEssai') == 0, 'une fonction de paquet en instruction : nargout 0');
+paquetessai.sorties;
+assert(evalin('base', 'sortiesEssai') == 0, 'sans parentheses non plus');
+x = paquetessai.sorties(); %#ok<NASGU>
+assert(evalin('base', 'sortiesEssai') == 1, 'en expression : une sortie');
+[s1, s2] = paquetessai.sorties();
+assert(evalin('base', 'sortiesEssai') == 2 && s1 == 1 && s2 == 2, 'deux sorties demandees');
+evalin('base', 'clear sortiesEssai');
+disp('proprietes dependantes et paquets : ok');
+
 disp('classes : toutes les verifications passent');

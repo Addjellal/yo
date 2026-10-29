@@ -117,6 +117,15 @@ function varargout = matlibre_sl_config(action, varargin)
 %     LoggingFileName      'out.mat'  Dataset — logsout, yout, xout — vont
 %                                     aussi dans ce fichier MAT
 %     SignalLoggingSaveFormat 'Dataset'  la forme du journal des signaux
+%     DataDictionary       ''         le dictionnaire de données du
+%                                     modèle, un fichier .sldd : ses
+%                                     blocs lisent les variables de sa
+%                                     section 'Design Data' après celles
+%                                     de l'espace du modèle (voir
+%                                     SIMULINK.DATA.DICTIONARY.OPEN)
+%     EnableAccessToBaseWorkspace 'on'  'off' : quand le modèle a un
+%                                     dictionnaire, ses blocs ne lisent
+%                                     plus l'espace de travail de base
 %     Description          ''         un texte qui décrit le modèle
 %     FastRestart          'off'      'on' est accepté : chaque simulation
 %                                     recompile le modèle, et donne ce
@@ -370,7 +379,8 @@ function d = defauts()
                'StrictBusMsg', 'ErrorLevel1', 'DefaultParameterBehavior', 'Tunable', ...
                'InlineParams', 'off', 'SystemTargetFile', 'grt.tlc', 'TargetLang', 'C', ...
                'GenerateReport', 'off', 'Lock', 'off', 'SampleTimeColors', 'off', ...
-               'ShowPortDataTypes', 'off', 'RecordCoverage', 'off');
+               'ShowPortDataTypes', 'off', 'RecordCoverage', 'off', 'DataDictionary', '', ...
+               'EnableAccessToBaseWorkspace', 'on');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -579,8 +589,23 @@ function v = valider(nom, v)
         case 'SampleTimeProperty'
             v = proprietesPeriodes(v);
         case {'LoggingToFile', 'FastRestart', 'EnablePacing', 'InlineParams', ...
-              'GenerateReport', 'Lock', 'SampleTimeColors', 'ShowPortDataTypes', 'RecordCoverage'}
+              'GenerateReport', 'Lock', 'SampleTimeColors', 'ShowPortDataTypes', ...
+              'RecordCoverage', 'EnableAccessToBaseWorkspace'}
             v = choix(nom, v, {'off', 'on'});
+        case 'DataDictionary'
+            if isstring(v) && isscalar(v)
+                v = char(v);
+            end
+            ext = '';
+            if ischar(v) && size(v, 1) <= 1
+                [~, ~, ext] = fileparts(strtrim(v));
+            end
+            if ~ischar(v) || size(v, 1) > 1 || (~isempty(strtrim(v)) && ~strcmpi(ext, '.sldd'))
+                error('Simulink:Config:InvalidValue', ...
+                      ['Le reglage DataDictionary nomme un dictionnaire de donnees, un fichier ' ...
+                       '.sldd (''donnees.sldd''), ou vaut '''' ; pas %s.'], decrire(v));
+            end
+            v = strtrim(v);
         case 'SignalLoggingSaveFormat'
             v = choix(nom, v, {'Dataset'});
         case 'ArrayBoundsChecking'

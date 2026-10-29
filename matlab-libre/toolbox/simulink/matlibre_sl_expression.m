@@ -19,7 +19,9 @@ function valeur = matlibre_sl_expression(texte, nomBloc, nomParametre, classe)
 %   Simulink.
 %
 %   L'espace consulté est celui de base, comme dans Simulink : un modèle
-%   ne voit pas les variables locales de la fonction qui le simule.
+%   ne voit pas les variables locales de la fonction qui le simule. Le
+%   dictionnaire de données du modèle (DataDictionary) passe avant lui ;
+%   EnableAccessToBaseWorkspace à 'off' le ferme.
 %
 %   Une expression qui ne s'évalue pas, ou qui ne rend pas un nombre, est
 %   refusée en nommant le bloc et le paramètre — sans quoi on chercherait
@@ -35,14 +37,23 @@ function valeur = matlibre_sl_expression(texte, nomBloc, nomParametre, classe)
     % Les objets paramètres que nomme l'expression : chacun est remplacé
     % par sa valeur. Sans eux, l'évaluation se fait telle quelle dans
     % l'espace de base.
-    [noms, valeurs] = parametresNommes(texte, nomBloc, nomParametre);
+    base = matlibre_sl_espace('base', nomBloc);
+    [noms, valeurs] = parametresNommes(texte, nomBloc, nomParametre, base);
     try
-        if isempty(noms)
+        if isempty(noms) && base
             valeur = evalin('base', texte);
         else
             valeur = evaluerAvec(texte, noms, valeurs);
         end
     catch err
+        if ~base
+            error('Simulink:Data:BaseWorkspaceAccessDisabled', ...
+                  ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'', et cette expression ne ' ...
+                   's''evalue ni dans l''espace du modele ni dans son dictionnaire de donnees ' ...
+                   '; l''espace de travail de base lui est ferme ' ...
+                   '(EnableAccessToBaseWorkspace vaut ''off'') : %s'], nomParametre, nomBloc, ...
+                  texte, err.message);
+        end
         error('Simulink:Commands:ParametreNonEvalue', ...
               ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'', et cette ' ...
                'expression ne s''evalue pas dans l''espace de travail de ' ...
@@ -72,18 +83,33 @@ end
 % modèle d'abord, puis celles de l'espace de base. Toutes, avec leur
 % valeur, dès que l'une porte un Simulink.Parameter ou vient de l'espace
 % du modèle ; aucune sinon.
-function [noms, valeurs] = parametresNommes(texte, nomBloc, nomParametre)
+function [noms, valeurs] = parametresNommes(texte, nomBloc, nomParametre, base)
     noms = {};
     valeurs = {};
-    objets = false;
-    [nomsModele, valeursModele] = matlibre_sl_espace('variables', nomBloc);
+    objets = ~base;
+    [nomsModele, valeursModele, dico] = matlibre_sl_espace('variables', nomBloc);
     for id = unique(regexp(texte, '[A-Za-z]\w*', 'match'))
         nom = id{1};
         j = find(strcmp(nomsModele, nom), 1);
         if ~isempty(j)
             v = valeursModele{j};
             objets = true;
-        elseif evalin('base', sprintf('exist(''%s'', ''var'')', nom)) ~= 1
+            % une variable du dictionnaire que l'espace de base porte
+            % aussi est ambiguë, comme dans Simulink
+            if dico(j) && base && evalin('base', sprintf('exist(''%s'', ''var'')', nom)) == 1
+                barre = find(nomBloc == '/', 1);
+                nomModele = nomBloc;
+                if ~isempty(barre)
+                    nomModele = nomBloc(1:barre - 1);
+                end
+                error('Simulink:Data:DuplicateDefinition', ...
+                      ['La variable ''%s'', que lit le parametre ''%s'' du bloc ''%s'', est ' ...
+                       'definie a la fois dans le dictionnaire de donnees du modele ''%s'' et ' ...
+                       'dans l''espace de travail de base : retirez-la de l''un des deux, ou ' ...
+                       'posez EnableAccessToBaseWorkspace a ''off''.'], nom, nomParametre, ...
+                      nomBloc, nomModele);
+            end
+        elseif ~base || evalin('base', sprintf('exist(''%s'', ''var'')', nom)) ~= 1
             continue
         else
             v = evalin('base', nom);
