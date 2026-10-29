@@ -15,6 +15,13 @@
 %                  de déclenchement d'un bloc Chart — ou de sortie, émis
 %                  par send(nom)
 %
+% L'API de Stateflow, sur les blocs Chart des modèles chargés
+%   sfnew        - Crée un modèle qui porte un diagramme vide
+%   sfroot       - La racine : FIND y cherche modèles, diagrammes et objets
+%   Stateflow.Chart, State, Transition, Junction, Data, Event
+%                - Les objets du diagramme, qui se créent dans un
+%                  diagramme ou un état et se règlent par leurs propriétés
+%
 % Logique temporelle, dans les gardes et les actions
 %   sfafter      - Après N réveils, ou N secondes, dans l'état
 %   sfbefore     - Avant N réveils, ou N secondes

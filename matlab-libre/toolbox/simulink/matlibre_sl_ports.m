@@ -373,6 +373,14 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
                                                              'none') + (lire(p, 'Action', 0) ~= 0) + ...
                        ~strcmpi(char(lire(p, 'ResetPort', 'none')), 'none');
         case 'chart'
+            if ~isempty(lire(p, 'Diagramme', ''))
+                % un diagramme de l'API de Stateflow : ses données et ses
+                % événements font ses ports
+                n = matlibre_sf_api('ports', p);
+                nEntrees = n(1);
+                nSorties = n(2);
+                return
+            end
             nEntrees = entier(lire(p, 'Inputs', 1));
             sorties = lire(p, 'Outputs', {'etat'});
             if ischar(sorties) || isstring(sorties)

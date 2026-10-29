@@ -76,6 +76,16 @@ classdef Line < handle
         function set(o, varargin)
             set_param(o.Poignee, varargin{:});
         end
+        function r = eq(a, b)
+            r = matlibre_sl_objet('egal', a, b);
+        end
+        function r = ne(a, b)
+            r = ~matlibre_sl_objet('egal', a, b);
+        end
+        function v = find(o, varargin)
+            % lui-même et les objets Stateflow qu'il contient
+            v = matlibre_sf_api('trouver', o, varargin);
+        end
         function disp(o)
             for k = 1:numel(o)
                 x = builtin('subsref', o, struct('type', '()', 'subs', {{k}}));

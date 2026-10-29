@@ -611,6 +611,12 @@ function h = ajouterParNom(source, destination, reglages)
        isempty(gabaritDeSousSysteme(source, feuille))
         reglages(end + 1:end + 2) = {'Model', new_system(regexprep(feuille, '[^A-Za-z0-9_]', '_'))};
     end
+    % un Chart de la bibliothèque arrive vide, comme dans Simulink : sans
+    % état ni port, un diagramme que l'API de Stateflow garnit
+    if ~isempty(entree) && strcmp(entree.type, 'chart') && ...
+       ~any(strcmpi(reglages(1:2:end), 'Chart') | strcmpi(reglages(1:2:end), 'Diagramme'))
+        reglages(end + 1:end + 2) = {'Diagramme', matlibre_sf_api('vide')};
+    end
     % un bloc d'un modèle chargé, recopié : ses rappels de copie
     copie = false;
     try

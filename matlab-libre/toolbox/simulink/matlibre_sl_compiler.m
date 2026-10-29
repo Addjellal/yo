@@ -6295,6 +6295,14 @@ end
 % contexte qu'il rend — « etat », le rang de l'état actif —, et leurs
 % dimensions, lues au démarrage de la machine.
 function code = preparerGraphe(p, chemin)
+    nomsEntrees = {};
+    if isfield(p, 'Diagramme') && ~isempty(p.Diagramme)
+        % un diagramme de l'API de Stateflow : sa machine, ses entrées et
+        % ses sorties par leur nom, son contexte de départ
+        [p.Chart, p.InitialContext, p.Outputs, nomsEntrees] = ...
+            matlibre_sf_api('machine', p, chemin);
+        p.Inputs = numel(nomsEntrees);
+    end
     machine = p.Chart;
     if ~isstruct(machine) || ~isfield(machine, 'etats') || ~isfield(machine, 'transitions')
         error('Simulink:blocks:ChartMachineMissing', ...
@@ -6322,7 +6330,7 @@ function code = preparerGraphe(p, chemin)
               chemin, err.message);
     end
     code = struct('machine', machine, 'sorties', {sorties}, 'contexte', contexte, ...
-                  'initial', p.InitialContext);
+                  'initial', p.InitialContext, 'nomsEntrees', {nomsEntrees});
     code.noms = cellfun(@(e) e.nom, machine.etats, 'UniformOutput', false);
     % Les événements : ceux d'entrée arrivent par un port de déclenchement,
     % après les entrées de données ; ceux de sortie ont chacun leur port,

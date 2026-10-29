@@ -15738,6 +15738,450 @@ for kT = 1:numel(catalogue115)
 end
 fprintf('objets et connectivite : %d types, %d ports verifies\n', nTypes115, nPorts115);
 
+%% ------------------------------------------------- 116. L'API de Stateflow
+% SFNEW pose un diagramme vide ; SFROOT et FIND le retrouvent ;
+% Stateflow.State, Transition, Junction, Data et Event le garnissent, comme
+% dans Stateflow. Le diagramme se range dans le bloc Chart, se compile en
+% la machine que fait tourner le bloc, et s'enregistre avec le modèle.
+bdclose('all');
+sfnew('sf116');
+assert(strcmp(get_param('sf116/Chart', 'BlockType'), 'Chart') && ...
+       isequal(get_param('sf116/Chart', 'Ports'), [0 0 0 0 0 0 0 0]), ...
+       'SFNEW : un bloc Chart vide, sans port');
+rt116 = sfroot;
+m116 = rt116.find('-isa', 'Simulink.BlockDiagram', 'Name', 'sf116');
+ch116 = m116.find('-isa', 'Stateflow.Chart');
+assert(isa(rt116, 'Stateflow.Root') && isa(m116, 'Simulink.BlockDiagram') && ...
+       isa(ch116, 'Stateflow.Chart') && strcmp(ch116.Path, 'sf116/Chart') && ...
+       ch116 == find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'sf116/Chart'), ...
+       'SFROOT et FIND : le modele, puis son diagramme, le meme objet');
+% un thermostat : deux états, une transition par défaut, deux gardes
+arret116 = Stateflow.State(ch116);
+arret116.LabelString = ['arret' newline 'entry: chauffe = 0;'];
+marche116 = Stateflow.State(ch116);
+marche116.Name = 'marche';
+marche116.LabelString = ['marche' newline 'en: chauffe = 1;'];
+defaut116 = Stateflow.Transition(ch116);
+defaut116.Destination = arret116;
+monte116 = Stateflow.Transition(ch116);
+monte116.Source = arret116;
+monte116.Destination = marche116;
+monte116.LabelString = '[temp < 19]';
+baisse116 = Stateflow.Transition(ch116);
+baisse116.Source = marche116;
+baisse116.Destination = arret116;
+baisse116.LabelString = '[temp > 21]';
+temp116 = Stateflow.Data(ch116);
+temp116.Name = 'temp';
+temp116.Scope = 'Input';
+chauffe116 = Stateflow.Data(ch116);
+chauffe116.Name = 'chauffe';
+chauffe116.Scope = 'Output';
+assert(strcmp(arret116.Name, 'arret') && isequal(get_param('sf116/Chart', 'Ports'), [1 1 0 0 0 0 0 0]) && ...
+       temp116.Port == 1 && chauffe116.Port == 1 && monte116.Source == arret116 && ...
+       strcmp(monte116.Destination.Name, 'marche') && isempty(defaut116.Source), ...
+       'les objets se relient ; les donnees font les ports du bloc');
+add_block('built-in/Gain', 'sf116/puissance', 'Gain', '5');
+add_block('built-in/Sum', 'sf116/bilan', 'Inputs', '+-');
+add_block('built-in/Gain', 'sf116/pertes', 'Gain', '0.2');
+add_block('built-in/Constant', 'sf116/ext', 'Value', '10');
+add_block('built-in/Sum', 'sf116/ecart', 'Inputs', '+-');
+add_block('built-in/Integrator', 'sf116/T', 'InitialCondition', '20');
+add_block('built-in/Outport', 'sf116/y');
+add_block('built-in/Outport', 'sf116/c');
+add_line('sf116', 'T/1', 'Chart/1');
+add_line('sf116', 'Chart/1', 'puissance/1');
+add_line('sf116', 'Chart/1', 'c/1');
+add_line('sf116', 'T/1', 'ecart/1');
+add_line('sf116', 'ext/1', 'ecart/2');
+add_line('sf116', 'ecart/1', 'pertes/1');
+add_line('sf116', 'puissance/1', 'bilan/1');
+add_line('sf116', 'pertes/1', 'bilan/2');
+add_line('sf116', 'bilan/1', 'T/1');
+add_line('sf116', 'T/1', 'y/1');
+set_param('sf116', 'Solver', 'ode4', 'FixedStep', '0.05', 'StopTime', '30');
+r116 = sim('sf116');
+apres116 = r116.tout > 5;
+assert(min(r116.yout(apres116, 1)) > 18.9 && max(r116.yout(apres116, 1)) < 21.1, ...
+       'le thermostat de l''API tient la piece entre 19 et 21');
+% la même machine, bâtie par SFCHART, pas à pas : les mêmes décisions
+ref116 = sfchart('reference');
+ref116 = sfstate(ref116, 'arret', 'en: chauffe = 0;');
+ref116 = sfstate(ref116, 'marche', 'en: chauffe = 1;');
+ref116 = sftransition(ref116, 'arret', 'marche', '[temp < 19]');
+ref116 = sftransition(ref116, 'marche', 'arret', '[temp > 21]');
+courant116 = '';
+contexte116 = struct('chauffe', 0, 'temp', 0);
+for i = 1:numel(r116.tout)
+    contexte116.temp = r116.yout(i, 1);
+    [courant116, contexte116] = sfstep(ref116, courant116, contexte116, []);
+    assert(contexte116.chauffe == r116.yout(i, 2), 'le bloc fait le pas de SFSTEP');
+end
+% l'objet en lecture et en écriture, la recherche, l'enregistrement
+assert(numel(find(ch116, '-isa', 'Stateflow.State')) == 2 && ...
+       numel(find(ch116, '-isa', 'Stateflow.Transition')) == 3 && ...
+       strcmp(find(ch116, '-isa', 'Stateflow.State', 'Name', 'marche').LabelString, ...
+              ['marche' newline 'en: chauffe = 1;']) && ...
+       numel(ch116.getChildren()) == 7, 'FIND avec des criteres, GETCHILDREN');
+assert(strcmp(arret116.Type, 'OR') && strcmp(arret116.Path, 'sf116/Chart') && ...
+       arret116.Chart == ch116 && monte116.ExecutionOrder == 1, ...
+       'Type, Path, Chart, ExecutionOrder');
+fichier116 = [tempname() '.slx'];
+save_system('sf116', fichier116);
+bdclose('sf116');
+load_system(fichier116);
+ch116 = find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'sf116/Chart');
+assert(numel(find(ch116, '-isa', 'Stateflow.State')) == 2, 'le diagramme s''enregistre avec le modele');
+r116b = sim('sf116');
+assert(isequal(r116b.yout, r116.yout), 'le modele recharge simule de meme');
+delete(fichier116);
+bdclose('all');
+
+% La hiérarchie : un super-état aux sous-états exclusifs, sa transition par
+% défaut intérieure, une jonction qui choisit, une jonction d'historique,
+% des états parallèles, un événement d'entrée et un de sortie, un
+% paramètre lu dans l'espace de travail, une constante, un booléen.
+sfnew('h116');
+ch = find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'h116/Chart');
+actif = Stateflow.State(ch);
+actif.Name = 'actif';
+lent = Stateflow.State(actif);
+lent.LabelString = ['lent' newline 'en: mode = 1;'];
+vite = Stateflow.State(actif);
+vite.LabelString = ['vite' newline 'en: mode = 2;'];
+pause116 = Stateflow.State(ch);
+pause116.LabelString = ['pause' newline 'en: mode = 0;'];
+histo = Stateflow.Junction(actif);
+histo.Type = 'HISTORY';
+t = Stateflow.Transition(ch); t.Destination = actif;
+t = Stateflow.Transition(actif); t.Destination = lent;
+t = Stateflow.Transition(actif); t.Source = lent; t.Destination = vite; t.LabelString = '[u > SEUIL]';
+t = Stateflow.Transition(actif); t.Source = vite; t.Destination = lent; t.LabelString = '[u < -SEUIL]';
+t = Stateflow.Transition(ch); t.Source = actif; t.Destination = pause116; t.LabelString = '[stop]{n = n + 1;}';
+t = Stateflow.Transition(ch); t.Source = pause116; t.Destination = actif; t.LabelString = '[~stop]';
+u = Stateflow.Data(ch); u.Name = 'u'; u.Scope = 'Input';
+stop = Stateflow.Data(ch); stop.Name = 'stop'; stop.Scope = 'Input';
+mode = Stateflow.Data(ch); mode.Name = 'mode'; mode.Scope = 'Output';
+n = Stateflow.Data(ch); n.Name = 'n'; n.Scope = 'Output'; n.Props.InitialValue = '10';
+seuil = Stateflow.Data(ch); seuil.Name = 'SEUIL'; seuil.Scope = 'Parameter';
+assignin('base', 'SEUIL', 0.5);
+assert(strcmp(lent.Path, 'h116/Chart/actif') && strcmp(n.Props.InitialValue, '10') && ...
+       stop.Port == 2 && n.Port == 2, 'les chemins des sous-etats, les rangs des ports');
+add_block('built-in/Sin', 'h116/sinus', 'Frequency', '2');
+add_block('built-in/Clock', 'h116/horloge');
+add_block('built-in/Fcn', 'h116/arret', 'Expr', 'u(1) > 2 && u(1) < 3');
+add_block('built-in/Outport', 'h116/ymode');
+add_block('built-in/Outport', 'h116/yn');
+add_block('built-in/Outport', 'h116/yu');
+add_line('h116', 'sinus/1', 'Chart/1');
+add_line('h116', 'horloge/1', 'arret/1');
+add_line('h116', 'arret/1', 'Chart/2');
+add_line('h116', 'Chart/1', 'ymode/1');
+add_line('h116', 'Chart/2', 'yn/1');
+add_line('h116', 'sinus/1', 'yu/1');
+set_param('h116', 'Solver', 'FixedStepDiscrete', 'FixedStep', '0.1', 'StopTime', '5');
+r = sim('h116');
+% la référence : la même hiérarchie, par SFCHART
+refH = sfchart('refH');
+refH = sfstate(refH, 'actif');
+refH = sfstate(refH, 'actif.lent', 'en: mode = 1;');
+refH = sfstate(refH, 'actif.vite', 'en: mode = 2;');
+refH = sfstate(refH, 'pause', 'en: mode = 0;');
+refH = sfhistory(refH, 'actif');
+refH = sftransition(refH, 'actif.lent', 'actif.vite', '[u > SEUIL]');
+refH = sftransition(refH, 'actif.vite', 'actif.lent', '[u < -SEUIL]');
+refH = sftransition(refH, 'actif', 'pause', '[stop]{n = n + 1;}');
+refH = sftransition(refH, 'pause', 'actif', '[~stop]');
+courant = '';
+contexteH = struct('u', 0, 'stop', 0, 'mode', 0, 'n', 10, 'SEUIL', 0.5);
+for i = 1:numel(r.tout)
+    contexteH.u = r.yout(i, 3);
+    contexteH.stop = r.tout(i) > 2 && r.tout(i) < 3;
+    [courant, contexteH] = sfstep(refH, courant, contexteH, []);
+    assert(contexteH.mode == r.yout(i, 1) && contexteH.n == r.yout(i, 2), ...
+           sprintf('la hierarchie : pas %d', i));
+end
+assert(any(r.yout(:, 1) == 2) && any(r.yout(:, 1) == 0) && r.yout(end, 2) == 11, ...
+       'les trois modes sont parcourus, la pause comptee une fois');
+% les états parallèles et un booléen
+sfnew('p116');
+ch = find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'p116/Chart');
+ch.Decomposition = 'PARALLEL_AND';
+ch.SampleTime = '1';   % sans entree, le diagramme a besoin de sa periode
+a = Stateflow.State(ch); a.LabelString = ['A' newline 'du: na = na + 1;'];
+b = Stateflow.State(ch); b.LabelString = ['B' newline 'du: nb = nb + 2; drapeau = nb > 5;'];
+na = Stateflow.Data(ch); na.Name = 'na'; na.Scope = 'Output';
+nb = Stateflow.Data(ch); nb.Name = 'nb'; nb.Scope = 'Local';
+dr = Stateflow.Data(ch); dr.Name = 'drapeau'; dr.Scope = 'Output'; dr.DataType = 'boolean';
+k = Stateflow.Data(ch); k.Name = 'K'; k.Scope = 'Constant'; k.Props.InitialValue = '7';
+add_block('built-in/Outport', 'p116/y1');
+add_block('built-in/Outport', 'p116/y2');
+add_line('p116', 'Chart/1', 'y1/1');
+add_line('p116', 'Chart/2', 'y2/1');
+set_param('p116', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', 'StopTime', '5');
+assert(strcmp(a.Type, 'AND') && isequal(get_param('p116/Chart', 'Ports'), [0 2 0 0 0 0 0 0]) && ...
+       strcmp(ch.SampleTime, '1'), ...
+       'des etats paralleles : Type AND');
+r = sim('p116');
+assert(isequal(r.yout(:, 1).', 0:5) && isequal(r.yout(:, 2).', [0 0 0 1 1 1]), ...
+       'les deux regions calculent a chaque pas ; le drapeau booleen');
+% un événement d'entrée par le port de déclenchement, un de sortie
+sfnew('e116');
+ch = find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'e116/Chart');
+s1 = Stateflow.State(ch); s1.LabelString = ['repos' newline 'en: y = 0;'];
+s2 = Stateflow.State(ch); s2.LabelString = ['compte' newline 'en: y = y + 1; send(plein);'];
+t = Stateflow.Transition(ch); t.Destination = s1;
+t = Stateflow.Transition(ch); t.Source = s1; t.Destination = s2; t.LabelString = 'top';
+t = Stateflow.Transition(ch); t.Source = s2; t.Destination = s1; t.LabelString = 'top';
+ev = Stateflow.Event(ch); ev.Name = 'top'; ev.Scope = 'Input'; ev.Trigger = 'Rising';
+es = Stateflow.Event(ch); es.Name = 'plein'; es.Scope = 'Output'; es.Trigger = 'Function call';
+y = Stateflow.Data(ch); y.Name = 'y'; y.Scope = 'Output';
+assert(isequal(get_param('e116/Chart', 'Ports'), [1 2 0 0 0 0 0 0]), ...
+       'un port de declenchement, et un port par evenement de sortie');
+add_block('built-in/PulseGenerator', 'e116/pouls', 'Period', '1', 'PulseWidth', '50');
+add_block('built-in/Outport', 'e116/y1');
+add_block('built-in/Outport', 'e116/y2');
+add_line('e116', 'pouls/1', 'Chart/1');
+add_line('e116', 'Chart/1', 'y1/1');
+add_line('e116', 'Chart/2', 'y2/1');
+set_param('e116', 'Solver', 'FixedStepDiscrete', 'FixedStep', '0.25', 'StopTime', '4');
+r = sim('e116');
+assert(max(r.yout(:, 1)) == 1 && sum(r.yout(:, 2)) >= 1, ...
+       'les fronts montants reveillent le diagramme, qui emet son evenement');
+bdclose('all');
+evalin('base', 'clear SEUIL');
+
+% L'ordre d'exécution : deux transitions qui partent du même état, leurs
+% rangs échangés, échangent leur priorité.
+sfnew('o116');
+ch = find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'o116/Chart');
+ch.SampleTime = '1';
+s0 = Stateflow.State(ch); s0.LabelString = ['depart' newline 'en: y = 0;'];
+sa = Stateflow.State(ch); sa.LabelString = ['a' newline 'en: y = 1;'];
+sb = Stateflow.State(ch); sb.LabelString = ['b' newline 'en: y = 2;'];
+t = Stateflow.Transition(ch); t.Destination = s0;
+ta = Stateflow.Transition(ch); ta.Source = s0; ta.Destination = sa;
+tb = Stateflow.Transition(ch); tb.Source = s0; tb.Destination = sb;
+y = Stateflow.Data(ch); y.Name = 'y'; y.Scope = 'Output';
+add_block('built-in/Outport', 'o116/y');
+add_line('o116', 'Chart/1', 'y/1');
+set_param('o116', 'Solver', 'FixedStepDiscrete', 'FixedStep', '1', 'StopTime', '2');
+r = sim('o116');
+assert(r.yout(end) == 1 && ta.ExecutionOrder == 1 && tb.ExecutionOrder == 2, ...
+       'la premiere transition l''emporte');
+tb.ExecutionOrder = 1;
+ta.ExecutionOrder = 2;
+r = sim('o116');
+assert(r.yout(end) == 2 && tb.ExecutionOrder == 1, 'les rangs echanges, la seconde l''emporte');
+% supprimer un état supprime les transitions qui le touchent
+delete(sb);
+assert(numel(find(ch, '-isa', 'Stateflow.Transition')) == 2 && ...
+       numel(find(ch, '-isa', 'Stateflow.State')) == 2, ...
+       'DELETE : l''etat et ses transitions');
+vu = '';
+try
+    sb.Name; %#ok<VUNUS>
+catch err
+    vu = err.identifier;
+end
+assert(strcmp(vu, 'Stateflow:API:DeletedObject'), 'un objet supprime ne se lit plus');
+ch.Name = 'Logique';
+assert(strcmp(get_param('o116/Logique', 'BlockType'), 'Chart') && strcmp(ch.Path, 'o116/Logique'), ...
+       'renommer le diagramme renomme son bloc');
+bdclose('all');
+
+% Les refus : à la pose d'une propriété, et à la compilation, comme
+% Stateflow les ferait.
+sfnew('r116');
+ch = find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'r116/Chart');
+s = Stateflow.State(ch);
+s.Name = 'A';
+d = Stateflow.Data(ch);
+pose116 = {
+    @() Stateflow.State(42), 'Stateflow:API:InvalidParent'
+    @() Stateflow.Data(d), 'Stateflow:API:InvalidParent'
+    @() Stateflow.Chart(), 'Stateflow:API:ChartConstructor'
+    @() poserPropriete(s, 'Couleur', 'rouge'), 'Stateflow:API:UnknownProperty'
+    @() poserPropriete(s, 'Id', 3), 'Stateflow:API:ReadOnlyProperty'
+    @() poserPropriete(s, 'Path', 'x'), 'Stateflow:API:ReadOnlyProperty'
+    @() poserPropriete(s, 'Name', '2A'), 'Stateflow:API:InvalidName'
+    @() poserPropriete(s, 'Decomposition', 'OU'), 'Stateflow:API:InvalidValue'
+    @() poserPropriete(d, 'Scope', 'Global'), 'Stateflow:API:InvalidValue'
+    @() poserPropriete(d, 'DataType', 'quaternion'), 'Stateflow:API:InvalidValue'
+    @() poserPropriete(d, 'Props', 3), 'Stateflow:API:InvalidValue'
+    @() poserPropriete(Stateflow.Transition(ch), 'Destination', d), 'Stateflow:API:InvalidEndpoint'
+    @() poserPropriete(Stateflow.Junction(ch), 'Type', 'SPLIT'), 'Stateflow:API:InvalidValue'
+    @() poserPropriete(Stateflow.Event(ch), 'Trigger', 'Parfois'), 'Stateflow:API:InvalidValue'
+    @() poserPropriete(ch, 'StateMachineType', 'Turing'), 'Stateflow:API:InvalidValue'
+    @() find(ch, '-isa'), 'Stateflow:API:InvalidFindArguments'
+    @() sfnew('1modele'), 'Stateflow:API:InvalidModelName'
+    @() delete(ch), 'Stateflow:API:InvalidDelete'
+    };
+for k = 1:size(pose116, 1)
+    vu = '';
+    try
+        pose116{k, 1}();
+    catch err
+        vu = err.identifier;
+    end
+    assert(strcmp(vu, pose116{k, 2}), sprintf('pose %d : %s attendu, %s rendu', k, ...
+                                              pose116{k, 2}, vu));
+end
+bdclose('all');
+% chaque défaut de diagramme, refusé à la compilation en nommant le bloc
+defauts116 = {
+    'aucun etat', 'Simulink:blocks:ChartNoState'
+    'pas de defaut', 'Stateflow:API:NoDefaultTransition'
+    'deux defauts', 'Stateflow:API:MultipleDefaultTransitions'
+    'sans destination', 'Stateflow:API:DanglingTransition'
+    'meme nom', 'Stateflow:API:DuplicateStateName'
+    'sans nom', 'Stateflow:API:UnnamedState'
+    'donnee double', 'Stateflow:API:DuplicateData'
+    'parametre absent', 'Stateflow:API:ParameterNotFound'
+    'valeur initiale', 'Stateflow:API:InvalidInitialValue'
+    'evenement local', 'Stateflow:API:LocalEvent'
+    'historique au sommet', 'Stateflow:API:HistoryJunctionAtChartLevel'
+    'etiquette fausse', 'Simulink:blocks:ChartError'
+    };
+for k = 1:size(defauts116, 1)
+    sfnew('d116');
+    ch = find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'd116/Chart');
+    y = Stateflow.Data(ch); y.Name = 'y'; y.Scope = 'Output';
+    if ~strcmp(defauts116{k, 1}, 'aucun etat')
+        a = Stateflow.State(ch); a.Name = 'A';
+        b = Stateflow.State(ch); b.Name = 'B';
+        t = Stateflow.Transition(ch); t.Destination = a;
+    end
+    switch defauts116{k, 1}
+        case 'pas de defaut'
+            delete(t);
+        case 'deux defauts'
+            t = Stateflow.Transition(ch); t.Destination = b;
+        case 'sans destination'
+            t = Stateflow.Transition(ch); t.Source = a;
+        case 'meme nom'
+            b.Name = 'A';
+        case 'sans nom'
+            Stateflow.State(ch);
+        case 'donnee double'
+            z = Stateflow.Data(ch); z.Name = 'y';
+        case 'parametre absent'
+            z = Stateflow.Data(ch); z.Name = 'parametreAbsent116'; z.Scope = 'Parameter';
+        case 'valeur initiale'
+            y.Props.InitialValue = '3 +* 2';
+        case 'evenement local'
+            Stateflow.Event(ch);
+        case 'historique au sommet'
+            j = Stateflow.Junction(ch); j.Type = 'HISTORY';
+        case 'etiquette fausse'
+            a.LabelString = ['A' newline 'en: y = inconnue116 + 1;'];
+    end
+    add_block('built-in/Outport', 'd116/sortie');
+    add_line('d116', 'Chart/1', 'sortie/1');
+    vu = [];
+    try
+        sim('d116');
+    catch err
+        vu = err;
+    end
+    assert(isa(vu, 'MException') && strcmp(vu.identifier, defauts116{k, 2}) && ...
+           ~isempty(strfind(vu.message, 'd116/Chart')), ...
+           sprintf('defaut ''%s'' : %s attendu, rendu %s', defauts116{k, 1}, defauts116{k, 2}, ...
+                   texteErreur114(vu)));
+    bdclose('d116');
+end
+
+% Batterie : des machines de deux ou trois états en anneau, plates ou
+% dans un super-état, gardées par un seuil sur une entrée, par le temps
+% (after, en réveils) ou par les deux, avec une ou deux entrées : le bloc
+% Chart bâti par l'API fait, pas à pas, ce que fait la même machine bâtie
+% par SFCHART.
+nCas116 = 0;
+for nEtats = 2:3
+    for garde = {'seuil', 'temps', 'mixte'}
+        for forme = {'plate', 'super'}
+            for nEntrees = 1:2
+                sfnew('b116');
+                ch = find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'b116/Chart');
+                conteneur = ch;
+                prefixe = '';
+                ref = sfchart('ref');
+                if strcmp(forme{1}, 'super')
+                    conteneur = Stateflow.State(ch);
+                    conteneur.Name = 'S';
+                    t = Stateflow.Transition(ch); t.Destination = conteneur;
+                    ref = sfstate(ref, 'S');
+                    prefixe = 'S.';
+                end
+                etats = cell(1, nEtats);
+                for q = 1:nEtats
+                    etats{q} = Stateflow.State(conteneur);
+                    etiquette = sprintf('en: y = %d; du: n = n + 1;', q);
+                    etats{q}.LabelString = [sprintf('e%d', q) newline etiquette];
+                    ref = sfstate(ref, sprintf('%se%d', prefixe, q), etiquette);
+                end
+                t = Stateflow.Transition(conteneur); t.Destination = etats{1};
+                for q = 1:nEtats
+                    suivant = mod(q, nEtats) + 1;
+                    switch garde{1}
+                        case 'seuil'
+                            texte = sprintf('[u > %g]', (q - 1) / nEtats - 0.3);
+                        case 'temps'
+                            texte = sprintf('[after(%d, tick)]', q + 1);
+                        otherwise
+                            texte = sprintf('[after(2, tick) && u > %g]', -0.5 + q / 10);
+                    end
+                    if nEntrees == 2
+                        texte = strrep(texte, ']', ' || v > 4.5]');
+                    end
+                    t = Stateflow.Transition(conteneur);
+                    t.Source = etats{q};
+                    t.Destination = etats{suivant};
+                    t.LabelString = texte;
+                    ref = sftransition(ref, sprintf('%se%d', prefixe, q), ...
+                                       sprintf('%se%d', prefixe, suivant), texte);
+                end
+                du = Stateflow.Data(ch); du.Name = 'u'; du.Scope = 'Input';
+                if nEntrees == 2
+                    dv = Stateflow.Data(ch); dv.Name = 'v'; dv.Scope = 'Input';
+                end
+                dy = Stateflow.Data(ch); dy.Name = 'y'; dy.Scope = 'Output';
+                dn = Stateflow.Data(ch); dn.Name = 'n'; dn.Scope = 'Output';
+                add_block('built-in/Sin', 'b116/u', 'Frequency', num2str(1 + nEtats / 2));
+                add_line('b116', 'u/1', 'Chart/1');
+                add_block('built-in/Outport', 'b116/yu');
+                add_line('b116', 'u/1', 'yu/1');
+                if nEntrees == 2
+                    add_block('built-in/Clock', 'b116/v');
+                    add_line('b116', 'v/1', 'Chart/2');
+                end
+                add_block('built-in/Outport', 'b116/yy');
+                add_block('built-in/Outport', 'b116/yn');
+                add_line('b116', 'Chart/1', 'yy/1');
+                add_line('b116', 'Chart/2', 'yn/1');
+                set_param('b116', 'Solver', 'FixedStepDiscrete', 'FixedStep', '0.1', ...
+                          'StopTime', '6');
+                r = sim('b116');
+                courant = '';
+                contexte = struct('u', 0, 'v', 0, 'y', 0, 'n', 0);
+                contexteTexte = sprintf('%d etats, %s, %s, %d entree(s)', nEtats, garde{1}, ...
+                                        forme{1}, nEntrees);
+                for i = 1:numel(r.tout)
+                    contexte.u = r.yout(i, 1);
+                    contexte.v = r.tout(i);
+                    [courant, contexte] = sfstep(ref, courant, contexte, []);
+                    assert(contexte.y == r.yout(i, 2) && contexte.n == r.yout(i, 3), ...
+                           sprintf('%s : pas %d', contexteTexte, i));
+                end
+                assert(numel(unique(r.yout(:, 2))) > 1, [contexteTexte ' : la machine tourne']);
+                bdclose('b116');
+                nCas116 = nCas116 + 1;
+            end
+        end
+    end
+end
+fprintf('API de Stateflow : %d machines croisees\n', nCas116);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

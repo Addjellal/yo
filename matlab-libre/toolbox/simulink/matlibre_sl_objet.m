@@ -48,6 +48,21 @@ function varargout = matlibre_sl_objet(action, varargin)
             o = feval(classe, h);
             objets(clef) = o;
             varargout{1} = o;
+        case 'egal'
+            % deux objets sont égaux quand ils désignent le même objet de
+            % Simulink, par sa poignée
+            [a, b] = varargin{1:2};
+            pa = poignees(a);
+            pb = poignees(b);
+            if numel(pa) == 1
+                pa = repmat(pa, size(pb));
+            elseif numel(pb) == 1
+                pb = repmat(pb, size(pa));
+            end
+            if ~isequal(size(pa), size(pb))
+                error('MATLAB:dimagree', 'Les deux operandes de == n''ont pas la meme taille.');
+            end
+            varargout{1} = reshape(pa == pb, size(pa));
         case 'lire'
             [o, s] = varargin{1:2};
             varargout{1} = lire(o, s);
@@ -77,7 +92,7 @@ function v = lire(o, s)
             end
             nom = s(1).subs;
             reste = s(2:end);
-            methodes = {'getFullName', 'getParent', 'getChildren', 'get', 'set'};
+            methodes = {'getFullName', 'getParent', 'getChildren', 'get', 'set', 'find'};
             k = find(strcmpi(methodes, nom), 1);
             if ~isempty(k)
                 arguments = {};
@@ -85,7 +100,12 @@ function v = lire(o, s)
                     arguments = reste(1).subs;
                     reste = reste(2:end);
                 end
-                v = feval(methodes{k}, o, arguments{:});
+                if strcmp(methodes{k}, 'find')
+                    % les objets Stateflow qu'il contient, et lui-même
+                    v = matlibre_sf_api('trouver', o, arguments);
+                else
+                    v = feval(methodes{k}, o, arguments{:});
+                end
             elseif strcmpi(nom, 'Handle')
                 v = poignee(o);
             else
@@ -115,6 +135,17 @@ function ecrire(o, s, v)
         v = subsasgn(actuel, s(2:end), v);
     end
     set_param(poignee(o), nom, v);
+end
+
+function p = poignees(o)
+    p = NaN(size(o));
+    if ~isobject(o) || ~any(strcmp(class(o), {'Simulink.Block', 'Simulink.BlockDiagram', ...
+                                              'Simulink.Line', 'Simulink.Port'}))
+        return
+    end
+    for k = 1:numel(o)
+        p(k) = poignee(builtin('subsref', o, struct('type', '()', 'subs', {{k}})));
+    end
 end
 
 function h = poignee(o)

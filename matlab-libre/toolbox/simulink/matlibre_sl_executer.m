@@ -3858,6 +3858,16 @@ function V = pasGraphe(T, k, V, p, e, t)
         end
         if isstruct(etat.contexte)
             etat.contexte.sf_t = t;   % pour la logique temporelle en secondes
+            % les données d'entrée d'un diagramme de l'API, par leur nom
+            if isfield(G, 'nomsEntrees')
+                for j = 1:numel(G.nomsEntrees)
+                    if nIn == 1
+                        etat.contexte.(G.nomsEntrees{j}) = u;
+                    else
+                        etat.contexte.(G.nomsEntrees{j}) = u{j};
+                    end
+                end
+            end
         end
         % Les événements d'entrée qui surviennent à cet instant : sans
         % événement d'entrée, le diagramme calcule à chaque pas.

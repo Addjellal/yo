@@ -1,0 +1,79 @@
+classdef Event < handle
+%EVENT Un événement d'un diagramme Stateflow.
+%   E = STATEFLOW.EVENT(PARENT) crée un événement. Scope 'Input' : il
+%   arrive par le port de déclenchement du bloc Chart, Trigger disant ce
+%   qui le fait — 'Rising', 'Falling', 'Either', 'Function call' — ;
+%   'Output' : une action l'émet, send(nom), par un port de sortie. Les
+%   événements locaux ne sont pas pris en charge. Port, Description ; Id,
+%   Path et Chart en lecture seule.
+%
+%   Méthodes : FIND, DELETE, GET, SET ; VIEW et FITTOVIEW ne font rien.
+%
+%   Exemple :
+%      sfnew('evenementEssai');
+%      ch = find(sfroot, '-isa', 'Stateflow.Chart', 'Path', 'evenementEssai/Chart');
+%      e = Stateflow.Event(ch);
+%      e.Name = 'top'; e.Scope = 'Input'; e.Trigger = 'Rising';
+%      e.Trigger                              % 'Rising'
+%      close_system('evenementEssai', 0);
+%
+%   Voir aussi SFNEW, SFROOT, STATEFLOW.CHART, STATEFLOW.STATE, STATEFLOW.TRANSITION.
+    properties (Hidden, SetAccess = private)
+        Bloc = []
+        Id_ = 0
+    end
+    methods
+        function o = Event(parent, h, id)
+            if nargin == 3 && ischar(parent) && strcmp(parent, 'matlibre__vue')
+                o.Bloc = h;
+                o.Id_ = id;
+                return
+            end
+            if nargin < 1
+                error('Stateflow:API:InvalidParent', ...
+                      'STATEFLOW.Event(PARENT) : PARENT est un diagramme ou un etat.');
+            end
+            [h, id] = matlibre_sf_api('creer', parent, 'Stateflow.Event');
+            o.Bloc = h;
+            o.Id_ = id;
+            matlibre_sf_objet('memoriser', o);
+        end
+        function varargout = subsref(o, s)
+            varargout{1} = matlibre_sf_objet('lire', o, s);
+        end
+        function o = subsasgn(o, s, v)
+            o = matlibre_sf_objet('ecrire', o, s, v);
+        end
+        function n = numArgumentsFromSubscript(o, s, contexte) %#ok<INUSD>
+            n = 1;
+        end
+        function v = find(o, varargin)
+            v = matlibre_sf_objet('methode', 'find', o, varargin);
+        end
+        function delete(o)
+            matlibre_sf_objet('methode', 'delete', o, {});
+        end
+        function v = get(o, varargin)
+            v = matlibre_sf_objet('methode', 'get', o, varargin);
+        end
+        function set(o, varargin)
+            matlibre_sf_objet('methode', 'set', o, varargin);
+        end
+        function v = getChildren(o)
+            v = matlibre_sf_objet('methode', 'getChildren', o, {});
+        end
+        function r = eq(a, b)
+            r = matlibre_sf_objet('egal', a, b);
+        end
+        function r = ne(a, b)
+            r = ~matlibre_sf_objet('egal', a, b);
+        end
+        function view(o) %#ok<MANU>
+        end
+        function fitToView(o) %#ok<MANU>
+        end
+        function disp(o)
+            matlibre_sf_objet('afficher', o);
+        end
+    end
+end
