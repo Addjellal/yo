@@ -39,6 +39,20 @@ function h = open_system(modele)
     if nargin < 1
         error('MATLAB:minrhs', 'OPEN_SYSTEM attend un modèle.');
     end
+    if isnumeric(modele)
+        % une poignée : celle d'un bloc ou d'un modèle chargé, sans quoi ce
+        % n'est pas un modèle
+        try
+            chemin = matlibre_sl_memoire('chemin', modele);
+        catch
+            error('Simulink:openSystem:Modele', ...
+                  ['OPEN_SYSTEM attend le modèle que rend NEW_SYSTEM, son nom, la poignée ' ...
+                   'd''un modèle ou d''un bloc chargé, ou un fichier .slx ou .mdl.']);
+        end
+        if ~any(chemin == '/')
+            modele = chemin;
+        end
+    end
     if ((ischar(modele) || isstring(modele)) && any(char(modele) == '/')) || isnumeric(modele)
         % un bloc d'un modèle chargé : son OpenFcn, comme un double clic
         chemin = matlibre_sl_memoire('chemin', modele);
