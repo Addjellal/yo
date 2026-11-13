@@ -189,9 +189,11 @@ totalité.
    s'activent (`Simulink.ConfigSet`, `getActiveConfigSet`,
    `attachConfigSet`, `setActiveConfigSet`), mais seul le jeu actif
    s'enregistre dans le fichier ; `Simulink.findBlocks` et
-   `Simulink.findBlocksOfType` cherchent par poignées ; il y manque
-   `Simulink.Mask`, `linio` et `linearize`, le réglage Commented et les
-   annotations ; les bus
+   `Simulink.findBlocksOfType` cherchent par poignées ; `linio` et
+   `linearize` linéarisent entre des points d'analyse — entrée, sortie,
+   coupure —, autour de l'état initial seulement, et en gardant tous les
+   états du modèle ; il y manque `Simulink.Mask`, `operpoint` et
+   `findop`, le réglage Commented et les annotations ; les bus
    se forment et se défont par nom (Bus Creator, Bus Selector), et se
    typent par `Simulink.Bus` et `Simulink.BusElement` ; Data
    Type Conversion convertit en entier, simple ou booléen, avec arrondi

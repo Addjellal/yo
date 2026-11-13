@@ -13576,6 +13576,206 @@ assert(getSimulinkBlockHandle('jeux106/K') == get_param('jeux106/K', 'Handle') &
 bdclose('all');
 fprintf('jeux de configuration, findBlocks : ok\n');
 
+%% ------------------------------------------------------ 107. LINIO et LINEARIZE
+% LINEARIZE lit sur le schéma d'une boucle fermée ce que LINMOD ne donne
+% qu'entre les ports du modèle : chaque point d'analyse de LINIO ajoute
+% une entrée, mesure une sortie ou coupe la boucle, où qu'il soit posé.
+% La boucle : r -> (+-) -> C (un gain de 4, dans un sous-système) -> P =
+% 1/(s+1)^2 -> y, P revenant sur la sommation.
+bdclose('all');
+rep107 = @(s, w) arrayfun(@(x) s.C * ((1i * x * eye(size(s.A, 1)) - s.A) \ s.B) + s.D, w);
+w107 = [0.3 2 7];
+G107 = 1 ./ (1i * w107 + 1) .^ 2;
+proche107 = @(s, attendu) max(abs(rep107(s, w107) - attendu)) < 1e-8;
+new_system('lin107');
+add_block('simulink/Sources/In1', 'lin107/r');
+add_block('simulink/Math Operations/Sum', 'lin107/e', 'Inputs', '+-');
+add_block('built-in/Subsystem', 'lin107/C');
+add_block('built-in/Inport', 'lin107/C/in');
+add_block('built-in/Gain', 'lin107/C/k', 'Gain', '4');
+add_block('built-in/Outport', 'lin107/C/out');
+add_line('lin107/C', {'in/1', 'k/1'}, {'k/1', 'out/1'});
+add_block('simulink/Continuous/Transfer Fcn', 'lin107/P', 'Numerator', '1', ...
+          'Denominator', '[1 2 1]');
+add_block('built-in/Outport', 'lin107/y');
+add_line('lin107', {'r/1', 'e/1', 'C/1', 'P/1', 'P/1'}, {'e/1', 'C/1', 'P/1', 'y/1', 'e/2'});
+
+% sans point : des ports aux ports, comme LINMOD
+[A107, B107, C107, D107] = linmod('lin107');
+s107 = linearize('lin107');
+assert(isa(s107, 'ss') && isequal(s107.A, A107) && isequal(s107.B, B107) && ...
+       isequal(s107.C, C107) && isequal(s107.D, D107) && s107.Ts == 0, 'sans point, LINMOD');
+assert(isequal(s107.InputName, {'r'}) && isequal(s107.OutputName, {'y'}) && ...
+       isequal(s107.StateName, {'P(1)', 'P(2)'}), 'les voies et les etats portent leur nom');
+
+% les huit points, chacun contre sa formule
+clear io107
+io107(1) = linio('lin107/r', 1, 'input');
+io107(2) = linio('lin107/P', 1, 'output');
+[s107, point107] = linearize('lin107', io107);
+assert(proche107(s107, 4 * G107 ./ (1 + 4 * G107)) && abs(dcgain(s107) - 0.8) < 1e-9, ...
+       'input et output : la boucle fermee');
+assert(isequal(s107.InputName, {'r'}) && isequal(s107.OutputName, {'P'}) && ...
+       isequal(point107.x, [0; 0]) && isequal(point107.u, 0), 'les noms, le point de fonctionnement');
+io107(1) = linio('lin107/C/k', 1, 'openinput');
+assert(proche107(linearize('lin107', io107), G107), ...
+       'openinput, pose dans le sous-systeme : le procede seul');
+clear io107
+io107(1) = linio('lin107/C/in', 1, 'input');
+io107(2) = linio('lin107/C/k', 1, 'openoutput');
+s107 = linearize('lin107', io107);
+assert(isequal(s107.D, 4) && proche107(s107, 4 * ones(1, 3)), 'openoutput : le regulateur seul');
+assert(proche107(linearize('lin107', linio('lin107/P', 1, 'looptransfer')), -4 * G107), ...
+       'looptransfer : la boucle, avec le signe du schema');
+assert(proche107(linearize('lin107', linio('lin107/C', 1, 'looptransfer')), -4 * G107), ...
+       'le meme, pose sur la sortie du sous-systeme');
+assert(proche107(linearize('lin107', linio('lin107/P', 1, 'sensitivity')), 1 ./ (1 + 4 * G107)), ...
+       'sensitivity : 1/(1+L)');
+assert(proche107(linearize('lin107', linio('lin107/P', 1, 'compsensitivity')), ...
+                 -4 * G107 ./ (1 + 4 * G107)), 'compsensitivity : -L/(1+L)');
+clear io107
+io107(1) = linio('lin107/r', 1, 'input');
+io107(2) = linio('lin107/e', 1, 'output');
+io107(3) = linio('lin107/P', 1, 'loopbreak');
+s107 = linearize('lin107', io107);
+assert(isequal(s107.D, 1) && proche107(s107, ones(1, 3)), 'loopbreak : l''ecart suit la consigne');
+io107(3).Active = 'off';
+assert(proche107(linearize('lin107', io107), 1 ./ (1 + 4 * G107)), 'un point inactif est ignore');
+
+% deux points sur le meme signal se suivent dans l'ordre donne
+clear io107
+io107(1) = linio('lin107/P', 1, 'input');
+io107(2) = linio('lin107/P', 1, 'output');
+assert(proche107(linearize('lin107', io107), 1 ./ (1 + 4 * G107)), 'une entree puis une sortie');
+io107 = io107([2 1]);
+assert(proche107(linearize('lin107', io107), -4 * G107 ./ (1 + 4 * G107)), ...
+       'une sortie puis une entree');
+
+% l'ancienne ecriture, OpenLoop, une poignee, un modele par valeur
+ancien107 = linio('lin107/P', 1, 'outin', 'on');
+assert(strcmp(ancien107.Type, 'looptransfer') && strcmp(ancien107.OpenLoop, 'on') && ...
+       strcmp(getfield(linio('lin107/P', 1), 'Type'), 'input') && ...
+       strcmp(getfield(linio('lin107/P', 1, 'inout'), 'Type'), 'sensitivity') && ...
+       strcmp(getfield(linio('lin107/P', 1, 'out', 'on'), 'Type'), 'openoutput'), ...
+       'les types d''hier');
+clear io107
+io107(1) = linio(get_param('lin107/C', 'Handle'), 1, 'input');
+io107(2) = linio('lin107/P', 1, 'output');
+assert(strcmp(io107(1).Block, 'lin107/C') && proche107(linearize('lin107', io107), ...
+       G107 ./ (1 + 4 * G107)), 'une poignee designe le bloc');
+io107(1).OpenLoop = 'on';
+assert(proche107(linearize('lin107', io107), G107), 'OpenLoop coupe la boucle au point');
+valeur107 = matlibre_sl_ouverts('lire', 'lin107');
+io107(1) = linio('C/k', 1, 'openinput');
+io107(2) = linio('P', 1, 'output');
+assert(proche107(linearize(valeur107, io107), G107), 'un modele par valeur, des chemins sans le modele');
+
+% des signaux vecteurs : une voie par element
+new_system('vec107');
+add_block('built-in/Inport', 'vec107/u', 'PortDimensions', '2');
+add_block('built-in/Gain', 'vec107/K', 'Gain', '[1 2; 3 4]', 'Multiplication', 'Matrix(K*u)');
+add_block('built-in/Integrator', 'vec107/x');
+add_block('built-in/Outport', 'vec107/y');
+add_line('vec107', {'u/1', 'K/1', 'x/1'}, {'K/1', 'x/1', 'y/1'});
+s107 = linearize('vec107');
+assert(isequal(s107.B, [1 2; 3 4]) && isequal(s107.InputName, {'u(1)', 'u(2)'}) && ...
+       isequal(s107.OutputName, {'y(1)', 'y(2)'}), 'sans point, les voies d''un port vecteur');
+clear io107
+io107(1) = linio('vec107/K', 1, 'input');
+io107(2) = linio('vec107/x', 1, 'output');
+s107 = linearize('vec107', io107);
+assert(isequal(s107.A, zeros(2)) && isequal(s107.B, eye(2)) && isequal(s107.C, eye(2)) && ...
+       isequal(s107.InputName, {'K(1)', 'K(2)'}) && isequal(s107.OutputName, {'x(1)', 'x(2)'}), ...
+       'une entree vecteur ajoutee au signal');
+io107(1) = linio('vec107/u', 1, 'openinput');
+io107(2) = linio('vec107/K', 1, 'openoutput');
+s107 = linearize('vec107', io107);
+assert(isequal(s107.D, [1 2; 3 4]) && isequal(s107.B, zeros(2)), 'le gain matriciel, isole');
+set_param(get_param('vec107/K', 'PortHandles').Outport(1), 'Name', 'commande');
+s107 = linearize('vec107', io107);
+assert(isequal(s107.OutputName, {'commande(1)', 'commande(2)'}), 'un signal nomme donne son nom');
+
+% un modele echantillonne : DLINMOD, a la periode des blocs discrets
+new_system('ech107');
+add_block('built-in/Constant', 'ech107/src', 'SampleTime', '0.1');
+add_block('built-in/Sum', 'ech107/s', 'Inputs', '++');
+add_block('simulink/Discrete/Unit Delay', 'ech107/retard', 'SampleTime', '0.1');
+add_block('built-in/Gain', 'ech107/g', 'Gain', '0.5');
+add_line('ech107', {'src/1', 's/1', 'retard/1', 'g/1'}, {'s/1', 'retard/1', 'g/1', 's/2'});
+clear io107
+io107(1) = linio('ech107/src', 1, 'input');
+io107(2) = linio('ech107/retard', 1, 'output');
+s107 = linearize('ech107', io107);
+assert(s107.Ts == 0.1 && max(abs([s107.A s107.B s107.C s107.D] - [0.5 1 1 0])) < 1e-9, ...
+       'x+ = u + x/2, a la periode du retard');
+io107(3) = linio('ech107/g', 1, 'loopbreak');
+s107 = linearize('ech107', io107);
+assert(s107.Ts == 0.1 && max(abs([s107.A s107.B s107.C s107.D] - [0 1 1 0])) < 1e-9, ...
+       'la boucle coupee : un retard pur');
+% un retard qui herite sa periode du signal la garde quand un point s'y pose
+new_system('her107');
+add_block('built-in/Constant', 'her107/src', 'SampleTime', '0.1');
+add_block('simulink/Discrete/Unit Delay', 'her107/retard', 'SampleTime', '-1');
+add_block('built-in/Gain', 'her107/g', 'Gain', '0.5');
+add_block('built-in/Outport', 'her107/y');
+add_line('her107', {'src/1', 'retard/1', 'g/1'}, {'retard/1', 'g/1', 'y/1'});
+assert(isequal(get_param('her107/retard', 'CompiledSampleTime'), [0.1 0]), 'la periode heritee');
+clear io107
+io107(1) = linio('her107/src', 1, 'input');
+io107(2) = linio('her107/g', 1, 'output');
+s107 = linearize('her107', io107);
+assert(s107.Ts == 0.1 && max(abs([s107.A s107.B s107.C s107.D] - [0 1 0.5 0])) < 1e-9, ...
+       'une entree ajoutee n''entraine pas le retard a sa cadence');
+io107(1).Type = 'openinput';
+s107 = linearize('her107', io107);
+assert(s107.Ts == 0.1 && max(abs([s107.A s107.B s107.C s107.D] - [0 1 0.5 0])) < 1e-9, ...
+       'ni une coupure');
+% un point qui changerait la periode d'un etat discret est refuse, plutot
+% que de rendre la linearisation d'un autre modele
+new_system('inf107');
+add_block('built-in/Constant', 'inf107/src');
+add_block('simulink/Discrete/Unit Delay', 'inf107/retard', 'SampleTime', '-1');
+add_block('built-in/Outport', 'inf107/y');
+add_line('inf107', {'src/1', 'retard/1'}, {'retard/1', 'y/1'});
+clear io107
+io107(1) = linio('inf107/src', 1, 'input');
+io107(2) = linio('inf107/retard', 1, 'output');
+vu107 = '';
+try
+    linearize('inf107', io107);
+catch err
+    vu107 = err.identifier;
+    assert(~isempty(strfind(err.message, 'inf107/retard')), 'le refus nomme le bloc');
+end
+assert(strcmp(vu107, 'Simulink:Linearize:SampleTimeChanged'), ['periode changee : ' vu107]);
+
+% ce qui se refuse
+refus107 = {@() linearize('lin107', linio('lin107/absent', 1, 'input')), ...
+                'Simulink:Commands:InvSimulinkObjectName'; ...
+            @() linearize('lin107', linio('lin107/P', 2, 'input')), 'Simulink:Linearize:InvalidPort'; ...
+            @() linearize('lin107', linio('lin107/P', 1, 'input')), 'Simulink:Linearize:NoIO'; ...
+            @() linearize('lin107', linio('lin107/P', 1, 'sensitivity'), 3), ...
+                'Simulink:Linearize:OperatingPointUnsupported'; ...
+            @() linearize('lin107', 5), 'Simulink:Linearize:InvalidIO'; ...
+            @() linearize('lin107', setfield(linio('lin107/P', 1, 'sensitivity'), 'OpenLoop', 'on')), ...
+                'Simulink:Linearize:LinioType'; ...
+            @() linio('lin107/P', 1, 'entree'), 'Simulink:Linearize:LinioType'; ...
+            @() linio('lin107/P', 0), 'Simulink:Linearize:LinioPort'; ...
+            @() linio('lin107/P', 1, 'input', 'peut-etre'), 'Simulink:Linearize:LinioOpenLoop'; ...
+            @() linio(5, 1), 'Simulink:Linearize:LinioBlock'; ...
+            @() linio('lin107/P', 1, 'input', 'off', 'a.b'), 'Simulink:Linearize:LinioBusElement'};
+for q = 1:size(refus107, 1)
+    vu107 = '';
+    try
+        refus107{q, 1}();
+    catch err
+        vu107 = err.identifier;
+    end
+    assert(strcmp(vu107, refus107{q, 2}), sprintf('refus %d : %s', q, vu107));
+end
+bdclose('all');
+fprintf('linio et linearize : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

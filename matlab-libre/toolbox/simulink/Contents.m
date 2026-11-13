@@ -135,3 +135,5 @@
 %   linmod        - Linéarise autour d'un point de fonctionnement
 %   dlinmod       - Linéarise et échantillonne
 %   trim          - Cherche un point d'équilibre
+%   linio         - Un point d'analyse : entrée, sortie, coupure
+%   linearize     - Linéarise entre des points d'analyse
