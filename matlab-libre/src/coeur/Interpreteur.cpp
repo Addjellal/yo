@@ -2131,6 +2131,12 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                 if (n->acces.size() > segments && n->acces[segments].genre == '(') {
                     args = evaluerListe(n->acces[segments].args);
                     debut = segments + 1;
+                    // les noms des arguments, pour inputname, comme pour
+                    // une fonction au nom simple
+                    std::vector<std::string> noms;
+                    for (const NoeudPtr& a : n->acces[segments].args)
+                        noms.push_back(a && a->type == TypeN::Ident ? a->texte : std::string());
+                    poserNomsArguments(std::move(noms));
                 }
                 // Comme pour une fonction au nom simple, l'appel en
                 // instruction ne demande aucune sortie : « paquet.f(...) »
