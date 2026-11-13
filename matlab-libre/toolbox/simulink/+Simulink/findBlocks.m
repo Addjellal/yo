@@ -1,0 +1,45 @@
+function poignees = findBlocks(systeme, varargin)
+%SIMULINK.FINDBLOCKS Les blocs d'un système, par leurs poignées.
+%   H = SIMULINK.FINDBLOCKS(SYSTEME) rend en colonne les poignées de tous
+%   les blocs du système — un modèle de la session ou un de ses
+%   sous-systèmes, désigné par son nom, son chemin ou sa poignée —, à
+%   tous les niveaux et sous les masques.
+%   H = SIMULINK.FINDBLOCKS(SYSTEME,'Param',VALEUR,...) ne garde que ceux
+%   dont les paramètres ont ces valeurs.
+%   H = SIMULINK.FINDBLOCKS(...,OPTIONS) cherche comme le dit le
+%   Simulink.FindOptions donné en dernier.
+%
+%   GETFULLNAME(H) rend leurs chemins, GET_PARAM(H,...) les lit.
+%
+%   Exemple :
+%      bdclose('all');
+%      new_system('essai');
+%      add_block('built-in/Gain', 'essai/g1', 'Gain', '2');
+%      add_block('built-in/Gain', 'essai/g2', 'Gain', '3');
+%      add_block('built-in/Constant', 'essai/c');
+%      numel(Simulink.findBlocks('essai'))                   % 3
+%      getfullname(Simulink.findBlocks('essai', 'Gain', '3'))  % 'essai/g2'
+%      bdclose('all');
+%
+%   Voir aussi SIMULINK.FINDBLOCKSOFTYPE, SIMULINK.FINDOPTIONS, FIND_SYSTEM.
+    if isstruct(systeme)
+        error('Simulink:Commands:FindBlocksNeedsLoadedModel', ...
+              ['Simulink.findBlocks rend des poignees, que seuls portent les modeles de la ' ...
+               'session : designez le modele par son nom. FIND_SYSTEM(MODELE,...) cherche ' ...
+               'dans un modele par valeur.']);
+    end
+    options = Simulink.FindOptions;
+    if ~isempty(varargin) && isa(varargin{end}, 'Simulink.FindOptions')
+        options = varargin{end};
+        varargin(end) = [];
+    end
+    if mod(numel(varargin), 2) ~= 0
+        error('Simulink:Commands:FindBlocksPairs', ...
+              'Simulink.findBlocks(SYSTEME,NOM,VALEUR,...) : les criteres vont par paires.');
+    end
+    arguments = options.enArguments();
+    ici = getfullname(get_param(systeme, 'Handle'));
+    poignees = find_system(ici, arguments{:}, 'FindAll', 'on', 'Type', 'block', varargin{:});
+    % le système lui-même n'est pas l'un de ses blocs
+    poignees = poignees(poignees ~= get_param(systeme, 'Handle'));
+end

@@ -35,6 +35,16 @@
 %   getfullname   - Le chemin « modele/bloc » d'un bloc
 %   save_system   - Écrit un .m qui rebâtit le modèle
 %   load_system   - Relit ce .m
+%   getSimulinkBlockHandle - La poignée d'un bloc, ou -1
+%
+% Jeux de configuration
+%   getActiveConfigSet  - Le jeu de configuration actif
+%   getConfigSets       - Les noms des jeux d'un modèle
+%   getConfigSet        - Un jeu, par son nom
+%   attachConfigSet     - Attache un jeu à un modèle
+%   attachConfigSetCopy - Attache la copie d'un jeu
+%   setActiveConfigSet  - Rend un jeu actif
+%   detachConfigSet     - Détache un jeu
 %
 % Du schéma au programme
 %   Deux chemins, qu'il ne faut pas confondre. SAVE_SYSTEM écrit le

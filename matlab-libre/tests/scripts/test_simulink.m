@@ -13458,6 +13458,124 @@ bdclose('all');
 assert(isempty(find_system()), 'BDCLOSE(''all'') vide la session');
 fprintf('le modele par son nom : ok\n');
 
+%% ---------------------------------- 106. Les jeux de configuration, et findBlocks
+% Le jeu actif d'un modèle de la session lui reste lié : le régler règle
+% le modèle. Un jeu libre s'attache, s'active, se détache ; ses réglages
+% deviennent ceux que SIM applique.
+bdclose('all');
+new_system('jeux106');
+add_block('simulink/Sources/Clock', 'jeux106/t');
+add_block('built-in/Outport', 'jeux106/y');
+add_line('jeux106', 't/1', 'y/1');
+cs106 = getActiveConfigSet('jeux106');
+assert(isa(cs106, 'Simulink.ConfigSet') && strcmp(cs106.Name, 'Configuration') && ...
+       cs106.isActive() && strcmp(cs106.getModel(), 'jeux106'), 'le jeu actif, lie au modele');
+assert(strcmp(get_param(cs106, 'StopTime'), '10') && strcmp(get_param(cs106, 'Solver'), 'ode1'), ...
+       'ses reglages par defaut, en texte');
+set_param(cs106, 'StopTime', '5');
+assert(strcmp(get_param('jeux106', 'StopTime'), '5'), 'regler le jeu actif regle le modele');
+set_param('jeux106', 'FixedStep', '0.5');
+assert(strcmp(get_param(cs106, 'FixedStep'), '0.5'), 'et regler le modele se lit dans le jeu');
+r106 = sim('jeux106');
+assert(r106.tout(end) == 5 && numel(r106.tout) == 11, 'SIM applique le jeu actif');
+
+% un jeu libre : regle, copie, attache, active
+libre106 = Simulink.ConfigSet;
+libre106.Name = 'Rapide';
+set_param(libre106, 'StopTime', '2', 'Solver', 'ode4', 'FixedStep', '0.25');
+double106 = copy(libre106);
+set_param(double106, 'StopTime', '99');
+assert(strcmp(get_param(libre106, 'StopTime'), '2') && isempty(libre106.getModel()) && ...
+       ~libre106.isActive(), 'la copie est independante, le jeu libre n''est a personne');
+attachConfigSet('jeux106', libre106);
+assert(isequal(getConfigSets('jeux106'), {'Configuration'; 'Rapide'}) && ...
+       strcmp(libre106.getModel(), 'jeux106') && ~libre106.isActive(), 'attache, pas encore actif');
+assert(strcmp(get_param('jeux106', 'StopTime'), '5'), 'attacher ne change pas le modele');
+set_param(libre106, 'StopTime', '3');
+assert(strcmp(get_param(getConfigSet('jeux106', 'Rapide'), 'StopTime'), '3'), ...
+       'un jeu attache se regle dans le modele');
+setActiveConfigSet('jeux106', 'Rapide');
+assert(libre106.isActive() && ~cs106.isActive() && ...
+       strcmp(get_param('jeux106', 'Solver'), 'ode4') && ...
+       strcmp(get_param(cs106, 'StopTime'), '5'), 'active : ses reglages sont ceux du modele');
+r106 = sim('jeux106');
+assert(r106.tout(end) == 3 && numel(r106.tout) == 13, 'SIM applique le nouveau jeu actif');
+setActiveConfigSet('jeux106', 'Configuration');
+r106 = sim('jeux106');
+assert(r106.tout(end) == 5 && numel(r106.tout) == 11 && ...
+       strcmp(get_param('jeux106', 'Solver'), 'ode1'), 'et l''ancien, reactive, revient entier');
+
+% la copie d'un jeu, d'un modele a l'autre ; renommer ; detacher
+new_system('autre106');
+copie106 = attachConfigSetCopy('autre106', cs106, true);
+assert(strcmp(copie106.Name, 'Configuration1') && strcmp(copie106.getModel(), 'autre106') && ...
+       strcmp(cs106.getModel(), 'jeux106'), 'la copie renommee, l''original reste chez lui');
+setActiveConfigSet('autre106', 'Configuration1');
+assert(strcmp(get_param('autre106', 'StopTime'), '5') && ...
+       strcmp(get_param('autre106', 'FixedStep'), '0.5'), 'les reglages ont suivi');
+copie106.Name = 'Recu';
+copie106.Description = 'venu de jeux106';
+assert(isequal(getConfigSets('autre106'), {'Recu'; 'Configuration'}) && ...
+       strcmp(getActiveConfigSet('autre106').Description, 'venu de jeux106'), 'renommer un jeu lie');
+detache106 = detachConfigSet('jeux106', 'Rapide');
+assert(isequal(getConfigSets('jeux106'), {'Configuration'}) && isempty(detache106.getModel()) && ...
+       strcmp(get_param(detache106, 'StopTime'), '3'), 'detache, il garde ses reglages');
+
+% par valeur : les memes fonctions rendent le modele
+v106 = new_system('valeur106');
+v106 = attachConfigSet(v106, detache106);
+v106 = setActiveConfigSet(v106, 'Rapide');
+assert(get_param(v106, 'StopTime') == 3 && strcmp(get_param(v106, 'Solver'), 'ode4') && ...
+       isequal(getConfigSets(v106), {'Rapide'; 'Configuration'}), 'par valeur');
+[v106, rendu106] = detachConfigSet(setActiveConfigSet(v106, 'Configuration'), 'Rapide');
+assert(get_param(v106, 'StopTime') == 10 && strcmp(rendu106.Name, 'Rapide'), 'et detache par valeur');
+
+% ce qui se refuse
+refus106 = {@() set_param(cs106, 'Solver', 'ode99'), 'Simulink:Commands:SolveurInconnu'; ...
+            @() set_param(cs106, 'Absent', '1'), 'Simulink:Commands:ParamUnknown'; ...
+            @() get_param(cs106, 'Absent'), 'Simulink:Commands:ParamUnknown'; ...
+            @() attachConfigSet('jeux106', copy(cs106)), 'Simulink:ConfigSet:ConfigSetNameNotUnique'; ...
+            @() attachConfigSet('autre106', cs106), 'Simulink:ConfigSet:ConfigSetAlreadyAttached'; ...
+            @() detachConfigSet('jeux106', 'Configuration'), ...
+                'Simulink:ConfigSet:ActiveConfigSetCannotBeDetached'; ...
+            @() setActiveConfigSet('jeux106', 'Absent'), 'Simulink:ConfigSet:ConfigSetNotFound'; ...
+            @() attachConfigSet('jeux106', 3), 'Simulink:ConfigSet:InvalidConfigSet'};
+for q = 1:size(refus106, 1)
+    vu106 = '';
+    try
+        refus106{q, 1}();
+    catch err
+        vu106 = err.identifier;
+    end
+    assert(strcmp(vu106, refus106{q, 2}), sprintf('refus %d : %s', q, vu106));
+end
+
+% Simulink.findBlocks : des poignees, a tous les niveaux, sous les masques
+add_block('simulink/Ports & Subsystems/Subsystem', 'jeux106/S');
+add_block('built-in/Gain', 'jeux106/S/k', 'Gain', '4');
+add_block('built-in/Gain', 'jeux106/K', 'Gain', '4');
+tous106 = Simulink.findBlocks('jeux106');
+assert(isequal(sort(getfullname(tous106)), sort({'jeux106/t'; 'jeux106/y'; 'jeux106/S'; ...
+       'jeux106/S/In1'; 'jeux106/S/Out1'; 'jeux106/S/k'; 'jeux106/K'})), 'tous les blocs');
+assert(isequal(getfullname(Simulink.findBlocks('jeux106/S')), ...
+               {'jeux106/S/In1'; 'jeux106/S/Out1'; 'jeux106/S/k'}), ...
+       'un sous-systeme n''est pas l''un de ses blocs');
+assert(numel(Simulink.findBlocks('jeux106', 'Gain', '4')) == 2 && ...
+       numel(Simulink.findBlocksOfType('jeux106', 'Gain')) == 2 && ...
+       isequal(Simulink.findBlocksOfType('jeux106', 'Gain', Simulink.FindOptions('SearchDepth', 1)), ...
+               get_param('jeux106/K', 'Handle')), 'par parametre, par type, a un niveau');
+assert(isequal(Simulink.findBlocks('jeux106', 'Name', '^[kK]$', ...
+                                   Simulink.FindOptions('RegExp', true, 'SearchDepth', 1)), ...
+               get_param('jeux106/K', 'Handle')) && ...
+       numel(Simulink.findBlocks('jeux106', 'Name', 'k', ...
+                                 Simulink.FindOptions('CaseSensitive', false))) == 2, ...
+       'les options : expression reguliere, casse');
+assert(getSimulinkBlockHandle('jeux106/K') == get_param('jeux106/K', 'Handle') && ...
+       getSimulinkBlockHandle('jeux106/absent') == -1 && ...
+       getSimulinkBlockHandle('ferme106/b') == -1, 'getSimulinkBlockHandle');
+bdclose('all');
+fprintf('jeux de configuration, findBlocks : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

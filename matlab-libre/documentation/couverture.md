@@ -185,9 +185,13 @@ totalité.
    session — `new_system('m')`, `add_block('simulink/Sources/Step',
    'm/echelon')`, `set_param('m/echelon', 'Time', '2')`,
    `find_system('m', 'BlockType', 'Gain')` —, ses blocs par leur chemin
-   et tous par leur poignée ; il y manque les jeux de configuration
-   (`getActiveConfigSet`), `Simulink.findBlocks`, `Simulink.Mask`,
-   `linio` et `linearize`, le réglage Commented et les annotations ; les bus
+   et tous par leur poignée ; les jeux de configuration s'attachent et
+   s'activent (`Simulink.ConfigSet`, `getActiveConfigSet`,
+   `attachConfigSet`, `setActiveConfigSet`), mais seul le jeu actif
+   s'enregistre dans le fichier ; `Simulink.findBlocks` et
+   `Simulink.findBlocksOfType` cherchent par poignées ; il y manque
+   `Simulink.Mask`, `linio` et `linearize`, le réglage Commented et les
+   annotations ; les bus
    se forment et se défont par nom (Bus Creator, Bus Selector), et se
    typent par `Simulink.Bus` et `Simulink.BusElement` ; Data
    Type Conversion convertit en entier, simple ou booléen, avec arrondi

@@ -22,7 +22,10 @@ function varargout = matlibre_sl_nomme(action, varargin)
 %   'delete_param', 'getfullname', 'bdroot'.
 %   MATLIBRE_SL_NOMME('ranger',NOM,MODELE) inscrit un modèle en gardant sa
 %   figure ; MATLIBRE_SL_NOMME('systeme',OBJET) rend le nom du modèle et
-%   le chemin, dans ce modèle, de ce qu'un nom ou une poignée désigne.
+%   le chemin, dans ce modèle, de ce qu'un nom ou une poignée désigne ;
+%   [MODELE,NOM] = MATLIBRE_SL_NOMME('modele',OBJET) rend le modèle de la
+%   session qui porte l'objet ; MATLIBRE_SL_NOMME('reglage',NOM,V) rend la
+%   valeur d'un réglage de configuration comme Simulink la rend, en texte.
 %
 %   Les poignées sont celles de MATLIBRE_SL_SIGNAUX : un nombre par
 %   modèle, par bloc, par port et par ligne, le même tant que dure la
@@ -70,6 +73,15 @@ function varargout = matlibre_sl_nomme(action, varargin)
             varargout{1} = nomComplet(varargin{2});
         case 'bdroot'
             varargout{1} = designer(varargin{2});
+        case 'modele'
+            % [MODELE,NOM] = MATLIBRE_SL_NOMME('modele',OBJET) : le modèle de
+            % la session qui porte l'objet, et son nom.
+            varargout{2} = designer(varargin{1});
+            varargout{1} = modeleNomme(varargout{2});
+        case 'reglage'
+            % T = MATLIBRE_SL_NOMME('reglage',NOM,V) : la valeur d'un réglage
+            % de configuration, comme Simulink la rend — en texte.
+            varargout{1} = reglageEnTexte(varargin{1}, varargin{2});
         otherwise
             error('Simulink:Commands:InvalidAction', 'Action inconnue : %s.', ...
                   char(action));
@@ -440,14 +452,17 @@ function valeur = lireModele(modele, racine, parametre)
         case 'lines'
             valeur = lignesDe(racine, '', modele);
         otherwise
-            valeur = get_param(modele, parametre);
-            % Les réglages de la boîte de configuration sont du texte dans
-            % Simulink : StopTime vaut '10', non 10.
-            if (isnumeric(valeur) || islogical(valeur)) && ...
-               ~isempty(matlibre_sl_config('nom', parametre)) && ...
-               ~any(strcmpi(parametre, {'SimulationTime', 'PacingRate'}))
-                valeur = enTexte(valeur);
-            end
+            valeur = reglageEnTexte(parametre, get_param(modele, parametre));
+    end
+end
+
+% Les réglages de la boîte de configuration sont du texte dans Simulink :
+% StopTime vaut '10', non 10.
+function valeur = reglageEnTexte(parametre, valeur)
+    if (isnumeric(valeur) || islogical(valeur)) && ...
+       ~isempty(matlibre_sl_config('nom', parametre)) && ...
+       ~any(strcmpi(parametre, {'SimulationTime', 'PacingRate'}))
+        valeur = enTexte(valeur);
     end
 end
 
