@@ -48,6 +48,8 @@ function [a, b, c, d] = linmod(modele, x, u, para)
     if numel(para) >= 3 && para(3) > 0
         perturbation = para(3);
     end
+    % un modèle de la session se désigne aussi par son nom
+    modele = matlibre_sl_modele(modele);
     [blocsEtat, rangs, entrees, sorties, T] = matlibre_sl_etats(modele);
     refuserDerivateur(T);
 

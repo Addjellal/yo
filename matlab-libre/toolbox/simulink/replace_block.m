@@ -13,6 +13,10 @@ function modele = replace_block(modele, ancien, nouveau, varargin)
 %   intégrateur continu par son équivalent discret sans redessiner le
 %   schéma.
 %
+%   La forme de MATLAB : REPLACE_BLOCK(SYSTEME,ANCIEN,NOUVEAU,'noprompt')
+%   sur un modèle de la session désigné par son nom, à tous ses niveaux ;
+%   elle rend les chemins des blocs remplacés.
+%
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'integrator', 'i1');
@@ -23,6 +27,12 @@ function modele = replace_block(modele, ancien, nouveau, varargin)
 %      get_param(m, 'i2', 'SampleTime')         % 0.1
 %
 %   Voir aussi ADD_BLOCK, DELETE_BLOCK, SET_PARAM, FIND_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        modele = matlibre_sl_nomme('replace_block', nargout, modele, ancien, nouveau, ...
+                                   varargin{:});
+        return
+    end
     ancien = matlibre_sl_catalogue('type', ancien);
     nouveau = matlibre_sl_catalogue('type', nouveau);
     for i = 1:numel(modele.blocs)

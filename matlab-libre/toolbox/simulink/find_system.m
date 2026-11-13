@@ -11,6 +11,14 @@ function noms = find_system(modele, varargin)
 %   un gain de 2 se retrouve aussi bien par 2 que par '2', puisque c'est
 %   ainsi qu'ADD_BLOCK accepte de l'écrire.
 %
+%   La forme de MATLAB : FIND_SYSTEM(SYSTEME,OPTIONS...,CRITERES...),
+%   SYSTEME le nom d'un modèle de la session, un chemin ou une poignée,
+%   rend en colonne les chemins complets — le système lui-même, puis ses
+%   blocs, sous-systèmes compris. Options : SearchDepth, LookUnderMasks,
+%   FollowLinks, FindAll (des poignées, lignes et ports compris), RegExp,
+%   CaseSensitive, FirstResultOnly. FIND_SYSTEM() cherche dans tous les
+%   modèles ouverts, FIND_SYSTEM('type','block_diagram') les nomme.
+%
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'gain', 'g1', 'Gain', 2);
@@ -21,6 +29,16 @@ function noms = find_system(modele, varargin)
 %      find_system(m, 'Gain', 3)                    % {'g2'}
 %
 %   Voir aussi GET_PARAM, SET_PARAM, ADD_BLOCK, NEW_SYSTEM.
+    % La forme de MATLAB : les modèles ouverts, désignés par leur nom ;
+    % FIND_SYSTEM() les rend tous.
+    if nargin == 0
+        noms = matlibre_sl_nomme('find_system', nargout);
+        return
+    end
+    if ~isstruct(modele)
+        noms = matlibre_sl_nomme('find_system', nargout, modele, varargin{:});
+        return
+    end
     noms = {};
     for i = 1:numel(modele.blocs)
         bloc = modele.blocs{i};

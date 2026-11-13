@@ -12,6 +12,9 @@ function modele = delete_block(modele, nom)
 %   l'ancien intact : un modèle est ici une valeur, non une référence.
 %   Dans MATLAB, DELETE_BLOCK modifie le modèle ouvert et ne rend rien.
 %
+%   La forme de MATLAB : DELETE_BLOCK(CHEMIN), le bloc 'modele/bloc' d'un
+%   modèle de la session, sa poignée, ou une cellule de chemins.
+%
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'constant', 'c', 'Value', 1);
@@ -22,6 +25,12 @@ function modele = delete_block(modele, nom)
 %      isempty(m.liens)                     % le lien est parti avec le bloc
 %
 %   Voir aussi ADD_BLOCK, DELETE_LINE, REPLACE_BLOCK, FIND_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        matlibre_sl_nomme('delete_block', nargout, modele);
+        clear modele
+        return
+    end
     k = matlibre_sl_indice(modele, nom);
     modele.blocs(k) = [];
     if ~isempty(modele.liens)

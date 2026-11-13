@@ -25,6 +25,12 @@ function modele = add_param(modele, varargin)
 %      numel(r.temps)                   % 5 : de 0 a 2 par pas de 0,5
 %
 %   Voir aussi DELETE_PARAM, SET_PARAM, GET_PARAM, NEW_SYSTEM, SIM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        matlibre_sl_nomme('add_param', nargout, modele, varargin{:});
+        clear modele
+        return
+    end
     if ~isfield(modele, 'parametres')
         modele.parametres = struct();
     end

@@ -31,6 +31,8 @@ function [x, u, y, dx] = trim(modele, x0, u0, y0, ix, iu, iy)
 %      abs(xe - 1) < 1e-8                   % l'equilibre de x' = u - x
 %
 %   Voir aussi LINMOD, DLINMOD, SIM, FSOLVE.
+    % un modèle de la session se désigne aussi par son nom
+    modele = matlibre_sl_modele(modele);
     [~, ~, entrees, ~, T] = matlibre_sl_etats(modele);
     nEtats = numel(T.x0);
     nEntrees = 0;

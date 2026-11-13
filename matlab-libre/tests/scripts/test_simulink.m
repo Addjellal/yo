@@ -12594,7 +12594,7 @@ assert(double(r97.yout(end)) == 21 && isa(r97.yout, 'int8'), 'le modele relu se 
 hws97.DataSource = 'MATLAB Code';
 hws97.MATLABCode = 'K = 2;';
 save_system(f97, fichier97);
-new_system('espace97');
+bdclose('espace97');   % ferme le modele relu, et vide son espace
 g97 = load_system(fichier97);
 delete(fichier97);
 h97 = get_param(g97, 'ModelWorkspace');
@@ -13279,6 +13279,184 @@ cd(avant104);
 rmdir(dossier104, 's');
 assert(isempty(echecs104), sprintf('chaque choix : %s', strjoin(echecs104, ' ; ')));
 fprintf('chaque choix de chaque bloc : %d essais, %d refus nommes\n', nEssais104, nRefus104);
+
+%% ------------------------- 105. La forme de MATLAB : le modèle désigné par son nom
+% Dans MATLAB, un modèle est un objet de la session : NEW_SYSTEM('nom') l'y
+% met, et tout le reste le désigne par son nom, ses blocs par leur chemin
+% « modele/bloc », l'un et l'autre par leur poignée. Les mêmes fonctions
+% que par valeur, sur le registre de la session.
+bdclose('all');
+new_system('nom105');
+assert(bdIsLoaded('nom105'), 'NEW_SYSTEM sans sortie met le modele dans la session');
+h105 = add_block('simulink/Sources/Step', 'nom105/echelon', 'Time', '0');
+add_block('simulink/Math Operations/Sum', 'nom105/ecart', 'Inputs', '+-');
+add_block('simulink/Continuous/Transfer Fcn', 'nom105/procede', ...
+          'Numerator', '1', 'Denominator', '[1 2 1]');
+add_block('built-in/Outport', 'nom105/y');
+l105 = add_line('nom105', {'echelon/1', 'ecart/1', 'procede/1', 'procede/1'}, ...
+                {'ecart/1', 'procede/1', 'y/1', 'ecart/2'});
+assert(numel(l105) == 4 && l105(3) == l105(4), 'une ligne par port de depart');
+r105 = sim('nom105', 'StopTime', '30');
+assert(abs(r105.yout(end) - 0.5) < 1e-3, 'la boucle fermee de 1/(s+1)^2 tend vers 1/2');
+
+% lire : le type de Simulink, les parametres en texte, les poignees
+assert(strcmp(get_param('nom105/procede', 'BlockType'), 'TransferFcn'), 'BlockType de Simulink');
+assert(strcmp(get_param('nom105/procede', 'Type'), 'block') && ...
+       strcmp(get_param('nom105', 'Type'), 'block_diagram'), 'Type');
+assert(strcmp(get_param('nom105/procede', 'Denominator'), '[1 2 1]'), 'le texte donne');
+assert(strcmp(get_param('nom105/echelon', 'After'), '1'), 'un defaut numerique, en texte');
+assert(strcmp(get_param('nom105/ecart', 'Parent'), 'nom105') && ...
+       isempty(get_param('nom105', 'Parent')), 'Parent');
+assert(get_param('nom105/echelon', 'Handle') == h105 && ...
+       strcmp(get_param(h105, 'Name'), 'echelon') && ...
+       strcmp(getfullname(h105), 'nom105/echelon'), 'la poignee d''un bloc');
+assert(strcmp(getfullname(get_param('nom105', 'Handle')), 'nom105') && ...
+       strcmp(bdroot(h105), 'nom105'), 'la poignee du modele');
+assert(isequal(get_param('nom105', 'Blocks'), {'echelon'; 'ecart'; 'procede'; 'y'}), 'Blocks');
+assert(isequal(get_param({'nom105/echelon', 'nom105/y'}, 'BlockType'), {'Step', 'Outport'}), ...
+       'plusieurs objets a la fois');
+
+% regler : un bloc, le modele
+set_param('nom105/echelon', 'After', '2');
+set_param('nom105', 'StopTime', '40');
+assert(strcmp(get_param('nom105', 'StopTime'), '40'), 'un reglage du modele, en texte');
+r105 = sim('nom105');
+assert(r105.tout(end) == 40 && abs(r105.yout(end) - 1) < 1e-3, 'l''echelon de 2 mene a 1');
+set_param('nom105/procede', 'Position', [200 100 260 140]);
+assert(isequal(get_param('nom105/procede', 'Position'), [200 100 260 140]), 'Position reste un nombre');
+
+% les ports et les lignes
+ph105 = get_param('nom105/procede', 'PortHandles');
+ligne105 = get_param(ph105.Outport(1), 'Line');
+assert(ligne105 == l105(3) && strcmp(get_param(ligne105, 'Type'), 'line') && ...
+       strcmp(get_param(ph105.Outport(1), 'Type'), 'port'), 'la ligne d''un port');
+assert(get_param(ligne105, 'SrcBlockHandle') == get_param('nom105/procede', 'Handle') && ...
+       get_param(ligne105, 'SrcPortHandle') == ph105.Outport(1) && ...
+       numel(get_param(ligne105, 'DstPortHandle')) == 2, 'les bouts d''une ligne');
+set_param(ligne105, 'Name', 'sortie105');
+assert(strcmp(get_param(ph105.Outport(1), 'Name'), 'sortie105') && ...
+       strcmp(get_param(ligne105, 'Name'), 'sortie105'), 'le nom d''une ligne est celui du signal');
+lh105 = get_param('nom105/ecart', 'LineHandles');
+assert(isequal(lh105.Inport, [l105(1), ligne105]) && lh105.Outport == l105(2), 'LineHandles');
+pc105 = get_param('nom105/ecart', 'PortConnectivity');
+assert(numel(pc105) == 3 && pc105(1).SrcBlock == h105 && pc105(1).SrcPort == 0 && ...
+       pc105(3).DstBlock == get_param('nom105/procede', 'Handle'), 'PortConnectivity');
+assert(get_param(get_param('nom105/y', 'PortHandles').Inport(1), 'Line') == ligne105, ...
+       'la ligne qui arrive sur une entree');
+
+% chercher
+assert(isequal(find_system('nom105'), {'nom105'; 'nom105/echelon'; 'nom105/ecart'; ...
+                                      'nom105/procede'; 'nom105/y'}), ...
+       'FIND_SYSTEM : le systeme, puis ses blocs');
+assert(isequal(find_system('nom105', 'BlockType', 'Sum'), {'nom105/ecart'}), 'par type');
+assert(isequal(find_system('nom105', 'RegExp', 'on', 'Name', '^e'), ...
+               {'nom105/echelon'; 'nom105/ecart'}), 'par expression reguliere');
+assert(isequal(find_system('nom105', 'CaseSensitive', 'off', 'Name', 'ECART'), ...
+               {'nom105/ecart'}) && isempty(find_system('nom105', 'Name', 'ECART')), 'la casse');
+assert(isequal(find_system('nom105', 'SearchDepth', 0), {'nom105'}), 'SearchDepth 0');
+assert(isequal(find_system('type', 'block_diagram'), {'nom105'}) && ...
+       isequal(find_system('SearchDepth', 0), {'nom105'}), 'les modeles ouverts');
+assert(isequal(sort(find_system('nom105', 'FindAll', 'on', 'Type', 'line')), sort(l105(1:3))), ...
+       'FindAll rend les poignees des lignes');
+assert(isequal(find_system(get_param('nom105', 'Handle'), 'BlockType', 'Step'), h105), ...
+       'depuis une poignee, des poignees');
+
+% un sous-systeme, bati par ses chemins
+add_block('built-in/Subsystem', 'nom105/regul');
+add_block('built-in/Inport', 'nom105/regul/e');
+add_block('built-in/Gain', 'nom105/regul/k', 'Gain', '4');
+add_block('built-in/Outport', 'nom105/regul/u');
+add_line('nom105/regul', 'e/1', 'k/1');
+add_line('nom105/regul', 'k/1', 'u/1');
+delete_line('nom105', 'ecart/1', 'procede/1');
+add_line('nom105', 'ecart/1', 'regul/1', 'autorouting', 'on');
+phr105 = get_param('nom105/regul', 'PortHandles');
+add_line('nom105', phr105.Outport(1), ph105.Inport(1));
+r105 = sim('nom105');
+assert(abs(r105.yout(end) - 1.6) < 1e-3, 'un gain de 4 dans la boucle : 2 x 4/5');
+assert(strcmp(get_param('nom105/regul/k', 'Parent'), 'nom105/regul') && ...
+       strcmp(bdroot('nom105/regul/k'), 'nom105'), 'le parent d''un bloc interieur');
+assert(numel(find_system('nom105')) == 9 && numel(find_system('nom105', 'SearchDepth', 1)) == 6 && ...
+       isequal(find_system('nom105/regul', 'BlockType', 'Gain'), {'nom105/regul/k'}), ...
+       'la recherche descend dans les sous-systemes');
+set_param('nom105/regul/k', 'Gain', '9');
+r105 = sim('nom105');
+assert(abs(r105.yout(end) - 1.8) < 1e-3, 'un gain de 9 : 2 x 9/10');
+
+% recopier, nommer sans collision, retirer, remplacer
+add_block('nom105/regul/k', 'nom105/copie');
+assert(strcmp(get_param('nom105/copie', 'Gain'), '9'), 'un bloc recopie garde ses parametres');
+c105 = add_block('built-in/Gain', 'nom105/copie', 'MakeNameUnique', 'on');
+assert(strcmp(get_param(c105, 'Name'), 'copie1'), 'MakeNameUnique');
+delete_block(c105);
+delete_block({'nom105/copie'});
+assert(numel(get_param('nom105', 'Blocks')) == 5, 'DELETE_BLOCK, par poignee et par chemin');
+add_block('built-in/Gain', 'nom105/libre');
+add_block('built-in/Terminator', 'nom105/fin');
+fil105 = add_line('nom105', 'libre/1', 'fin/1');
+delete_line(fil105);
+lh105 = get_param('nom105/fin', 'LineHandles');
+assert(lh105.Inport == -1, 'DELETE_LINE par poignee ; un port libre rend -1');
+delete_block('nom105/fin');
+remplaces105 = replace_block('nom105', 'Gain', 'built-in/Abs', 'noprompt');
+assert(isequal(sort(remplaces105), {'nom105/libre'; 'nom105/regul/k'}) && ...
+       strcmp(get_param('nom105/regul/k', 'BlockType'), 'Abs'), 'REPLACE_BLOCK, a tous les niveaux');
+delete_block('nom105/libre');
+r105 = sim('nom105');
+assert(abs(r105.yout(end) - 1) < 1e-3, '|e| a la place du gain : 2/2');
+
+% le Subsystem de la bibliotheque arrive garni ; une copie se nomme sans collision
+add_block('simulink/Ports & Subsystems/Subsystem', 'nom105/garni');
+assert(isequal(find_system('nom105/garni'), ...
+               {'nom105/garni'; 'nom105/garni/In1'; 'nom105/garni/Out1'}), ...
+       'le Subsystem de la bibliotheque : une entree reliee a une sortie');
+d105 = add_block('nom105/garni', 'nom105/garni', 'MakeNameUnique', 'on');
+assert(strcmp(getfullname(d105), 'nom105/garni1'), 'MakeNameUnique sur une copie');
+delete_block({'nom105/garni', 'nom105/garni1'});
+
+% enregistrer sous un autre nom, fermer, relire
+dossier105 = tempname;
+mkdir(dossier105);
+fichier105 = fullfile(dossier105, 'relu105.slx');
+save_system('nom105', fichier105);
+assert(exist(fichier105, 'file') == 2 && bdIsLoaded('relu105') && ~bdIsLoaded('nom105'), ...
+       'enregistre sous un autre nom, le modele le prend');
+close_system('relu105', 0);
+assert(~bdIsLoaded('relu105'), 'CLOSE_SYSTEM(NOM,0) ferme sans enregistrer');
+load_system(fichier105);
+assert(numel(find_system('relu105')) == 9 && ...
+       strcmp(get_param('relu105/procede', 'Denominator'), '[1 2 1]'), 'relu du fichier');
+relu105 = sim('relu105');
+assert(max(abs(relu105.yout - r105.yout)) < 1e-12, 'et il se simule de meme');
+[A105, B105, C105, D105] = linmod('relu105'); %#ok<ASGLU>
+assert(isequal(size(A105), [2 2]), 'LINMOD par le nom');
+rmdir(dossier105, 's');
+
+% ce qui se refuse, et comment
+refus105 = {@() evalc('new_system(''relu105'');'), 'Simulink:Commands:NewSysAlreadyExists'; ...
+            @() get_param('absent105/b', 'Gain'), 'Simulink:Commands:InvSimulinkObjectName'; ...
+            @() get_param('relu105/absent', 'Gain'), 'Simulink:Commands:InvSimulinkObjectName'; ...
+            @() add_block('built-in/Gain', 'relu105'), 'Simulink:Commands:AddBlockInvalidDest'; ...
+            @() get_param(123456.5, 'Name'), 'Simulink:Commands:InvSimulinkObjectHandle'; ...
+            @() set_param('relu105/procede', 'Absent', '1'), 'Simulink:Commands:ParamUnknown'; ...
+            @() add_line('relu105', 'procede/1', 'absent/1'), 'Simulink:Commands:InvSimulinkObjectName'};
+for q = 1:size(refus105, 1)
+    vu105 = '';
+    try
+        refus105{q, 1}();
+    catch err
+        vu105 = err.identifier;
+    end
+    assert(strcmp(vu105, refus105{q, 2}), sprintf('refus %d : %s', q, vu105));
+end
+
+% la forme par valeur reste ce qu'elle etait : un modele repris dans une
+% variable n'entre pas dans la session
+valeur105 = new_system('valeur105');
+assert(~bdIsLoaded('valeur105') && isstruct(valeur105), 'NEW_SYSTEM avec sortie rend la valeur');
+bdclose('all');
+assert(isempty(find_system()), 'BDCLOSE(''all'') vide la session');
+fprintf('le modele par son nom : ok\n');
 
 disp('simulink : toutes les verifications passent');
 

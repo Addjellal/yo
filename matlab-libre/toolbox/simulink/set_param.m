@@ -43,6 +43,11 @@ function modele = set_param(modele, nom, varargin)
 %   instant sur N, DataLoggingLimitDataPoints et DataLoggingMaxPoints
 %   les derniers.
 %
+%   La forme de MATLAB : SET_PARAM(OBJET,'Param',VALEUR,...), sans sortie,
+%   règle dans la session l'objet que désigne son nom ('modele'), son
+%   chemin ('modele/bloc') ou sa poignée — un modèle, un bloc, un port, ou
+%   une ligne, qui porte les réglages du signal.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -63,6 +68,16 @@ function modele = set_param(modele, nom, varargin)
 %      get_param(m, 'Solver')                   % 'ode4'
 %
 %   Voir aussi GET_PARAM, ADD_PARAM, ADD_BLOCK, SIM, REPLACE_BLOCK.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        if nargin < 2
+            error('Simulink:Commands:SetParamArguments', ...
+                  'SET_PARAM(OBJET,NOM,VALEUR,...) : les reglages vont par paires.');
+        end
+        matlibre_sl_nomme('set_param', nargout, modele, nom, varargin{:});
+        clear modele
+        return
+    end
     % Une poignée de port : le signal qui en part, son nom et son journal.
     if isnumeric(nom)
         modele = matlibre_sl_signaux('poser', modele, nom, varargin{:});

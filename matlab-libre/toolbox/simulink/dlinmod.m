@@ -45,6 +45,8 @@ function [a, b, c, d] = dlinmod(modele, Ts, x, u, para)
         error('Simulink:Commands:DlinmodPeriode', ...
               'La periode d''echantillonnage doit etre un nombre positif.');
     end
+    % un modèle de la session se désigne aussi par son nom
+    modele = matlibre_sl_modele(modele);
     if ~isempty(Ts) && Ts > 0
         [~, ~, entrees, ~, T] = matlibre_sl_etats(modele);
         discrets = blocsDiscrets(T, Ts);

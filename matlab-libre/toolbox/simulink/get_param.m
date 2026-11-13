@@ -43,6 +43,15 @@ function valeur = get_param(modele, nom, parametre)
 %   une erreur qui le nomme, plutôt que de rendre une valeur vide dont on
 %   ne saurait pas si elle est le réglage ou son absence.
 %
+%   La forme de MATLAB : V = GET_PARAM(OBJET,'Param'), OBJET un modèle de
+%   la session ('modele'), un bloc ('modele/bloc'), une poignée, ou une
+%   cellule de ceux-là. Elle répond comme Simulink : les paramètres du
+%   dialogue et les réglages de configuration en texte ('3', non 3),
+%   BlockType le type de Simulink ('Gain'), Type 'block', 'block_diagram',
+%   'port' ou 'line'. S'y ajoutent Handle, LineHandles, PortConnectivity,
+%   Lines et, pour un port ou une ligne, Line, SrcBlockHandle,
+%   SrcPortHandle, DstBlockHandle, DstPortHandle.
+%
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'gain', 'g', 'Gain', 2);
@@ -55,6 +64,15 @@ function valeur = get_param(modele, nom, parametre)
 %      get_param(m, 'Solver')               % 'ode1'
 %
 %   Voir aussi SET_PARAM, ADD_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        if nargin ~= 2
+            error('Simulink:Commands:GetParamArguments', ...
+                  'GET_PARAM(OBJET,NOM) : un objet, designe par son nom ou sa poignee, et un reglage.');
+        end
+        valeur = matlibre_sl_nomme('get_param', nargout, modele, nom);
+        return
+    end
     % Une poignée de port : les réglages du signal qui en part.
     if isnumeric(nom)
         if nargin < 3

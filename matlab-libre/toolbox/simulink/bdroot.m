@@ -8,6 +8,9 @@ function nom = bdroot(modele)
 %   et non un objet ouvert dans une fenêtre : il n'y a rien à remonter,
 %   sinon le nom.
 %
+%   BDROOT(CHEMIN) et BDROOT(H) rendent le nom du modèle qui porte le
+%   bloc 'modele/sousSysteme/bloc' ou l'objet de poignée H.
+%
 %   Exemple :
 %      m = new_system('asservissement');
 %      bdroot(m)                        % 'asservissement'
@@ -17,8 +20,9 @@ function nom = bdroot(modele)
         nom = gcs();
         return
     end
-    if ischar(modele) || isstring(modele)
-        nom = char(modele);
+    if ischar(modele) || isstring(modele) || isnumeric(modele)
+        % d'un chemin ou d'une poignée, le modèle qui porte l'objet
+        nom = matlibre_sl_nomme('bdroot', nargout, modele);
         return
     end
     if ~isstruct(modele) || ~isfield(modele, 'nom')

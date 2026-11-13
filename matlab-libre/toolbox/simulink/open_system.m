@@ -36,6 +36,20 @@ function h = open_system(modele)
     if nargin < 1
         error('MATLAB:minrhs', 'OPEN_SYSTEM attend un modèle.');
     end
+    if isnumeric(modele) && isscalar(modele) && ...
+       ~isempty(matlibre_sl_signaux('cle', double(modele)))
+        % une poignée : l'objet qu'elle désigne
+        modele = matlibre_sl_nomme('getfullname', 1, modele);
+    end
+    if (ischar(modele) || isstring(modele)) && any(char(modele) == '/') && ...
+       matlibre_sl_ouverts('connu', bdroot(modele))
+        % Un bloc ou un sous-système d'un modèle ouvert : dans Simulink,
+        % sa fenêtre ou son dialogue. Il n'y en a pas ici, et rien à faire.
+        if nargout > 0
+            h = [];
+        end
+        return
+    end
     if ischar(modele) || isstring(modele)
         modele = matlibre_sl_modele(modele);
     end

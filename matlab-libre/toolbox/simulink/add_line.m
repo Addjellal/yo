@@ -33,6 +33,12 @@ function modele = add_line(modele, source, destination, entree, sortie)
 %   résout à chaque pas, et le signale selon le réglage AlgebraicLoopMsg
 %   du modèle.
 %
+%   La forme de MATLAB : H = ADD_LINE(SYSTEME,SORTIE,ENTREE), SYSTEME le nom
+%   d'un modèle de la session ou le chemin d'un de ses sous-systèmes,
+%   SORTIE et ENTREE des 'bloc/port', des poignées de port, ou des
+%   cellules de l'un ou de l'autre ; elle rend la poignée de chaque ligne.
+%   'autorouting' est accepté : le tracé se calcule de toute façon.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -45,6 +51,20 @@ function modele = add_line(modele, source, destination, entree, sortie)
 %      m = add_line(m, 'gain', 'sortie');
 %
 %   Voir aussi ADD_BLOCK, DELETE_LINE, NEW_SYSTEM, SIM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        arguments = {modele};
+        if nargin >= 2, arguments{end + 1} = source; end
+        if nargin >= 3, arguments{end + 1} = destination; end
+        if nargin >= 4, arguments{end + 1} = entree; end
+        if nargin >= 5, arguments{end + 1} = sortie; end
+        ligne = matlibre_sl_nomme('add_line', nargout, arguments{:});
+        clear modele
+        if nargout > 0
+            modele = ligne;
+        end
+        return
+    end
     if estPhysique(source) || estPhysique(destination)
         modele = lienPhysique(modele, source, destination);
         return

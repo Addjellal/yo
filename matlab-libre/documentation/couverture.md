@@ -180,7 +180,14 @@ totalité.
    connaît pas est nommé dans l'erreur, avec tous les autres. Les
    sous-systèmes se masquent (`Mask`, `MaskVariables`,
    `MaskValueString`), les bibliothèques se bâtissent avec
-   `new_system(nom, 'Library')` et leurs copies restent liées ; les bus
+   `new_system(nom, 'Library')` et leurs copies restent liées ; un
+   modèle se désigne aussi comme dans MATLAB, par son nom dans la
+   session — `new_system('m')`, `add_block('simulink/Sources/Step',
+   'm/echelon')`, `set_param('m/echelon', 'Time', '2')`,
+   `find_system('m', 'BlockType', 'Gain')` —, ses blocs par leur chemin
+   et tous par leur poignée ; il y manque les jeux de configuration
+   (`getActiveConfigSet`), `Simulink.findBlocks`, `Simulink.Mask`,
+   `linio` et `linearize`, le réglage Commented et les annotations ; les bus
    se forment et se défont par nom (Bus Creator, Bus Selector), et se
    typent par `Simulink.Bus` et `Simulink.BusElement` ; Data
    Type Conversion convertit en entier, simple ou booléen, avec arrondi

@@ -83,7 +83,8 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 MATLAB, ce sont plusieurs milliers de fonctions et un environnement
 graphique complet. Ce dépôt en couvre une part utile, pas la totalité :
 pas d'éditeur de schéma Simulink (les modèles se décrivent en appelant
-`add_block` et `add_line`, mais la simulation est réelle), pas d'App
+`add_block` et `add_line` — par valeur, ou comme dans MATLAB par le nom
+du modèle et le chemin du bloc —, mais la simulation est réelle), pas d'App
 Designer, génération de code C restreinte aux scalaires et aux matrices de
 taille fixe, pas d'objets ni de poignées de fonction dans les fichiers
 MAT. La liste complète des écarts est dans

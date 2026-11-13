@@ -23,6 +23,19 @@ function modele = load_system(nom)
 %   Voir aussi SAVE_SYSTEM, OPEN_SYSTEM, BDISLOADED, GCS, SIM.
     nom = char(nom);
     [dossier, base, extension] = fileparts(nom);
+    if isempty(dossier) && isempty(extension)
+        % Déjà dans la session : rien à relire, comme dans Simulink.
+        if matlibre_sl_ouverts('connu', nom)
+            modele = matlibre_sl_ouverts('lire', nom);
+            return
+        end
+        % La bibliothèque de blocs de Simulink n'est pas un fichier ici :
+        % ADD_BLOCK connaît ses chemins sans qu'on la charge.
+        if any(strcmpi(nom, {'simulink', 'built-in'}))
+            modele = [];
+            return
+        end
+    end
     if strcmpi(extension, '.slx') || strcmpi(extension, '.mdl')
         modele = matlibre_sl_slx('lire', nom);
         charge(modele);

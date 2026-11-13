@@ -11,6 +11,10 @@ function modele = delete_line(modele, source, destination, entree, sortie)
 %   Un lien qui n'existe pas lève une erreur qui nomme les deux blocs,
 %   plutôt que de laisser croire à une suppression qui n'a pas eu lieu.
 %
+%   La forme de MATLAB : DELETE_LINE(SYSTEME,SORTIE,ENTREE) sur un modèle
+%   de la session désigné par son nom, et DELETE_LINE(H), H la poignée
+%   d'une ligne, qui retire tous les liens partant de ce port.
+%
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'constant', 'c', 'Value', 1);
@@ -20,6 +24,16 @@ function modele = delete_line(modele, source, destination, entree, sortie)
 %      isempty(m.liens)                 % vrai
 %
 %   Voir aussi ADD_LINE, DELETE_BLOCK, NEW_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        if nargin < 3
+            matlibre_sl_nomme('delete_line', nargout, modele);
+        else
+            matlibre_sl_nomme('delete_line', nargout, modele, source, destination);
+        end
+        clear modele
+        return
+    end
     physique = @(t) (ischar(t) || isstring(t)) && ...
                     ~isempty(regexp(char(t), '/(LConn|RConn)\d+$', 'once', 'ignorecase'));
     if physique(source) && physique(destination) && isfield(modele, 'connexions')

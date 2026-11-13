@@ -1542,6 +1542,11 @@ end
 % l'appelant, un fichier .m qui le construit, ou un fichier .slx ou .mdl
 % de Simulink, que MATLIBRE_SL_SLX lit.
 function modele = chargerModele(nom)
+    % un modèle de la session, celui que NEW_SYSTEM('nom') y a mis
+    if matlibre_sl_ouverts('connu', nom)
+        modele = matlibre_sl_ouverts('lire', nom);
+        return
+    end
     [~, ~, extension] = fileparts(nom);
     if any(strcmpi(extension, {'.slx', '.mdl'}))
         modele = matlibre_sl_slx('lire', nom);

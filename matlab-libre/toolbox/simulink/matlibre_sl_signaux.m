@@ -47,6 +47,15 @@ function varargout = matlibre_sl_signaux(action, varargin)
             varargout{1} = journal(varargin{:});
         case 'defauts'
             varargout{1} = defauts();
+        case 'numero'
+            % H = MATLIBRE_SL_SIGNAUX('numero',CLE) : la poignée d'une clé
+            % « modele|chemin|genre|rang » — un port, mais aussi un bloc,
+            % une ligne ou un modèle, pour MATLIBRE_SL_NOMME.
+            varargout{1} = registre('numero', varargin{1});
+        case 'cle'
+            % CLE = MATLIBRE_SL_SIGNAUX('cle',H) : la clé d'une poignée,
+            % '' si le nombre n'en est pas une.
+            varargout{1} = registre('cle', varargin{1});
         case 'nom'
             % NOM = MATLIBRE_SL_SIGNAUX('nom',BLOC,PORT) : le nom du signal
             % qui part du port de sortie PORT, '' s'il n'en a pas.

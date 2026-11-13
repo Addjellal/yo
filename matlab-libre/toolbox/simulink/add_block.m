@@ -537,6 +537,12 @@ function modele = add_block(modele, type, nom, varargin)
 %      r = sim(m, 1, 0.01);                          % le gain vaut 4
 %      K = 10; r = sim(m, 1, 0.01);                  % il vaut 10
 %
+%   La forme de MATLAB : H = ADD_BLOCK(SOURCE,DESTINATION,'Param',VALEUR,...)
+%   pose dans un modèle de la session — NEW_SYSTEM('nom') l'y met — le bloc
+%   SOURCE ('simulink/Sources/Step', 'built-in/Gain', ou le chemin d'un
+%   bloc existant, qu'elle recopie) sous le chemin DESTINATION,
+%   'nom/bloc' ou 'nom/sousSysteme/bloc', et rend sa poignée.
+%
 %   Exemple :
 %      m = new_system('rampe');
 %      m = add_block(m, 'constant', 'un', 'Value', 2);
@@ -544,6 +550,20 @@ function modele = add_block(modele, type, nom, varargin)
 %      get_param(m, 'integ', 'BlockType')         % 'integrator'
 %
 %   Voir aussi NEW_SYSTEM, ADD_LINE, SET_PARAM, DELETE_BLOCK, SIM, OPEN_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        if nargin < 3
+            reste = {};
+        else
+            reste = [{nom}, varargin];
+        end
+        pose = matlibre_sl_nomme('add_block', nargout, modele, type, reste{:});
+        clear modele
+        if nargout > 0
+            modele = pose;
+        end
+        return
+    end
     nom = char(nom);
     % « bibliotheque/bloc » : un bloc d'une bibliothèque de l'utilisateur,
     % ou d'un autre modèle, recopié — et lié s'il vient d'une bibliothèque.

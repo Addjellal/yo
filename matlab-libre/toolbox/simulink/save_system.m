@@ -20,6 +20,10 @@ function fichier = save_system(modele, fichier)
 %   bâtit d'abord, dans sa propre variable, puis le donne au bloc qui
 %   l'abrège : un schéma emboîté se relit donc comme un schéma plat.
 %
+%   La forme de MATLAB : SAVE_SYSTEM(NOM) écrit NOM.slx depuis le modèle de
+%   la session ; SAVE_SYSTEM(NOM,FICHIER) sous un autre nom de fichier, que
+%   le modèle ouvert prend alors, comme dans Simulink.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'c', 'Value', 2);
@@ -31,6 +35,14 @@ function fichier = save_system(modele, fichier)
 %      delete(chemin);
 %
 %   Voir aussi LOAD_SYSTEM, NEW_SYSTEM, ADD_BLOCK, ADD_LINE, CLOSE_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ischar(modele) || isstring(modele) || isnumeric(modele)
+        if nargin < 2
+            fichier = '';
+        end
+        fichier = matlibre_sl_nomme('save_system', nargout, modele, fichier);
+        return
+    end
     if ~isstruct(modele) || ~isfield(modele, 'blocs')
         error('Simulink:Commands:InvalidModel', ...
               'SAVE_SYSTEM attend un modele bati par NEW_SYSTEM.');
