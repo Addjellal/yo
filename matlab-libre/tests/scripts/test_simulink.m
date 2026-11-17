@@ -14295,6 +14295,53 @@ assert(max(abs(deplie110.yout{1}.Values.Data - avant110.yout{1}.Values.Data)) < 
 bdclose('all');
 fprintf('cas de la litterature : ok\n');
 
+%% ------------------- 111. Nom=valeur, et les noms de Simulink.FindOptions d'aujourd'hui
+% Les scripts de MATLAB récent écrivent « add_block(..., Gain="2") » et
+% « Simulink.FindOptions(SearchUnderMasks="none") » : la forme nom=valeur,
+% et les noms que FindOptions porte depuis R2024 — les anciens restent
+% admis. Ce que MatLibre ne parcourt pas est refusé en le disant.
+bdclose('all');
+new_system('nv111');
+add_block('built-in/Constant', 'nv111/c', Value='3');
+add_block('built-in/Gain', 'nv111/g', Gain="2");
+add_block('simulink/Ports & Subsystems/Subsystem', 'nv111/S');
+add_block('built-in/Gain', 'nv111/S/k', Gain='3');
+add_block('built-in/Outport', 'nv111/y');
+add_line('nv111', {'c/1', 'g/1'}, {'g/1', 'y/1'});
+set_param('nv111/g', Gain='5');
+r111 = sim('nv111', StopTime="2");
+assert(r111.tout(end) == 2 && r111.yout{1}.Values.Data(end) == 15, ...
+       'nom=valeur dans add_block, set_param et sim');
+o111 = Simulink.FindOptions(SearchDepth=1, RegExp=true);
+assert(isequal(sort(getfullname(Simulink.findBlocks('nv111', 'Name', '^[cg]$', o111))), ...
+               {'nv111/c'; 'nv111/g'}), 'FindOptions par nom=valeur');
+o111 = Simulink.FindOptions(SearchUnderMasks="none", SearchInsideLibraryLinks=true);
+assert(strcmp(o111.LookUnderMasks, 'none') && o111.FollowLinks == true, ...
+       'les noms d''aujourd''hui, lus sous les anciens');
+o111 = Simulink.FindOptions('LookUnderMasks', 'functional', 'FollowLinks', false);
+assert(strcmp(o111.SearchUnderMasks, 'functional') && ~o111.SearchInsideLibraryLinks, ...
+       'les anciens noms, lus sous ceux d''aujourd''hui');
+o111 = Simulink.FindOptions(MatchFilter=@(h) strcmp(get_param(h, 'BlockType'), 'Gain') && ...
+                                             strcmp(get_param(h, 'Gain'), '3'));
+assert(strcmp(getfullname(Simulink.findBlocks('nv111', o111)), 'nv111/S/k'), ...
+       'MatchFilter garde les blocs pour lesquels il rend vrai');
+refus111 = {{'SearchInsideModelReferences', true}, 'Simulink:FindOptions:NotSupported'; ...
+            {'Variants', 'ActiveVariants'}, 'Simulink:FindOptions:NotSupported'; ...
+            {'SearchUnderMasks', 'dessous'}, 'Simulink:Data:InvalidValue'; ...
+            {'MatchFilter', 3}, 'Simulink:FindOptions:InvalidMatchFilter'; ...
+            {'Inconnue', 1}, 'Simulink:FindOptions:UnknownOption'};
+for q = 1:size(refus111, 1)
+    vu111 = '';
+    try
+        Simulink.FindOptions(refus111{q, 1}{:});
+    catch err
+        vu111 = err.identifier;
+    end
+    assert(strcmp(vu111, refus111{q, 2}), sprintf('FindOptions refuse %d : %s', q, vu111));
+end
+bdclose('all');
+fprintf('nom=valeur et FindOptions : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

@@ -7,7 +7,9 @@ function poignees = findBlocks(systeme, varargin)
 %   H = SIMULINK.FINDBLOCKS(SYSTEME,'Param',VALEUR,...) ne garde que ceux
 %   dont les paramètres ont ces valeurs.
 %   H = SIMULINK.FINDBLOCKS(...,OPTIONS) cherche comme le dit le
-%   Simulink.FindOptions donné en dernier.
+%   Simulink.FindOptions donné en dernier ; son MatchFilter, une fonction
+%   qui reçoit la poignée de chaque bloc trouvé, ne garde que ceux pour
+%   lesquels elle rend vrai.
 %
 %   GETFULLNAME(H) rend leurs chemins, GET_PARAM(H,...) les lit.
 %
@@ -42,4 +44,12 @@ function poignees = findBlocks(systeme, varargin)
     poignees = find_system(ici, arguments{:}, 'FindAll', 'on', 'Type', 'block', varargin{:});
     % le système lui-même n'est pas l'un de ses blocs
     poignees = poignees(poignees ~= get_param(systeme, 'Handle'));
+    % MatchFilter garde les blocs pour lesquels il rend vrai
+    if ~isempty(options.MatchFilter)
+        garde = false(size(poignees));
+        for k = 1:numel(poignees)
+            garde(k) = logical(options.MatchFilter(poignees(k)));
+        end
+        poignees = poignees(garde);
+    end
 end
