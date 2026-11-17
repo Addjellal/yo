@@ -1,7 +1,8 @@
 classdef ConfigSet < handle
 %SIMULINK.CONFIGSET Un jeu de configuration : les réglages d'un modèle.
 %   CS = SIMULINK.CONFIGSET crée un jeu libre, nommé 'Configuration', aux
-%   valeurs par défaut. SET_PARAM(CS,'Reglage',VALEUR,...) le règle,
+%   valeurs d'un modèle neuf de Simulink : le solveur automatique à pas
+%   variable, les sorties en Dataset. SET_PARAM(CS,'Reglage',VALEUR,...) le règle,
 %   GET_PARAM(CS,'Reglage') le lit — en texte, comme dans Simulink —, et
 %   COPY(CS) en rend un double indépendant.
 %
@@ -38,6 +39,11 @@ classdef ConfigSet < handle
     end
     methods
         function obj = ConfigSet(jeu, modele)
+            if nargin == 0
+                % un jeu neuf part des réglages d'un modèle neuf de
+                % Simulink, comme NEW_SYSTEM dans la session
+                obj.Reglages = struct('Solver', 'VariableStepAuto', 'SaveFormat', 'Dataset');
+            end
             if nargin >= 1
                 obj.Nom = char(jeu.Name);
                 obj.Texte = char(jeu.Description);

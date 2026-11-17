@@ -46,7 +46,14 @@ function modele = set_param(modele, nom, varargin)
 %   La forme de MATLAB : SET_PARAM(OBJET,'Param',VALEUR,...), sans sortie,
 %   règle dans la session l'objet que désigne son nom ('modele'), son
 %   chemin ('modele/bloc') ou sa poignée — un modèle, un bloc, un port, ou
-%   une ligne, qui porte les réglages du signal.
+%   une ligne, qui porte les réglages du signal. Position s'y donne en
+%   pixels, comme dans Simulink ; Dirty, que la session tient pour chaque
+%   modèle, s'y règle ('on', 'off'). Changer le rang (Port) d'un Inport ou
+%   d'un Outport décale les autres, pour que les rangs restent 1 à N.
+%
+%   Commented met un bloc en commentaire : 'on' le retire du calcul — ce
+%   qu'il alimentait lit zéro —, 'through' le fait traverser, chaque
+%   sortie rendant l'entrée de même rang ; 'off' le rétablit.
 %
 %   Exemple :
 %      m = new_system('boucle');
@@ -134,6 +141,10 @@ function modele = set_param(modele, nom, varargin)
                   ['Le bloc ''%s'' (%s) n''a pas de parametre nomme ''%s''. Ses ' ...
                    'parametres sont : %s.'], b.nom, entree.affiche, champ, ...
                   strjoin(entree.params(:, 1).', ', '));
+        end
+        if strcmp(canon, 'Commented')
+            valeur = matlibre_sl_parametre('choix', valeur, 'Commented', ...
+                                           {'off', 'on', 'through'});
         end
         b.parametres.(canon) = valeur;
     end

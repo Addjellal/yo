@@ -18,6 +18,10 @@ function valeur = get_param(modele, nom, parametre)
 %                   Parent, BlockType, Ports... —, leur type, leurs valeurs
 %                   admises et s'ils se règlent (Attributes)
 %     Mask, MaskType  'off' et '' pour un bloc sans masque
+%     Position, Orientation, BackgroundColor, ShowName, Commented...  les
+%                   réglages que tout bloc porte ; non posés, ils valent
+%                   le défaut de Simulink, et Position le cadre où la mise
+%                   en place range le bloc
 %     CompiledSampleTime  sa période, [période décalage], une fois le
 %                   modèle compilé : [0 0] continue, [0 1] continue fixée
 %                   aux pas mineurs, [Inf 0] constante
@@ -50,7 +54,10 @@ function valeur = get_param(modele, nom, parametre)
 %   BlockType le type de Simulink ('Gain'), Type 'block', 'block_diagram',
 %   'port' ou 'line'. S'y ajoutent Handle, LineHandles, PortConnectivity,
 %   Lines et, pour un port ou une ligne, Line, SrcBlockHandle,
-%   SrcPortHandle, DstBlockHandle, DstPortHandle.
+%   SrcPortHandle, DstBlockHandle, DstPortHandle. Position y est en
+%   pixels. Du modèle se lisent aussi Dirty — 'on' s'il a changé depuis
+%   son fichier — et FileName, le fichier d'où il vient ou vers lequel
+%   on l'a enregistré.
 %
 %   Exemple :
 %      m = new_system('essai');
@@ -206,8 +213,48 @@ function valeur = get_param(modele, nom, parametre)
             return
         end
     end
+    [connu, valeur] = defautCommun(modele, bloc, canon);
+    if connu
+        return
+    end
     error('Simulink:Commands:ParamUnknown', ...
           'Le bloc ''%s'' n''a pas de paramètre ''%s''.', feuille, champ);
+end
+
+% Ce que vaut un réglage que tout bloc porte quand on ne l'a pas posé : le
+% défaut de Simulink, et pour Position le cadre que la mise en place donne
+% au bloc — celui qu'OPEN_SYSTEM trace.
+function [connu, valeur] = defautCommun(modele, bloc, nom)
+    connu = true;
+    switch nom
+        case 'Position'
+            g = matlibre_sl_geometrie(modele);
+            k = find(strcmp({g.blocs.nom}, char(bloc.nom)), 1);
+            valeur = [g.blocs(k).gauche, g.blocs(k).haut, g.blocs(k).droite, g.blocs(k).bas];
+        case 'Orientation'
+            valeur = 'right';
+        case 'ForegroundColor'
+            valeur = 'black';
+        case 'BackgroundColor'
+            valeur = 'white';
+        case 'ShowName'
+            valeur = 'on';
+        case {'Description', 'Tag', 'Priority', 'AttributesFormatString'}
+            valeur = '';
+        case 'NamePlacement'
+            valeur = 'normal';
+        case 'FontSize'
+            valeur = -1;
+        case 'FontName'
+            valeur = 'auto';
+        case {'DropShadow', 'Commented'}
+            valeur = 'off';
+        case 'UserData'
+            valeur = [];
+        otherwise
+            connu = false;
+            valeur = [];
+    end
 end
 
 % Tous les paramètres d'un bloc, comme les décrit ObjectParameters : ceux

@@ -13286,8 +13286,13 @@ fprintf('chaque choix de chaque bloc : %d essais, %d refus nommes\n', nEssais104
 % « modele/bloc », l'un et l'autre par leur poignée. Les mêmes fonctions
 % que par valeur, sur le registre de la session.
 bdclose('all');
+fin105 = @(r) r.yout{1}.Values.Data(end);
 new_system('nom105');
 assert(bdIsLoaded('nom105'), 'NEW_SYSTEM sans sortie met le modele dans la session');
+assert(strcmp(get_param('nom105', 'Solver'), 'VariableStepAuto') && ...
+       strcmp(get_param('nom105', 'SaveFormat'), 'Dataset') && ...
+       strcmp(get_param('nom105', 'Dirty'), 'off') && isempty(get_param('nom105', 'FileName')), ...
+       'il y part des reglages d''un modele neuf de Simulink, sans fichier');
 h105 = add_block('simulink/Sources/Step', 'nom105/echelon', 'Time', '0');
 add_block('simulink/Math Operations/Sum', 'nom105/ecart', 'Inputs', '+-');
 add_block('simulink/Continuous/Transfer Fcn', 'nom105/procede', ...
@@ -13296,8 +13301,10 @@ add_block('built-in/Outport', 'nom105/y');
 l105 = add_line('nom105', {'echelon/1', 'ecart/1', 'procede/1', 'procede/1'}, ...
                 {'ecart/1', 'procede/1', 'y/1', 'ecart/2'});
 assert(numel(l105) == 4 && l105(3) == l105(4), 'une ligne par port de depart');
+assert(strcmp(get_param('nom105', 'Dirty'), 'on'), 'le modele a change : Dirty le dit');
 r105 = sim('nom105', 'StopTime', '30');
-assert(abs(r105.yout(end) - 0.5) < 1e-3, 'la boucle fermee de 1/(s+1)^2 tend vers 1/2');
+assert(isa(r105.yout, 'Simulink.SimulationData.Dataset') && abs(fin105(r105) - 0.5) < 1e-3, ...
+       'la boucle fermee de 1/(s+1)^2 tend vers 1/2 ; la sortie, en Dataset');
 
 % lire : le type de Simulink, les parametres en texte, les poignees
 assert(strcmp(get_param('nom105/procede', 'BlockType'), 'TransferFcn'), 'BlockType de Simulink');
@@ -13321,9 +13328,19 @@ set_param('nom105/echelon', 'After', '2');
 set_param('nom105', 'StopTime', '40');
 assert(strcmp(get_param('nom105', 'StopTime'), '40'), 'un reglage du modele, en texte');
 r105 = sim('nom105');
-assert(r105.tout(end) == 40 && abs(r105.yout(end) - 1) < 1e-3, 'l''echelon de 2 mene a 1');
+assert(r105.tout(end) == 40 && abs(fin105(r105) - 1) < 1e-3, 'l''echelon de 2 mene a 1');
+% les reglages que tout bloc porte : leur defaut, et Position en pixels
+libre105 = get_param('nom105/procede', 'Position');
+assert(isnumeric(libre105) && numel(libre105) == 4 && libre105(3) > libre105(1) && ...
+       libre105(4) > libre105(2) && isequal(libre105, round(libre105)), ...
+       'sans Position posee, le cadre de la mise en place, en pixels');
+assert(strcmp(get_param('nom105/procede', 'Orientation'), 'right') && ...
+       strcmp(get_param('nom105/procede', 'BackgroundColor'), 'white') && ...
+       strcmp(get_param('nom105/procede', 'ShowName'), 'on') && ...
+       strcmp(get_param('nom105/procede', 'Commented'), 'off') && ...
+       isempty(get_param('nom105/procede', 'Tag')), 'les defauts de Simulink');
 set_param('nom105/procede', 'Position', [200 100 260 140]);
-assert(isequal(get_param('nom105/procede', 'Position'), [200 100 260 140]), 'Position reste un nombre');
+assert(isequal(get_param('nom105/procede', 'Position'), [200 100 260 140]), 'Position posee, relue');
 
 % les ports et les lignes
 ph105 = get_param('nom105/procede', 'PortHandles');
@@ -13373,7 +13390,7 @@ add_line('nom105', 'ecart/1', 'regul/1', 'autorouting', 'on');
 phr105 = get_param('nom105/regul', 'PortHandles');
 add_line('nom105', phr105.Outport(1), ph105.Inport(1));
 r105 = sim('nom105');
-assert(abs(r105.yout(end) - 1.6) < 1e-3, 'un gain de 4 dans la boucle : 2 x 4/5');
+assert(abs(fin105(r105) - 1.6) < 1e-3, 'un gain de 4 dans la boucle : 2 x 4/5');
 assert(strcmp(get_param('nom105/regul/k', 'Parent'), 'nom105/regul') && ...
        strcmp(bdroot('nom105/regul/k'), 'nom105'), 'le parent d''un bloc interieur');
 assert(numel(find_system('nom105')) == 9 && numel(find_system('nom105', 'SearchDepth', 1)) == 6 && ...
@@ -13381,7 +13398,22 @@ assert(numel(find_system('nom105')) == 9 && numel(find_system('nom105', 'SearchD
        'la recherche descend dans les sous-systemes');
 set_param('nom105/regul/k', 'Gain', '9');
 r105 = sim('nom105');
-assert(abs(r105.yout(end) - 1.8) < 1e-3, 'un gain de 9 : 2 x 9/10');
+assert(abs(fin105(r105) - 1.8) < 1e-3, 'un gain de 9 : 2 x 9/10');
+
+% un sous-systeme pose vide ne touche pas au modele qui porte son nom
+new_system('regul105');
+hws105 = get_param('regul105', 'ModelWorkspace');
+assignin(hws105, 'k105', 3);
+add_block('built-in/Subsystem', 'nom105/regul105');
+add_block('built-in/Gain', 'nom105/regul105/g');     % le contenu vide se cree ici
+assert(hasVariable(get_param('regul105', 'ModelWorkspace'), 'k105'), ...
+       'un sous-systeme rempli par son chemin : l''espace du modele homonyme reste');
+delete_block('nom105/regul105');
+add_block('simulink/Ports & Subsystems/Subsystem', 'nom105/regul105');
+assert(hasVariable(get_param('regul105', 'ModelWorkspace'), 'k105'), ...
+       'le Subsystem de la bibliotheque : l''espace du modele homonyme reste');
+delete_block('nom105/regul105');
+bdclose('regul105');
 
 % recopier, nommer sans collision, retirer, remplacer
 add_block('nom105/regul/k', 'nom105/copie');
@@ -13403,7 +13435,7 @@ assert(isequal(sort(remplaces105), {'nom105/libre'; 'nom105/regul/k'}) && ...
        strcmp(get_param('nom105/regul/k', 'BlockType'), 'Abs'), 'REPLACE_BLOCK, a tous les niveaux');
 delete_block('nom105/libre');
 r105 = sim('nom105');
-assert(abs(r105.yout(end) - 1) < 1e-3, '|e| a la place du gain : 2/2');
+assert(abs(fin105(r105) - 1) < 1e-3, '|e| a la place du gain : 2/2');
 
 % le Subsystem de la bibliotheque arrive garni ; une copie se nomme sans collision
 add_block('simulink/Ports & Subsystems/Subsystem', 'nom105/garni');
@@ -13421,13 +13453,24 @@ fichier105 = fullfile(dossier105, 'relu105.slx');
 save_system('nom105', fichier105);
 assert(exist(fichier105, 'file') == 2 && bdIsLoaded('relu105') && ~bdIsLoaded('nom105'), ...
        'enregistre sous un autre nom, le modele le prend');
+assert(strcmp(get_param('relu105', 'Dirty'), 'off') && ...
+       strcmp(get_param('relu105', 'FileName'), fichier105), 'enregistre : Dirty retombe, FileName dit ou');
+set_param('relu105', 'Dirty', 'on');
+assert(strcmp(get_param('relu105', 'Dirty'), 'on'), 'Dirty se regle aussi a la main');
 close_system('relu105', 0);
 assert(~bdIsLoaded('relu105'), 'CLOSE_SYSTEM(NOM,0) ferme sans enregistrer');
 load_system(fichier105);
+assert(strcmp(get_param('relu105', 'Dirty'), 'off') && ...
+       strcmp(get_param('relu105', 'FileName'), fichier105), 'relu : intact, et son fichier connu');
 assert(numel(find_system('relu105')) == 9 && ...
        strcmp(get_param('relu105/procede', 'Denominator'), '[1 2 1]'), 'relu du fichier');
+assert(isequal(get_param('relu105/procede', 'Position'), [200 100 260 140]) && ...
+       strcmp(get_param('relu105', 'Solver'), 'VariableStepAuto'), ...
+       'la position, en pixels dans le fichier, et le solveur en reviennent');
 relu105 = sim('relu105');
-assert(max(abs(relu105.yout - r105.yout)) < 1e-12, 'et il se simule de meme');
+assert(isequal(relu105.tout, r105.tout) && ...
+       max(abs(relu105.yout{1}.Values.Data - r105.yout{1}.Values.Data)) < 1e-12, ...
+       'et il se simule de meme');
 [A105, B105, C105, D105] = linmod('relu105'); %#ok<ASGLU>
 assert(isequal(size(A105), [2 2]), 'LINMOD par le nom');
 rmdir(dossier105, 's');
@@ -13439,6 +13482,9 @@ refus105 = {@() evalc('new_system(''relu105'');'), 'Simulink:Commands:NewSysAlre
             @() add_block('built-in/Gain', 'relu105'), 'Simulink:Commands:AddBlockInvalidDest'; ...
             @() get_param(123456.5, 'Name'), 'Simulink:Commands:InvSimulinkObjectHandle'; ...
             @() set_param('relu105/procede', 'Absent', '1'), 'Simulink:Commands:ParamUnknown'; ...
+            @() set_param('relu105/procede', 'Position', [1 2 3]), 'Simulink:Commands:InvalidPosition'; ...
+            @() set_param('relu105', 'FileName', 'ailleurs.slx'), 'Simulink:Commands:SetParamReadOnly'; ...
+            @() set_param('relu105', 'Dirty', 'peut-etre'), 'Simulink:Data:InvalidValue'; ...
             @() add_line('relu105', 'procede/1', 'absent/1'), 'Simulink:Commands:InvSimulinkObjectName'};
 for q = 1:size(refus105, 1)
     vu105 = '';
@@ -13470,9 +13516,10 @@ add_line('jeux106', 't/1', 'y/1');
 cs106 = getActiveConfigSet('jeux106');
 assert(isa(cs106, 'Simulink.ConfigSet') && strcmp(cs106.Name, 'Configuration') && ...
        cs106.isActive() && strcmp(cs106.getModel(), 'jeux106'), 'le jeu actif, lie au modele');
-assert(strcmp(get_param(cs106, 'StopTime'), '10') && strcmp(get_param(cs106, 'Solver'), 'ode1'), ...
-       'ses reglages par defaut, en texte');
-set_param(cs106, 'StopTime', '5');
+assert(strcmp(get_param(cs106, 'StopTime'), '10') && ...
+       strcmp(get_param(cs106, 'Solver'), 'VariableStepAuto'), ...
+       'ses reglages, ceux d''un modele neuf de Simulink, en texte');
+set_param(cs106, 'StopTime', '5', 'Solver', 'ode1');
 assert(strcmp(get_param('jeux106', 'StopTime'), '5'), 'regler le jeu actif regle le modele');
 set_param('jeux106', 'FixedStep', '0.5');
 assert(strcmp(get_param(cs106, 'FixedStep'), '0.5'), 'et regler le modele se lit dans le jeu');
@@ -13481,6 +13528,8 @@ assert(r106.tout(end) == 5 && numel(r106.tout) == 11, 'SIM applique le jeu actif
 
 % un jeu libre : regle, copie, attache, active
 libre106 = Simulink.ConfigSet;
+assert(strcmp(get_param(libre106, 'Solver'), 'VariableStepAuto') && ...
+       strcmp(get_param(libre106, 'SaveFormat'), 'Dataset'), 'un jeu neuf : les memes reglages');
 libre106.Name = 'Rapide';
 set_param(libre106, 'StopTime', '2', 'Solver', 'ode4', 'FixedStep', '0.25');
 double106 = copy(libre106);
@@ -13775,6 +13824,138 @@ for q = 1:size(refus107, 1)
 end
 bdclose('all');
 fprintf('linio et linearize : ok\n');
+
+%% --------------------------------------------- 108. Les blocs mis en commentaire
+% Commented vaut 'off', 'on' ou 'through'. Un bloc commenté reste dans le
+% modèle — GET_PARAM le lit, FIND_SYSTEM le trouve à la demande — mais ne
+% calcule plus : 'on', ce qu'il alimentait lit zéro ; 'through', chaque
+% sortie rend l'entrée de même rang.
+bdclose('all');
+m108 = new_system('com108');
+m108 = add_block(m108, 'constant', 'c', 'Value', 3);
+m108 = add_block(m108, 'gain', 'g', 'Gain', 2);
+m108 = add_block(m108, 'gain', 'h', 'Gain', 5);
+m108 = add_block(m108, 'outport', 'y');
+m108 = add_line(add_line(add_line(m108, 'c', 'g'), 'g', 'h'), 'h', 'y');
+dernier108 = @(v) v(end);
+fin108 = @(m) dernier108(subsref(sim(m, 'StopTime', 0.1), substruct('.', 'yout')));
+assert(strcmp(get_param(m108, 'g', 'Commented'), 'off') && fin108(m108) == 30, ...
+       'sans commentaire : 3 x 2 x 5');
+assert(fin108(set_param(m108, 'g', 'Commented', 'through')) == 15, 'g traverse : 3 x 5');
+assert(fin108(set_param(m108, 'g', 'Commented', 'on')) == 0, 'g retire : h lit zero');
+assert(fin108(set_param(set_param(m108, 'g', 'Commented', 'through'), 'h', 'Commented', ...
+                        'through')) == 3, 'deux blocs traverses de suite');
+assert(fin108(set_param(set_param(m108, 'g', 'Commented', 'on'), 'h', 'Commented', ...
+                        'through')) == 0, 'un bloc traverse derriere un bloc retire');
+assert(fin108(set_param(m108, 'c', 'Commented', 'on')) == 0, 'une source retiree vaut zero');
+assert(fin108(add_block(m108, 'gain', 'libre', 'Commented', 'on')) == 30, ...
+       'ADD_BLOCK le pose aussi ; un bloc sans lien part sans rien changer');
+sansSortie108 = sim(set_param(m108, 'y', 'Commented', 'on'), 'StopTime', 0.1);
+assert(isempty(sansSortie108.yout), 'la sortie du modele, commentee, n''en est plus une');
+% le modele garde le bloc : c'est le calcul qui l'ignore
+commente108 = set_param(m108, 'g', 'Commented', 'on');
+assert(numel(commente108.blocs) == 4 && strcmp(get_param(commente108, 'g', 'Commented'), 'on') && ...
+       numel(matlibre_sl_commentes(commente108).blocs) == 4 && ...
+       ~any(strcmp(cellfun(@(b) b.nom, matlibre_sl_commentes(commente108).blocs, ...
+                           'UniformOutput', false), 'g')), ...
+       'le bloc reste dans le modele ; un Ground le remplace au calcul');
+% LINMOD le voit comme SIM
+l108 = new_system('lin108');
+l108 = add_block(l108, 'inport', 'u');
+l108 = add_block(l108, 'gain', 'k', 'Gain', 7);
+l108 = add_block(l108, 'outport', 'y');
+l108 = add_line(add_line(l108, 'u', 'k'), 'k', 'y');
+[~, ~, ~, D108] = linmod(l108);
+[~, ~, ~, Dt108] = linmod(set_param(l108, 'k', 'Commented', 'through'));
+[~, ~, ~, Do108] = linmod(set_param(l108, 'k', 'Commented', 'on'));
+assert(D108 == 7 && Dt108 == 1 && Do108 == 0, 'LINMOD : 7, puis 1 traverse, puis 0 retire');
+
+% un sous-systeme : commente entier, traverse, ou un bloc dedans
+dedans108 = new_system('dedans');
+dedans108 = add_block(dedans108, 'inport', 'e');
+dedans108 = add_block(dedans108, 'gain', 'k', 'Gain', 10);
+dedans108 = add_block(dedans108, 'bias', 'b', 'Bias', 1);
+dedans108 = add_block(dedans108, 'outport', 's');
+dedans108 = add_line(add_line(add_line(dedans108, 'e', 'k'), 'k', 'b'), 'b', 's');
+s108 = new_system('sous108');
+s108 = add_block(s108, 'constant', 'c', 'Value', 3);
+s108 = add_block(s108, 'subsystem', 'S', 'Model', dedans108);
+s108 = add_block(s108, 'outport', 'y');
+s108 = add_line(add_line(s108, 'c', 'S'), 'S', 'y');
+assert(fin108(s108) == 31, 'le sous-systeme : 3 x 10 + 1');
+assert(fin108(set_param(s108, 'S', 'Commented', 'on')) == 0 && ...
+       fin108(set_param(s108, 'S', 'Commented', 'through')) == 3, ...
+       'le sous-systeme entier, retire puis traverse');
+assert(fin108(set_param(s108, 'S/k', 'Commented', 'through')) == 4 && ...
+       fin108(set_param(s108, 'S/k', 'Commented', 'on')) == 1 && ...
+       fin108(set_param(s108, 'S/b', 'Commented', 'through')) == 30, ...
+       'un bloc commente dans le sous-systeme');
+
+% ce qui se refuse, en nommant le bloc
+deux108 = add_block(m108, 'sum', 'somme', 'Signs', '++');
+deux108 = add_line(add_line(deux108, 'c', 'somme', 1), 'g', 'somme', 2);
+deux108 = add_block(deux108, 'outport', 'z', 'Port', 2);
+deux108 = add_line(deux108, 'somme', 'z');
+refus108 = {@() sim(set_param(deux108, 'somme', 'Commented', 'through'), 'StopTime', 0.1), ...
+                'Simulink:Commands:CommentThroughPorts', 'somme'; ...
+            @() sim(set_param(s108, 'S/e', 'Commented', 'on'), 'StopTime', 0.1), ...
+                'Simulink:Commands:CommentPortBlock', 'e'; ...
+            @() set_param(m108, 'g', 'Commented', 'oui'), 'Simulink:Data:InvalidValue', 'Commented'; ...
+            @() add_block(m108, 'gain', 'x', 'Commented', 3), 'Simulink:Data:InvalidValue', 'Commented'};
+for q = 1:size(refus108, 1)
+    vu108 = '';
+    dit108 = '';
+    try
+        refus108{q, 1}();
+    catch err
+        vu108 = err.identifier;
+        dit108 = err.message;
+    end
+    assert(strcmp(vu108, refus108{q, 2}) && ~isempty(strfind(dit108, refus108{q, 3})), ...
+           sprintf('refus %d : %s, %s', q, vu108, dit108));
+end
+
+% la forme de MATLAB : regler, simuler, chercher, enregistrer
+new_system('nom108');
+add_block('simulink/Sources/Constant', 'nom108/c', 'Value', '3');
+add_block('simulink/Math Operations/Gain', 'nom108/g', 'Gain', '2');
+add_block('simulink/Ports & Subsystems/Subsystem', 'nom108/S');
+add_block('simulink/Math Operations/Gain', 'nom108/S/k', 'Gain', '10');
+delete_line('nom108/S', 'In1/1', 'Out1/1');
+add_line('nom108/S', {'In1/1', 'k/1'}, {'k/1', 'Out1/1'});
+add_block('simulink/Sinks/Out1', 'nom108/y');
+add_line('nom108', {'c/1', 'g/1', 'S/1'}, {'g/1', 'S/1', 'y/1'});
+out108 = sim('nom108', 'StopTime', '0.1');
+assert(out108.yout{1}.Values.Data(end) == 60, '3 x 2 x 10');
+set_param('nom108/g', 'Commented', 'through');
+out108 = sim('nom108', 'StopTime', '0.1');
+assert(strcmp(get_param('nom108/g', 'Commented'), 'through') && ...
+       out108.yout{1}.Values.Data(end) == 30, 'le gain traverse : 3 x 10');
+set_param('nom108/g', 'Commented', 'off');
+set_param('nom108/S', 'Commented', 'on');
+out108 = sim('nom108', 'StopTime', '0.1');
+assert(out108.yout{1}.Values.Data(end) == 0, 'le sous-systeme retire : la sortie lit zero');
+% FIND_SYSTEM ne voit un bloc commente, et ce qu'il contient, qu'a la demande
+assert(isequal(find_system('nom108'), {'nom108'; 'nom108/c'; 'nom108/g'; 'nom108/y'}) && ...
+       numel(find_system('nom108', 'IncludeCommented', 'on')) == 8 && ...
+       isequal(find_system('nom108', 'IncludeCommented', 'on', 'Commented', 'on'), {'nom108/S'}), ...
+       'IncludeCommented');
+assert(numel(Simulink.findBlocks('nom108')) == 7 && ...
+       numel(Simulink.findBlocks('nom108', Simulink.FindOptions('IncludeCommented', false))) == 3, ...
+       'Simulink.findBlocks les voit, sauf a dire le contraire');
+% le reglage va dans le fichier, et en revient
+dossier108 = tempname;
+mkdir(dossier108);
+save_system('nom108', fullfile(dossier108, 'nom108.slx'));
+close_system('nom108', 0);
+load_system(fullfile(dossier108, 'nom108.slx'));
+assert(strcmp(get_param('nom108/S', 'Commented'), 'on') && ...
+       strcmp(get_param('nom108/g', 'Commented'), 'off'), 'Commented, relu du fichier');
+out108 = sim('nom108', 'StopTime', '0.1');
+assert(out108.yout{1}.Values.Data(end) == 0, 'et le modele relu calcule de meme');
+rmdir(dossier108, 's');
+bdclose('all');
+fprintf('blocs commentes : ok\n');
 
 disp('simulink : toutes les verifications passent');
 

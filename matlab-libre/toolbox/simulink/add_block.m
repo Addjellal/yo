@@ -541,7 +541,17 @@ function modele = add_block(modele, type, nom, varargin)
 %   pose dans un modèle de la session — NEW_SYSTEM('nom') l'y met — le bloc
 %   SOURCE ('simulink/Sources/Step', 'built-in/Gain', ou le chemin d'un
 %   bloc existant, qu'elle recopie) sous le chemin DESTINATION,
-%   'nom/bloc' ou 'nom/sousSysteme/bloc', et rend sa poignée.
+%   'nom/bloc' ou 'nom/sousSysteme/bloc', et rend sa poignée. Position s'y
+%   donne en pixels, et un bloc pris à la bibliothèque y prend les défauts
+%   de Simulink là où MatLibre en a d'autres : un bloc discret hérite sa
+%   période (SampleTime -1), To Workspace range une timeseries. Un Inport
+%   ou un Outport y prend le rang suivant (Port) ; un rang donné s'insère
+%   et décale ceux qui le suivent : les ports d'un système vont de 1 à N.
+%
+%   Tout bloc porte aussi Position, Orientation, les couleurs, Tag,
+%   Description, UserData... et Commented : 'on' retire le bloc du calcul
+%   — ce qu'il alimentait lit zéro —, 'through' le fait traverser, chaque
+%   sortie rendant l'entrée de même rang.
 %
 %   Exemple :
 %      m = new_system('rampe');
@@ -648,6 +658,10 @@ function modele = add_block(modele, type, nom, varargin)
                   ['Le bloc ''%s'' (%s) n''a pas de parametre nomme ''%s''. Ses ' ...
                    'parametres sont : %s.'], nom, entree.affiche, char(reglages{k}), ...
                   strjoin(entree.params(:, 1).', ', '));
+        end
+        if strcmp(canon, 'Commented')
+            reglages{k + 1} = matlibre_sl_parametre('choix', reglages{k + 1}, 'Commented', ...
+                                                    {'off', 'on', 'through'});
         end
         bloc.parametres.(canon) = reglages{k + 1};
     end

@@ -4,6 +4,9 @@ function modele = matlibre_sl_aplatir(modele)
 %   bloc de type « subsystem » a été remplacé par les blocs qu'il
 %   contient. Un modèle sans sous-système est rendu tel quel.
 %
+%   Les blocs mis en commentaire (Commented) partent d'abord, par
+%   MATLIBRE_SL_COMMENTES : rien de ce qui calcule ne les voit.
+%
 %   C'est ainsi qu'un sous-système se simule : non pas comme un bloc à
 %   part, mais comme le schéma qu'il abrège. SIM, LINMOD, TRIM et
 %   MATLIBRE_SL_PROGRAMME appellent tous cette fonction d'abord, si bien
@@ -58,6 +61,8 @@ function modele = matlibre_sl_aplatir(modele)
 %
 %   Voir aussi SIM, ADD_BLOCK, MATLIBRE_SL_ORDRE.
     modele = matlibre_sl_modele(modele);
+    % les blocs mis en commentaire ne calculent pas : ils partent d'abord
+    modele = matlibre_sl_commentes(modele);
     modele.liens = matlibre_sl_liens(modele);
     modele = rafraichirLiens(modele);
     for j = 1:numel(modele.blocs)

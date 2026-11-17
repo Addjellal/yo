@@ -16,8 +16,10 @@ function noms = find_system(modele, varargin)
 %   rend en colonne les chemins complets — le système lui-même, puis ses
 %   blocs, sous-systèmes compris. Options : SearchDepth, LookUnderMasks,
 %   FollowLinks, FindAll (des poignées, lignes et ports compris), RegExp,
-%   CaseSensitive, FirstResultOnly. FIND_SYSTEM() cherche dans tous les
-%   modèles ouverts, FIND_SYSTEM('type','block_diagram') les nomme.
+%   CaseSensitive, FirstResultOnly, et IncludeCommented : un bloc mis en
+%   commentaire, et ce qu'il contient, ne sort que si elle vaut 'on'.
+%   FIND_SYSTEM() cherche dans tous les modèles ouverts,
+%   FIND_SYSTEM('type','block_diagram') les nomme.
 %
 %   Exemple :
 %      m = new_system('essai');

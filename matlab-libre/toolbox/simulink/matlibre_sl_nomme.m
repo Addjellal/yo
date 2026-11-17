@@ -25,7 +25,16 @@ function varargout = matlibre_sl_nomme(action, varargin)
 %   le chemin, dans ce modèle, de ce qu'un nom ou une poignée désigne ;
 %   [MODELE,NOM] = MATLIBRE_SL_NOMME('modele',OBJET) rend le modèle de la
 %   session qui porte l'objet ; MATLIBRE_SL_NOMME('reglage',NOM,V) rend la
-%   valeur d'un réglage de configuration comme Simulink la rend, en texte.
+%   valeur d'un réglage de configuration comme Simulink la rend, en texte ;
+%   MATLIBRE_SL_NOMME('fichier',NOM,FICHIER) note que le modèle vient
+%   d'être lu de ce fichier ou d'y être écrit, et
+%   MATLIBRE_SL_NOMME('chemin',FICHIER) rend son chemin absolu.
+%
+%   Trois choses distinguent cette forme de la forme par valeur, pour
+%   répondre comme Simulink : Position s'y dit en pixels — le modèle la
+%   range quarante fois plus petite, dans l'unité de sa mise en place — ;
+%   un bloc pris à la bibliothèque y prend les défauts de Simulink ; et
+%   la session tient pour chaque modèle Dirty et FileName.
 %
 %   Les poignées sont celles de MATLIBRE_SL_SIGNAUX : un nombre par
 %   modèle, par bloc, par port et par ligne, le même tant que dure la
@@ -73,6 +82,13 @@ function varargout = matlibre_sl_nomme(action, varargin)
             varargout{1} = nomComplet(varargin{2});
         case 'bdroot'
             varargout{1} = designer(varargin{2});
+        case 'fichier'
+            % MATLIBRE_SL_NOMME('fichier',NOM,FICHIER) : le modèle vient
+            % d'être lu de ce fichier, ou d'y être écrit.
+            matlibre_sl_ouverts('noter', char(varargin{1}), ...
+                                struct('Dirty', 'off', 'FileName', cheminAbsolu(varargin{2})));
+        case 'chemin'
+            varargout{1} = cheminAbsolu(varargin{1});
         case 'modele'
             % [MODELE,NOM] = MATLIBRE_SL_NOMME('modele',OBJET) : le modèle de
             % la session qui porte l'objet, et son nom.
@@ -94,10 +110,61 @@ end
 function ranger(nom, modele)
     nom = char(nom);
     figureDuModele = 0;
+    change = true;
     if matlibre_sl_ouverts('connu', nom)
         figureDuModele = matlibre_sl_ouverts('figure', nom);
+        change = ~isequal(matlibre_sl_ouverts('lire', nom), modele);
     end
     matlibre_sl_ouverts('inscrire', nom, modele, figureDuModele);
+    if change
+        % il a changé depuis son fichier : Dirty le dit
+        matlibre_sl_ouverts('noter', nom, struct('Dirty', 'on'));
+    end
+end
+
+function chemin = cheminAbsolu(fichier)
+    chemin = char(fichier);
+    absolu = ~isempty(chemin) && (any(chemin(1) == '/\') || ...
+                                 (numel(chemin) > 1 && chemin(2) == ':'));
+    if ~absolu
+        chemin = fullfile(pwd(), chemin);
+    end
+end
+
+% Position se dit en pixels dans Simulink, [gauche haut droite bas] ; le
+% modèle la range dans l'unité de sa mise en place, quarante fois plus
+% grande — celle que le lecteur de .slx emploie.
+function couples = positionsDuModele(couples)
+    for k = 1:2:numel(couples) - 1
+        if ~((ischar(couples{k}) || isstring(couples{k})) && ...
+             strcmpi(char(couples{k}), 'Position'))
+            continue
+        end
+        v = couples{k + 1};
+        if ischar(v) || (isstring(v) && isscalar(v))
+            v = str2num(char(v)); %#ok<ST2NM>
+        end
+        if ~(isnumeric(v) && isreal(v) && numel(v) == 4 && all(isfinite(v(:))))
+            error('Simulink:Commands:InvalidPosition', ...
+                  'Position vaut [gauche haut droite bas], quatre nombres, en pixels.');
+        end
+        couples{k + 1} = double(v(:).') / 40;
+    end
+end
+
+% Les défauts de Simulink là où ceux de MatLibre diffèrent, pour un bloc
+% pris à la bibliothèque : un bloc discret hérite sa période (-1) — ce que
+% MATLIBRE_SL_SLX applique aux fichiers qui ne la disent pas —, et To
+% Workspace range une timeseries.
+function bloc = defautsDeSimulink(bloc)
+    if any(strcmp(bloc.type, {'delay', 'zoh', 'discreteintegrator', 'discretetransferfcn', ...
+                              'discretefilter', 'discretestatespace'})) && ...
+       ~isfield(bloc.parametres, 'SampleTime')
+        bloc.parametres.SampleTime = -1;
+    end
+    if strcmp(bloc.type, 'toworkspace') && ~isfield(bloc.parametres, 'SaveFormat')
+        bloc.parametres.SaveFormat = 'Timeseries';
+    end
 end
 
 % Le modèle ouvert sous ce nom.
@@ -183,7 +250,7 @@ function [modele, systeme] = systemeDe(modele, chemin)
         bloc = systeme.blocs{i};
         if strcmp(bloc.type, 'subsystem') && ~isfield(bloc.parametres, 'Model') && ...
            ~isfield(bloc.parametres, 'Modele')
-            bloc.parametres.Model = new_system(etapes{k});
+            bloc.parametres.Model = systemeVide(etapes{k});
             systeme.blocs{i} = bloc;
             if isempty(fait)
                 modele = systeme;
@@ -194,6 +261,12 @@ function [modele, systeme] = systemeDe(modele, chemin)
         fait = joindre(fait, etapes{k});
         systeme = matlibre_sl_dedans(modele, fait);
     end
+end
+
+% Le contenu vide d'un sous-système. Non pas NEW_SYSTEM(NOM) : il oublie
+% l'espace de travail du modèle qui porterait ce nom dans la session.
+function systeme = systemeVide(nom)
+    systeme = struct('nom', char(nom), 'blocs', {{}}, 'liens', [], 'parametres', struct());
 end
 
 function modele = reposer(modele, chemin, systeme)
@@ -250,10 +323,35 @@ function h = ajouterBloc(source, destination, varargin)
     if any(strcmpi(source, {'simulink/Ports & Subsystems/Subsystem', ...
                             'simulink/Commonly Used Blocks/Subsystem'})) && ...
        ~any(strcmpi(varargin(1:2:end), 'Model'))
-        garni = add_block(add_block(new_system(feuille), 'inport', 'In1'), 'outport', 'Out1');
+        garni = add_block(add_block(systemeVide(feuille), 'inport', 'In1'), 'outport', 'Out1');
         varargin(end + 1:end + 2) = {'Model', add_line(garni, 'In1/1', 'Out1/1')};
     end
+    % un bloc de la bibliothèque, ou la copie d'un bloc qui existe ?
+    deLaBibliotheque = true;
+    try
+        matlibre_sl_catalogue('type', source);
+    catch
+        deLaBibliotheque = false;
+    end
+    varargin = positionsDuModele(varargin);
     systeme = add_block(systeme, source, feuille, varargin{:});
+    if deLaBibliotheque
+        systeme.blocs{end} = defautsDeSimulink(systeme.blocs{end});
+    end
+    % Un Inport ou un Outport neuf prend le rang suivant, comme dans
+    % Simulink : les ports d'un système vont de 1 à N. Un rang donné
+    % s'insère, et décale ceux qui le suivent.
+    genre = genreDePort(systeme.blocs{end});
+    if ~isempty(genre)
+        n = numel(portsDuSysteme(systeme, genre));
+        if any(strcmpi(varargin(1:2:end), 'Port'))
+            systeme = renumeroter(systeme, numel(systeme.blocs), n, ...
+                                  rangDemande(systeme.blocs{end}, n, joindre(racine, parent)), ...
+                                  joindre(racine, chemin));
+        else
+            systeme.blocs{end}.parametres.Port = n;
+        end
+    end
     pose = systeme.blocs{end}.nom;
     ranger(racine, reposer(modele, parent, systeme));
     h = poignee(racine, joindre(parent, pose), 'bloc', 0);
@@ -339,8 +437,84 @@ function retirerBloc(objets)
         modele = modeleNomme(racine);
         [parent, feuille] = couper(chemin);
         [modele, systeme] = systemeDe(modele, parent);
+        i = matlibre_sl_indice(systeme, feuille);
+        genre = genreDePort(systeme.blocs{i});
+        if ~isempty(genre)
+            % les ports qui le suivent reculent d'un rang, comme dans Simulink
+            rang = rangDe(systeme.blocs{i});
+            [indices, rangs] = portsDuSysteme(systeme, genre);
+            for j = indices(rangs > rang)
+                systeme.blocs{j}.parametres.Port = rangDe(systeme.blocs{j}) - 1;
+            end
+        end
         ranger(racine, reposer(modele, parent, delete_block(systeme, feuille)));
     end
+end
+
+% --- les rangs des ports ------------------------------------------------------
+
+% 'inport' ou 'outport' pour un bloc de port d'un système, '' sinon.
+function genre = genreDePort(bloc)
+    genre = '';
+    try
+        entree = matlibre_sl_catalogue('type', bloc.type);
+    catch
+        return
+    end
+    if any(strcmp(entree.type, {'inport', 'outport'}))
+        genre = entree.type;
+    end
+end
+
+function rang = rangDe(bloc)
+    rang = 1;
+    if isfield(bloc.parametres, 'Port')
+        rang = bloc.parametres.Port;
+        if ischar(rang) || isstring(rang)
+            rang = str2double(rang);
+        end
+        rang = double(rang);
+    end
+end
+
+function [indices, rangs] = portsDuSysteme(systeme, genre)
+    indices = [];
+    rangs = [];
+    for k = 1:numel(systeme.blocs)
+        if strcmp(genreDePort(systeme.blocs{k}), genre)
+            indices(end + 1) = k; %#ok<AGROW>
+            rangs(end + 1) = rangDe(systeme.blocs{k}); %#ok<AGROW>
+        end
+    end
+end
+
+% Le rang demandé pour un port, vérifié : un entier de 1 à N.
+function rang = rangDemande(bloc, n, ou)
+    rang = rangDe(bloc);
+    if ~(isscalar(rang) && isfinite(rang) && rang == fix(rang) && rang >= 1 && rang <= n)
+        error('Simulink:blocks:InvalidPortNumber', ...
+              ['Le rang (Port) du bloc ''%s/%s'' doit etre un entier de 1 a %d : le systeme a ' ...
+               '%d port(s) de ce genre.'], ou, char(bloc.nom), n, n);
+    end
+end
+
+% Le port K passe du rang AVANT au rang APRES, et les autres se décalent
+% pour que les rangs restent 1 à N, comme Simulink les renumérote.
+function systeme = renumeroter(systeme, k, avant, apres, ~)
+    genre = genreDePort(systeme.blocs{k});
+    [indices, rangs] = portsDuSysteme(systeme, genre);
+    for i = 1:numel(indices)
+        j = indices(i);
+        if j == k
+            continue
+        end
+        if apres < avant && rangs(i) >= apres && rangs(i) < avant
+            systeme.blocs{j}.parametres.Port = rangs(i) + 1;
+        elseif apres > avant && rangs(i) > avant && rangs(i) <= apres
+            systeme.blocs{j}.parametres.Port = rangs(i) - 1;
+        end
+    end
+    systeme.blocs{k}.parametres.Port = apres;
 end
 
 function retirerLigne(objet, source, destination)
@@ -385,17 +559,52 @@ function regler(objet, varargin)
     end
     [racine, chemin, genre, port] = designer(objet);
     modele = modeleNomme(racine);
+    info = matlibre_sl_ouverts('info', racine);
     switch genre
         case 'modele'
-            modele = set_param(modele, varargin{:});
+            % Dirty et FileName sont à la session, non au modèle
+            k = 1;
+            while k <= numel(varargin)
+                if strcmpi(char(varargin{k}), 'FileName')
+                    error('Simulink:Commands:SetParamReadOnly', ...
+                          ['Le reglage FileName du modele ''%s'' se lit, mais ne se regle ' ...
+                           'pas : SAVE_SYSTEM(MODELE,FICHIER) l''enregistre ailleurs.'], racine);
+                elseif strcmpi(char(varargin{k}), 'Dirty')
+                    info.Dirty = matlibre_sl_parametre('choix', varargin{k + 1}, 'Dirty', ...
+                                                       {'off', 'on'});
+                    info.DirtyDit = true;
+                    varargin(k:k + 1) = [];
+                else
+                    k = k + 2;
+                end
+            end
+            if ~isempty(varargin)
+                modele = set_param(modele, varargin{:});
+            end
             if ~strcmp(char(modele.nom), racine)
                 matlibre_sl_ouverts('retirer', racine);
                 racine = char(modele.nom);
+                matlibre_sl_ouverts('inscrire', racine, modele, 0);
+                matlibre_sl_ouverts('noter', racine, struct('FileName', info.FileName));
             end
         case 'bloc'
             % descendre d'abord : un sous-système posé vide y gagne son système
             modele = systemeDe(modele, couper(chemin));
+            varargin = positionsDuModele(varargin);
+            [parent, feuille] = couper(chemin);
+            [~, systeme] = systemeDe(modele, parent);
+            i = matlibre_sl_indice(systeme, feuille);
+            avant = rangDe(systeme.blocs{i});
             modele = set_param(modele, chemin, varargin{:});
+            genre = genreDePort(systeme.blocs{i});
+            if ~isempty(genre) && any(strcmpi(varargin(1:2:end), 'Port'))
+                % le rang change : les autres ports se décalent
+                [~, systeme] = systemeDe(modele, parent);
+                n = numel(portsDuSysteme(systeme, genre));
+                apres = rangDemande(systeme.blocs{i}, n, joindre(racine, parent));
+                systeme = renumeroter(systeme, i, avant, apres);
+                modele = reposer(modele, parent, systeme);
+            end
         case 'ligne'
             % une ligne porte les réglages du signal : ceux du port d'où elle part
             depart = poignee(racine, chemin, 'outport', port);
@@ -404,6 +613,10 @@ function regler(objet, varargin)
             modele = set_param(modele, double(objet), varargin{:});
     end
     ranger(racine, modele);
+    if isfield(info, 'DirtyDit')
+        % Dirty réglé à la main l'emporte sur ce que le réglage a changé
+        matlibre_sl_ouverts('noter', racine, struct('Dirty', info.Dirty));
+    end
 end
 
 function valeur = lire(objet, parametre)
@@ -451,6 +664,12 @@ function valeur = lireModele(modele, racine, parametre)
             valeur = cellfun(@(b) char(b.nom), modele.blocs(:), 'UniformOutput', false);
         case 'lines'
             valeur = lignesDe(racine, '', modele);
+        case 'dirty'
+            info = matlibre_sl_ouverts('info', racine);
+            valeur = info.Dirty;
+        case 'filename'
+            info = matlibre_sl_ouverts('info', racine);
+            valeur = info.FileName;
         otherwise
             valeur = reglageEnTexte(parametre, get_param(modele, parametre));
     end
@@ -493,6 +712,10 @@ function valeur = lireBloc(modele, racine, chemin, parametre)
             valeur = feuille;
         case 'parent'
             valeur = joindre(racine, parent);
+        case 'position'
+            % en pixels, comme Simulink : le modèle la range quarante fois
+            % plus petite
+            valeur = round(get_param(modele, chemin, 'Position') * 40);
         case 'porthandles'
             valeur = get_param(modele, chemin, 'PortHandles');
         case 'linehandles'
@@ -692,7 +915,7 @@ function trouves = chercher(varargin)
     options = struct('SearchDepth', Inf, 'LookUnderMasks', 'graphical', ...
                      'FollowLinks', 'off', 'FindAll', 'off', 'CaseSensitive', 'on', ...
                      'RegExp', 'off', 'Variants', '', 'MatchFilter', [], ...
-                     'IncludeCommented', 'on', 'LookInsideSubsystemReference', 'on', ...
+                     'IncludeCommented', 'off', 'LookInsideSubsystemReference', 'on', ...
                      'FirstResultOnly', 'off');
     nomsOptions = fieldnames(options);
     departs = {};
@@ -734,6 +957,7 @@ function trouves = chercher(varargin)
     reglage = struct('profondeur', profondeur, ...
                      'masques', any(strcmpi(char(sousMasques), {'all', 'on', 'functional'})), ...
                      'liens', strcmpi(char(options.FollowLinks), 'on'), ...
+                     'commentes', strcmpi(char(options.IncludeCommented), 'on'), ...
                      'tout', strcmpi(char(options.FindAll), 'on'));
     objets = {};
     for k = 1:numel(departs)
@@ -781,7 +1005,13 @@ function objets = parcourir(objets, racine, chemin, systeme, niveau, reglage)
     if niveau > reglage.profondeur
         return
     end
+    vus = true(1, numel(systeme.blocs));
     for k = 1:numel(systeme.blocs)
+        % un bloc commenté, et ce qu'il contient, ne se voit qu'à la demande
+        if ~reglage.commentes && estCommente(systeme.blocs{k})
+            vus(k) = false;
+            continue
+        end
         ici = joindre(chemin, char(systeme.blocs{k}.nom));
         objets{end + 1, 1} = joindre(racine, ici); %#ok<AGROW>
         objets = descendre(objets, racine, ici, systeme.blocs{k}, niveau + 1, reglage);
@@ -791,7 +1021,7 @@ function objets = parcourir(objets, racine, chemin, systeme, niveau, reglage)
         for k = 1:numel(lignes)
             objets{end + 1, 1} = lignes(k).Handle; %#ok<AGROW>
         end
-        for k = 1:numel(systeme.blocs)
+        for k = find(vus)
             % les poignées se comptent depuis la racine
             ph = get_param(modeleNomme(racine), ...
                            joindre(chemin, char(systeme.blocs{k}.nom)), 'PortHandles');
@@ -800,6 +1030,11 @@ function objets = parcourir(objets, racine, chemin, systeme, niveau, reglage)
             end
         end
     end
+end
+
+function oui = estCommente(bloc)
+    oui = isfield(bloc.parametres, 'Commented') && ...
+          ~strcmpi(char(bloc.parametres.Commented), 'off');
 end
 
 % Sous un bloc : rien s'il n'est pas un sous-système, ou si son masque ou
@@ -885,6 +1120,11 @@ function fichier = enregistrer(nom, fichier, varargin)
         matlibre_sl_ouverts('inscrire', base, modele, figureDuModele);
     end
     fichier = save_system(modele, fichier);
+    racine = char(modele.nom);
+    if matlibre_sl_ouverts('connu', racine)
+        matlibre_sl_ouverts('noter', racine, ...
+                            struct('Dirty', 'off', 'FileName', cheminAbsolu(fichier)));
+    end
 end
 
 % REPLACE_BLOCK(SYSTEME,ANCIEN,NOUVEAU) : dans le système et tout ce
@@ -896,7 +1136,8 @@ function remplaces = remplacerBlocs(systemeNomme, ancien, nouveau, varargin)
     modele = modeleNomme(racine);
     entreeAncien = matlibre_sl_catalogue('type', ancien);
     type = entreeAncien.type;
-    avant = chercher(joindre(racine, chemin), 'LookUnderMasks', 'all', 'FollowLinks', 'on');
+    avant = chercher(joindre(racine, chemin), 'LookUnderMasks', 'all', 'FollowLinks', 'on', ...
+                     'IncludeCommented', 'on');
     remplaces = {};
     systemes = {chemin};
     for k = 2:numel(avant)

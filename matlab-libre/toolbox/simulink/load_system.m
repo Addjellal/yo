@@ -38,7 +38,7 @@ function modele = load_system(nom)
     end
     if strcmpi(extension, '.slx') || strcmpi(extension, '.mdl')
         modele = matlibre_sl_slx('lire', nom);
-        charge(modele);
+        charge(modele, nom);
         return
     end
     chemin = fullfile(dossier, [base '.m']);
@@ -46,13 +46,15 @@ function modele = load_system(nom)
         for autre = {'.slx', '.mdl'}
             if exist(fullfile(dossier, [base autre{1}]), 'file') == 2
                 modele = matlibre_sl_slx('lire', fullfile(dossier, [base autre{1}]));
-                charge(modele);
+                charge(modele, fullfile(dossier, [base autre{1}]));
                 return
             end
         end
         error('Simulink:Commands:OpenSystemUnknownSystem', ...
               'Invalid Simulink object name: ''%s''.', nom);
     end
+    % retenu avant de changer de dossier : le chemin est relatif à celui-ci
+    fichier = matlibre_sl_nomme('chemin', chemin);
     ancien = pwd();
     if ~isempty(dossier)
         % Le fichier est appelé par son nom de base : il doit être
@@ -65,13 +67,14 @@ function modele = load_system(nom)
         error('Simulink:Commands:InvalidModel', ...
               'Le fichier ''%s'' ne rend pas un modele.', chemin);
     end
-    charge(modele);
+    charge(modele, fichier);
 end
 
 % Le modèle est chargé : ses rappels PreLoadFcn puis PostLoadFcn, et le
 % registre de la session.
-function charge(modele)
+function charge(modele, fichier)
     matlibre_sl_rappel(modele, 'PreLoadFcn');
     matlibre_sl_ouverts('inscrire', modele.nom, modele, 0);
+    matlibre_sl_nomme('fichier', modele.nom, fichier);
     matlibre_sl_rappel(modele, 'PostLoadFcn');
 end

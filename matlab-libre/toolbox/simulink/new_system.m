@@ -30,7 +30,11 @@ function modele = new_system(nom, genre)
 %   modèle dans la session : ADD_BLOCK, ADD_LINE, SET_PARAM, GET_PARAM,
 %   FIND_SYSTEM, SIM et SAVE_SYSTEM le désignent alors par son nom, et ses
 %   blocs par leur chemin « nom/bloc ». Un modèle de ce nom déjà ouvert
-%   est refusé ; BDCLOSE le ferme.
+%   est refusé ; BDCLOSE le ferme. Le modèle y part des réglages d'un
+%   modèle neuf de Simulink — le solveur automatique à pas variable
+%   (VariableStepAuto), les sorties en Dataset (SaveFormat) —, là où le
+%   modèle par valeur part de ceux de MatLibre : ode1 au pas de 0,01, et
+%   des sorties en tableau.
 %
 %   Exemple :
 %      m = new_system('rampe');
@@ -74,6 +78,10 @@ function modele = new_system(nom, genre)
                   ['A block diagram named ''%s'' already exists. BDCLOSE(''%s'') ' ...
                    'le ferme.'], char(nom), char(nom));
         end
+        % Il y part des réglages d'un modèle neuf de Simulink, comme un
+        % fichier .slx qui ne dit rien : le solveur automatique à pas
+        % variable, et les sorties rangées en Dataset.
+        modele = set_param(modele, 'Solver', 'VariableStepAuto', 'SaveFormat', 'Dataset');
         matlibre_sl_ouverts('inscrire', char(nom), modele, 0);
         clear modele
     end

@@ -13,7 +13,9 @@ function modele = delete_block(modele, nom)
 %   Dans MATLAB, DELETE_BLOCK modifie le modèle ouvert et ne rend rien.
 %
 %   La forme de MATLAB : DELETE_BLOCK(CHEMIN), le bloc 'modele/bloc' d'un
-%   modèle de la session, sa poignée, ou une cellule de chemins.
+%   modèle de la session, sa poignée, ou une cellule de chemins. Un Inport
+%   ou un Outport retiré fait reculer d'un rang ceux qui le suivaient,
+%   comme dans Simulink.
 %
 %   Exemple :
 %      m = new_system('essai');
