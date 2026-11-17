@@ -42,6 +42,12 @@ function [gainMarge, phaseMarge, wGain, wPhase] = margin(varargin)
             f = dB(k) / (dB(k) - dB(k+1));
             wPhase = w(k) + f * (w(k+1) - w(k));
             phaseMarge = 180 + p(k) + f * (p(k+1) - p(k));
+            if ~isempty(sys)
+                % La grille ne fait que situer la traversée : elle se
+                % lit ensuite sur la réponse exacte, par dichotomie.
+                wPhase = dichotomie(@(x) gainDB(sys, x), w(k), w(k+1));
+                phaseMarge = 180 + phaseExacte(sys, wPhase, p(k), p(k+1), w(k), w(k+1));
+            end
             break;
         end
     end
@@ -53,6 +59,11 @@ function [gainMarge, phaseMarge, wGain, wPhase] = margin(varargin)
             f = (p(k) + 180) / (p(k) - p(k+1));
             wGain = w(k) + f * (w(k+1) - w(k));
             gainMarge = 10 ^ (-(dB(k) + f * (dB(k+1) - dB(k))) / 20);
+            if ~isempty(sys)
+                wGain = dichotomie(@(x) phaseExacte(sys, x, p(k), p(k+1), w(k), w(k+1)) + 180, ...
+                                   w(k), w(k+1));
+                gainMarge = 10 ^ (-gainDB(sys, wGain) / 20);
+            end
             break;
         end
     end
@@ -85,4 +96,40 @@ function [gainMarge, phaseMarge, wGain, wPhase] = margin(varargin)
         ylabel('Phase (deg)');
         clear gainMarge phaseMarge wGain wPhase
     end
+end
+
+% Le zéro d'une fonction qui change de signe entre A et B, à la précision
+% de la machine.
+function x = dichotomie(f, a, b)
+    fa = f(a);
+    for k = 1:200
+        x = (a + b) / 2;
+        if x <= a || x >= b
+            break
+        end
+        fx = f(x);
+        if fx == 0
+            return
+        end
+        if sign(fx) == sign(fa)
+            a = x;
+            fa = fx;
+        else
+            b = x;
+        end
+    end
+end
+
+function g = gainDB(sys, w)
+    m = bode(sys, w);
+    g = 20 * log10(m(1));
+end
+
+% La phase exacte en W, ramenée à la branche de la grille : celle que
+% l'interpolation entre (WA, PA) et (WB, PB) donne à 180 degrés près.
+function ph = phaseExacte(sys, w, pa, pb, wa, wb)
+    [~, ph] = bode(sys, w);
+    ph = ph(1);
+    estime = pa + (w - wa) / (wb - wa) * (pb - pa);
+    ph = ph + 360 * round((estime - ph) / 360);
 end

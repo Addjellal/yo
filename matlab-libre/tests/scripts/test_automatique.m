@@ -425,13 +425,42 @@ assert(abs(m2 - m) < 1e-15 && w2 == w);
 assert(numel(wBornes) == 200);
 assert(abs(wBornes(1) - 0.1) < 1e-12 && abs(wBornes(end) - 10) < 1e-12);
 
-% « margin » accepte aussi une reponse deja calculee.
-[gmSys, pmSys] = margin(tf(1, [1 2 1 0]));
+% « margin » accepte aussi une reponse deja calculee : il interpole alors
+% la grille qu'on lui donne. D'un modele, il lit les traversees sur la
+% reponse exacte, comme MATLAB : 1/(s(s+1)^2) a une marge de gain de 2,
+% exactement, a w = 1 ; sa marge de phase se lit ou w (1 + w^2) = 1.
+[gmSys, pmSys, wgSys, wpSys] = margin(tf(1, [1 2 1 0]));
+wp = roots([1 0 1 -1]);
+wp = real(wp(abs(imag(wp)) < 1e-12));
+assert(abs(gmSys - 2) < 1e-12 && abs(wgSys - 1) < 1e-12, 'margin, la marge de gain exacte');
+assert(abs(wpSys - wp) < 1e-12 && abs(pmSys - (90 - 2 * atand(wp))) < 1e-9, ...
+       'margin, la marge de phase exacte');
 [mm, pp, ww] = bode(tf(1, [1 2 1 0]), logspace(-4, 4, 4000).');
 [gmRep, pmRep] = margin(mm, pp, ww);
-assert(abs(gmSys - gmRep) < 1e-12 && abs(pmSys - pmRep) < 1e-12);
-assert(abs(gmSys - 2) < 1e-3);
+assert(abs(gmSys - gmRep) < 1e-4 && abs(pmSys - pmRep) < 1e-3, 'margin d''une grille, interpolee');
+% Ogata : K/(s(s+1)(s+2)), K = 1 -- marge de gain 6 a sqrt(2) rad/s
+[gmO, pmO, wgO, wpO] = margin(tf(1, [1 3 2 0]));
+assert(abs(gmO - 6) < 1e-12 && abs(wgO - sqrt(2)) < 1e-12 && ...
+       abs(pmO - 53.4107861777) < 1e-9 && abs(wpO - 0.4457479596) < 1e-9, ...
+       'margin, le cas d''Ogata');
 close all
+
+% Le calcul avance a pas fixe : des instants inegalement espaces sont
+% refuses, comme dans MATLAB, plutot que de rendre une reponse fausse.
+for appel = {@() step(tf(1, [1 1]), [0 0.1 0.3 1]), ...
+             @() lsim(tf(1, [1 1]), ones(4, 1), [0 0.1 0.3 1]), ...
+             @() impulse(tf(1, [1 1]), [0 1 0.5])}
+    vu = '';
+    try
+        appel{1}();
+    catch err
+        vu = err.identifier;
+    end
+    assert(strcmp(vu, 'Control:analysis:NonUniformTimeVector'), ['instants inegaux : ' vu]);
+end
+tReg = (0:0.001:1)';
+assert(max(abs(step(tf(1, [1 1]), tReg) - (1 - exp(-tReg)))) < 1e-12, ...
+       'une grille reguliere, la reponse exacte');
 
 %% ------------------------------- modeles a plusieurs entrees et sorties
 % L'algebre des schemas-blocs se fait dans l'espace d'etat : elle doit

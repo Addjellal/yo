@@ -40,6 +40,13 @@ function [y, t, x] = lsim(sys, u, t, x0)
     end
     u = entreeEnColonnes(u, N, nu);
     dt = t(2) - t(1);
+    % Le calcul avance d'un pas fixe : des instants inégalement espacés
+    % donneraient une réponse fausse, sans le dire. MATLAB les refuse.
+    if ~(dt > 0) || any(abs(diff(t) - dt) > 1e-6 * dt)
+        error('Control:analysis:NonUniformTimeVector', ...
+              ['The time vector must be real, finite, and must contain monotonically ' ...
+               'increasing and evenly spaced time samples.']);
+    end
     [Ad, Bd] = discretiser(s, dt);
 
     % Les retards se decomposent voie par voie : celui d'entree retarde ce
