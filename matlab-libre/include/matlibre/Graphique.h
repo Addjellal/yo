@@ -179,9 +179,15 @@ struct Figure {
 //
 // Les indices sont rendus dans l'ordre croissant. Un tracé déjà court, ou
 // dont les x ne progressent pas régulièrement, est rendu tel quel.
+//
+// LOGX dit que l'axe des abscisses est logarithmique : les colonnes sont
+// alors celles de l'écran, égales en décades et non en unités. Sans cela,
+// un Bode de 1e-4 à 1e4 rad/s sur cinq cents pixels mettait tout ce qui est
+// sous 20 rad/s dans la première colonne, et n'en gardait que quatre
+// points : la courbe devenait un segment.
 std::vector<std::size_t> indicesVisibles(const std::vector<double>& x,
                                          const std::vector<double>& y, double xmin,
-                                         double xmax, int colonnes);
+                                         double xmax, int colonnes, bool logX = false);
 
 // Poignées de MATLAB : « ax = gca » puis « ax.XTick = [...] ».
 Valeur poigneeAxesCourants(Interpreteur& it);

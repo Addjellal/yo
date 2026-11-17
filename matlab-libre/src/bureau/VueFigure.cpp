@@ -300,7 +300,7 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                 peintre.setPen(QPen(couleur, 1));
                 peintre.setBrush(couleur);
                 std::vector<std::size_t> visibles =
-                    indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width());
+                    indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width(), logX);
                 for (std::size_t indice : visibles) {
                     if (indice >= n) continue;
                     peintre.drawEllipse(
@@ -316,7 +316,7 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                     // Plus de deux tiges par pixel : elles ne se distinguent
                     // plus, on trace l'enveloppe.
                     std::vector<std::size_t> visibles =
-                        indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width());
+                        indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width(), logX);
                     for (std::size_t indice : visibles) {
                         if (indice >= n) continue;
                         double x = versEcranX(serie.x[indice]);
@@ -426,7 +426,7 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                 // trace que l'enveloppe visible de chaque colonne — le
                 // dessin est le meme, le nombre de segments s'effondre.
                 std::vector<std::size_t> visibles =
-                    indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width());
+                    indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width(), logX);
                 for (std::size_t indice : visibles) {
                     if (indice >= n) continue;
                     double x = versEcranX(serie.x[indice]), y = versEcranY(serie.y[indice]);

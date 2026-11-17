@@ -97,6 +97,24 @@ texteCourt = fileread(fichierCourt);
 delete(fichierCourt);
 assert(numel(strfind(texteCourt, 'L ')) >= 4);
 
+% Sur un axe logarithmique, les colonnes sont egales en decades. Le Bode
+% de 1/(s(s+1)(s+2)), de 1e-4 a 1e4 rad/s : la reduction en abscisse
+% lineaire mettait tout ce qui est sous 20 rad/s dans la premiere colonne,
+% et le trace sautait d'un trait de 1e-4 a 20 rad/s, coudes compris.
+close all;
+wl = logspace(-4, 4, 4000);
+figure; semilogx(wl, 20 * log10(abs(1 ./ (1i * wl .* (1i * wl + 1) .* (1i * wl + 2)))));
+fichierLog = [tempname() '.svg'];
+print(fichierLog);
+texteLog = fileread(fichierLog);
+delete(fichierLog);
+debut = strfind(texteLog, '<path d="');
+reste = texteLog(debut(1) + 9:end);
+cheminLog = reste(1:find(reste == '"', 1) - 1);
+xl = cellfun(@(c) str2double(c{1}), regexp(cheminLog, '[ML] ([-\d.]+) ', 'tokens'));
+assert(numel(xl) > 100 && max(diff(sort(xl))) < 3, ...
+       'axe logarithmique : aucune decade n''est sautee');
+
 %% ----------------------------- poignees : gca, gcf et leurs proprietes
 % « ax = gca ; ax.XTick = [...] » est la facon courante de regler un axe en
 % MATLAB. gca rendait un simple nombre : l'ecriture au point echouait sur

@@ -75,9 +75,19 @@ struct Echelle {
 
 std::vector<std::size_t> indicesVisibles(const std::vector<double>& x,
                                          const std::vector<double>& y, double xmin,
-                                         double xmax, int colonnes) {
+                                         double xmax, int colonnes, bool logX) {
     std::size_t n = std::min(x.size(), y.size());
     std::vector<std::size_t> gardes;
+    // Sur un axe logarithmique, les colonnes de l'ecran sont egales en
+    // decades : c'est le logarithme de x qui se repartit.
+    if (logX) {
+        if (xmin > 0 && xmax > 0) {
+            xmin = std::log10(xmin);
+            xmax = std::log10(xmax);
+        } else {
+            logX = false;
+        }
+    }
     // En dessous de quatre points par colonne il n'y a rien a gagner, et le
     // trace garde exactement les points d'origine.
     if (colonnes < 2 || n <= (std::size_t)colonnes * 4 || !(xmax > xmin)) {
@@ -108,8 +118,12 @@ std::vector<std::size_t> indicesVisibles(const std::vector<double>& x,
             colonneCourante = LLONG_MIN;
             continue;
         }
+        // un x negatif ou nul n'a pas de place sur un axe logarithmique :
+        // il forme sa propre colonne, a gauche de toutes
+        double abscisse = x[k];
+        if (logX) abscisse = abscisse > 0 ? std::log10(abscisse) : xmin - (xmax - xmin);
         long long colonne =
-            (long long)((x[k] - xmin) / (xmax - xmin) * (double)colonnes);
+            (long long)((abscisse - xmin) / (xmax - xmin) * (double)colonnes);
         if (!ouverte || colonne != colonneCourante) {
             fermer();
             colonneCourante = colonne;
@@ -567,7 +581,7 @@ std::string rendreSVG(const Figure& figure) {
             // Les points qu'aucun pixel ne distingue sont retires : le
             // dessin est le meme, le fichier tient.
             std::vector<std::size_t> visibles =
-                indicesVisibles(s.x, s.y, ex.min, ex.max, ex.pixelsMax - ex.pixelsMin);
+                indicesVisibles(s.x, s.y, ex.min, ex.max, ex.pixelsMax - ex.pixelsMin, ex.log);
             std::string chemin;
             bool premier = true;
             std::size_t precedent = 0;
