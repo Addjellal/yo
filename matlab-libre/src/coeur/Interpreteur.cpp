@@ -2114,7 +2114,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     }
                     courant = appelerUtilisateur(
                         defPaquet->methodes[membre], args,
-                        debut < n->acces.size() ? 1 : std::max(nargout, 1));
+                        debut < n->acces.size() ? 1 : (nargout < 0 ? 1 : nargout));
                     statique = true;
                 } else {
                     auto itd = defPaquet->defauts.find(membre);
@@ -2126,6 +2126,9 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                 }
             }
             if (!statique) {
+                // En instruction (nargout nul), aucune sortie n'est exigée,
+                // comme pour toute fonction : « pkg.f(x); » n'échoue pas si f
+                // ne pose sa sortie que lorsqu'on la demande.
                 std::vector<Valeur> args;
                 debut = segments;
                 if (n->acces.size() > segments && n->acces[segments].genre == '(') {
@@ -2133,7 +2136,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     debut = segments + 1;
                 }
                 courant = appeler(compose, args,
-                                  debut < n->acces.size() ? 1 : std::max(nargout, 1));
+                                  debut < n->acces.size() ? 1 : (nargout < 0 ? 1 : nargout));
             }
         } else if (!n->acces.empty() && n->acces[0].genre == '.' &&
                    n->acces[0].nom == "empty" && classeVide(nom) &&
@@ -2178,7 +2181,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                 }
                 courant = appelerUtilisateur(def->methodes[membre], args,
                                              debut < n->acces.size() ? 1
-                                                                     : std::max(nargout, 1));
+                                                                     : (nargout < 0 ? 1 : nargout));
             } else {
                 auto itd = def->defauts.find(membre);
                 if (itd == def->defauts.end() || !itd->second)
@@ -2311,7 +2314,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                         std::vector<Valeur> args = {base};
                         if (dernier || n->acces[k + 1].genre != '(') {
                             auto r = appelerUtilisateur(def->methodes[nom], args,
-                                                        dernier ? std::max(nargout, 1) : 1);
+                                                        dernier ? (nargout < 0 ? 1 : nargout) : 1);
                             for (auto& x : r) suivant.push_back(x);
                             continue;
                         }
@@ -2319,7 +2322,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                         for (auto& x : extra) args.push_back(x);
                         auto r = appelerUtilisateur(
                             def->methodes[nom], args,
-                            (k + 2 == n->acces.size()) ? std::max(nargout, 1) : 1);
+                            (k + 2 == n->acces.size()) ? (nargout < 0 ? 1 : nargout) : 1);
                         for (auto& x : r) suivant.push_back(x);
                         ++k;
                         continue;

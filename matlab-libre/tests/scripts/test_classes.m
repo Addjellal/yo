@@ -293,8 +293,12 @@ fichiersPaquet = {
         '            if nargin > 0', '                p.x = x;', '                p.y = y;', ...
         '            end', '        end', '        function d = norme(p)', ...
         '            d = hypot(p.x, p.y);', '        end', '    end', ...
+        '    methods', '        function r = surDemande(p)', '            if nargout > 0', ...
+        '                r = p.x;', '            end', '        end', '    end', ...
         '    methods (Static)', '        function p = origine()', ...
-        '            p = geo.Point(0, 0);', '        end', '    end', 'end'}
+        '            p = geo.Point(0, 0);', '        end', ...
+        '        function r = statiqueSurDemande()', '            if nargout > 0', ...
+        '                r = 1;', '            end', '        end', '    end', 'end'}
     fullfile('+geo', 'Point3.m'), {'classdef Point3 < geo.Point', '    properties', ...
         '        z = 0', '    end', '    methods', '        function p = Point3(x, y, z)', ...
         '            p@geo.Point(x, y);', '            p.z = z;', '        end', ...
@@ -303,6 +307,9 @@ fichiersPaquet = {
     fullfile('+geo', 'distance.m'), {'function d = distance(p)', '    d = p.norme();', 'end'}
     fullfile('+geo', '+unites', 'metres.m'), {'function m = metres(km)', ...
         '    m = 1000 * km;', 'end'}
+    fullfile('+geo', 'surDemande.m'), {'function r = surDemande()', '    if nargout > 0', ...
+        '        r = 1;', '    end', 'end'}
+    fullfile('+geo', 'compte.m'), {'function n = compte()', '    n = nargout;', 'end'}
     };
 for kP = 1:size(fichiersPaquet, 1)
     fid = fopen(fullfile(racinePaquet, fichiersPaquet{kP, 1}), 'w');
@@ -328,6 +335,15 @@ assert(isequal([points.x], [1 2]) && isequal({points.y}, {0, 0}), ...
        'la propriete d''un tableau d''objets est la liste des proprietes de chacun');
 poignee = @geo.distance;
 assert(poignee(p) == 5, 'une poignee vers une fonction de paquet');
+% En instruction, comme toute fonction, elles sont appelees sans sortie
+% demandee : une sortie qu'elles ne posent que sur demande n'est pas due.
+geo.surDemande();
+geo.Point.statiqueSurDemande();
+p.surDemande();
+geo.compte();
+assert(ans == 0, 'en instruction, nargout vaut 0, et la sortie posee va dans ans'); %#ok<NOANS>
+assert(geo.compte() == 1 && geo.surDemande() == 1 && p.surDemande() == 3, ...
+       'dans une expression, une sortie est demandee');
 refuse = '';
 try
     distance(p); %#ok<NASGU>
@@ -547,5 +563,20 @@ tableau = struct('v', {1, 2, 3});
 assert(isequal([u1 u2 u3], [1 2 3]), 'subsref rend la liste des champs');
 assert(isequal(subsref(tableau(2), substruct('.', 'v')), 2), 'subsref d''un seul element');
 disp('numArgumentsFromSubscript : ok');
+
+% « end » au bout d'une chaîne qui traverse un objet à subsref surchargé :
+% il vaut la taille de ce que la chaîne rend à cet endroit, que le pas
+% d'avant soit un point, des accolades ou des parenthèses.
+casier = CasierEssai({[1 2 3], struct('v', [4 5 6 7])});
+range = RecueilEssai(struct('casier', casier, 'suite', [10 20 30]));
+assert(range.suite(end) == 30, 'end apres un point lu par subsref');
+assert(range.casier{1}(end) == 3, 'end apres des accolades lues par subsref');
+assert(range.casier{2}.v(end) == 7 && range.casier{2}.v(end - 1) == 6, ...
+       'end apres des accolades puis un champ');
+assert(isequal(range.casier{end}.v(end - 2:end), [5 6 7]), ...
+       'end dans les accolades : la methode end de la classe');
+sousCasier = casier(1:2);
+assert(sousCasier{end}.v(end) == 7, 'end apres des parentheses lues par subsref');
+disp('end dans une chaine a subsref surcharge : ok');
 
 disp('classes : toutes les verifications passent');

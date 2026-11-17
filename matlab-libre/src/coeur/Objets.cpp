@@ -125,6 +125,22 @@ bool Interpreteur::valeurIntermediaire(const Valeur& base,
                     return false;
                 continue;
             }
+            if (courant.classe == Classe::Objet) {
+                // De même pour « {k} » et « (k) » : la classe qui définit
+                // subsref dit ce qu'ils rendent. Dans
+                // « out.yout{1}.Values.Data(end) », le Dataset rend son
+                // premier signal par subsref ; l'indexation par défaut
+                // d'un objet échouait là, et « end » ne trouvait rien.
+                auto def = classeDefinie(courant.nomObjet);
+                if (def && def->aMethode("subsref") && !dansMethodeDe(courant.nomObjet)) {
+                    std::vector<ElementAcces> pas(1, e);
+                    Valeur s = substruct(pas, 0, &courant);
+                    auto r = appelerMethode(courant, "subsref", {s}, 1);
+                    if (r.empty()) return false;
+                    courant = r[0];
+                    continue;
+                }
+            }
             auto idx = evaluerIndices(e.args, &courant, 0, (int)e.args.size());
             courant = indexer(courant, idx, e.genre);
         }
