@@ -196,8 +196,12 @@ totalité.
    d'un modèle neuf de Simulink (pas variable, sorties en Dataset), là
    où le modèle par valeur garde ceux de MatLibre (ode1 au pas de 0,01,
    sorties en tableau) ; Commented retire un bloc du calcul ou le fait
-   traverser ; il y manque `Simulink.Mask`, `operpoint` et `findop`, et
-   les annotations ; les bus
+   traverser ; `Simulink.BlockDiagram.createSubsystem` et
+   `expandSubsystem` regroupent et déplient des blocs en rebranchant
+   leurs liens — un sous-système masqué, lié, commenté, atomique,
+   conditionnel ou à variantes ne se déplie pas, comme dans Simulink ; il
+   y manque `Simulink.Mask`, `operpoint` et `findop`, et les annotations ;
+   les bus
    se forment et se défont par nom (Bus Creator, Bus Selector), et se
    typent par `Simulink.Bus` et `Simulink.BusElement` ; Data
    Type Conversion convertit en entier, simple ou booléen, avec arrondi

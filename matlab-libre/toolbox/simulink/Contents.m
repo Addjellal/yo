@@ -37,6 +37,15 @@
 %   load_system   - Relit ce .m
 %   getSimulinkBlockHandle - La poignée d'un bloc, ou -1
 %
+% Restructurer un modèle
+%   Simulink.BlockDiagram.createSubsystem   - Range des blocs dans un sous-système
+%   Simulink.BlockDiagram.expandSubsystem   - Remplace un sous-système par son contenu
+%   Simulink.BlockDiagram.arrangeSystem     - Range les blocs d'un système
+%   Simulink.BlockDiagram.deleteContents    - Vide un modèle
+%   Simulink.BlockDiagram.copyContentsToSubsystem  - Copie un modèle dans un sous-système
+%   Simulink.SubSystem.deleteContents       - Vide un sous-système
+%   Simulink.SubSystem.copyContentsToBlockDiagram  - Copie un sous-système dans un modèle
+%
 % Jeux de configuration
 %   getActiveConfigSet  - Le jeu de configuration actif
 %   getConfigSets       - Les noms des jeux d'un modèle

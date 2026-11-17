@@ -13957,6 +13957,344 @@ rmdir(dossier108, 's');
 bdclose('all');
 fprintf('blocs commentes : ok\n');
 
+%% ------------------------- 109. Restructurer un modèle : regrouper, déplier, vider
+% Simulink.BlockDiagram.createSubsystem range des blocs dans un
+% sous-système neuf et rebranche les liens ; expandSubsystem fait
+% l'inverse ; arrangeSystem rend la place à la mise en place automatique ;
+% deleteContents et copyContentsTo... vident et remplissent. Le calcul ne
+% change pas : la linéarisation du modèle le prouve à chaque étape.
+bdclose('all');
+new_system('rst109');
+add_block('built-in/Inport', 'rst109/u');
+add_block('built-in/Constant', 'rst109/c', 'Value', '2');
+add_block('built-in/Sum', 'rst109/s', 'Inputs', '++');
+add_block('built-in/Gain', 'rst109/g', 'Gain', '3');
+add_block('built-in/Gain', 'rst109/h', 'Gain', '5');
+add_block('built-in/Outport', 'rst109/y');
+add_block('built-in/Outport', 'rst109/z');
+add_line('rst109', {'u/1', 'c/1', 's/1', 'g/1', 'g/1', 'u/1'}, ...
+         {'s/1', 's/2', 'g/1', 'y/1', 'h/1', 'z/1'});
+[~, ~, ~, D109] = linmod('rst109');
+assert(max(abs(D109 - [3; 1])) < 1e-9, 'avant : y = 3(u+2), z = u');
+% regrouper s et g : deux entrees (u, c), une sortie (g, qui alimente y et h)
+Simulink.BlockDiagram.createSubsystem([get_param('rst109/s', 'Handle'), ...
+                                       get_param('rst109/g', 'Handle')]);
+assert(isequal(find_system('rst109/Subsystem'), {'rst109/Subsystem'; 'rst109/Subsystem/s'; ...
+       'rst109/Subsystem/g'; 'rst109/Subsystem/In1'; 'rst109/Subsystem/In2'; ...
+       'rst109/Subsystem/Out1'}) && isequal(get_param('rst109/Subsystem', 'Ports'), ...
+       [2 1 0 0 0 0 0 0]), 'un signal par entree, une sortie pour g');
+[~, ~, ~, D109] = linmod('rst109');
+assert(max(abs(D109 - [3; 1])) < 1e-9, 'regroupe : le calcul ne change pas');
+Simulink.BlockDiagram.expandSubsystem('rst109/Subsystem');
+assert(isequal(sort(get_param('rst109', 'Blocks')), sort({'u'; 'c'; 's'; 'g'; 'h'; 'y'; 'z'})), ...
+       'deplie : les blocs reviennent, sous leur nom');
+[~, ~, ~, D109] = linmod('rst109');
+assert(max(abs(D109 - [3; 1])) < 1e-9, 'deplie : le calcul ne change pas');
+% tout le modele, Inport et Outport compris : ils partent dedans, et des
+% ports de meme nom et de meme rang les remplacent dehors
+Simulink.BlockDiagram.createSubsystem(Simulink.findBlocks('rst109'), 'Name', 'tout');
+assert(isequal(sort(get_param('rst109', 'Blocks')), sort({'tout'; 'u'; 'y'; 'z'})) && ...
+       strcmp(get_param('rst109/y', 'Port'), '1') && strcmp(get_param('rst109/z', 'Port'), '2'), ...
+       'les ports du modele gardent leur rang');
+[~, ~, ~, D109] = linmod('rst109');
+assert(max(abs(D109 - [3; 1])) < 1e-9, 'tout regroupe : le calcul ne change pas');
+% le nom pris : le rang libre suivant, ou un refus
+Simulink.BlockDiagram.createSubsystem(get_param('rst109/u', 'Handle'), 'Name', 'tout');
+assert(any(strcmp(get_param('rst109', 'Blocks'), 'tout1')), 'MakeNameUnique, par defaut');
+Simulink.BlockDiagram.expandSubsystem('rst109/tout1');
+Simulink.BlockDiagram.expandSubsystem('rst109/tout');
+[~, ~, ~, D109] = linmod('rst109');
+assert(max(abs(D109 - [3; 1])) < 1e-9 && numel(get_param('rst109', 'Blocks')) == 7, ...
+       'deplie deux fois : le modele de depart');
+% deplier : un nom deja pris prend le rang libre suivant, les priorites partent
+new_system('dep109');
+add_block('built-in/Constant', 'dep109/c', 'Value', '1');
+add_block('built-in/Gain', 'dep109/g', 'Gain', '7');
+add_block('simulink/Ports & Subsystems/Subsystem', 'dep109/S');
+delete_line('dep109/S', 'In1/1', 'Out1/1');
+add_block('built-in/Gain', 'dep109/S/g', 'Gain', '2', 'Priority', '1');
+add_line('dep109/S', {'In1/1', 'g/1'}, {'g/1', 'Out1/1'});
+add_block('built-in/Outport', 'dep109/y');
+add_line('dep109', {'c/1', 'g/1', 'S/1'}, {'g/1', 'S/1', 'y/1'});
+avant109 = sim('dep109', 'StopTime', '1');
+Simulink.BlockDiagram.expandSubsystem('dep109/S', 'CreateArea', 'off');
+assert(isequal(sort(get_param('dep109', 'Blocks')), sort({'c'; 'g'; 'g1'; 'y'})) && ...
+       strcmp(get_param('dep109/g1', 'Gain'), '2') && ...
+       isempty(get_param('dep109/g1', 'Priority')), 'g devient g1, sa priorite part');
+apres109 = sim('dep109', 'StopTime', '1');
+assert(apres109.yout{1}.Values.Data(end) == 14 && ...
+       isequal(apres109.yout{1}.Values.Data, avant109.yout{1}.Values.Data), '1 x 7 x 2, avant et apres');
+% un Inport relie droit a l'Outport : la ligne traverse
+new_system('tra109');
+add_block('built-in/Constant', 'tra109/c', 'Value', '5');
+add_block('simulink/Ports & Subsystems/Subsystem', 'tra109/S');
+add_block('built-in/Outport', 'tra109/y');
+add_line('tra109', {'c/1', 'S/1'}, {'S/1', 'y/1'});
+Simulink.BlockDiagram.expandSubsystem('tra109/S');
+assert(isequal(get_param('tra109', 'Blocks'), {'c'; 'y'}), 'les ports partent');
+r109 = sim('tra109', 'StopTime', '1');
+assert(r109.yout{1}.Values.Data(end) == 5, 'c va droit a y');
+
+% arrangeSystem : la mise en place reprend la main, a ce niveau seulement
+new_system('arr109');
+add_block('built-in/Constant', 'arr109/c', 'Position', [300 300 330 330]);
+add_block('built-in/Gain', 'arr109/g', 'Position', [20 20 50 50]);
+add_block('simulink/Ports & Subsystems/Subsystem', 'arr109/S', 'Position', [100 300 140 340]);
+set_param('arr109/S/In1', 'Position', [500 500 530 530]);
+add_line('arr109', {'c/1', 'g/1'}, {'g/1', 'S/1'});
+Simulink.BlockDiagram.arrangeSystem('arr109', 'FullLayout', 'true');
+p109 = get_param('arr109/c', 'Position');
+q109 = get_param('arr109/g', 'Position');
+assert(p109(3) < q109(1) && isequal(get_param('arr109/S/In1', 'Position'), [500 500 530 530]), ...
+       'la source a gauche ; le sous-systeme n''est pas touche');
+Simulink.BlockDiagram.arrangeSystem('arr109/S');
+assert(~isequal(get_param('arr109/S/In1', 'Position'), [500 500 530 530]), ...
+       'range par son chemin, le sous-systeme l''est');
+v109 = Simulink.BlockDiagram.arrangeSystem(add_block(new_system('val109'), 'gain', 'g', ...
+                                            'Position', [1 2 3 4]));
+assert(~isfield(v109.blocs{1}.parametres, 'Position'), 'un modele par valeur');
+
+% vider, copier
+new_system('src109');
+add_block('built-in/Inport', 'src109/u');
+add_block('built-in/Gain', 'src109/g', 'Gain', '4');
+add_block('built-in/Outport', 'src109/y');
+add_line('src109', {'u/1', 'g/1'}, {'g/1', 'y/1'});
+new_system('cib109');
+add_block('built-in/Constant', 'cib109/c', 'Value', '3');
+add_block('simulink/Ports & Subsystems/Subsystem', 'cib109/S');
+add_block('built-in/Outport', 'cib109/y');
+add_line('cib109', {'c/1', 'S/1'}, {'S/1', 'y/1'});
+Simulink.SubSystem.deleteContents('cib109/S');
+assert(isequal(find_system('cib109/S'), {'cib109/S'}) && ...
+       isequal(get_param('cib109/S', 'Ports'), [0 0 0 0 0 0 0 0]) && ...
+       isempty(get_param('cib109', 'Lines')), 'vide : ses ports et les liens qui y tenaient partent');
+Simulink.BlockDiagram.copyContentsToSubsystem('src109', 'cib109/S');
+add_line('cib109', {'c/1', 'S/1'}, {'S/1', 'y/1'});
+r109 = sim('cib109', 'StopTime', '1');
+assert(r109.yout{1}.Values.Data(end) == 12, 'le sous-systeme rempli : 3 x 4');
+set_param('src109', 'StopTime', '7');
+Simulink.BlockDiagram.deleteContents('src109');
+assert(isempty(get_param('src109', 'Blocks')) && strcmp(get_param('src109', 'StopTime'), '7'), ...
+       'le modele vide garde sa configuration');
+Simulink.SubSystem.copyContentsToBlockDiagram('cib109/S', 'src109');
+[~, ~, ~, D109] = linmod('src109');
+assert(D109 == 4 && numel(find_system('cib109')) == 7, 'recopie : le gain seul, l''original intact');
+
+% ce qui se refuse, en nommant le bloc
+new_system('ref109');
+add_block('simulink/Ports & Subsystems/Subsystem', 'ref109/S');
+add_block('simulink/Ports & Subsystems/Subsystem', 'ref109/S/T');
+add_block('simulink/Ports & Subsystems/Enabled Subsystem', 'ref109/E');
+add_block('simulink/Ports & Subsystems/Subsystem', 'ref109/A', 'TreatAsAtomicUnit', 'on');
+add_block('simulink/Ports & Subsystems/Subsystem', 'ref109/M', 'Mask', 'on', ...
+          'MaskVariables', 'k=@1;', 'MaskValueString', '2');
+add_block('simulink/Ports & Subsystems/Subsystem', 'ref109/K', 'Commented', 'on');
+add_block('built-in/Gain', 'ref109/g');
+refus109 = {@() Simulink.BlockDiagram.expandSubsystem('ref109/E'), ...
+                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'conditionnel'; ...
+            @() Simulink.BlockDiagram.expandSubsystem('ref109/A'), ...
+                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'atomique'; ...
+            @() Simulink.BlockDiagram.expandSubsystem('ref109/M'), ...
+                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'masque'; ...
+            @() Simulink.BlockDiagram.expandSubsystem('ref109/K'), ...
+                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'commentaire'; ...
+            @() Simulink.BlockDiagram.expandSubsystem('ref109/g'), ...
+                'Simulink:BlockDiagram:ExpandSubsystemNotSubsystem', 'ref109/g'; ...
+            @() Simulink.BlockDiagram.createSubsystem([get_param('ref109/g', 'Handle'), ...
+                                                       get_param('ref109/S/T', 'Handle')]), ...
+                'Simulink:BlockDiagram:CreateSubsystemDifferentParents', 'ref109/S/T'; ...
+            @() Simulink.BlockDiagram.createSubsystem(get_param('ref109/E/Enable', 'Handle')), ...
+                'Simulink:BlockDiagram:CreateSubsystemControlPort', 'Enable'; ...
+            @() Simulink.BlockDiagram.createSubsystem(get_param('ref109/g', 'Handle'), ...
+                'Name', 'S', 'MakeNameUnique', 'off'), 'Simulink:Commands:AddBlockCantAdd', 'S'; ...
+            @() Simulink.BlockDiagram.createSubsystem(), ...
+                'Simulink:BlockDiagram:CreateSubsystemNoSelection', 'selection'; ...
+            @() Simulink.BlockDiagram.copyContentsToSubsystem('src109', 'cib109/S'), ...
+                'Simulink:SubSystem:SubsystemNotEmpty', 'cib109/S'; ...
+            @() Simulink.SubSystem.copyContentsToBlockDiagram('cib109/S', 'src109'), ...
+                'Simulink:SubSystem:CopyContentsTargetNotEmpty', 'src109'; ...
+            @() Simulink.BlockDiagram.copyContentsToSubsystem('ref109', 'ref109/S'), ...
+                'Simulink:BlockDiagram:CopyContentsSourceContainsTarget', 'ref109'; ...
+            @() Simulink.BlockDiagram.expandSubsystem('ref109/S', 'CreateArea', 'oui'), ...
+                'Simulink:BlockDiagram:ExpandSubsystemArguments', 'CreateArea'};
+for q = 1:size(refus109, 1)
+    vu109 = '';
+    dit109 = '';
+    try
+        refus109{q, 1}();
+    catch err
+        vu109 = err.identifier;
+        dit109 = err.message;
+    end
+    assert(strcmp(vu109, refus109{q, 2}) && ~isempty(strfind(dit109, refus109{q, 3})), ...
+           sprintf('refus %d : %s, %s', q, vu109, dit109));
+end
+bdclose('all');
+fprintf('restructurer un modele : ok\n');
+
+%% ----------------------------------------------- 110. Cas de la littérature
+% Chaque fonction ajoutée depuis la section 105, éprouvée sur un cas dont
+% la littérature donne le résultat ; les valeurs attendues ont été
+% recoupées par un calcul indépendant (SciPy).
+bdclose('all');
+
+% A. Le moteur à courant continu de « Control Tutorials for MATLAB and
+% Simulink » (Université du Michigan, DC Motor Speed) : J = 0.01, b = 0.1,
+% K = 0.01, R = 1, L = 0.5. Bâti bloc par bloc sous la forme de MATLAB,
+% les paramètres dans l'espace de travail du modèle. Le tutoriel donne la
+% transmittance 0.01/(0.005 s^2 + 0.06 s + 0.1001), ses pôles -2.0025 et
+% -9.9975, un temps de montée de 1.14 s et un temps d'établissement de
+% 2.07 s.
+moteur110('moteur110');
+sortie110 = sim('moteur110', 'StopTime', '3');
+assert(strcmp(get_param('moteur110', 'Solver'), 'VariableStepAuto'), 'le solveur de Simulink');
+t110 = sortie110.yout{1}.Values.Time;
+w110 = sortie110.yout{1}.Values.Data;
+p110 = roots([0.005 0.06 0.1001]);
+exact110 = @(t) (0.01 / 0.1001) * (1 - (p110(2) * exp(p110(1) * t) - ...
+                                       p110(1) * exp(p110(2) * t)) / (p110(2) - p110(1)));
+assert(max(abs(w110 - exact110(t110))) < 1e-5, 'A : la reponse indicielle, aux reglages de Simulink');
+set_param('moteur110', 'RelTol', '1e-10', 'AbsTol', '1e-12');
+sortie110 = sim('moteur110', 'StopTime', '3');
+assert(max(abs(sortie110.yout{1}.Values.Data - exact110(sortie110.yout{1}.Values.Time))) < 1e-8, ...
+       'A : la reponse indicielle, serree');
+set_param('moteur110', 'Solver', 'ode4', 'FixedStep', '1e-3');
+sortie110 = sim('moteur110', 'StopTime', '3');
+[montee110, etablissement110] = tempsDeReponse110(sortie110.yout{1}.Values.Time, ...
+                                                  sortie110.yout{1}.Values.Data, 0.01 / 0.1001);
+assert(abs(montee110 - 1.1350) < 2e-3 && abs(etablissement110 - 2.0652) < 2e-3, ...
+       sprintf('A : montee %.4f s, etablissement %.4f s', montee110, etablissement110));
+% le tutoriel extrait le modele lineaire en remplacant l'echelon par un In1
+replace_block('moteur110', 'Step', 'built-in/Inport', 'noprompt');
+[A110, B110, C110, D110] = linmod('moteur110');
+[num110, den110] = ss2tf(A110, B110, C110, D110);
+assert(max(abs(sort(eig(A110)) - sort(p110))) < 1e-9 && ...
+       max(abs(num110 / den110(1) - [0 0 2])) < 1e-9 && ...
+       max(abs(den110 / den110(1) - [1 12 20.02])) < 1e-9 && ...
+       abs(dcgain(ss(A110, B110, C110, D110)) - 0.01 / 0.1001) < 1e-12, ...
+       'A : la transmittance du tutoriel, par LINMOD');
+
+% B. L'oscillateur de Van der Pol, mu = 1 : son cycle limite a pour
+% période 6.6632868593 et pour amplitude 2.0086198601. Deux jeux de
+% configuration attachés au même modèle, un pas variable serré et un
+% Runge-Kutta à pas fixe, s'activent tour à tour.
+vdp110('vdp110');
+precis110 = Simulink.ConfigSet;
+precis110.Name = 'Precis';
+set_param(precis110, 'Solver', 'ode45', 'RelTol', '1e-10', 'AbsTol', '1e-12', ...
+          'MaxStep', '0.01', 'StopTime', '40');
+grossier110 = copy(precis110);
+grossier110.Name = 'Grossier';
+set_param(grossier110, 'Solver', 'ode4', 'FixedStep', '0.1');
+attachConfigSet('vdp110', precis110);
+attachConfigSet('vdp110', grossier110);
+setActiveConfigSet('vdp110', 'Precis');
+fin110 = sim('vdp110');
+[T110, A110v] = cycle110(fin110);
+assert(abs(T110 - 6.6632868593) < 1e-5 && abs(A110v - 2.0086198601) < 1e-4, ...
+       sprintf('B : periode %.10f, amplitude %.10f', T110, A110v));
+setActiveConfigSet('vdp110', 'Grossier');
+gros110 = sim('vdp110');
+[Tg110, Ag110] = cycle110(gros110);
+assert(numel(gros110.tout) == 401 && abs(Tg110 - 6.6632868593) < 5e-3 && ...
+       abs(Ag110 - 2.0086198601) < 5e-3, ...
+       sprintf('B : ode4 au pas de 0.1, periode %.6f, amplitude %.6f', Tg110, Ag110));
+assert(strcmp(get_param('vdp110', 'Solver'), 'ode4') && ...
+       strcmp(get_param(getConfigSet('vdp110', 'Precis'), 'Solver'), 'ode45'), ...
+       'B : le jeu actif est celui que SIM applique');
+
+% C. Ogata, « Modern Control Engineering » : G(s) = K/(s(s+1)(s+2)) en
+% boucle fermée unitaire. Pour K = 1, marge de gain 6 à w = sqrt(2) rad/s
+% et marge de phase 53.41 degrés à w = 0.4457 rad/s ; Routh : la boucle
+% oscille pour K = 6, ses pôles en +/- j sqrt(2) et -3.
+ogata110('ogata110');
+L110 = linearize('ogata110', linio('ogata110/G', 1, 'looptransfer'));
+[Gm110, Pm110, Wcg110, Wcp110] = margin(-L110);
+assert(abs(Gm110 - 6) < 1e-6 && abs(Wcg110 - sqrt(2)) < 1e-6 && ...
+       abs(Pm110 - 53.4107861777) < 1e-5 && abs(Wcp110 - 0.4457479596) < 1e-6, ...
+       sprintf('C : GM %.8f a %.8f, PM %.8f a %.8f', Gm110, Wcg110, Pm110, Wcp110));
+io110 = [linio('ogata110/r', 1, 'input'), linio('ogata110/G', 1, 'output')];
+T110f = linearize('ogata110', io110);
+pf110 = sort(eig(T110f.A));
+assert(max(abs(sort(pf110) - sort(roots([1 3 2 1])))) < 1e-8, 'C : K = 1, les poles en boucle fermee');
+assignin(get_param('ogata110', 'ModelWorkspace'), 'K', 6);
+T110f = linearize('ogata110', io110);
+pf110 = eig(T110f.A);
+assert(min(abs(pf110 + 3)) < 1e-8 && min(abs(pf110 - 1i * sqrt(2))) < 1e-8 && ...
+       min(abs(pf110 + 1i * sqrt(2))) < 1e-8, 'C : K = 6, des poles en +/- j sqrt(2)');
+set_param('ogata110', 'RelTol', '1e-10', 'AbsTol', '1e-12', 'MaxStep', '0.01');
+o110 = sim('ogata110', 'StopTime', '40');
+y110 = o110.yout{1}.Values.Data - 1;
+t110 = o110.yout{1}.Values.Time;
+k110 = find(y110(1:end - 1) < 0 & y110(2:end) >= 0 & t110(1:end - 1) > 10);
+tc110 = t110(k110) - y110(k110) .* (t110(k110 + 1) - t110(k110)) ./ (y110(k110 + 1) - y110(k110));
+assert(abs(mean(diff(tc110)) - 2 * pi / sqrt(2)) < 1e-3, 'C : K = 6, la boucle oscille a 2 pi / sqrt(2)');
+
+% D. Le régulateur de vitesse de « Control Tutorials » (Cruise Control) :
+% m = 1000 kg, b = 50 N.s/m, consigne 10 m/s, PI Kp = 800, Ki = 40. Ki/Kp
+% = b/m : le zéro du PI compense le pôle de la voiture, et la boucle
+% fermée est exactement 10 (1 - exp(-0.8 t)). Commenter l'intégrale laisse
+% le P seul, qui s'établit à 10 Kp/(b + Kp) = 9.4118 m/s ; traverser le
+% capteur rend le retour unitaire.
+croisiere110('croisiere110');
+set_param('croisiere110', 'RelTol', '1e-10', 'AbsTol', '1e-12', 'MaxStep', '0.05');
+set_param('croisiere110/capteur', 'Commented', 'through');
+c110 = sim('croisiere110', 'StopTime', '20');
+tc110 = c110.yout{1}.Values.Time;
+assert(max(abs(c110.yout{1}.Values.Data - 10 * (1 - exp(-0.8 * tc110)))) < 1e-6, ...
+       'D : le capteur traverse, la boucle PI du tutoriel');
+set_param('croisiere110/Ki', 'Commented', 'on');
+c110 = sim('croisiere110', 'StopTime', '20');
+tc110 = c110.yout{1}.Values.Time;
+assert(max(abs(c110.yout{1}.Values.Data - 10 * 800 / 850 * (1 - exp(-0.85 * tc110)))) < 1e-6 && ...
+       abs(c110.yout{1}.Values.Data(end) - 9.4117647059) < 1e-6, ...
+       'D : l''integrale commentee, le P seul et son erreur statique');
+set_param('croisiere110/Ki', 'Commented', 'off');
+set_param('croisiere110/capteur', 'Commented', 'off');
+% les sorties aux instants memes ou STEP calcule
+set_param('croisiere110', 'OutputOption', 'SpecifiedOutputTimes', 'OutputTimes', '0:0.01:20');
+c110 = sim('croisiere110', 'StopTime', '20');
+tc110 = (0:0.01:20)';
+H110 = feedback(tf([800 40], [1 0]) * tf(1, [1000 50]), tf(1, [0.5 1]));
+assert(isequal(size(c110.yout{1}.Values.Data), size(tc110)) && ...
+       max(abs(c110.yout{1}.Values.Data - 10 * step(H110, tc110))) < 1e-6, ...
+       'D : avec le capteur, la boucle que donne FEEDBACK');
+
+% E. Le moteur de A en boucle PI, Kp = 100, Ki = 200 (Control Tutorials,
+% DC Motor Speed: PID) : pôles -1.99978 et -5.00011 +/- 13.22954j,
+% dépassement de 30.5 %. Les blocs du moteur se regroupent dans un
+% sous-système, puis se déplient : rien ne change, que les chemins.
+boucle110('boucle110');
+set_param('boucle110', 'RelTol', '1e-10', 'AbsTol', '1e-12', 'MaxStep', '0.002');
+avant110 = sim('boucle110', 'StopTime', '3');
+blocs110 = {'somme_e', '1_L', 'i', 'R', 'Kt', 'somme_m', '1_J', 'w', 'b', 'Ke'};
+Simulink.BlockDiagram.createSubsystem(cellfun(@(n) get_param(['boucle110/' n], 'Handle'), ...
+                                              blocs110), 'Name', 'Moteur');
+assert(isequal(get_param('boucle110/Moteur', 'Ports'), [1 1 0 0 0 0 0 0]) && ...
+       numel(find_system('boucle110/Moteur', 'SearchDepth', 1)) == 13, ...
+       'E : le moteur, une entree (la tension) et une sortie (la vitesse)');
+groupe110 = sim('boucle110', 'StopTime', '3');
+assert(isequal(groupe110.tout, avant110.tout) && ...
+       max(abs(groupe110.yout{1}.Values.Data - avant110.yout{1}.Values.Data)) < 1e-12, ...
+       'E : regroupe, la boucle calcule de meme');
+assert(abs(max(groupe110.yout{1}.Values.Data) - 1.3049072878) < 1e-4, 'E : le depassement de 30.5 %');
+T110e = linearize('boucle110', [linio('boucle110/consigne', 1, 'input'), ...
+                                linio('boucle110/Moteur', 1, 'output')]);
+attendus110 = [-1.9997826339; -5.0001086831 + 13.2295371096i; -5.0001086831 - 13.2295371096i];
+pe110 = eig(T110e.A);
+assert(all(arrayfun(@(p) min(abs(pe110 - p)), attendus110) < 1e-6), ...
+       'E : les poles de la boucle, par un point pose sur le sous-systeme');
+Simulink.BlockDiagram.expandSubsystem('boucle110/Moteur');
+assert(isempty(setxor(get_param('boucle110', 'Blocks'), ...
+                      [blocs110, {'consigne', 'erreur', 'Kp', 'integrale', 'Ki', 'u', ...
+                                  'vitesse'}])), 'E : deplie, les blocs reviennent sous leur nom');
+deplie110 = sim('boucle110', 'StopTime', '3');
+assert(max(abs(deplie110.yout{1}.Values.Data - avant110.yout{1}.Values.Data)) < 1e-12, ...
+       'E : deplie, la boucle calcule de meme');
+bdclose('all');
+fprintf('cas de la litterature : ok\n');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -14548,4 +14886,130 @@ function b = lineaireAuHasard(discret, strict, Ts)
                 b.reponse = @(s) 1 ./ s;
             end
     end
+end
+
+% --- section 110 : les modèles de la littérature, bâtis sous la forme de MATLAB
+
+% Le moteur à courant continu de Control Tutorials for MATLAB and Simulink
+% (DC Motor Speed: Simulink Modeling) : J dw/dt = K i - b w,
+% L di/dt = V - R i - K w.
+function moteur110(nom)
+    new_system(nom);
+    espace = get_param(nom, 'ModelWorkspace');
+    assignin(espace, 'J', 0.01);
+    assignin(espace, 'b', 0.1);
+    assignin(espace, 'K', 0.01);
+    assignin(espace, 'R', 1);
+    assignin(espace, 'L', 0.5);
+    add_block('simulink/Sources/Step', [nom '/V'], 'Time', '0', 'After', '1');
+    add_block('simulink/Math Operations/Sum', [nom '/somme_e'], 'Inputs', '+--');
+    add_block('simulink/Math Operations/Gain', [nom '/1_L'], 'Gain', '1/L');
+    add_block('simulink/Continuous/Integrator', [nom '/i']);
+    add_block('simulink/Math Operations/Gain', [nom '/R'], 'Gain', 'R');
+    add_block('simulink/Math Operations/Gain', [nom '/Kt'], 'Gain', 'K');
+    add_block('simulink/Math Operations/Sum', [nom '/somme_m'], 'Inputs', '+-');
+    add_block('simulink/Math Operations/Gain', [nom '/1_J'], 'Gain', '1/J');
+    add_block('simulink/Continuous/Integrator', [nom '/w']);
+    add_block('simulink/Math Operations/Gain', [nom '/b'], 'Gain', 'b');
+    add_block('simulink/Math Operations/Gain', [nom '/Ke'], 'Gain', 'K');
+    add_block('simulink/Sinks/Out1', [nom '/vitesse']);
+    add_line(nom, {'V/1', 'somme_e/1', '1_L/1', 'i/1', 'i/1', 'R/1', 'Kt/1', 'somme_m/1', ...
+                   '1_J/1', 'w/1', 'w/1', 'b/1', 'w/1', 'Ke/1'}, ...
+                  {'somme_e/1', '1_L/1', 'i/1', 'R/1', 'Kt/1', 'somme_e/2', 'somme_m/1', ...
+                   '1_J/1', 'w/1', 'b/1', 'vitesse/1', 'somme_m/2', 'Ke/1', 'somme_e/3'});
+end
+
+% Le moteur en boucle PI de vitesse, Kp = 100, Ki = 200.
+function boucle110(nom)
+    moteur110(nom);
+    delete_block([nom '/V']);
+    add_block('simulink/Sources/Step', [nom '/consigne'], 'Time', '0', 'After', '1');
+    add_block('simulink/Math Operations/Sum', [nom '/erreur'], 'Inputs', '+-');
+    add_block('simulink/Math Operations/Gain', [nom '/Kp'], 'Gain', '100');
+    add_block('simulink/Continuous/Integrator', [nom '/integrale']);
+    add_block('simulink/Math Operations/Gain', [nom '/Ki'], 'Gain', '200');
+    add_block('simulink/Math Operations/Sum', [nom '/u'], 'Inputs', '++');
+    add_line(nom, {'consigne/1', 'erreur/1', 'erreur/1', 'integrale/1', 'Kp/1', 'Ki/1', ...
+                   'u/1', 'w/1'}, ...
+                  {'erreur/1', 'Kp/1', 'integrale/1', 'Ki/1', 'u/1', 'u/2', 'somme_e/1', ...
+                   'erreur/2'});
+end
+
+% L'oscillateur de Van der Pol : x1' = x2, x2' = mu (1 - x1^2) x2 - x1.
+function vdp110(nom)
+    new_system(nom);
+    assignin(get_param(nom, 'ModelWorkspace'), 'mu', 1);
+    add_block('simulink/Continuous/Integrator', [nom '/x2'], 'InitialCondition', '0');
+    add_block('simulink/Continuous/Integrator', [nom '/x1'], 'InitialCondition', '2');
+    add_block('simulink/Math Operations/Product', [nom '/carre']);
+    add_block('simulink/Sources/Constant', [nom '/un'], 'Value', '1');
+    add_block('simulink/Math Operations/Sum', [nom '/s1'], 'Inputs', '+-');
+    add_block('simulink/Math Operations/Product', [nom '/p']);
+    add_block('simulink/Math Operations/Gain', [nom '/mu'], 'Gain', 'mu');
+    add_block('simulink/Math Operations/Sum', [nom '/s2'], 'Inputs', '+-');
+    add_block('simulink/Sinks/Out1', [nom '/y1']);
+    add_block('simulink/Sinks/Out1', [nom '/y2']);
+    add_line(nom, {'x2/1', 'x1/1', 'x1/1', 'un/1', 'carre/1', 's1/1', 'x2/1', 'p/1', 'mu/1', ...
+                   'x1/1', 's2/1', 'x1/1', 'x2/1'}, ...
+                  {'x1/1', 'carre/1', 'carre/2', 's1/1', 's1/2', 'p/1', 'p/2', 'mu/1', 's2/1', ...
+                   's2/2', 'x2/1', 'y1/1', 'y2/1'});
+end
+
+% Ogata : G(s) = K/(s(s+1)(s+2)) en boucle fermée unitaire.
+function ogata110(nom)
+    new_system(nom);
+    assignin(get_param(nom, 'ModelWorkspace'), 'K', 1);
+    add_block('simulink/Sources/Step', [nom '/r'], 'Time', '0');
+    add_block('simulink/Math Operations/Sum', [nom '/e'], 'Inputs', '+-');
+    add_block('simulink/Math Operations/Gain', [nom '/K'], 'Gain', 'K');
+    add_block('simulink/Continuous/Transfer Fcn', [nom '/G'], 'Numerator', '1', ...
+              'Denominator', '[1 3 2 0]');
+    add_block('simulink/Sinks/Out1', [nom '/y']);
+    add_line(nom, {'r/1', 'e/1', 'K/1', 'G/1', 'G/1'}, {'e/1', 'K/1', 'G/1', 'y/1', 'e/2'});
+end
+
+% Le régulateur de vitesse de Control Tutorials (Cruise Control), PI et
+% capteur du premier ordre dans le retour.
+function croisiere110(nom)
+    new_system(nom);
+    espace = get_param(nom, 'ModelWorkspace');
+    assignin(espace, 'm', 1000);
+    assignin(espace, 'b', 50);
+    assignin(espace, 'r', 10);
+    add_block('simulink/Sources/Step', [nom '/consigne'], 'Time', '0', 'After', 'r');
+    add_block('simulink/Math Operations/Sum', [nom '/erreur'], 'Inputs', '+-');
+    add_block('simulink/Math Operations/Gain', [nom '/Kp'], 'Gain', '800');
+    add_block('simulink/Continuous/Integrator', [nom '/integrale']);
+    add_block('simulink/Math Operations/Gain', [nom '/Ki'], 'Gain', '40');
+    add_block('simulink/Math Operations/Sum', [nom '/u'], 'Inputs', '++');
+    add_block('simulink/Continuous/Transfer Fcn', [nom '/voiture'], 'Numerator', '1', ...
+              'Denominator', '[m b]');
+    add_block('simulink/Continuous/Transfer Fcn', [nom '/capteur'], 'Numerator', '1', ...
+              'Denominator', '[0.5 1]');
+    add_block('simulink/Sinks/Out1', [nom '/vitesse']);
+    add_line(nom, {'consigne/1', 'erreur/1', 'erreur/1', 'integrale/1', 'Kp/1', 'Ki/1', ...
+                   'u/1', 'voiture/1', 'voiture/1', 'capteur/1'}, ...
+                  {'erreur/1', 'Kp/1', 'integrale/1', 'Ki/1', 'u/1', 'u/2', 'voiture/1', ...
+                   'vitesse/1', 'capteur/1', 'erreur/2'});
+end
+
+% Les temps de montée (10 à 90 %) et d'établissement (à 2 %) d'une réponse
+% indicielle de valeur finale YF, interpolés entre les échantillons.
+function [montee, etablissement] = tempsDeReponse110(t, y, yf)
+    passe = @(seuil) interp1(y(find(y >= seuil, 1) - 1:find(y >= seuil, 1)), ...
+                             t(find(y >= seuil, 1) - 1:find(y >= seuil, 1)), seuil);
+    montee = passe(0.9 * yf) - passe(0.1 * yf);
+    hors = find(abs(y - yf) > 0.02 * yf, 1, 'last');
+    etablissement = interp1(y(hors:hors + 1), t(hors:hors + 1), 0.98 * yf);
+end
+
+% La période du cycle limite — entre deux montées par zéro de x1, après
+% le transitoire — et son amplitude.
+function [periode, amplitude] = cycle110(sortie)
+    t = sortie.yout{1}.Values.Time;
+    x = sortie.yout{1}.Values.Data;
+    k = find(x(1:end - 1) < 0 & x(2:end) >= 0 & t(1:end - 1) > 15);
+    tz = t(k) - x(k) .* (t(k + 1) - t(k)) ./ (x(k + 1) - x(k));
+    periode = mean(diff(tz));
+    amplitude = max(x(t > 15));
 end
