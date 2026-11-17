@@ -1031,16 +1031,34 @@ NoeudPtr Analyseur::puissance() {
     return a;
 }
 
-std::vector<NoeudPtr> Analyseur::listeArguments(const char* fermeture) {
+std::vector<NoeudPtr> Analyseur::listeArguments(const char* fermeture, bool* nomValeur) {
     std::vector<NoeudPtr> args;
     int sauveTableau = dansTableau_;
     dansTableau_ = 0;
     ++dansIndice_;
     sauterFinsLignes();
+    bool vuNomValeur = false;
     if (!jeton().estOp(fermeture)) {
         for (;;) {
             sauterFinsLignes();
-            if (jeton().estOp(":") &&
+            if (nomValeur && jeton().genre == Genre::Ident && jeton(1).estOp("=")) {
+                // « f(x, Nom=valeur) », la forme de MATLAB depuis R2021a :
+                // la fonction reçoit "Nom", valeur, le nom en chaîne.
+                auto nom = Noeud::creer(TypeN::LitteralChaine);
+                nom->texte = jeton().texte;
+                avancer();
+                avancer();
+                args.push_back(nom);
+                args.push_back(expression());
+                vuNomValeur = true;
+                *nomValeur = true;
+            } else if (vuNomValeur) {
+                // Comme MATLAB : après un nom=valeur, plus que des nom=valeur.
+                erreurSyntaxe("Unsupported use of the '=' operator. To compare values for "
+                              "equality, use '=='. To pass name-value arguments using the "
+                              "name=value format, provide these arguments after all other "
+                              "inputs.");
+            } else if (jeton().estOp(":") &&
                 (jeton(1).estOp(",") || jeton(1).estOp(fermeture))) {
                 args.push_back(Noeud::creer(TypeN::DeuxPointsSeul));
                 avancer();
@@ -1092,7 +1110,7 @@ NoeudPtr Analyseur::postfixe() {
             avancer();
             ElementAcces e;
             e.genre = '(';
-            e.args = listeArguments(")");
+            e.args = listeArguments(")", &e.nomValeur);
             ajouter(std::move(e));
         } else if (t.estOp("{") && !(dansTableau_ && t.espaceAvant)) {
             avancer();

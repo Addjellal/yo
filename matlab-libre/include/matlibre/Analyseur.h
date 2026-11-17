@@ -88,7 +88,7 @@ private:
     NoeudPtr postfixe();
     NoeudPtr primaire();
     NoeudPtr litteralTableau(bool cellule);
-    std::vector<NoeudPtr> listeArguments(const char* fermeture);
+    std::vector<NoeudPtr> listeArguments(const char* fermeture, bool* nomValeur = nullptr);
     bool nouvelElement() const;
 };
 

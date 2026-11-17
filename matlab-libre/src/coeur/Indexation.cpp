@@ -666,6 +666,10 @@ Valeur Interpreteur::ecrireIndex(Valeur base, std::vector<Valeur>& idx, const Va
 Valeur Interpreteur::affecterIndex(Valeur base, const std::vector<ElementAcces>& chaine,
                                    std::size_t k, const Valeur& v, bool suppression) {
     if (k >= chaine.size()) return v;
+    if (chaine[k].nomValeur)
+        erreur("MATLAB:index:nameValueSyntax",
+               "La forme nom=valeur ne s'emploie que dans un appel de fonction : "
+               "ici les parentheses designent ou ecrire.");
 
     // Une classe qui definit « subsasgn » decide elle-meme de ce que veut
     // dire une affectation indexee. La regle vaut aussi quand l'objet est

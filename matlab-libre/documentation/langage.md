@@ -71,6 +71,13 @@ comme MATLAB l'exige depuis R2016b.
 Fonctions anonymes : `f = @(x, y) x + y`. La capture est faite à la
 création, par valeur.
 
+Les arguments nom-valeur s'écrivent aussi `f(x, Nom=valeur)`, la forme
+de MATLAB depuis R2021a : la fonction reçoit `"Nom", valeur`, le nom en
+chaîne, comme si on l'avait écrit ainsi. Comme dans MATLAB, cette forme
+ne vaut que dans les parenthèses d'un appel, après tous les autres
+arguments — un argument ordinaire qui la suit est refusé à l'analyse —,
+et elle ne sert pas à indexer une variable.
+
 ## Classes
 
 ```matlab

@@ -30,6 +30,9 @@ struct ElementAcces {
     char genre = '(';  // '(' indice, '{' cellule, '.' champ, '?' champ dynamique
     std::vector<NoeudPtr> args;
     std::string nom;
+    // « f(x, Nom=valeur) » : des arguments écrits sous la forme nom=valeur,
+    // devenus "Nom", valeur. Ils ne vont qu'à un appel, non à une indexation.
+    bool nomValeur = false;
 };
 
 struct Noeud {

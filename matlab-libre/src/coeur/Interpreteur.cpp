@@ -1351,7 +1351,7 @@ bool Interpreteur::affecterEnPlace(const NoeudPtr& cible, const Valeur& v) {
                x->classe != Classe::Structure && !x->estCreux();
     };
     if (acces.size() == 1 && (acces[0].genre == '(' || acces[0].genre == '{') &&
-        !acces[0].args.empty()) {
+        !acces[0].args.empty() && !acces[0].nomValeur) {
         const Valeur* trouve = trouverVariable(nom);
         if (!ordinaire(trouve)) return false;
         const ElementAcces& e = acces[0];
@@ -2007,6 +2007,10 @@ std::size_t Interpreteur::lireSansCopie(const std::string& nom, const NoeudPtr& 
         courant.push_back(*cur);
         return k;
     }
+    if (e.nomValeur)
+        erreur("MATLAB:index:nameValueSyntax",
+               "La forme nom=valeur ne s'emploie que dans un appel de fonction : "
+               "ici les parentheses indexent une valeur.");
     auto idx = evaluerIndices(e.args, cur, 0, (int)e.args.size());
     if (k == 0) {
         cur = trouverVariable(nom);
@@ -2294,6 +2298,10 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     for (auto& x : r) suivant.push_back(x);
                     continue;
                 }
+                if (e.nomValeur)
+                    erreur("MATLAB:index:nameValueSyntax",
+                           "La forme nom=valeur ne s'emploie que dans un appel de fonction : "
+                           "ici les parentheses indexent une valeur.");
                 auto idx = evaluerIndices(e.args, &base, 0, (int)e.args.size());
                 suivant.push_back(indexer(base, idx, '('));
             } else if (e.genre == '{') {

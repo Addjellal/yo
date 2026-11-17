@@ -1145,6 +1145,51 @@ assert(~isempty(strfind(texteAffiche, 'BusElement with properties:')) && ...
        ~isempty(strfind(texteAffiche, sprintf('              Name: ''a''\n'))), ...
        'un objet : « X with properties: », les proprietes alignees');
 
+%% ------------------------------------ nom=valeur dans un appel (R2021a)
+% « f(x, Nom=valeur) » est la forme que MATLAB donne depuis R2021a aux
+% arguments nom-valeur : la fonction reçoit "Nom", valeur, le nom en
+% chaîne, exactement comme si on l'avait écrit ainsi. Elle ne vaut que
+% dans les parenthèses d'un appel, et seulement après tous les autres
+% arguments.
+recoit = @(varargin) varargin;
+nv = recoit(1, Tol=1e-3, Methode="lin");
+assert(numel(nv) == 5 && nv{1} == 1 && isstring(nv{2}) && nv{2} == "Tol" && ...
+       nv{3} == 1e-3 && nv{4} == "Methode" && nv{5} == "lin", ...
+       'nom=valeur : le nom en chaine, puis la valeur');
+nv = recoit(Seul = 2 + 3);
+assert(isequal(nv, {"Seul", 5}), 'des espaces autour du =, une expression en valeur');
+nv = recoit(1, "Avant", 2, Apres=3);
+assert(isequal(nv, {1, "Avant", 2, "Apres", 3}), 'apres des paires ecrites a la virgule');
+nv = recoit(a == 1);
+assert(isequal(nv, {false}), '« == » reste une comparaison');
+assert(isequal(nomValeurLocal(3, Gain=2), 6) && isequal(nomValeurLocal(3), 3), ...
+       'une fonction a varargin, en instruction comme en expression');
+s1 = struct(a=1, b="deux");
+assert(isequal(fieldnames(s1), {'a'; 'b'}) && s1.a == 1, 'struct, par nom=valeur');
+nv = recoit(1, Imbrique=recoit(x=1));
+assert(isequal(nv{3}, {"x", 1}), 'un appel imbrique');
+% ce qui se refuse : un argument ordinaire apres un nom=valeur, et
+% l'indexation d'une valeur
+refusNV = {'recoit(Tol=1, 2)', 'MATLAB:parseError'; ...
+           'recoit(Tol=1, "Gain", 2)', 'MATLAB:parseError'; ...
+           'vecteurNV = [1 2 3]; vecteurNV(a=1)', 'MATLAB:index:nameValueSyntax'; ...
+           'vecteurNV = [1 2 3]; vecteurNV(a=1) = 4;', 'MATLAB:index:nameValueSyntax'; ...
+           'sNV.v = [1 2 3]; sNV.v(a=1)', 'MATLAB:index:nameValueSyntax'};
+for q = 1:size(refusNV, 1)
+    vuNV = '';
+    try
+        eval(refusNV{q, 1});
+    catch err
+        vuNV = err.identifier;
+        if q == 1
+            assert(~isempty(strfind(err.message, 'after all other inputs')), ...
+                   'le message de MATLAB');
+        end
+    end
+    assert(strcmp(vuNV, refusNV{q, 2}), sprintf('nom=valeur refuse %d : %s', q, vuNV));
+end
+disp('nom=valeur : ok');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)
@@ -1273,4 +1318,15 @@ end
 function nettoyageInterne()
     c = onCleanup(@() noterNettoyage('interne'));   %#ok<NASGU>
     noterNettoyage('dans interne');
+end
+
+% Un appel nom=valeur vers une fonction locale : la valeur nommee Gain,
+% multipliee.
+function y = nomValeurLocal(x, varargin)
+    y = x;
+    for k = 1:2:numel(varargin)
+        if strcmpi(varargin{k}, 'Gain')
+            y = y * varargin{k + 1};
+        end
+    end
 end
