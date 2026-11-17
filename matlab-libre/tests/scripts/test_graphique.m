@@ -753,6 +753,55 @@ assert(strcmp(get(gca, 'YDir'), 'normal'));
 cla; pcolor(magic(4));
 assert(strcmp(get(gca, 'YDir'), 'normal'));
 
+%% --------------------------------- les options, en char, en chaine, par nom=valeur
+% MATLAB accepte un nom d'option en chaine comme en char, et c'est en
+% chaine qu'il arrive de « f(Nom=valeur) ». figure refusait la chaine ;
+% surf et imagesc prenaient la derniere option pour les donnees, et
+% dessinaient les codes de caracteres de 'none' ; histogram prenait le nom
+% d'une option pour des bords, et rendait des effectifs nuls.
+close all;
+figure("Position", [0 0 640 480]);
+fOpt = gcf;
+assert(isequal(fOpt.Position(3:4), [640 480]), 'figure, un nom en chaine');
+figure(Position=[0 0 500 300]);
+fOpt = gcf;
+assert(isequal(fOpt.Position(3:4), [500 300]), 'figure, nom=valeur');
+% le rendu est celui des seules donnees : les options n'y changent rien
+cla; surf(magic(4)); svgSeul = matlibre_svg();
+cla; surf(magic(4), 'EdgeColor', 'none');
+assert(strcmp(matlibre_svg(), svgSeul), 'surf : les donnees, non l''option');
+cla; surf(magic(4), EdgeColor="none", FaceAlpha=0.5);
+assert(strcmp(matlibre_svg(), svgSeul), 'surf, nom=valeur');
+cla; imagesc(magic(3)); svgSeul = matlibre_svg();
+cla; imagesc(magic(3), 'AlphaData', 0.5);
+assert(strcmp(matlibre_svg(), svgSeul), 'imagesc : les donnees, non l''option');
+vuOpt = '';
+try
+    surf(magic(4), 'Couleur', 'r');
+catch err
+    vuOpt = err.identifier;
+end
+assert(strcmp(vuOpt, 'MATLAB:hg:InvalidProperty'), 'une propriete inconnue est refusee');
+xOpt = [1 2 2 3 3 3 4 4 4 4];
+cla; nOpt = histogram(xOpt, BinEdges=[0.5 1.5 2.5 3.5 4.5], FaceColor="r");
+assert(isequal(nOpt, [1 2 3 4]), 'histogram : BinEdges, et FaceColor pour le dessin');
+assert(isequal(histogram(xOpt, [0.5 2.5 4.5]), [3 7]), 'histogram : des bords par position');
+assert(max(abs(histcounts(xOpt, 'Normalization', 'probability', 'NumBins', 4) - ...
+               [0.1 0.2 0.3 0.4])) < 1e-15, 'histcounts : deux couples de suite');
+refusOpt = {@() histogram(xOpt, 'BinWidth', 1), 'MATLAB:histcounts:NotSupported'; ...
+            @() histcounts(xOpt, 4, 'NumBins', 4), 'MATLAB:histcounts:BinsTwice'; ...
+            @() histcounts(xOpt, 'BinEdges', 3), 'MATLAB:histcounts:InvalidBinEdges'};
+for q = 1:size(refusOpt, 1)
+    vuOpt = '';
+    try
+        refusOpt{q, 1}();
+    catch err
+        vuOpt = err.identifier;
+    end
+    assert(strcmp(vuOpt, refusOpt{q, 2}), sprintf('histogram, refus %d : %s', q, vuOpt));
+end
+close all;
+
 %% ------------------------------------------------- histogramme a deux axes
 [comptes, bordsX, bordsY] = histcounts2([1 2 3], [1 1 2], [0 2 4], [0 1.5 3]);
 assert(isequal(comptes, [1 0; 1 1]));

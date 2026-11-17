@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
+#include <set>
 
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"
@@ -310,10 +311,35 @@ FONCTION(fnPlot3) {
 
 FONCTION(fnHistogramme) {
     INUTILISE
-    exigerArguments(args, 1, 3, "histogram");
-    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "histogram");
+    exigerArguments(args, 1, 0, "histogram");
+    exigerNumerique(args[0], "histogram");
+    // Les donnees, un nombre de classes ou des bords, puis des couples
+    // nom-valeur. Ceux du dessin restent ici — FaceColor colore les
+    // barres ; les aretes et la transparence, que ce trace n'a pas, sont
+    // acceptees sans effet —, les autres vont a histcounts, qui refuse en
+    // le nommant ce qu'il ne traite pas. Les trois arguments au plus d'hier
+    // prenaient « histogram(x,'BinWidth',1) » pour des bords : les codes des
+    // caracteres de 'BinWidth', et sept effectifs nuls.
+    static const std::set<std::string> dessin = {"facecolor", "edgecolor", "facealpha",
+                                                 "edgealpha", "linewidth"};
     std::vector<Valeur> a = {args[0]};
-    if (args.size() > 1) a.push_back(args[1]);
+    std::string couleur;
+    for (std::size_t k = 1; k < args.size(); ++k) {
+        if ((args[k].estTexte() || args[k].estChaine()) && k + 1 < args.size()) {
+            std::string nom = args[k].versTexte();
+            for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+            if (dessin.count(nom)) {
+                if (nom == "facecolor") couleur = couleurDepuisValeur(args[k + 1]);
+                ++k;
+                continue;
+            }
+            a.push_back(args[k]);
+            a.push_back(args[k + 1]);
+            ++k;
+            continue;
+        }
+        a.push_back(args[k]);
+    }
     auto comptes = it.appeler("histcounts", a, 2);
     if (comptes.size() < 2) return {};
     std::vector<double> centres;
@@ -326,6 +352,7 @@ FONCTION(fnHistogramme) {
     s.x = centres;
     s.y = valeursDe(comptes[0]);
     s.couleur = palette(axesCourants(it)->series.size());
+    if (!couleur.empty() && couleur != "none") s.couleur = couleur;
     ajouterSerie(it, s);
     if (nargout > 0) return {comptes[0]};
     return {};
@@ -348,6 +375,30 @@ FONCTION(fnHist) {
         centres.push_back(0.5 * (bords.re[k] + bords.re[k + 1]));
     if (nargout == 1) return {comptes[0]};
     return {comptes[0], Valeur::ligne(centres)};
+}
+
+// Les couples nom-valeur qui terminent l'appel d'une surface ou d'une
+// image, retirés. Le tracé est ici une image vue de dessus : les arêtes,
+// la transparence, l'éclairage n'y changent rien, si bien que ces
+// propriétés sont acceptées sans effet. Un nom inconnu est refusé. Sans
+// ce tri, « surf(Z,'EdgeColor','none') » prenait 'none' pour les données,
+// et en dessinait les codes de caractères.
+std::vector<Valeur> sansProprietes(Arguments args, const char* fonction) {
+    static const std::set<std::string> connues = {
+        "edgecolor", "facecolor", "facealpha", "edgealpha", "linestyle", "linewidth",
+        "displayname", "alphadata", "alphadatamapping", "cdatamapping", "facelighting",
+        "meshstyle", "marker", "tag", "userdata"};
+    std::size_t fin = args.size();
+    while (fin >= 3 && (args[fin - 2].estTexte() || args[fin - 2].estChaine())) {
+        std::string nom = args[fin - 2].versTexte();
+        for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+        if (!connues.count(nom))
+            erreur("MATLAB:hg:InvalidProperty",
+                   formater("%s : la propriete '%s' est inconnue ici.", fonction,
+                            args[fin - 2].versTexte().c_str()));
+        fin -= 2;
+    }
+    return std::vector<Valeur>(args.begin(), args.begin() + (long)fin);
 }
 
 // Le corps commun de « imagesc », « image », « pcolor » et « surf ».
@@ -388,24 +439,27 @@ std::vector<Valeur> traceImage(Interpreteur& it, Arguments args, int nargout,
 
 FONCTION(fnImagesc) {
     INUTILISE
-    return traceImage(it, args, nargout, true);
+    std::vector<Valeur> donnees = sansProprietes(args, "imagesc");
+    return traceImage(it, donnees, nargout, true);
 }
 
 // « pcolor » suit les ordonnees croissantes vers le haut, comme une
 // surface vue de dessus, et non comme une image.
 FONCTION(fnPcolor) {
     INUTILISE
-    return traceImage(it, args, nargout, false);
+    std::vector<Valeur> donnees = sansProprietes(args, "pcolor");
+    return traceImage(it, donnees, nargout, false);
 }
 
-FONCTION(fnSurf) {
+FONCTION(surfDonnees) {
     INUTILISE
     exigerArguments(args, 1, 4, "surf");
     // « surf(X,Y,Z) » : on garde l'etendue de X et de Y, faute de quoi
     // l'image serait graduee en indices de maille.
     std::vector<Valeur> a;
     if (args.size() >= 3 && args[0].nelem() >= 2 && args[1].nelem() >= 2 &&
-        !args[0].estTexte() && !args[1].estTexte()) {
+        !args[0].estTexte() && !args[1].estTexte() && !args[0].estChaine() &&
+        !args[1].estChaine()) {
         exigerNumerique(args[0], "surf");
         exigerNumerique(args[1], "surf");
         const Valeur& X = args[0];
@@ -426,6 +480,12 @@ FONCTION(fnSurf) {
         a = {args[args.size() - 1]};
     }
     return traceImage(it, a, nargout, false);
+}
+
+FONCTION(fnSurf) {
+    INUTILISE
+    std::vector<Valeur> donnees = sansProprietes(args, "surf");
+    return surfDonnees(it, donnees, nargout);
 }
 
 // ---------------------------------------------------------- contours
@@ -780,7 +840,9 @@ FONCTION(fnFigure) {
     // la figure ne porte pas est refuse plutot qu'ignore.
     auto& fig = *it.figures[numero];
     for (std::size_t k = premierCouple; k < args.size(); k += 2) {
-        if (!args[k].estTexte())
+        // un nom en chaîne vaut un nom en char : c'est ainsi qu'arrive
+        // « figure(Position=[...]) »
+        if (!args[k].estTexte() && !args[k].estChaine())
             erreur("MATLAB:hg:InvalidProperty",
                    "FIGURE attend des couples nom-valeur.");
         std::string nom = args[k].versTexte();
@@ -852,7 +914,7 @@ FONCTION(fnClose) {
         it.figureCourante = it.figures.empty() ? 0 : it.figures.begin()->first;
         return {};
     }
-    if (args[0].estTexte() && args[0].versTexte() == "all") {
+    if ((args[0].estTexte() || args[0].estChaine()) && args[0].versTexte() == "all") {
         it.figures.clear();
         it.figureCourante = 0;
         return {};
@@ -1325,7 +1387,7 @@ std::vector<Valeur> graduationsAxe(Interpreteur& it, Arguments args, char axe) {
     auto a = axesCourants(it);
     std::vector<double>& cible = axe == 'x' ? a->ticksX : a->ticksY;
     if (args.empty()) return {Valeur::ligne(cible)};
-    if (args[0].estTexte()) {
+    if (args[0].estTexte() || args[0].estChaine()) {
         // « xticks('auto') » rend le choix automatique.
         std::string mode = args[0].versTexte();
         if (mode == "auto") cible.clear();
@@ -1350,7 +1412,7 @@ std::vector<Valeur> etiquettesAxe(Interpreteur& it, Arguments args, char axe) {
     cible.clear();
     if (args[0].classe == Classe::Cellule) {
         for (const Valeur& v : args[0].cellules) cible.push_back(v.versTexte());
-    } else if (args[0].estTexte() && args[0].versTexte() == "auto") {
+    } else if ((args[0].estTexte() || args[0].estChaine()) && args[0].versTexte() == "auto") {
         // rien : les nombres reviennent
     } else if (args[0].estTexte() || args[0].estChaine()) {
         cible.push_back(args[0].versTexte());

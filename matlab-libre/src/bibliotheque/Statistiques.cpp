@@ -430,23 +430,46 @@ FONCTION(fnHistcounts) {
     // des effectifs bruts sans que rien ne le dise.
     std::string normalisation = "count";
     std::size_t finPositionnels = args.size();
+    bool classesNommees = false;
     for (std::size_t k = 1; k + 1 < args.size(); ++k) {
         if (!(args[k].estTexte() || args[k].estChaine())) continue;
         std::string nom = args[k].versTexte();
         for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+        finPositionnels = std::min(finPositionnels, k);
+        const Valeur& valeur = args[k + 1];
         if (nom == "normalization") {
-            normalisation = args[k + 1].versTexte();
+            normalisation = valeur.versTexte();
             for (auto& c : normalisation) c = (char)std::tolower((unsigned char)c);
-            finPositionnels = std::min(finPositionnels, k);
-        } else if (nom == "binlimits" || nom == "numbins" || nom == "binwidth" ||
-                   nom == "binmethod") {
+        } else if (nom == "numbins") {
+            // la forme nommee de « histcounts(x,n) »
+            exigerNumerique(valeur, "histcounts");
+            if (valeur.nelem() != 1 || !(valeur.scal() >= 1) ||
+                valeur.scal() != std::floor(valeur.scal()))
+                erreur("MATLAB:histcounts:InvalidNumBins",
+                       "NumBins est un entier positif.");
+            nbClasses = (int)valeur.scal();
+            classesNommees = true;
+        } else if (nom == "binedges") {
+            // la forme nommee de « histcounts(x,bords) »
+            exigerNumerique(valeur, "histcounts");
+            if (valeur.nelem() < 2)
+                erreur("MATLAB:histcounts:InvalidBinEdges",
+                       "BinEdges porte au moins deux bords.");
+            bords.assign(valeur.re.begin(), valeur.re.end());
+            classesNommees = true;
+        } else if (nom == "binlimits" || nom == "binwidth" || nom == "binmethod") {
             erreur("MATLAB:histcounts:NotSupported",
                    "L'option '" + args[k].versTexte() + "' n'est pas encore traitee.");
         } else {
             erreur("MATLAB:histcounts:InvalidName",
                    "Option inconnue : '" + args[k].versTexte() + "'.");
         }
+        // la valeur du couple n'est pas un nom : on la saute
+        ++k;
     }
+    if (classesNommees && finPositionnels > 1 && args.size() > 1)
+        erreur("MATLAB:histcounts:BinsTwice",
+               "Les classes se donnent une fois : par position, ou par NumBins ou BinEdges.");
     static const char* normalisationsConnues[] = {"count",      "probability", "pdf",
                                                   "countdensity", "cumcount",  "cdf"};
     bool normalisationConnue = false;
