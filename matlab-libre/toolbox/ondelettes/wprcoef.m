@@ -24,13 +24,14 @@ function x = wprcoef(arbre, noeud)
     if arbre.dimension == 1
         courant = donnees;
         while indice > 0
-            vide = zeros(size(courant));
+            parent = floor((indice - 1) / 2);
+            taille = matlibre_taille_noeud(arbre, parent);
             if mod(indice, 2) == 1
-                courant = idwt(courant, vide, arbre.nom);
+                courant = idwt(courant, [], arbre.nom, taille);
             else
-                courant = idwt(vide, courant, arbre.nom);
+                courant = idwt([], courant, arbre.nom, taille);
             end
-            indice = floor((indice - 1) / 2);
+            indice = parent;
         end
         x = wkeep(courant, arbre.longueur);
         if ~arbre.ligne
@@ -39,12 +40,13 @@ function x = wprcoef(arbre, noeud)
     else
         courant = donnees;
         while indice > 0
-            vide = zeros(size(courant));
+            parent = floor((indice - 1) / 4);
             rang = mod(indice - 1, 4);
-            morceaux = {vide, vide, vide, vide};
+            morceaux = {[], [], [], []};
             morceaux{rang + 1} = courant;
-            courant = idwt2(morceaux{1}, morceaux{2}, morceaux{3}, morceaux{4}, arbre.nom);
-            indice = floor((indice - 1) / 4);
+            courant = idwt2(morceaux{1}, morceaux{2}, morceaux{3}, morceaux{4}, arbre.nom, ...
+                            matlibre_taille_noeud(arbre, parent));
+            indice = parent;
         end
         x = wkeep(courant, arbre.taille);
     end

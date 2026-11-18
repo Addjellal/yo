@@ -380,9 +380,14 @@ FONCTION(fnWhich) {
         auto index = it.indexFichiers();
         auto f = index.find(nom);
         std::string courant = it.fichierDossierCourant(nom);
+        // « which fisheriris.mat » : un fichier nommé avec son extension se
+        // cherche dans le dossier courant puis sur le chemin.
+        std::string fichier =
+            nom.find('.') != std::string::npos ? fichierSurChemin(it, nom) : std::string();
         if (f != index.end()) reponse = f->second;
         else if (!courant.empty()) reponse = courant;
         else if (it.natif(nom)) reponse = "built-in (" + nom + ")";
+        else if (!fichier.empty()) reponse = fichier;
         else { reponse = "'" + nom + "' not found."; trouve = false; }
     }
     if (nargout == 0) {

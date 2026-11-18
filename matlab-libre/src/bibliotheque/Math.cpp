@@ -886,39 +886,29 @@ FONCTION(fnPsi) {
     return {appliquerReel(numerique(args[1]), [k](double x) { return polygammaFn(k, x); })};
 }
 
+// erfc(x) = y : x = -quantileNormal(y/2)/sqrt(2). Défini sur [0,2].
+double erfcinvFn(double y) {
+    if (std::isnan(y) || y < 0 || y > 2) return std::nan("");
+    if (y == 0) return INFINITY;
+    if (y == 2) return -INFINITY;
+    if (y > 1) return -erfcinvFn(2.0 - y);  // 2-y exact ici
+    double x = -quantileNormal(y / 2.0) / std::sqrt(2.0);
+    return x == 0 ? 0.0 : x;  // erfcinv(1) vaut 0, non -0
+}
+
+// erf(x) = y. Près de zéro, Newton sur erf, juste à toute échelle ; au-delà
+// de 1/2, par erfcinv(1-|y|), où 1-|y| est exact.
 double erfinvFn(double y) {
-    if (y <= -1) return -INFINITY;
-    if (y >= 1) return INFINITY;
-    // Approximation de Giles, affinée par Newton.
-    double w = -std::log((1.0 - y) * (1.0 + y));
-    double x;
-    if (w < 5.0) {
-        w -= 2.5;
-        x = 2.81022636e-08;
-        x = 3.43273939e-07 + x * w;
-        x = -3.5233877e-06 + x * w;
-        x = -4.39150654e-06 + x * w;
-        x = 0.00021858087 + x * w;
-        x = -0.00125372503 + x * w;
-        x = -0.00417768164 + x * w;
-        x = 0.246640727 + x * w;
-        x = 1.50140941 + x * w;
-    } else {
-        w = std::sqrt(w) - 3.0;
-        x = -0.000200214257;
-        x = 0.000100950558 + x * w;
-        x = 0.00134934322 + x * w;
-        x = -0.00367342844 + x * w;
-        x = 0.00573950773 + x * w;
-        x = -0.0076224613 + x * w;
-        x = 0.00943887047 + x * w;
-        x = 1.00167406 + x * w;
-        x = 2.83297682 + x * w;
-    }
-    x *= y;
-    for (int k = 0; k < 3; ++k) {
-        double err = std::erf(x) - y;
-        x -= err / (2.0 / std::sqrt(3.14159265358979323846) * std::exp(-x * x));
+    if (std::isnan(y) || y < -1 || y > 1) return std::nan("");
+    if (y == -1) return -INFINITY;
+    if (y == 1) return INFINITY;
+    if (std::fabs(y) >= 0.5) return std::copysign(erfcinvFn(1.0 - std::fabs(y)), y);
+    const double racinePi = std::sqrt(3.14159265358979323846);
+    double x = racinePi / 2.0 * y * (1.0 + 3.14159265358979323846 * y * y / 12.0);
+    for (int k = 0; k < 6; ++k) {
+        double pas = (std::erf(x) - y) / (2.0 / racinePi * std::exp(-x * x));
+        x -= pas;
+        if (std::fabs(pas) <= 1e-17 * std::fabs(x)) break;
     }
     return x;
 }
@@ -929,7 +919,7 @@ FONCTION(fnErfinv) {
 }
 FONCTION(fnErfcinv) {
     INUTILISE
-    return {appliquerReel(numerique(args[0]), [](double x) { return erfinvFn(1.0 - x); })};
+    return {appliquerReel(numerique(args[0]), [](double x) { return erfcinvFn(x); })};
 }
 
 // Fonctions de Bessel de première espèce, par la série entière.
@@ -996,36 +986,81 @@ double betaFractionContinue(double x, double a, double b) {
     return h;
 }
 
-double betaIncompleteRegularisee(double x, double a, double b) {
-    if (x <= 0) return 0.0;
-    if (x >= 1) return 1.0;
+// I_x(a,b) et 1 - I_x(a,b) : la queue la plus petite est calculée
+// directement, l'autre par complément, si bien qu'une p-valeur de 1e-12
+// garde tous ses chiffres au lieu de naître d'une soustraction.
+static void betaIncompleteDeux(double x, double a, double b, double& p, double& q) {
+    if (std::isnan(x) || std::isnan(a) || std::isnan(b) || a < 0 || b < 0) {
+        p = q = std::nan("");
+        return;
+    }
+    if (x <= 0) {
+        p = 0.0;
+        q = 1.0;
+        return;
+    }
+    if (x >= 1) {
+        p = 1.0;
+        q = 0.0;
+        return;
+    }
     double lbeta = std::lgamma(a) + std::lgamma(b) - std::lgamma(a + b);
     double devant = std::exp(a * std::log(x) + b * std::log1p(-x) - lbeta);
-    if (x < (a + 1) / (a + b + 2))
-        return devant * betaFractionContinue(x, a, b) / a;
-    return 1.0 - devant * betaFractionContinue(1 - x, b, a) / b;
+    if (x < (a + 1) / (a + b + 2)) {
+        p = devant * betaFractionContinue(x, a, b) / a;
+        q = 1.0 - p;
+    } else {
+        q = devant * betaFractionContinue(1 - x, b, a) / b;
+        p = 1.0 - q;
+    }
 }
 
-double gammaIncompleteRegularisee(double x, double a) {
-    if (x <= 0) return 0.0;
+double betaIncompleteRegularisee(double x, double a, double b) {
+    double p, q;
+    betaIncompleteDeux(x, a, b, p, q);
+    return p;
+}
+
+// P(a,x) et Q(a,x) = 1 - P(a,x), la plus petite calculée directement :
+// la série sous a+1, la fraction continue au-delà.
+static void gammaIncompleteDeux(double x, double a, double& p, double& q) {
+    if (std::isnan(x) || std::isnan(a) || a < 0) {
+        p = q = std::nan("");
+        return;
+    }
+    if (x <= 0) {
+        p = 0.0;
+        q = 1.0;
+        return;
+    }
+    if (std::isinf(x)) {
+        p = 1.0;
+        q = 0.0;
+        return;
+    }
+    if (a == 0) {
+        p = 1.0;
+        q = 0.0;
+        return;
+    }
     if (x < a + 1) {
-        // Serie.
         double somme = 1.0 / a;
         double terme = somme;
-        for (int n = 1; n < 500; ++n) {
+        for (int n = 1; n < 2000; ++n) {
             terme *= x / (a + n);
             somme += terme;
             if (std::fabs(terme) < std::fabs(somme) * 1e-16) break;
         }
-        return somme * std::exp(-x + a * std::log(x) - std::lgamma(a));
+        p = somme * std::exp(-x + a * std::log(x) - std::lgamma(a));
+        q = 1.0 - p;
+        return;
     }
-    // Fraction continue pour la partie superieure.
     const double minuscule = 1e-300;
     double b = x + 1 - a;
     double c = 1e300;
     double d = 1.0 / b;
     double h = d;
-    for (int i = 1; i < 500; ++i) {
+    for (int i = 1; i < 2000; ++i) {
         double an = -i * (i - a);
         b += 2.0;
         d = an * d + b;
@@ -1037,30 +1072,46 @@ double gammaIncompleteRegularisee(double x, double a) {
         h *= del;
         if (std::fabs(del - 1.0) < 1e-16) break;
     }
-    double q = std::exp(-x + a * std::log(x) - std::lgamma(a)) * h;
-    return 1.0 - q;
+    q = std::exp(-x + a * std::log(x) - std::lgamma(a)) * h;
+    p = 1.0 - q;
+}
+
+double gammaIncompleteRegularisee(double x, double a) {
+    double p, q;
+    gammaIncompleteDeux(x, a, p, q);
+    return p;
+}
+
+// Queue demandée : « lower » (défaut) ou « upper ».
+static bool queueSuperieure(const std::vector<Valeur>& args, std::size_t rang, const char* nom) {
+    if (args.size() <= rang) return false;
+    std::string t = args[rang].versTexte();
+    if (t == "upper") return true;
+    if (t == "lower") return false;
+    erreur(formater("MATLAB:%s:InvalidTail", nom), "Tail must be \"lower\" or \"upper\".");
+    return false;
 }
 
 FONCTION(fnBetainc) {
     INUTILISE
     exigerArguments(args, 3, 4, "betainc");
-    double a = args[1].scal();
-    double b = args[2].scal();
-    bool superieure = args.size() > 3 && args[3].versTexte() == "upper";
-    return {appliquerReel(versDouble(args[0]), [a, b, superieure](double x) {
-        double v = betaIncompleteRegularisee(x, a, b);
-        return superieure ? 1.0 - v : v;
-    })};
+    bool superieure = queueSuperieure(args, 3, "betainc");
+    return {appliquerParElements({args[0], args[1], args[2]}, "betainc",
+                                 [superieure](const double* v) {
+                                     double p, q;
+                                     betaIncompleteDeux(v[0], v[1], v[2], p, q);
+                                     return superieure ? q : p;
+                                 })};
 }
 
 FONCTION(fnGammainc) {
     INUTILISE
     exigerArguments(args, 2, 3, "gammainc");
-    bool superieure = args.size() > 2 && args[2].versTexte() == "upper";
-    double a = args[1].scal();
-    return {appliquerReel(versDouble(args[0]), [a, superieure](double x) {
-        double v = gammaIncompleteRegularisee(x, a);
-        return superieure ? 1.0 - v : v;
+    bool superieure = queueSuperieure(args, 2, "gammainc");
+    return {appliquerParElements({args[0], args[1]}, "gammainc", [superieure](const double* v) {
+        double p, q;
+        gammaIncompleteDeux(v[0], v[1], p, q);
+        return superieure ? q : p;
     })};
 }
 

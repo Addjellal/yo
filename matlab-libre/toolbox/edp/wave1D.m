@@ -22,17 +22,23 @@ function [u, x, t] = wave1D(u0, c, longueur, tFinal, nx, nt)
     dt = tFinal / nt;
     x = (1:nx).' * dx;
     t = (0:nt) * dt;
-    lambda = (c * dt / dx) ^ 2;
-    u = zeros(nx, nt + 1);
-    u(:, 1) = u0(x);
-    % Premier pas : vitesse initiale nulle.
-    for i = 2:nx-1
-        u(i, 2) = u(i, 1) + 0.5 * lambda * (u(i+1, 1) - 2*u(i, 1) + u(i-1, 1));
+    courant = c * dt / dx;
+    if courant > 1
+        warning('edp:wave1D:Courant', ...
+                ['Nombre de Courant c*dt/dx = %.3g > 1 : le schéma est instable ', ...
+                 'et la solution va diverger. Augmentez NT ou diminuez NX.'], courant);
     end
+    lambda = courant ^ 2;
+    u = zeros(nx, nt + 1);
+    u(:, 1) = reshape(u0(x), [], 1);
+    % Le laplacien discret sur tous les points intérieurs, les bords valant
+    % zéro : le premier et le dernier point intérieurs ont un voisin au bord,
+    % et doivent bouger comme les autres.
+    laplacien = @(v) [v(2:end); 0] - 2 * v + [0; v(1:end-1)];
+    % Premier pas, vitesse initiale nulle : le développement de Taylor
+    % u(dt) = u0 + dt^2/2 * c^2 * u0'' garde l'ordre deux du schéma.
+    u(:, 2) = u(:, 1) + 0.5 * lambda * laplacien(u(:, 1));
     for k = 2:nt
-        for i = 2:nx-1
-            u(i, k+1) = 2*u(i, k) - u(i, k-1) + ...
-                        lambda * (u(i+1, k) - 2*u(i, k) + u(i-1, k));
-        end
+        u(:, k + 1) = 2 * u(:, k) - u(:, k - 1) + lambda * laplacien(u(:, k));
     end
 end

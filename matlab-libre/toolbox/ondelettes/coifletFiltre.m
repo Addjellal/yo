@@ -2,7 +2,7 @@ function h = coifletFiltre(N)
 %COIFLETFILTRE Filtre d'échelle d'une coiflette, par ses conditions.
 %   H = COIFLETFILTRE(N) rend le filtre d'échelle de coifN, de longueur
 %   6N et de somme racine de deux, dans l'ordre de synthèse : c'est
-%   celui de MATLAB, où le plus gros coefficient tombe à l'indice 4N-1.
+%   celui de MATLAB, où le plus gros coefficient tombe à l'indice 2N+1.
 %
 %   Aucune table n'est recopiée : le filtre est la solution du système
 %   qui définit une coiflette. Avec j l'indice de 0 à 6N-1, m = 2N le
@@ -46,8 +46,10 @@ function h = coifletFiltre(N)
     if isempty(connus)
         connus = {};
     end
+    % Le système est résolu dans l'ordre d'analyse ; on rend l'ordre de
+    % synthèse, celui de MATLAB (coifwavf('coif1') commence par -0.0515).
     if numel(connus) >= N && ~isempty(connus{N})
-        h = connus{N};
+        h = connus{N}(end:-1:1);
         return
     end
     depart = [];
@@ -59,7 +61,7 @@ function h = coifletFiltre(N)
         depart = resoudreCoiflette(ordre, depart);
         connus{ordre} = depart;   %#ok<AGROW>
     end
-    h = connus{N};
+    h = connus{N}(end:-1:1);
 end
 
 function h = resoudreCoiflette(N, precedente)

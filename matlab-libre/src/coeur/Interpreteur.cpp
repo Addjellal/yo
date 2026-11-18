@@ -11,6 +11,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <unordered_set>
 
 #include "matlibre/Affichage.h"
 #include "matlibre/Analyseur.h"
@@ -186,6 +187,19 @@ std::shared_ptr<Portee> Interpreteur::trouverPortee(const Portee* brut) const {
     return nullptr;
 }
 
+// Les noms qu'une expression cite : identificateurs, bases des accès,
+// jusque dans les fonctions anonymes qu'elle contient.
+static void nomsCites(const NoeudPtr& n, std::unordered_set<std::string>& noms) {
+    if (!n) return;
+    if (n->type == TypeN::Ident) noms.insert(n->texte);
+    for (const auto& e : n->enfants) nomsCites(e, noms);
+    for (const auto& e : n->cibles) nomsCites(e, noms);
+    for (const auto& r : n->rangees)
+        for (const auto& e : r) nomsCites(e, noms);
+    for (const auto& a : n->acces)
+        for (const auto& e : a.args) nomsCites(e, noms);
+}
+
 // Cherche une variable dans une portée, puis dans celles qui l'englobent :
 // c'est le partage d'espace de travail des fonctions imbriquées.
 static const Valeur* chercherDansChaine(const Portee& depart, const std::string& nom) {
@@ -203,6 +217,10 @@ const Valeur* Interpreteur::trouverVariable(const std::string& nom) const {
     if (p.globales.empty() && p.liensPersistants.empty()) {
         auto it = p.variables.find(nom);
         if (it != p.variables.end()) return &it->second;
+        if (p.capture) {
+            auto ic = p.capture->find(nom);
+            if (ic != p.capture->end()) return &ic->second;
+        }
         return p.englobante ? chercherDansChaine(p, nom) : nullptr;
     }
     if (p.globales.count(nom)) {
@@ -216,6 +234,10 @@ const Valeur* Interpreteur::trouverVariable(const std::string& nom) const {
     }
     auto it = p.variables.find(nom);
     if (it != p.variables.end()) return &it->second;
+    if (p.capture) {
+        auto ic = p.capture->find(nom);
+        if (ic != p.capture->end()) return &ic->second;
+    }
     return p.englobante ? chercherDansChaine(p, nom) : nullptr;
 }
 
@@ -1044,8 +1066,7 @@ std::vector<Valeur> Interpreteur::appelerValeur(const Valeur& poignee, std::vect
     portee->fonction = f.contexte;
     portee->englobante = f.porteeEnglobante;
     portee->anonyme = true;
-    if (f.capture)
-        for (const auto& kv : *f.capture) portee->variables[kv.first] = kv.second;
+    portee->capture = f.capture;
     for (std::size_t k = 0; k < f.parametres.size(); ++k) {
         if (f.parametres[k] == "~") continue;
         if (k < args.size()) portee->variables[f.parametres[k]] = args[k];
@@ -2520,8 +2541,21 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
             f->genre = Fonction::Anonyme;
             f->parametres = n->noms;
             f->corps = n->enfants[0];
-            f->capture = std::make_shared<std::unordered_map<std::string, Valeur>>(
-                portee().variables);
+            // Comme MATLAB, la capture ne retient que les variables que le
+            // corps cite, avec leur valeur du moment : copier tout l'espace
+            // de travail rendait chaque appel aussi lent que la plus grosse
+            // variable qui s'y trouvait.
+            {
+                std::unordered_set<std::string> cites;
+                nomsCites(n->enfants[0], cites);
+                auto capture = std::make_shared<std::unordered_map<std::string, Valeur>>();
+                for (const auto& nom : cites) {
+                    if (std::find(n->noms.begin(), n->noms.end(), nom) != n->noms.end())
+                        continue;
+                    if (const Valeur* v = trouverVariable(nom)) (*capture)[nom] = *v;
+                }
+                f->capture = capture;
+            }
             f->contexte = portee().fonction;
             // Si la fonction courante a des imbriquées, ou en est une, la
             // poignée garde sa portée : le rappel appelé plus tard y

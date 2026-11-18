@@ -142,11 +142,59 @@ FONCTION(fnLu) {
     return {l, u, p};
 }
 
+// qr(A), qr(A,0), qr(A,"econ"), qr(A,"vector"), qr(A,"econ","vector")...
+// Avec trois sorties, les colonnes sont pivotées : A*P = Q*R, ou
+// A(:,P) = Q*R quand P est rendu en vecteur — ce que fait qr(A,0).
 FONCTION(fnQr) {
     INUTILISE
-    exigerArguments(args, 1, 2, "qr");
+    exigerArguments(args, 1, 3, "qr");
+    exigerNumerique(args[0], "qr");
+    bool economique = false, enVecteur = false, formeDonnee = false;
+    for (std::size_t k = 1; k < args.size(); ++k) {
+        const Valeur& o = args[k];
+        if (o.estTexte() || o.estChaine()) {
+            std::string t = o.versTexte();
+            std::transform(t.begin(), t.end(), t.begin(),
+                           [](unsigned char c) { return (char)std::tolower(c); });
+            if (t == "econ") {
+                economique = true;
+            } else if (t == "vector") {
+                enVecteur = true;
+                formeDonnee = true;
+            } else if (t == "matrix") {
+                enVecteur = false;
+                formeDonnee = true;
+            } else {
+                erreur("MATLAB:qr:unknownOption",
+                       "Option must be 0, \"econ\", \"vector\" or \"matrix\".");
+            }
+        } else if (o.estScalaire() && o.scal() == 0) {
+            economique = true;
+            if (!formeDonnee) enVecteur = true;
+        } else {
+            erreur("MATLAB:qr:unknownOption",
+                   "Option must be 0, \"econ\", \"vector\" or \"matrix\".");
+        }
+    }
     Valeur q, r;
-    bool economique = args.size() > 1 && args[1].scal() == 0;
+    if (nargout >= 3) {
+        std::vector<int> permutation;
+        factorisationQR(args[0], q, r, economique, &permutation);
+        const int n = (int)permutation.size();
+        Valeur e;
+        if (enVecteur) {
+            std::vector<double> rangs((std::size_t)n);
+            for (int j = 0; j < n; ++j) rangs[(std::size_t)j] = permutation[(std::size_t)j] + 1;
+            e = Valeur::ligne(rangs);
+        } else {
+            e = Valeur::matrice(n, n, 0.0);
+            for (int j = 0; j < n; ++j) {
+                const std::size_t ligne = (std::size_t)permutation[(std::size_t)j];
+                e.re[ligne + (std::size_t)j * (std::size_t)n] = 1.0;
+            }
+        }
+        return {q, r, e};
+    }
     factorisationQR(args[0], q, r, economique);
     if (nargout <= 1) return {r};
     return {q, r};
@@ -180,7 +228,7 @@ void valeursPropresGeneralisees(const Valeur& a, const Valeur& b, Valeur& valeur
                "Matrices must be square and of the same size.");
     int defaut = 0;
     Valeur L;
-    if (estSymetrique(b)) {
+    if (estHermitienne(b)) {
         L = cholesky(b, true, &defaut);
     } else {
         defaut = 1;
@@ -315,6 +363,13 @@ FONCTION(fnIssymmetric) {
     return {Valeur::booleen(estSymetrique(args[0]))};
 }
 
+// A == A' : la partie imaginaire antisymétrique, la diagonale réelle.
+FONCTION(fnIshermitian) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "ishermitian");
+    return {Valeur::booleen(estHermitienne(args[0]))};
+}
+
 FONCTION(fnIsdiag) {
     INUTILISE
     exigerNumerique(args[0], "isdiag");
@@ -413,6 +468,8 @@ void enregistrerAlgebre(Interpreteur& it) {
     it.enregistrer("qr", fnQr, "algebre", "qr  Factorisation QR de Householder.");
     it.enregistrer("chol", fnChol, "algebre", "chol  Factorisation de Cholesky.");
     it.enregistrer("eig", fnEig, "algebre", "eig  Valeurs et vecteurs propres.");
+    it.enregistrer("ishermitian", fnIshermitian, "algebre",
+                   "ishermitian  Vrai si la matrice est hermitienne : A == A'.");
     it.enregistrer("svd", fnSvd, "algebre", "svd  Decomposition en valeurs singulieres.");
     it.enregistrer("linsolve", fnLinsolve, "algebre", "linsolve  Resolution de systeme lineaire.");
     it.enregistrer("issymmetric", fnIssymmetric, "algebre", "issymmetric  Matrice symetrique ?");

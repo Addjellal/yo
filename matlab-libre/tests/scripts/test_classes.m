@@ -304,7 +304,7 @@ fichiersPaquet = {
         '            p@geo.Point(x, y);', '            p.z = z;', '        end', ...
         '        function d = norme(p)', '            d = sqrt(p.x^2 + p.y^2 + p.z^2);', ...
         '        end', '    end', 'end'}
-    fullfile('+geo', 'distance.m'), {'function d = distance(p)', '    d = p.norme();', 'end'}
+    fullfile('+geo', 'ecartOrigine.m'), {'function d = ecartOrigine(p)', '    d = p.norme();', 'end'}
     fullfile('+geo', '+unites', 'metres.m'), {'function m = metres(km)', ...
         '    m = 1000 * km;', 'end'}
     fullfile('+geo', 'surDemande.m'), {'function r = surDemande()', '    if nargout > 0', ...
@@ -319,21 +319,21 @@ end
 addpath(racinePaquet);
 p = geo.Point(3, 4);
 assert(strcmp(class(p), 'geo.Point') && isa(p, 'geo.Point'), 'une classe de paquet porte son nom entier');
-assert(geo.distance(p) == 5, 'une fonction de paquet');
+assert(geo.ecartOrigine(p) == 5, 'une fonction de paquet');
 assert(geo.unites.metres(2) == 2000, 'un paquet dans un paquet');
 assert(geo.Point.origine().x == 0, 'une methode statique de paquet');
 assert(geo.Point.DIMENSION == 2, 'une constante de paquet');
 vide = geo.Point.empty(0, 1);
 assert(isequal(size(vide), [0 1]) && strcmp(class(vide), 'geo.Point'), 'le tableau vide d''une classe de paquet');
 q = geo.Point3(1, 2, 2);
-assert(strcmp(class(q), 'geo.Point3') && isa(q, 'geo.Point') && geo.distance(q) == 3 && ...
+assert(strcmp(class(q), 'geo.Point3') && isa(q, 'geo.Point') && geo.ecartOrigine(q) == 3 && ...
        q.x == 1, 'une classe derivee d''une classe de paquet, et son p@geo.Point(x, y)');
 assert(isequal(metaclass(q).SuperclassList', {'geo.Point'}), 'metaclass nomme le parent entier');
 points(1) = geo.Point(1, 0);
 points(2) = geo.Point(2, 0);
 assert(isequal([points.x], [1 2]) && isequal({points.y}, {0, 0}), ...
        'la propriete d''un tableau d''objets est la liste des proprietes de chacun');
-poignee = @geo.distance;
+poignee = @geo.ecartOrigine;
 assert(poignee(p) == 5, 'une poignee vers une fonction de paquet');
 % En instruction, comme toute fonction, elles sont appelees sans sortie
 % demandee : une sortie qu'elles ne posent que sur demande n'est pas due.
@@ -346,7 +346,7 @@ assert(geo.compte() == 1 && geo.surDemande() == 1 && p.surDemande() == 3, ...
        'dans une expression, une sortie est demandee');
 refuse = '';
 try
-    distance(p); %#ok<NASGU>
+    ecartOrigine(p); %#ok<NASGU>
 catch err
     refuse = err.identifier;
 end

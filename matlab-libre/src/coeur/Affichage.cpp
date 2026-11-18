@@ -36,12 +36,15 @@ std::string rendreScalaire(double x, int format, bool simple) {
     const int longues = decimalesLongues(simple);
     if (std::isnan(x)) return "NaN";
     if (std::isinf(x)) return x > 0 ? "Inf" : "-Inf";
+    if (x == 0 && f != Format::Hex) x = 0.0;  // -0 s'écrit 0, comme dans MATLAB
     switch (f) {
         case Format::Long:
             // « format long » montre quinze décimales, pas quinze chiffres
             // significatifs : pi s'écrit 3.141592653589793.
             if (estEntierAffichable(x)) return formater("%.0f", x);
-            if (std::fabs(x) >= 1e5 || std::fabs(x) < 1e-5)
+            // Sous 0.001, comme MATLAB, la notation exponentielle : quinze
+            // décimales fixes n'y montreraient que onze chiffres de 1.46e-05.
+            if (std::fabs(x) >= 1e5 || std::fabs(x) < 1e-3)
                 return formater("%.*e", longues, x);
             return formater("%.*f", longues, x);
         case Format::CourtE: return formater("%.4e", x);
@@ -74,6 +77,10 @@ std::string rendreScalaire(double x, int format, bool simple) {
         }
         default:
             if (estEntierAffichable(x)) return formater("%.0f", x);
+            // Comme MATLAB, « format short » passe en notation exponentielle
+            // hors de [0.001, 1000) : sans quoi 1.46e-05 s'écrirait 0.0000 et
+            // 89874.5631 aurait neuf chiffres là où MATLAB en montre cinq.
+            if (std::fabs(x) >= 1000 || std::fabs(x) < 0.001) return formater("%.4e", x);
             return formater("%.4f", x);
     }
 }
@@ -143,7 +150,12 @@ static PlanColonne planifier(const Valeur& v, Format format) {
 static std::string cellule(double x, const PlanColonne& p, Format format) {
     if (std::isnan(x)) return "NaN";
     if (std::isinf(x)) return x > 0 ? "Inf" : "-Inf";
+    if (x == 0) x = 0.0;  // -0 s'écrit 0, comme dans MATLAB
     if (p.entiers) return formater("%.0f", x);
+    // Un zéro exact s'écrit « 0 », même parmi des décimaux : MATLAB montre
+    // « 1.5000         0 », et c'est ainsi qu'on distingue un vrai zéro
+    // d'une valeur que l'arrondi de l'affichage fait passer pour nulle.
+    if (x == 0 && (format == Format::Court || format == Format::Long)) return "0";
     if (format == Format::Banque) return formater("%.2f", x);
     return formater("%.*f", p.decimales, x / p.facteur);
 }
@@ -343,10 +355,16 @@ static void ecrireNumerique(std::ostream& os, const Valeur& v, Format format,
             ligne.clear();
             for (int j = debut; j < fin; ++j) {
                 std::size_t k = (std::size_t)i + (std::size_t)j * l;
-                std::string texte = cellule(v.re[k], p, format);
+                // Un complexe garde ses deux parties écrites en entier :
+                // MATLAB montre « 0.0000 + 1.0000i », non « 0 + 1.0000i ».
+                std::string texte = v.estComplexe() && v.re[k] == 0 && !p.entiers
+                                        ? formater("%.*f", p.decimales, 0.0)
+                                        : cellule(v.re[k], p, format);
                 if (v.estComplexe()) {
                     double im = v.im[k];
-                    std::string ti = cellule(std::fabs(im), p, format);
+                    std::string ti = im == 0 && !p.entiers
+                                         ? formater("%.*f", p.decimales, 0.0)
+                                         : cellule(std::fabs(im), p, format);
                     texte += (im < 0 ? " - " : " + ") + ti + "i";
                 }
                 ligne += formater("%*s", largeurCellule, texte.c_str());

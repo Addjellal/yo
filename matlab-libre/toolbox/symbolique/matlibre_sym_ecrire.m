@@ -11,12 +11,8 @@ function texte = matlibre_sym_ecrire(arbre, priorite, aGauche)
     switch operateur
         case 'num'
             valeur = arbre{2};
-            if valeur == round(valeur)
-                texte = sprintf('%d', valeur);
-            else
-                texte = sprintf('%g', valeur);
-            end
-            if valeur < 0 && priorite > 0 && ~aGauche
+            [texte, fraction] = ecrireNombre(valeur);
+            if (valeur < 0 && priorite > 0 && ~aGauche) || (fraction && priorite > 2)
                 texte = ['(' texte ')'];
             end
             return
@@ -90,5 +86,80 @@ function texte = matlibre_sym_ecrire(arbre, priorite, aGauche)
     end
     if rang < priorite
         texte = ['(' texte ')'];
+    end
+end
+
+function [texte, fraction] = ecrireNombre(valeur)
+%ECRIRENOMBRE Un nombre écrit sans rien perdre.
+%   Un entier s'écrit en entier ; un rationnel simple p/q (q <= 10^6) dont
+%   la division redonne le double, à quatre ulps près, s'écrit p/q quand
+%   ce n'est pas plus long que le décimal, comme MATLAB écrit 1/120 ;
+%   tout autre nombre avec le plus petit nombre de chiffres
+%   qui le relise à l'identique — jamais six chiffres seulement, car
+%   MATLABFUNCTION compile ce texte : un coefficient tronqué y deviendrait
+%   un calcul faux.
+    fraction = false;
+    if ~isfinite(valeur)
+        if isnan(valeur)
+            texte = 'NaN';
+        elseif valeur > 0
+            texte = 'Inf';
+        else
+            texte = '-Inf';
+        end
+        return
+    end
+    if valeur == round(valeur) && abs(valeur) < 1e15
+        texte = sprintf('%d', valeur);
+        return
+    end
+    for chiffres = 15:17
+        texte = sprintf('%.*g', chiffres, valeur);
+        if str2double(texte) == valeur
+            break
+        end
+    end
+    % La fraction l'emporte quand elle n'est pas plus longue que le
+    % décimal : 1/120 plutôt que 0.008333333333333333, 1/2 plutôt que 0.5,
+    % mais 0.333333 — ce que rend VPA(1/3,6) — plutôt que 333333/1000000.
+    [p, q] = rationnelExact(valeur);
+    if q > 1
+        texteFraction = sprintf('%d/%d', p, q);
+        if numel(texteFraction) <= numel(texte)
+            texte = texteFraction;
+            fraction = true;
+        end
+    end
+end
+
+function [p, q] = rationnelExact(valeur)
+%RATIONNELEXACT p/q tel que p/q vaille exactement VALEUR en double, q <= 10^6.
+%   Les réduites de la fraction continue sont essayées dans l'ordre ; la
+%   première dont la division redonne le double est la bonne.
+    p = 0;
+    q = 0;
+    x = abs(valeur);
+    pPrec = 1; qPrec = 0;
+    pCour = floor(x); qCour = 1;
+    reste = x - floor(x);
+    for etape = 1:40
+        if qCour > 1e6
+            return
+        end
+        % Exact, ou à quatre ulps près : 0.5000000000000001, que laisse un
+        % calcul en double, est 1/2.
+        if qCour > 1 && abs(sign(valeur) * pCour / qCour - valeur) <= 4 * eps(valeur)
+            p = sign(valeur) * pCour;
+            q = qCour;
+            return
+        end
+        if reste == 0
+            return
+        end
+        inverse = 1 / reste;
+        terme = floor(inverse);
+        reste = inverse - terme;
+        [pPrec, pCour] = deal(pCour, terme * pCour + pPrec);
+        [qPrec, qCour] = deal(qCour, terme * qCour + qPrec);
     end
 end

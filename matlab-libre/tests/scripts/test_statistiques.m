@@ -892,7 +892,7 @@ assert(abs(modeleLogit.Coefficients(2) - 2) < 3 * modeleLogit.SE(2));
 Xnormal = randn(200, 2);
 yNormal = 1 + 2 * Xnormal(:, 1) - Xnormal(:, 2) + 0.1 * randn(200, 1);
 assert(max(abs(fitglm(Xnormal, yNormal).Coefficients - ...
-              fitlm(Xnormal, yNormal).Coefficients)) < 1e-10);
+              fitlm(Xnormal, yNormal).Coefficients.Estimate)) < 1e-10);
 % Poisson : le lien logarithmique retrouve les coefficients.
 yComptes = poissrnd(exp(0.5 + Xglm(1:200)));
 modelePoisson = fitglm(Xglm(1:200), yComptes, 'Distribution', 'poisson');
@@ -1169,5 +1169,108 @@ assert(m == 5 && i == 3);
 assert(isequal(nanmax([1 NaN], [NaN 4]), [1 4]));
 assert(isequal(nanmin([1 NaN], [NaN 4]), [1 4]));
 assert(nanmin([3 NaN 1 2]) == 1);
+
+%% ----------------------------------------- lois : diffusion et queues
+% Les paramètres se diffusent (même taille ou scalaire), et la queue
+% supérieure est calculée directement : une p-valeur de 1e-12 garde ses
+% chiffres. Valeurs de référence : scipy.special et scipy.stats.
+assert(max(abs(betainc(0.5, [1 2], [3 4]) - [0.875 0.8125])) < 1e-15);
+assert(max(abs(gammainc([1 2 3], 2) - [0.264241117657115 0.593994150290162 0.800851726528544])) < 1e-14);
+assert(abs(gammainc(50, 2, 'upper') - 51 * exp(-50)) < 1e-30);
+assert(max(abs(normcdf([1 2], [0 1], 1) - normcdf(1))) < 1e-15);
+assert(abs(normcdf(10, 0, 1, 'upper') / 7.619853024160527e-24 - 1) < 1e-13);
+assert(abs(norminv(1e-20) + 9.262340089798408) < 1e-12);       % non -Inf
+assert(abs(erfcinv(1e-300) - 26.209469960516117) < 1e-12);
+assert(abs(erfinv(-1e-20) + 8.862269254527579e-21) < 1e-33);
+assert(erfcinv(1) == 0 && isnan(norminv(1.5)) && isnan(normcdf(0, 0, -1)));
+assert(abs(tcdf(8, 10, 'upper') / 5.887471394833082e-06 - 1) < 1e-12);
+assert(max(abs(tcdf([-3 2], [10 Inf]) - [0.006671827511284782 normcdf(2)])) < 1e-14);
+assert(abs(fcdf(330.285, 6, 9, 'upper') / 4.984053422648484e-10 - 1) < 1e-12);
+assert(abs(chi2cdf(200, 10, 'upper') / 1.6139305336977313e-37 - 1) < 1e-12);
+refuse = false;
+try
+    normcdf([1 2 3], [0 1], 1);
+catch
+    refuse = true;
+end
+assert(refuse);
+
+%% ---------------------------------------------- pca : sorties de MATLAB
+Xp = [2 4 1; 3 5 2; 4 4 4; 5 7 3; 6 6 6; 8 9 7];
+[coeffP, scoreP, latentP, t2P, explP, muP] = pca(Xp);
+assert(isequal(size(t2P), [6 1]) && abs(sum(explP) - 100) < 1e-12);
+assert(max(abs(muP - mean(Xp))) < 1e-14);
+[~, rangsMax] = max(abs(coeffP), [], 1);
+assert(all(coeffP(sub2ind(size(coeffP), rangsMax, 1:3)) > 0));     % convention de signe
+assert(max(max(abs(scoreP * coeffP' + muP - Xp))) < 1e-12);
+coeffEig = pca(Xp, 'Algorithm', 'eig');
+assert(max(abs(abs(coeffEig(:)) - abs(coeffP(:)))) < 1e-10);
+[c2P, s2P] = pca(Xp, 'NumComponents', 2);
+assert(isequal(size(c2P), [3 2]) && isequal(size(s2P), [6 2]));
+XpNaN = Xp;
+XpNaN(2, 3) = NaN;
+[~, sNaN, ~, tNaN] = pca(XpNaN);
+assert(all(isnan(sNaN(2, :))) && isnan(tNaN(2)) && all(isfinite(tNaN([1 3:6]))));
+refuse = false;
+try
+    pca(Xp, 'Weights', ones(6, 1));
+catch
+    refuse = true;
+end
+assert(refuse);
+
+%% ------------------------------------------- LinearModel, formules
+% Valeurs recoupées avec statsmodels (OLS, influence, prédiction).
+iL = (1:30)';
+x1L = iL / 3;
+x2L = mod(iL * 7, 11);
+gL = categorical(mod(iL, 3), [0 1 2], {'a', 'b', 'c'});
+yL = 2 + 0.5 * x1L - 0.3 * x2L + 0.8 * (gL == 'b') - 1.1 * (gL == 'c') + ...
+     0.1 * x1L .* x2L / 5 + sin(iL * 1.7);
+tL = table(x1L, x2L, gL, yL, 'VariableNames', {'x1', 'x2', 'grp', 'y'});
+mL = fitlm(tL, 'y ~ x1*x2 + grp');
+assert(isa(mL, 'LinearModel'));
+assert(isequal(mL.CoefficientNames, {'(Intercept)', 'x1', 'x2', 'grp_b', 'grp_c', 'x1:x2'}));
+assert(abs(mL.Coefficients.Estimate(1) - 2.37118810734032) < 1e-12);
+assert(abs(mL.Coefficients.SE(6) - 0.0195278425208516) < 1e-14);
+assert(abs(mL.Rsquared.Ordinary - 0.908721246165578) < 1e-13 && mL.DFE == 24);
+assert(strcmp(char(mL.Formula), 'y ~ 1 + grp + x1*x2'));
+assert(isequal(mL.Formula.Terms(end, :), [1 1 0 0]));
+[yPred, ciPred] = predict(mL, table(4, 5, categorical({'c'}, {'a', 'b', 'c'}), ...
+                                    'VariableNames', {'x1', 'x2', 'grp'}));
+assert(ciPred(1) < yPred && yPred < ciPred(2));
+assert(abs(feval(mL, 4, 5, categorical({'c'}, {'a', 'b', 'c'})) - yPred) < 1e-12);
+[pAll, FAll] = coefTest(mL);
+assert(pAll < 1e-10 && abs(FAll - 47.7861692711881) < 1e-10);
+anovaL = anova(mL);
+assert(isequal(anovaL.Properties.RowNames, {'x1'; 'x2'; 'grp'; 'x1:x2'; 'Error'}));
+assert(abs(anovaL.SumSq(end) - mL.SSE) < 1e-9);
+% Rang déficient : le coefficient de trop vaut zéro, sans écart type.
+mRang = fitlm([x1L, x2L, 2 * x1L + x2L], yL);
+assert(mRang.NumEstimatedCoefficients == 3 && mRang.NumCoefficients == 4);
+assert(nnz(mRang.Coefficients.Estimate == 0) == 1 && sum(isnan(mRang.Coefficients.tStat)) == 1);
+% Ordre de MATLAB pour 'quadratic', et formule repliée.
+mQ = fitlm([x1L, x2L], yL, 'quadratic');
+assert(isequal(mQ.CoefficientNames, {'(Intercept)', 'x1', 'x2', 'x1:x2', 'x1^2', 'x2^2'}));
+assert(strcmp(char(mQ.Formula), 'y ~ 1 + x1*x2 + x1^2 + x2^2'));
+assert(strcmp(char(fitlm([x1L, x2L], yL, 'Intercept', false).Formula), 'y ~ x1 + x2'));
+% Valeurs manquantes et exclusions : résidus NaN, observations retirées.
+yManque = yL;
+yManque(5) = NaN;
+mManque = fitlm([x1L, x2L], yManque, 'Exclude', [7 8]);
+assert(mManque.NumObservations == 27 && all(isnan(mManque.Residuals.Raw([5 7 8]))));
+
+%% ------------------------------- classify, loss, resubLoss, resubPredict
+load fisheriris
+[classeIris, errIris, postIris] = classify(meas, meas, species);
+assert(abs(errIris - 0.02) < 1e-12 && max(abs(sum(postIris, 2) - 1)) < 1e-12);
+assert(sum(~strcmp(classeIris, species)) == 3);
+assert(isa(classify(meas, meas, double(strcmp(species, 'setosa'))), 'double'));
+MdIris = fitcdiscr(meas(1:2:end, :), species(1:2:end));
+assert(abs(loss(MdIris, meas(2:2:end, :), species(2:2:end)) - 0.04) < 1e-12);
+assert(isequal(MdIris.ClassNames, {'setosa'; 'versicolor'; 'virginica'}));
+assert(abs(resubLoss(fitcnb(meas, double(strcmp(species, 'virginica')))) - ...
+           mean(resubPredict(fitcnb(meas, double(strcmp(species, 'virginica')))) ~= ...
+                strcmp(species, 'virginica'))) < 1e-12);
 
 disp('statistiques : toutes les verifications passent');

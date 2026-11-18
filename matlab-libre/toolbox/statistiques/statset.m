@@ -10,6 +10,11 @@ function options = statset(varargin)
 %   OPTIONS = STATSET(ANCIENNES,'nom',valeur,...) part d'une structure
 %   existante et n'en change que ce qui est nommé.
 %
+%   OPTIONS = STATSET('nlinfit') rend les valeurs par défaut de la
+%   fonction nommée — 'nlinfit' et 'fitnlm' (MaxIter 100, TolFun et TolX
+%   1e-8, DerivStep eps^(1/3)), 'kmeans', 'mle', 'fitgmdist' —, qu'on
+%   modifie ensuite champ par champ.
+%
 %   V = STATSET(OPTIONS,'nom') n'est pas la forme de MATLAB ; pour lire
 %   un champ, employez STATGET.
 %
@@ -19,7 +24,7 @@ function options = statset(varargin)
 %      MaxFunEvals    nombre maximal d'évaluations ;
 %      TolFun         tolérance sur la fonction ;
 %      TolX           tolérance sur les paramètres ;
-%      TolBound       tolérance sur les bornes ;
+%      TolBnd         tolérance sur les bornes ;
 %      GradObj        'on' si le gradient est fourni ;
 %      DerivStep      pas des différences finies ;
 %      FunValCheck    'on' pour refuser un NaN ou un infini ;
@@ -37,6 +42,9 @@ function options = statset(varargin)
 %
 %      serrees = statset(options, 'TolX', 1e-14);
 %
+%      parDefaut = statset('nlinfit');
+%      parDefaut.MaxIter              % 100
+%
 %   Voir aussi STATGET, NLINFIT, MLE, KMEANS, OPTIMSET.
     noms = {'Display', 'MaxFunEvals', 'MaxIter', 'TolBnd', 'TolFun', ...
             'TolTypeFun', 'TolX', 'TolTypeX', 'GradObj', 'Jacobian', ...
@@ -47,6 +55,9 @@ function options = statset(varargin)
     if numel(varargin) >= 1 && isstruct(varargin{1})
         options = varargin{1};
         debut = 2;
+    elseif numel(varargin) == 1 && (ischar(varargin{1}) || isstring(varargin{1}))
+        options = defautsDe(char(varargin{1}), noms);
+        return
     end
     for i = 1:numel(noms)
         if ~isfield(options, noms{i})
@@ -72,5 +83,46 @@ function options = statset(varargin)
     end
     if k <= numel(varargin)
         error('stats:statset:BadInput', 'Options must come in name-value pairs.');
+    end
+end
+
+function options = defautsDe(fonction, noms)
+%DEFAUTSDE Les réglages par défaut d'une fonction, comme STATSET(NOM).
+    options = struct();
+    for i = 1:numel(noms)
+        options.(noms{i}) = [];
+    end
+    options.Streams = {};
+    switch lower(fonction)
+        case {'nlinfit', 'fitnlm'}
+            options.Display = 'off';
+            options.MaxIter = 100;
+            options.TolFun = 1e-8;
+            options.TolX = 1e-8;
+            options.DerivStep = eps ^ (1 / 3);
+            options.FunValCheck = 'on';
+            options.Robust = 'off';
+            options.WgtFun = 'bisquare';
+        case 'kmeans'
+            options.Display = 'notify';
+            options.MaxIter = 100;
+        case 'mle'
+            options.Display = 'off';
+            options.MaxFunEvals = 200;
+            options.MaxIter = 100;
+            options.TolBnd = 1e-6;
+            options.TolFun = 1e-6;
+            options.TolX = 1e-6;
+            options.GradObj = 'off';
+            options.DerivStep = eps ^ (1 / 3);
+            options.FunValCheck = 'on';
+        case {'fitgmdist', 'gmdistribution'}
+            options.Display = 'off';
+            options.MaxIter = 100;
+            options.TolFun = 1e-6;
+        otherwise
+            error('stats:statset:BadFunName', ...
+                  ['STATSET : pas de réglages par défaut connus pour ''%s'' ', ...
+                   '(nlinfit, fitnlm, kmeans, mle, fitgmdist).'], fonction);
     end
 end

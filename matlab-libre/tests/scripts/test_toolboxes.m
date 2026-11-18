@@ -255,8 +255,9 @@ assert(isequal(sym2poly(poly2sym([2 -3 0 5], u), u), [2 -3 0 5]));
 % Les racines d'une equation polynomiale.
 racinesSym = solve(t ^ 2 - 4);
 assert(numel(racinesSym) == 2);
-assert(abs(double(racinesSym{1}) + 2) < 1e-12);
-assert(abs(double(racinesSym{2}) - 2) < 1e-12);
+assert(isequal(size(racinesSym), [2 1]));      % une colonne de SYM, comme MATLAB
+assert(abs(double(racinesSym(1)) + 2) < 1e-12);
+assert(abs(double(racinesSym(2)) - 2) < 1e-12);
 assert(abs(double(solve(3 * t - 6)) - 2) < 1e-12);
 % La variable sous-entendue est la plus proche de x.
 syms a x

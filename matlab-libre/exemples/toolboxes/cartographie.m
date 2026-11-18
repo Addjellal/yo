@@ -87,44 +87,42 @@ assert(abs(latNord - 100000 / rayonTerre * 180 / pi) < 1e-6);
 assert(abs(lonNord) < 1e-9, 'plein nord ne change pas la longitude');
 
 %% 4. La surface
-% Sur une sphère, l'aire ne se calcule pas comme sur un plan. AREAINT
-% passe par la projection cylindrique équivalente — celle où l'ordonnée
-% est le sinus de la latitude —, qui conserve les aires.
-%
-% Le résultat est exact pour un rectangle en latitude-longitude, dont les
-% côtés restent droits dans cette projection.
+% Sur une sphère, l'aire ne se calcule pas comme sur un plan. AREAQUAD
+% donne celle d'un quadrangle entre deux parallèles et deux méridiens :
+% R^2 (lon2 - lon1) (sin lat2 - sin lat1), la formule exacte. AREAINT
+% donne celle d'un polygone quelconque, dont les côtés sont des arcs de
+% grand cercle.
 latitudes = [0 0 10 10];
 longitudes = [0 10 10 0];
-aire = areaint(latitudes, longitudes, rayonTerre);
+aireQuadrangle = areaquad(0, 0, 10, 10, rayonTerre);
 exacte = rayonTerre ^ 2 * (10 * pi / 180) * (sind(10) - sind(0));
-fprintf('\nAire d''un rectangle de 10 degres sur 10, a l''equateur :\n');
+fprintf('\nAire d''un quadrangle de 10 degres sur 10, a l''equateur :\n');
 fprintf('  %.6e m2, exacte %.6e m2, ecart relatif %.2e\n', ...
-        aire, exacte, abs(aire - exacte) / exacte);
-assert(abs(aire - exacte) / exacte < 1e-12, ...
-       'la projection equivalente rend l''aire exacte d''un rectangle');
+        aireQuadrangle, exacte, abs(aireQuadrangle - exacte) / exacte);
+assert(abs(aireQuadrangle - exacte) / exacte < 1e-12, ...
+       'AREAQUAD rend l''aire exacte d''un quadrangle');
+% Le polygone aux memes sommets, mais aux cotes de grand cercle : le cote
+% nord s'arque vers le pole, et l'aire est un peu plus grande.
+aire = areaint(latitudes, longitudes, rayonTerre);
+fprintf('  le polygone de grand cercle aux memes sommets : %.6e m2 (+%.2f %%)\n', ...
+        aire, 100 * (aire / exacte - 1));
+assert(aire > exacte && aire < 1.01 * exacte);
 % Une aire est positive quel que soit le sens de parcours.
-assert(areaint(fliplr(latitudes), fliplr(longitudes), rayonTerre) > 0);
-% Le meme rectangle plus au nord couvre moins de surface : les meridiens
+assert(abs(areaint(fliplr(latitudes), fliplr(longitudes), rayonTerre) - aire) < 1e-3);
+% Le meme quadrangle plus au nord couvre moins de surface : les meridiens
 % s'y rapprochent.
-aireNord = areaint([60 60 70 70], longitudes, rayonTerre);
-fprintf('  le meme rectangle entre 60 et 70 degres nord : %.6e m2\n', aireNord);
-assert(aireNord < aire, 'les meridiens se resserrent vers les poles');
-% Toute la sphere : quatre rectangles de 180 degres de longitude.
-aireHemisphere = areaint([0 0 90 90], [0 180 180 0], rayonTerre);
-fprintf('  un quart de sphere : %.6f de 4 pi R2 (attendu 0.25)\n', ...
-        aireHemisphere / (4 * pi * rayonTerre ^ 2));
-assert(abs(aireHemisphere / (4 * pi * rayonTerre ^ 2) - 0.25) < 1e-12);
-%
-% En revanche, un polygone dont les cotes suivent des arcs de grand
-% cercle n'est pas rendu exactement : ces arcs se courbent dans la
-% projection. Le triangle equateur-pole en est le cas d'ecole — son aire
-% vraie est le huitieme de la sphere, la formule en rend le seizieme.
-% C'est une limite de la methode, non une erreur de calcul, et elle est
-% dite dans l'aide d'AREAINT.
-triangle = areaint([0 0 90], [0 90 0], rayonTerre);
-fprintf('  triangle equateur-pole : %.6f de la sphere (aire vraie 0.125)\n', ...
-        triangle / (4 * pi * rayonTerre ^ 2));
-assert(abs(triangle / (4 * pi * rayonTerre ^ 2) - 0.0625) < 1e-9);
+aireNord = areaquad(60, 0, 70, 10, rayonTerre);
+fprintf('  le meme quadrangle entre 60 et 70 degres nord : %.6e m2\n', aireNord);
+assert(aireNord < aireQuadrangle, 'les meridiens se resserrent vers les poles');
+% Sans rayon, l'aire est la fraction de la sphere, comme dans MATLAB.
+quart = areaquad(0, 0, 90, 180);
+fprintf('  un quart de sphere : %.6f (attendu 0.25)\n', quart);
+assert(abs(quart - 0.25) < 1e-12);
+% Le triangle equateur-pole : ses trois angles sont droits, son exces
+% spherique vaut pi/2, et il couvre le huitieme de la sphere.
+triangle = areaint([0 0 90], [0 90 0]);
+fprintf('  triangle equateur-pole : %.6f de la sphere (attendu 0.125)\n', triangle);
+assert(abs(triangle - 0.125) < 1e-12);
 
 %% 5. La projection UTM
 % Passer de la sphère au plan. UTM découpe le globe en soixante fuseaux

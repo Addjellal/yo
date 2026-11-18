@@ -23,7 +23,8 @@ function donnees = remonter(arbre, indice)
         for k = 1:4
             enfants{k} = remonter(arbre, 4 * indice + k);
         end
-        donnees = idwt2(enfants{1}, enfants{2}, enfants{3}, enfants{4}, arbre.nom);
+        donnees = idwt2(enfants{1}, enfants{2}, enfants{3}, enfants{4}, arbre.nom, ...
+                        matlibre_taille_noeud(arbre, indice));
     else
         donnees = lireNoeud(arbre, indice);
         if isempty(donnees)

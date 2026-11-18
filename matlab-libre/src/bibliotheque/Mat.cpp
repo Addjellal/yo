@@ -235,6 +235,13 @@ FONCTION(fnLoad) {
     std::string demande = argNom(args[0], "filename");
     std::string fichier = demande;
     if (!fs::exists(fichier)) fichier = avecExtension(demande);
+    // « load fisheriris » : un nom sans dossier se cherche aussi sur le
+    // chemin, comme dans MATLAB, qui y range ses jeux de données.
+    if (!fs::exists(fichier)) {
+        std::string trouve = fichierSurChemin(it, demande);
+        if (trouve.empty()) trouve = fichierSurChemin(it, avecExtension(demande));
+        if (!trouve.empty()) fichier = trouve;
+    }
     if (!fs::exists(fichier))
         erreur("MATLAB:load:couldNotReadFile",
                "Unable to read file '" + demande + "'. No such file or directory.");

@@ -7,6 +7,7 @@
 // dossier indiqué par MATLIBRE_FIGURES si la variable existe.
 #pragma once
 
+#include <cmath>
 #include <map>
 #include <memory>
 #include <string>
@@ -68,6 +69,35 @@ struct Serie {
     double taillePoliceTexte = 0;
     // Alignement horizontal d'un texte pose : 'l', 'c' ou 'r'.
     char alignement = 'l';
+    // Marqueurs : la taille en points (6 par défaut, comme MATLAB), la
+    // couleur de face (« none » : creux) et celle du bord (vide : celle du
+    // trait).
+    double tailleMarqueur = 6;
+    std::string couleurFaceMarqueur = "none";
+    std::string couleurBordMarqueur;
+    // Hors de la légende : les niveaux d'un contour après le premier —
+    // MATLAB n'y met qu'un objet par appel à « contour ».
+    bool horsLegende = false;
+    // Couleur tirée de la palette : un niveau de contour, un polygone
+    // « fill » de couleur numérique. VALEURCOULEUR passe par CLim comme un
+    // pixel d'image ; CBAS et CHAUT élargissent la CLim automatique (la
+    // plage de Z d'un contour).
+    bool couleurIndexee = false;
+    double valeurCouleur = 0;
+    double cBas = NAN, cHaut = NAN;
+    // Une image : en couleurs vraies (z porte trois plans, valeurs dans
+    // [0,1]), à indices directs dans la palette (« image »), ou mise à
+    // l'échelle par CLim (« imagesc », le défaut). IMAGEENTIERE : en
+    // direct, la valeur zéro d'un entier désigne la première couleur.
+    bool imageRvb = false;
+    bool imageDirecte = false;
+    bool imageEntiere = false;
+    // Barres : la largeur, en fraction de l'écart entre deux abscisses
+    // (BarWidth, 0,8 comme MATLAB), et le pied de chaque barre — vide : la
+    // ligne de base zéro ; rempli : des barres empilées, chacune posée sur
+    // la précédente.
+    double largeurBarre = 0.8;
+    std::vector<double> basesBarres;
 };
 
 struct Axes {
@@ -115,6 +145,21 @@ struct Axes {
     // « imagesc » — la ligne 1 en haut.
     bool xInverse = false, yInverse = false;
     bool axesVisibles = true;
+    // La palette de l'axe (m lignes de trois valeurs dans [0,1], rangées
+    // ligne par ligne) : « colormap(ax, gray) » et « imshow » la posent.
+    // Vide, c'est celle de la figure.
+    std::vector<double> palette;
+    // Les bornes de couleur : « clim([a b]) ». Sans elles, l'étendue des
+    // données mises à l'échelle.
+    bool climManuelle = false;
+    double cmin = 0, cmax = 1;
+    // La légende : sa position (« Location » de MATLAB, en minuscules), son
+    // orientation, son cadre, et les courbes qu'elle nomme quand
+    // « legend(h, ...) » les désigne (vide : toutes).
+    std::string positionLegende = "northeast";
+    bool legendeHorizontale = false;
+    bool boiteLegende = true;
+    std::vector<int> seriesLegende;
 };
 
 // Rectangle qu'occupe un axe dans sa figure, en fractions de la largeur et
@@ -129,6 +174,9 @@ void cadreAxes(const Axes& a, double& x, double& y, double& largeur, double& hau
 // C'est ce que rend « xlim » sans argument, et ce que lit « get(gca,
 // 'XLim') » — les deux doivent dire la même chose.
 void limitesAxe(const Axes& a, double& xmin, double& xmax, double& ymin, double& ymax);
+// L'étendue des données d'un axe, sans arrondi ni limite imposée : ce que
+// « axis tight » et « axis image » serrent.
+void etendueDonnees(const Axes& a, double& xmin, double& xmax, double& ymin, double& ymax);
 
 // Vrai si les deux axes se recouvrent. MATLAB efface les axes qu'une
 // nouvelle case recouvre : c'est ce qui fait que « subplot(2,1,1) » après
@@ -165,7 +213,57 @@ struct Figure {
     int lignes = 1, colonnes = 1;
     int largeur = 800, hauteur = 600;
     std::string nom;
+    // La palette de la figure : « colormap(map) ». Vide, la palette par
+    // défaut — viridis, faute de pouvoir reprendre parula, propre à
+    // MathWorks.
+    std::vector<double> palette;
 };
+
+// La palette par défaut : viridis à 256 couleurs (van der Walt et Smith,
+// domaine public), choisie comme le fait GNU Octave.
+const std::vector<double>& paletteParDefaut();
+// La palette en vigueur pour un axe : la sienne, celle de sa figure, ou
+// celle par défaut.
+const std::vector<double>& paletteEnVigueur(const Figure& f, const Axes& a);
+// Les bornes de couleur d'un axe : celles qu'on a fixées, ou l'étendue des
+// données que la palette met à l'échelle (images, niveaux, polygones).
+void limitesCouleur(const Axes& a, double& cmin, double& cmax);
+// La couleur qu'une valeur prend dans une palette, mise à l'échelle entre
+// CMIN et CMAX comme MATLAB le fait : rang = fix((v-cmin)/(cmax-cmin)*m)+1,
+// borné à [1,m].
+void couleurEchelle(const std::vector<double>& palette, double valeur, double cmin,
+                    double cmax, int& r, int& v, int& b);
+// La couleur du pixel K d'une image, selon son mode (couleurs vraies,
+// indices directs, mise à l'échelle).
+void couleurPixelImage(const std::vector<double>& palette, const Serie& s, std::size_t k,
+                       double cmin, double cmax, int& r, int& v, int& b);
+// La couleur d'une série, hexadécimale : celle qu'elle porte, ou celle que
+// la palette donne à sa valeur quand elle est indexée.
+std::string couleurDeSerie(const Figure& f, const Axes& a, const Serie& s);
+
+// Une entrée de légende : la série qu'elle désigne, par son rang dans
+// l'axe, et son texte.
+struct EntreeLegende {
+    std::size_t serie = 0;
+    std::string texte;
+};
+// Les entrées de la légende d'un axe, comme MATLAB les choisit : les
+// courbes désignées, ou toutes sauf les textes, les images et les niveaux
+// d'un contour après le premier ; autant d'entrées que d'étiquettes
+// données, ou « data1 », « data2 »... sans étiquettes.
+std::vector<EntreeLegende> entreesLegende(const Axes& a);
+
+// La forme d'un marqueur de MATLAB, centrée sur l'origine, en pixels :
+// un cercle, un polygone, ou des traits. TAILLE est en points.
+struct FormeMarqueur {
+    enum Genre { Rien, Cercle, Polygone, Traits } genre = Rien;
+    double rayon = 0;
+    // Polygone : les sommets ; Traits : des paires d'extrémités.
+    std::vector<std::pair<double, double>> points;
+    // Le point « . » est toujours plein.
+    bool toujoursPlein = false;
+};
+FormeMarqueur formeMarqueur(const std::string& marqueur, double taille);
 
 // Réduit une polyligne à ce qu'un écran peut montrer.
 //
@@ -205,6 +303,8 @@ Valeur poigneeLignes(int figure, int axe, const std::vector<int>& series);
 // Une couleur ecrite comme MATLAB l'accepte — 'r', 'red', '#D95319' ou
 // le triplet [0.85 0.55 0] — rendue sous forme hexadecimale.
 std::string couleurDepuisValeur(const Valeur& v);
+// Le plus petit écart entre deux abscisses de barres (1 pour une seule).
+double ecartBarres(const std::vector<double>& x);
 
 // Ajoute un axe a une figure et lui donne son identifiant. Tout axe cree
 // passe par la.

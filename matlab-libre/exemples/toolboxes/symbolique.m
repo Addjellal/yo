@@ -64,20 +64,20 @@ droite = double(int(x ^ 2, x, 1, 3));
 assert(abs(gauche + droite - double(aire)) < 1e-12);
 
 %% 3. Résoudre
-% Les racines d'un polynôme, rendues dans une cellule d'expressions.
+% Les racines d'un polynôme, rendues en colonne de SYM, comme dans MATLAB.
 solutions = solve(x ^ 2 - 5 * x + 6, x);
 fprintf('\nResolution :\n');
 fprintf('  x^2 - 5x + 6 = 0 : %d racines\n', numel(solutions));
-valeurs = sort(cellfun(@double, solutions));
+valeurs = sort(double(solutions));
 fprintf('  racines : %s\n', mat2str(round(valeurs', 6)));
 assert(max(abs(valeurs(:)' - [2 3])) < 1e-10);
 % Chaque racine annule bien le polynome : c'est la definition.
 polynome = x ^ 2 - 5 * x + 6;
 for k = 1:numel(solutions)
-    assert(abs(double(subs(polynome, x, double(solutions{k})))) < 1e-10);
+    assert(abs(double(subs(polynome, x, double(solutions(k))))) < 1e-10);
 end
 % Une racine irrationnelle est rendue en nombre, non en radical.
-irrationnelles = sort(cellfun(@double, solve(x ^ 2 - 2, x)));
+irrationnelles = sort(double(solve(x ^ 2 - 2, x)));
 fprintf('  x^2 - 2 = 0 : %s\n', mat2str(round(irrationnelles', 6)));
 assert(max(abs(irrationnelles(:)' - [-sqrt(2) sqrt(2)])) < 1e-12);
 

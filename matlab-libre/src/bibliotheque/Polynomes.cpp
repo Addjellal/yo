@@ -109,14 +109,19 @@ FONCTION(fnRoots) {
     INUTILISE
     exigerArguments(args, 1, 1, "roots");
     exigerNumerique(args[0], "roots");
-    std::vector<double> c;
-    for (std::size_t k = 0; k < args[0].nelem(); ++k) c.push_back(args[0].re[k]);
+    // Les coefficients, complexes s'il le faut : un polynôme à
+    // coefficients complexes a ses racines propres, pas celles de sa
+    // partie réelle.
+    const Valeur& p = args[0];
+    std::vector<std::complex<double>> c;
+    for (std::size_t k = 0; k < p.nelem(); ++k)
+        c.emplace_back(p.re[k], p.im.empty() ? 0.0 : p.im[k]);
     // On retire les zéros de tête, puis on résout par la matrice compagnon.
     std::size_t debut = 0;
-    while (debut < c.size() && c[debut] == 0) ++debut;
+    while (debut < c.size() && c[debut] == 0.0) ++debut;
     c.erase(c.begin(), c.begin() + (long)debut);
     std::size_t fin = 0;
-    while (c.size() > 1 && c.back() == 0) {
+    while (c.size() > 1 && c.back() == 0.0) {
         c.pop_back();
         ++fin;
     }
@@ -125,11 +130,17 @@ FONCTION(fnRoots) {
         std::vector<double> zeros(fin, 0.0);
         return {Valeur::colonne(zeros)};
     }
+    bool complexe = p.estComplexe();
     Valeur compagnon = Valeur::matrice(n, n);
-    for (int j = 0; j < n; ++j)
-        compagnon.re[(std::size_t)0 + (std::size_t)j * n] = -c[(std::size_t)j + 1] / c[0];
+    if (complexe) compagnon.im.assign(compagnon.re.size(), 0.0);
+    for (int j = 0; j < n; ++j) {
+        std::complex<double> v = -c[(std::size_t)j + 1] / c[0];
+        compagnon.re[(std::size_t)0 + (std::size_t)j * n] = v.real();
+        if (complexe) compagnon.im[(std::size_t)0 + (std::size_t)j * n] = v.imag();
+    }
     for (int i = 1; i < n; ++i)
         compagnon.re[(std::size_t)i + (std::size_t)(i - 1) * n] = 1.0;
+    if (complexe) compagnon.compacter();
     Valeur valeurs;
     valeursPropres(compagnon, valeurs, nullptr);
     if (fin) {
@@ -192,6 +203,9 @@ FONCTION(fnPolyfit) {
     exigerNumerique(args[1], "polyfit");
     Valeur x = versDouble(args[0]);
     const Valeur& y = versDouble(args[1]);
+    if (x.estComplexe())
+        erreur("MatLibre:polyfit:XComplexe",
+               "POLYFIT : des abscisses X complexes ne sont pas gérées ; Y peut l'être.");
     int n = (int)args[2].scal();
     if (n < 0) erreur("MATLAB:polyfit:BadDegree", "The degree must be nonnegative.");
     int m = (int)x.nelem();
@@ -220,7 +234,10 @@ FONCTION(fnPolyfit) {
     for (int i = 0; i < m; ++i)
         for (int j = 0; j <= n; ++j)
             A.re[(std::size_t)i + (std::size_t)j * m] = std::pow(x.re[(std::size_t)i], n - j);
-    Valeur b = Valeur::colonne(std::vector<double>(y.re.begin(), y.re.end()));
+    // Y complexe : les coefficients le sont aussi — garder la partie
+    // imaginaire, sans quoi on ajusterait la seule partie réelle.
+    Valeur b = y;
+    b.dims = {m, 1};
     Valeur c = divisionGauche(A, b);
     Valeur r = transposer(c, false);
     if (nargout < 2) return {r};

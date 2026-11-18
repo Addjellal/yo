@@ -1,4 +1,4 @@
-function statistique = matlibre_rapport_independance(echecs)
+function [statistique, comptes] = matlibre_rapport_independance(echecs)
 %MATLIBRE_RAPPORT_INDEPENDANCE Test d'indépendance de Christoffersen.
 %   Compte les quatre transitions de la suite des dépassements, et compare
 %   une chaîne de Markov à deux paramètres à une suite indépendante.
@@ -7,6 +7,7 @@ function statistique = matlibre_rapport_independance(echecs)
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
     echecs = double(echecs(:));
+    comptes = [0 0 0 0];
     if numel(echecs) < 2
         statistique = 0;
         return
@@ -17,6 +18,7 @@ function statistique = matlibre_rapport_independance(echecs)
     n01 = sum(avant == 0 & apres == 1);
     n10 = sum(avant == 1 & apres == 0);
     n11 = sum(avant == 1 & apres == 1);
+    comptes = [n00 n10 n01 n11];
     total = n00 + n01 + n10 + n11;
     pi01 = matlibre_part(n01, n00 + n01);
     pi11 = matlibre_part(n11, n10 + n11);

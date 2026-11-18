@@ -191,8 +191,10 @@ classdef table
         end
 
         function p = proprietes(t)
+            % Comme dans MATLAB : les noms de variables en ligne, ceux des
+            % lignes en colonne.
             p = struct('VariableNames', {t.NomsVariables}, ...
-                       'RowNames', {t.NomsLignes}, ...
+                       'RowNames', {t.NomsLignes(:)}, ...
                        'DimensionNames', {t.NomsDimensions}, ...
                        'VariableUnits', {t.UnitesVariables}, ...
                        'VariableDescriptions', {t.DescriptionsVariables}, ...
@@ -1257,10 +1259,15 @@ classdef table
             end
         end
 
+        % Un nombre dans une table : comme MATLAB, cinq chiffres
+        % significatifs sans zéros superflus — 0.0035604, 1.13,
+        % -3.4823e+06 —, et les entiers en entier.
         function s = nombre(x)
             if isnan(x), s = 'NaN';
+            elseif isinf(x) && x > 0, s = 'Inf';
+            elseif isinf(x), s = '-Inf';
             elseif x == fix(x) && abs(x) < 1e10, s = sprintf('%d', x);
-            else, s = sprintf('%.4f', x);
+            else, s = sprintf('%.5g', x);
             end
         end
     end

@@ -1,24 +1,17 @@
-function x = waverec2(C, S, nom)
+function x = waverec2(C, S, varargin)
 %WAVEREC2 Reconstruction d'une image à partir de sa décomposition.
-%   Réciproque de WAVEDEC2.
+%   X = WAVEREC2(C,S,'wname') est la réciproque de WAVEDEC2, c'est-à-dire
+%   APPCOEF2(C,S,'wname',0) ; WAVEREC2(C,S,Lo_R,Hi_R) avec des filtres
+%   donnés. L'ondelette et le mode de DWTMODE doivent être ceux de la
+%   décomposition.
 %
 %   Exemple :
 %      [C, S] = wavedec2(magic(8), 2, 'haar');
 %      max(max(abs(waverec2(C, S, 'haar') - magic(8)))) < 1e-10
 %
 %   Voir aussi WAVEDEC2, APPCOEF2, WRCOEF2.
-    if nargin < 3 || isempty(nom), nom = 'haar'; end
-    niveaux = size(S, 1) - 2;
-    courant = reshape(C(1:prod(S(1, :))), S(1, :));
-    position = prod(S(1, :));
-    for k = 1:niveaux
-        taille = S(k + 1, :);
-        n = prod(taille);
-        ch = reshape(C(position + (1:n)), taille);
-        cv = reshape(C(position + n + (1:n)), taille);
-        cd = reshape(C(position + 2 * n + (1:n)), taille);
-        position = position + 3 * n;
-        courant = idwt2(courant, ch, cv, cd, nom);
+    if isempty(varargin)
+        varargin = {'haar'};
     end
-    x = courant;
+    x = appcoef2(C, S, varargin{:}, 0);
 end

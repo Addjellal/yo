@@ -84,18 +84,20 @@ premier = 'ACGTACGT';
 second = 'ACGTTACGT';
 [score, alignement] = nwalign(premier, second, 2, -1, -2);
 fprintf('\nAlignement global :\n');
-% L'alignement est rendu sous forme de deux lignes d'un tableau de
-% caracteres, non d'une cellule.
+% L'alignement est rendu, comme dans MATLAB, sur trois lignes d'un
+% tableau de caracteres : la premiere sequence, les symboles ('|' pour
+% deux bases identiques), la seconde.
 fprintf('  %s\n', alignement(1, :));
 fprintf('  %s\n', alignement(2, :));
+fprintf('  %s\n', alignement(3, :));
 fprintf('  score %g\n', score);
-% Les deux lignes ont la meme longueur, et au moins celle de la plus
-% longue sequence.
-assert(size(alignement, 1) == 2);
+% Les lignes ont la meme longueur, et au moins celle de la plus longue
+% sequence.
+assert(size(alignement, 1) == 3);
 assert(size(alignement, 2) >= numel(second));
 % Oter les trous rend les sequences de depart.
 assert(strcmp(strrep(alignement(1, :), '-', ''), premier));
-assert(strcmp(strrep(alignement(2, :), '-', ''), second));
+assert(strcmp(strrep(alignement(3, :), '-', ''), second));
 % Une sequence alignee avec elle-meme donne le score maximal, sans trou.
 [scoreParfait, alignementParfait] = nwalign(premier, premier, 2, -1, -2);
 fprintf('  alignee avec elle-meme : score %g (%d correspondances x 2)\n', ...
@@ -118,6 +120,7 @@ droite = 'GGGGACGTACGTGGGGGG';
 fprintf('\nAlignement local :\n');
 fprintf('  %s\n', alignementLocal(1, :));
 fprintf('  %s\n', alignementLocal(2, :));
+fprintf('  %s\n', alignementLocal(3, :));
 fprintf('  score %g\n', scoreLocal);
 % Il trouve le motif commun, sans les extremites qui different.
 assert(scoreLocal > 0);

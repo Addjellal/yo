@@ -683,6 +683,24 @@ Valeur concatener(const std::vector<Valeur>& elementsBruts, int dimension) {
             if (e.classe == Classe::Cellule) return Valeur::celluleDims({0, 0});
         return Valeur::vide();
     }
+    // Dès qu'un opérande a des éléments, MATLAB omet les vides, quelles
+    // que soient leurs dimensions : [ones(2,1); zeros(1,0)] est la
+    // colonne. Les 1x0 ne comptent que quand tout est vide.
+    bool unNonVide = false;
+    for (const auto& e : elements)
+        if (e.nelem() > 0) unNonVide = true;
+    bool tousVides = !unNonVide;
+    if (unNonVide && elements.size() > 1) {
+        std::vector<Valeur> pleins;
+        for (const auto& e : elements)
+            if (e.nelem() > 0) pleins.push_back(e);
+        if (pleins.size() != elements.size()) {
+            Classe cibleTous = classeConcat(elements);
+            elements.swap(pleins);
+            if (elements.size() == 1 && elements[0].classe != Classe::Chaine)
+                return convertirPour(elements[0], cibleTous);
+        }
+    }
     if (elements.size() == 1 && elements[0].classe != Classe::Chaine) {
         Classe cible = classeConcat(elements);
         return convertirPour(elements[0], cible);
@@ -706,6 +724,13 @@ Valeur concatener(const std::vector<Valeur>& elementsBruts, int dimension) {
             else if (taille != t) {
                 if (cible == Classe::Caractere && dimension == 0 && i == 1) {
                     taille = std::max(taille, t);  // char : complété par des blancs
+                } else if (tousVides) {
+                    // Que des vides, de tailles incompatibles : MATLAB rend
+                    // un 0x0 (documentation de vertcat).
+                    Valeur r = Valeur::vide();
+                    r.classe = cible;
+                    if (cible == Classe::Cellule) return Valeur::celluleDims({0, 0});
+                    return r;
                 } else {
                     erreur("MATLAB:catenate:dimensionMismatch",
                            dimension == 0

@@ -1,24 +1,60 @@
-function serie = taylor(f, variable, point, ordre)
+function serie = taylor(f, varargin)
 %TAYLOR Développement de Taylor d'une expression symbolique.
 %   T = TAYLOR(F) développe F autour de zéro jusqu'au degré cinq.
-%   T = TAYLOR(F,X) nomme la variable, TAYLOR(F,X,A) choisit le point,
-%   TAYLOR(F,X,A,N) le nombre de termes — le développement va alors
-%   jusqu'au degré N-1, comme dans MATLAB.
+%   T = TAYLOR(F,X) nomme la variable, TAYLOR(F,X,A) choisit le point.
+%   TAYLOR(...,'Order',N) fixe l'ordre : le développement va jusqu'au
+%   degré N-1, comme dans MATLAB (N vaut 6 par défaut).
+%   TAYLOR(...,'ExpansionPoint',A) donne le point par son nom.
+%   TAYLOR(F,X,A,N), avec l'ordre en quatrième position, est accepté.
 %
 %   Les coefficients viennent des dérivées successives évaluées au
 %   point : c'est la définition, non une table.
 %
 %   Exemple :
 %      syms x
-%      pretty(taylor(exp(x), x, 0, 4))   % 1 + x + x^2/2 + x^3/6
+%      pretty(taylor(exp(x), x, 0, 'Order', 4))   % 1 + x + x^2/2 + x^3/6
 %      pretty(taylor(sin(x), x, 0, 6))
 %
 %   Voir aussi DIFF, SUBS, SIMPLIFY, LIMIT.
-    if nargin < 2 || isempty(variable)
+    variable = [];
+    point = 0;
+    ordre = 6;
+    positionnels = {};
+    k = 1;
+    while k <= numel(varargin)
+        argument = varargin{k};
+        if (ischar(argument) || isstring(argument)) && ...
+                any(strcmpi(char(argument), {'Order', 'ExpansionPoint', 'OrderMode'}))
+            if k == numel(varargin)
+                error('symbolic:taylor:Option', 'L''option %s attend une valeur.', ...
+                      char(argument));
+            end
+            switch lower(char(argument))
+                case 'order'
+                    ordre = double(varargin{k + 1});
+                case 'expansionpoint'
+                    point = varargin{k + 1};
+                case 'ordermode'
+                    if ~strcmpi(char(varargin{k + 1}), 'absolute')
+                        error('symbolic:taylor:OrderMode', ...
+                              'Seul OrderMode ''absolute'' est fait.');
+                    end
+            end
+            k = k + 2;
+        else
+            positionnels{end + 1} = argument; %#ok<AGROW>
+            k = k + 1;
+        end
+    end
+    if numel(positionnels) >= 1, variable = positionnels{1}; end
+    if numel(positionnels) >= 2 && ~isempty(positionnels{2}), point = positionnels{2}; end
+    if numel(positionnels) >= 3 && ~isempty(positionnels{3}), ordre = positionnels{3}; end
+    if numel(positionnels) > 3
+        error('MATLAB:TooManyInputs', 'Too many input arguments.');
+    end
+    if isempty(variable)
         variable = matlibre_sym_defaut(f);
     end
-    if nargin < 3 || isempty(point), point = 0; end
-    if nargin < 4 || isempty(ordre), ordre = 6; end
     nom = matlibre_sym_nom(variable);
     ordre = round(ordre);
     if ordre < 1

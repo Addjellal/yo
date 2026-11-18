@@ -13,7 +13,9 @@ function modele = fitcdiscr(X, y, varargin)
 %   d'une diagonale, ce qui la rend inversible quand les variables sont
 %   peu nombreuses devant les dimensions.
 %
-%   PREDICT applique le modèle.
+%   PREDICT applique le modèle ; RESUBPREDICT et RESUBLOSS le jugent sur
+%   ses propres données d'apprentissage, que le modèle garde (champs X et
+%   Y), et LOSS sur d'autres. Les classes sont dans ClassNames.
 %
 %   La règle est celle de Bayes, écrite pour des gaussiennes : on classe
 %   x dans la classe qui maximise
@@ -26,14 +28,19 @@ function modele = fitcdiscr(X, y, varargin)
 %   variantes : ce n'est pas le modèle qui change de nature, seulement ce
 %   qui survit à la soustraction.
 %
-%   Exemple :
+%   Exemples :
 %      rng(1);
 %      X = [randn(50, 2); randn(50, 2) + 3];
 %      y = [ones(50, 1); 2 * ones(50, 1)];
 %      m = fitcdiscr(X, y);
 %      mean(predict(m, X) == y)
 %
-%   Voir aussi PREDICT, FITCNB, FITCSVM, FITCKNN, PCA.
+%      % Les iris de Fisher (1936) :
+%      load fisheriris
+%      Md = fitcdiscr(meas, species);
+%      resubLoss(Md)      % 0.02 : trois fleurs sur cent cinquante
+%
+%   Voir aussi PREDICT, RESUBLOSS, LOSS, CLASSIFY, FITCNB, FITCSVM, FITCKNN.
     X = double(X);
     y = y(:);
     if size(X, 1) ~= numel(y)
@@ -121,6 +128,12 @@ function modele = fitcdiscr(X, y, varargin)
                     'DiscrimType', genre, 'Mu', moyennes, ...
                     'Sigma', {covariances}, 'CommuneSigma', commune, ...
                     'Prior', apriori, 'NumObservations', numel(y));
+    % Les noms de MATLAB, et les données d'apprentissage qu'il garde dans
+    % le modèle complet : RESUBPREDICT et RESUBLOSS s'en servent.
+    modele.ClassNames = classes;
+    modele.Gamma = gamma;
+    modele.X = X;
+    modele.Y = y;
 end
 
 function S = regulariser(S, gamma, diagonale)

@@ -30,7 +30,9 @@ function donnees = remonter(arbre, indice)
     if any(arbre.noeuds == gauche) && any(arbre.noeuds == droite)
         a = remonter(arbre, gauche);
         d = remonter(arbre, droite);
-        donnees = idwt(a, d, arbre.nom);
+        % La longueur du nœud parent, que DWT ne laisse pas déduire des
+        % enfants dès que le mode n'est pas 'per'.
+        donnees = idwt(a, d, arbre.nom, matlibre_taille_noeud(arbre, indice));
     else
         donnees = lireNoeud(arbre, indice);
         if isempty(donnees)

@@ -33,6 +33,15 @@ classdef sym
                 obj.arbre = {'num', 0};
                 return
             end
+            if (isnumeric(valeur) || islogical(valeur)) && ~isscalar(valeur)
+                % Un tableau numérique devient un tableau de SYM, élément
+                % par élément, comme sym([1 2; 3 4]) dans MATLAB.
+                obj = repmat(sym(0), size(valeur));
+                for k = 1:numel(valeur)
+                    obj(k) = sym(valeur(k));
+                end
+                return
+            end
             if isa(valeur, 'sym')
                 obj.arbre = valeur.arbre;
             elseif iscell(valeur)
@@ -45,7 +54,7 @@ classdef sym
                 else
                     obj.arbre = {'var', texte};
                 end
-            elseif isnumeric(valeur) && isscalar(valeur)
+            elseif (isnumeric(valeur) || islogical(valeur)) && isscalar(valeur)
                 obj.arbre = {'num', double(valeur)};
             else
                 error('symbolic:sym:Valeur', ...
@@ -53,61 +62,76 @@ classdef sym
             end
         end
 
-        function r = plus(a, b)
-            r = sym(symsimplify(symadd(matlibre_sym_arbre(a), matlibre_sym_arbre(b))));
-        end
-
-        function r = minus(a, b)
-            r = sym(symsimplify(symsub(matlibre_sym_arbre(a), matlibre_sym_arbre(b))));
-        end
+        % Les opérations élément par élément : un scalaire s'étend à la
+        % taille de l'autre opérande, deux tableaux doivent être de même
+        % taille.
+        function r = plus(a, b),    r = operer(@symadd, a, b);  end
+        function r = minus(a, b),   r = operer(@symsub, a, b);  end
+        function r = times(a, b),   r = operer(@symmul, a, b);  end
+        function r = rdivide(a, b), r = operer(@symdiv, a, b);  end
+        function r = ldivide(a, b), r = operer(@symdiv, b, a);  end
+        function r = power(a, b),   r = operer(@sympow, a, b);  end
 
         function r = uminus(a)
-            r = sym(symsimplify(symmul(symnum(-1), matlibre_sym_arbre(a))));
+            r = operer(@symmul, -1, a);
         end
 
         function r = uplus(a)
-            r = sym(matlibre_sym_arbre(a));
-        end
-
-        function r = times(a, b)
-            r = sym(symsimplify(symmul(matlibre_sym_arbre(a), matlibre_sym_arbre(b))));
+            r = a;
         end
 
         function r = mtimes(a, b)
-            r = times(a, b);
-        end
-
-        function r = rdivide(a, b)
-            r = sym(symsimplify(symdiv(matlibre_sym_arbre(a), matlibre_sym_arbre(b))));
+        %MTIMES Produit matriciel ; par un scalaire, produit élément par élément.
+            if isscalar(a) || isscalar(b)
+                r = operer(@symmul, a, b);
+                return
+            end
+            if ~ismatrix(a) || ~ismatrix(b) || size(a, 2) ~= size(b, 1)
+                error('MATLAB:innerdim', ...
+                      'Incorrect dimensions for matrix multiplication.');
+            end
+            r = repmat(sym(0), size(a, 1), size(b, 2));
+            for i = 1:size(a, 1)
+                for j = 1:size(b, 2)
+                    somme = symnum(0);
+                    for k = 1:size(a, 2)
+                        somme = symadd(somme, symmul(arbreDe(a, i + (k - 1) * size(a, 1)), ...
+                                                      arbreDe(b, k + (j - 1) * size(b, 1))));
+                    end
+                    r(i, j) = sym(symsimplify(somme));
+                end
+            end
         end
 
         function r = mrdivide(a, b)
+            if ~isscalar(b)
+                error('symbolic:mrdivide:Matrice', ...
+                      ['La division à droite par une matrice SYM n''est pas faite ; ', ...
+                       'seule la division par un scalaire l''est.']);
+            end
             r = rdivide(a, b);
         end
 
-        function r = ldivide(a, b)
-            r = rdivide(b, a);
-        end
-
-        function r = power(a, b)
-            r = sym(symsimplify(sympow(matlibre_sym_arbre(a), matlibre_sym_arbre(b))));
-        end
-
         function r = mpower(a, b)
+            if ~isscalar(a) || ~isscalar(b)
+                error('symbolic:mpower:Matrice', ...
+                      ['La puissance matricielle d''un SYM n''est pas faite ; ', ...
+                       'employez .^ pour la puissance élément par élément.']);
+            end
             r = power(a, b);
         end
 
         function r = eq(a, b)
             % Une égalité symbolique est une équation : SOLVE la résout.
-            r = sym(symsub(matlibre_sym_arbre(a), matlibre_sym_arbre(b)));
+            r = operer(@(u, v) {'-', u, v}, a, b);
         end
 
-        function r = sin(a),  r = matlibre_sym_appliquer('sin', a);  end
-        function r = cos(a),  r = matlibre_sym_appliquer('cos', a);  end
-        function r = tan(a),  r = matlibre_sym_appliquer('tan', a);  end
-        function r = exp(a),  r = matlibre_sym_appliquer('exp', a);  end
-        function r = log(a),  r = matlibre_sym_appliquer('log', a);  end
-        function r = sqrt(a), r = matlibre_sym_appliquer('sqrt', a); end
+        function r = sin(a),   r = matlibre_sym_appliquer('sin', a);   end
+        function r = cos(a),   r = matlibre_sym_appliquer('cos', a);   end
+        function r = tan(a),   r = matlibre_sym_appliquer('tan', a);   end
+        function r = exp(a),   r = matlibre_sym_appliquer('exp', a);   end
+        function r = log(a),   r = matlibre_sym_appliquer('log', a);   end
+        function r = sqrt(a),  r = matlibre_sym_appliquer('sqrt', a);  end
         function r = sinh(a),  r = matlibre_sym_appliquer('sinh', a);  end
         function r = cosh(a),  r = matlibre_sym_appliquer('cosh', a);  end
         function r = tanh(a),  r = matlibre_sym_appliquer('tanh', a);  end
@@ -117,44 +141,104 @@ classdef sym
         function r = abs(a),   r = matlibre_sym_appliquer('abs', a);   end
         function r = log2(a),  r = matlibre_sym_appliquer('log2', a);  end
         function r = log10(a), r = matlibre_sym_appliquer('log10', a); end
+        function r = erf(a),   r = matlibre_sym_appliquer('erf', a);   end
+        function r = erfc(a),  r = matlibre_sym_appliquer('erfc', a);  end
+        function r = sign(a),  r = matlibre_sym_appliquer('sign', a);  end
 
         function texte = char(a)
-            texte = symstr(a.arbre);
+        %CHAR Le texte de l'expression ; '[a, b; c, d]' pour un tableau.
+            if isscalar(a)
+                texte = symstr(a.arbre);
+                return
+            end
+            lignes = cell(1, size(a, 1));
+            for i = 1:size(a, 1)
+                elements = cell(1, size(a, 2));
+                for j = 1:size(a, 2)
+                    elements{j} = symstr(arbreDe(a, i + (j - 1) * size(a, 1)));
+                end
+                lignes{i} = strjoin(elements, ', ');
+            end
+            texte = ['[' strjoin(lignes, '; ') ']'];
         end
 
         function texte = string(a)
-            texte = string(symstr(a.arbre));
+            texte = strings(size(a));
+            for k = 1:numel(a)
+                texte(k) = string(symstr(arbreDe(a, k)));
+            end
         end
 
         function disp(a)
-            fprintf('%s\n', symstr(a.arbre));
+        %DISP Un scalaire sur une ligne ; un vecteur colonne un élément par
+        %   ligne, alignés à droite ; une matrice une ligne entre crochets
+        %   par ligne, les colonnes alignées.
+            if isscalar(a)
+                fprintf('%s\n', symstr(a.arbre));
+                return
+            end
+            if isempty(a)
+                fprintf('Empty sym: %d-by-%d\n', size(a, 1), size(a, 2));
+                return
+            end
+            textes = cell(size(a));
+            for k = 1:numel(a)
+                textes{k} = symstr(arbreDe(a, k));
+            end
+            if size(a, 2) == 1
+                largeur = max(cellfun(@numel, textes));
+                for i = 1:numel(textes)
+                    fprintf(' %*s\n', largeur, textes{i});
+                end
+                return
+            end
+            largeurs = max(cellfun(@numel, textes), [], 1);
+            for i = 1:size(a, 1)
+                morceaux = cell(1, size(a, 2));
+                for j = 1:size(a, 2)
+                    morceaux{j} = sprintf('%*s', largeurs(j), textes{i, j});
+                end
+                fprintf('[%s]\n', strjoin(morceaux, ', '));
+            end
         end
 
         function r = double(a)
-            r = symeval(a.arbre);
+            r = zeros(size(a));
+            for k = 1:numel(a)
+                r(k) = symeval(arbreDe(a, k));
+            end
         end
 
         function r = isnumeric(a)   %#ok<MANU>
             r = false;
         end
 
-        function d = diff(f, variable, ordre)
+        function d = diff(f, varargin)
         %DIFF Dérivée d'une expression symbolique.
         %   DIFF(F) dérive par rapport à la variable la plus proche de x.
-        %   DIFF(F,X) nomme la variable, DIFF(F,X,N) dérive N fois.
-            if nargin < 2 || isempty(variable)
+        %   DIFF(F,X) nomme la variable, DIFF(F,X,N) dérive N fois. Un
+        %   tableau est dérivé élément par élément.
+            if ~isscalar(f)
+                d = parElement(f, @(e) diff(e, varargin{:}));
+                return
+            end
+            variable = [];
+            ordre = [];
+            if numel(varargin) >= 1, variable = varargin{1}; end
+            if numel(varargin) >= 2, ordre = varargin{2}; end
+            if isempty(variable)
                 variable = matlibre_sym_defaut(f);
             end
-            nom = matlibre_sym_nom(variable);
-            if nargin < 3 || isempty(ordre)
+            if isempty(ordre)
                 if isnumeric(variable)
                     % DIFF(F,N) : l'ordre passé à la place de la variable.
                     ordre = round(variable);
-                    nom = matlibre_sym_defaut(f);
+                    variable = matlibre_sym_defaut(f);
                 else
                     ordre = 1;
                 end
             end
+            nom = matlibre_sym_nom(variable);
             arbre = f.arbre;
             for k = 1:ordre
                 arbre = symdiff(arbre, nom);
@@ -162,41 +246,84 @@ classdef sym
             d = sym(matlibre_sym_reduire(arbre));
         end
 
-        function r = int(f, variable, bas, haut)
+        function r = int(f, varargin)
         %INT Primitive ou intégrale définie d'une expression symbolique.
         %   INT(F) et INT(F,X) rendent une primitive ; INT(F,A,B) et
-        %   INT(F,X,A,B) l'intégrale entre A et B, par la primitive.
-            if nargin < 2 || isempty(variable)
+        %   INT(F,X,A,B) l'intégrale entre A et B, par la primitive. Une
+        %   borne infinie est atteinte par passage à la limite.
+        %
+        %   Une intégrale définie entre bornes numériques est recoupée par
+        %   INTEGRAL : une primitive discontinue sur l'intervalle — 1/x^2
+        %   entre -1 et 1 — donnerait sans cela un nombre faux, et INT le
+        %   refuse au lieu de le rendre.
+            if ~isscalar(f)
+                r = parElement(f, @(e) int(e, varargin{:}));
+                return
+            end
+            switch numel(varargin)
+                case 0
+                    variable = matlibre_sym_defaut(f);
+                    bornes = {};
+                case 1
+                    variable = varargin{1};
+                    bornes = {};
+                case 2
+                    variable = matlibre_sym_defaut(f);
+                    bornes = varargin;
+                case 3
+                    variable = varargin{1};
+                    bornes = varargin(2:3);
+                otherwise
+                    error('MATLAB:TooManyInputs', 'Too many input arguments.');
+            end
+            if isempty(variable)
                 variable = matlibre_sym_defaut(f);
             end
-            if nargin == 3
-                error('symbolic:int:Bornes', ...
-                      'Une intégrale définie demande les deux bornes.');
-            end
-            if nargin >= 4
-                nom = matlibre_sym_nom(variable);
-            elseif isnumeric(variable) || isa(variable, 'sym')
-                nom = matlibre_sym_nom(variable);
-            else
-                nom = matlibre_sym_nom(variable);
-            end
+            nom = matlibre_sym_nom(variable);
             primitive = symint(f.arbre, nom);
-            if nargin < 4
+            if isempty(bornes)
                 r = sym(matlibre_sym_reduire(primitive));
                 return
             end
-            enHaut = symsubs(primitive, nom, matlibre_sym_arbre(haut));
-            enBas = symsubs(primitive, nom, matlibre_sym_arbre(bas));
-            r = sym(matlibre_sym_reduire(symsub(enHaut, enBas)));
+            valeurs = cell(1, 2);
+            for k = 1:2
+                borne = matlibre_sym_arbre(bornes{k});
+                if strcmp(borne{1}, 'num') && isinf(borne{2})
+                    valeurs{k} = symnum(matlibre_sym_limite(primitive, nom, borne{2}, 'both'));
+                else
+                    valeurs{k} = symsubs(primitive, nom, borne);
+                end
+            end
+            arbre = matlibre_sym_reduire(symsub(valeurs{2}, valeurs{1}));
+            if isempty(matlibre_sym_noms(arbre))
+                % Plus aucune variable : atan(1) - atan(0) est un nombre.
+                arbre = symnum(symeval(arbre));
+            end
+            r = sym(arbre);
+            verifierIntegrale(f.arbre, nom, bornes, r);
         end
 
         function r = subs(f, ancienne, nouvelle)
         %SUBS Substitution dans une expression symbolique.
         %   SUBS(F,X,V) remplace la variable X par V, nombre ou
         %   expression. X et V peuvent être des cellules de même
-        %   longueur : les substitutions se font alors ensemble.
+        %   longueur : les substitutions se font alors ensemble. Un
+        %   tableau numérique V donne un tableau de résultats, un par
+        %   valeur.
             if nargin < 3
                 error('MATLAB:minrhs', 'Not enough input arguments.');
+            end
+            if ~isscalar(f)
+                r = parElement(f, @(e) subs(e, ancienne, nouvelle));
+                return
+            end
+            if ~iscell(ancienne) && (isnumeric(nouvelle) || isa(nouvelle, 'sym')) && ...
+                    ~isscalar(nouvelle)
+                r = repmat(sym(0), size(nouvelle));
+                for k = 1:numel(nouvelle)
+                    r(k) = subs(f, ancienne, nouvelle(k));
+                end
+                return
             end
             if ~iscell(ancienne)
                 ancienne = {ancienne};
@@ -207,7 +334,7 @@ classdef sym
                 arbre = symsubs(arbre, matlibre_sym_nom(ancienne{k}), ...
                                 matlibre_sym_arbre(nouvelle{k}));
             end
-            r = sym(arbre);
+            r = sym(matlibre_sym_reduire(arbre));
         end
 
         function r = simplify(f)
@@ -215,6 +342,10 @@ classdef sym
         %   Les cas triviaux — zéro, un, constantes réunies — sont
         %   réduits, et les termes semblables regroupés quand
         %   l'expression est polynomiale en une variable.
+            if ~isscalar(f)
+                r = parElement(f, @simplify);
+                return
+            end
             r = sym(matlibre_sym_reduire(f.arbre));
         end
 
@@ -222,6 +353,10 @@ classdef sym
         %EXPAND Développement d'une expression symbolique.
         %   Les produits sont distribués sur les sommes, et les
         %   puissances entières positives développées.
+            if ~isscalar(f)
+                r = parElement(f, @expand);
+                return
+            end
             r = sym(matlibre_sym_reduire(matlibre_sym_developper(f.arbre)));
         end
 
@@ -322,7 +457,10 @@ classdef sym
 
         function racines = solve(equation, variable)
         %SOLVE Résolution d'une équation polynomiale.
-        %   SOLVE(F) résout F = 0 ; SOLVE(F,X) nomme l'inconnue.
+        %   SOLVE(F) résout F = 0 ; SOLVE(F,X) nomme l'inconnue. Les
+        %   racines sont rendues en colonne de SYM, comme dans MATLAB,
+        %   triées ; une racine multiple apparaît autant de fois que sa
+        %   multiplicité.
             if nargin < 2 || isempty(variable)
                 variable = matlibre_sym_defaut(equation);
             end
@@ -332,20 +470,102 @@ classdef sym
                 error('symbolic:solve:Constante', ...
                       'L''équation ne dépend pas de %s.', nom);
             end
-            valeurs = roots(coefficients);
+            % Les racines rationnelles d'un polynôme entier sont trouvées
+            % exactement — le théorème des racines rationnelles, comme pour
+            % FACTOR — : 4 est racine de x^3 - 15x - 4, non 3.9999999999999982.
+            % Le reste, dégonflé de ces racines, va à ROOTS.
+            [~, exactes, reste] = matlibre_sym_facteurs(coefficients);
+            if numel(reste) > 1
+                autres = roots(reste);
+            else
+                autres = zeros(0, 1);
+            end
             % Les racines quasi réelles le sont : l'arrondi ne doit pas
             % faire croire à une partie imaginaire.
-            proches = abs(imag(valeurs)) < 1e-10 * max(abs(valeurs), 1);
-            valeurs(proches) = real(valeurs(proches));
-            valeurs = sort(valeurs);
-            racines = cell(numel(valeurs), 1);
+            proches = abs(imag(autres)) < 1e-10 * max(abs(autres), 1);
+            autres(proches) = real(autres(proches));
+            valeurs = sort([exactes(:); autres(:)]);
+            racines = repmat(sym(0), numel(valeurs), 1);
             for k = 1:numel(valeurs)
-                racines{k} = sym(valeurs(k));
-            end
-            if numel(racines) == 1
-                racines = racines{1};
+                racines(k) = sym(valeurs(k));
             end
         end
+    end
+end
+
+function r = operer(fonction, a, b)
+%OPERER Une opération entre deux opérandes, élément par élément.
+    na = numel(a);
+    nb = numel(b);
+    if na == 1 && nb == 1
+        r = sym(symsimplify(fonction(arbreDe(a, 1), arbreDe(b, 1))));
+        return
+    end
+    if na == 1
+        forme = size(b);
+    elseif nb == 1 || isequal(size(a), size(b))
+        forme = size(a);
+    else
+        error('MATLAB:sizeDimensionsMustMatch', ...
+              'Arrays have incompatible sizes for this operation.');
+    end
+    r = repmat(sym(0), forme);
+    for k = 1:prod(forme)
+        r(k) = sym(symsimplify(fonction(arbreDe(a, min(k, na)), arbreDe(b, min(k, nb)))));
+    end
+end
+
+function e = arbreDe(a, k)
+%ARBREDE L'arbre du k-ième élément d'un SYM ou d'un tableau numérique.
+    if isa(a, 'sym')
+        element = a(k);
+        e = element.arbre;
+    else
+        e = matlibre_sym_arbre(a(k));
+    end
+end
+
+function r = parElement(f, fonction)
+%PARELEMENT Une fonction appliquée à chaque élément d'un tableau de SYM.
+    r = repmat(sym(0), size(f));
+    for k = 1:numel(f)
+        r(k) = fonction(f(k));
+    end
+end
+
+function verifierIntegrale(arbre, nom, bornes, resultat)
+%VERIFIERINTEGRALE Recoupe une intégrale définie par INTEGRAL.
+%   Le contrôle ne vaut que pour un intégrande sans autre variable et des
+%   bornes numériques. Un désaccord — primitive discontinue sur
+%   l'intervalle, intégrale divergente — est une erreur : rendre le
+%   nombre tiré de la primitive serait rendre un résultat faux.
+    autres = setdiff(unique(matlibre_sym_noms(arbre)), {nom});
+    if ~isempty(autres)
+        return
+    end
+    try
+        a = double(matlibre_sym_valeur(bornes{1}));
+        b = double(matlibre_sym_valeur(bornes{2}));
+        valeur = double(resultat);
+    catch
+        return
+    end
+    if ~isfinite(valeur) || isnan(a) || isnan(b) || a == b
+        return
+    end
+    f = @(t) arrayfun(@(u) symeval(symsubs(arbre, nom, symnum(u))), t);
+    etat = warning('off', 'all');
+    try
+        numerique = integral(f, a, b, 'RelTol', 1e-8, 'AbsTol', 1e-12);
+    catch
+        numerique = NaN;
+    end
+    warning(etat);
+    if ~(abs(numerique - valeur) <= 1e-6 * max(1, abs(valeur)))
+        error('symbolic:int:Verification', ...
+              ['INT : la primitive donne %.15g, l''intégration numérique %.15g. ', ...
+               'L''intégrande a sans doute une singularité sur l''intervalle, ', ...
+               'ou l''intégrale diverge.'], valeur, numerique);
     end
 end
 

@@ -108,7 +108,13 @@ function [rejet, pValeur, statistique, valeurCritique, regression, residuelle] =
     end
     residuelle = struct('coefficients', coefficientsResiduels, ...
                         'rreg', rreg, 'lags', retards, 'test', forme);
+    % La taille effective de la régression des résidus, pour les tables.
+    if strcmp(rreg, 'adf')
+        taille = numel(residus) - 1 - retards;
+    else
+        taille = numel(residus) - 1;
+    end
     [pValeur, valeurCritique] = ...
-        matlibre_egci_table(statistique, creg, regresseurs, forme, alpha);
+        matlibre_egci_table(statistique, creg, regresseurs, forme, alpha, taille);
     rejet = statistique < valeurCritique;
 end

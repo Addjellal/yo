@@ -567,30 +567,56 @@ double erfinvLocal(double y) {
     return x;
 }
 
+// Les paramètres de la loi normale : X, MU, SIGMA de même taille ou
+// scalaires, comme dans MATLAB ; SIGMA <= 0 donne NaN.
+static std::vector<Valeur> argumentsNormaux(const std::vector<Valeur>& args, std::size_t nombre) {
+    std::vector<Valeur> r;
+    r.push_back(args[0]);
+    r.push_back(nombre > 1 && args.size() > 1 ? args[1] : Valeur::scalaire(0.0));
+    r.push_back(nombre > 2 && args.size() > 2 ? args[2] : Valeur::scalaire(1.0));
+    return r;
+}
+
 FONCTION(fnNormpdf) {
     INUTILISE
     exigerArguments(args, 1, 3, "normpdf");
-    double mu = args.size() > 1 ? args[1].scal() : 0.0;
-    double sigma = args.size() > 2 ? args[2].scal() : 1.0;
-    return {appliquerReel(versDouble(args[0]),
-                          [mu, sigma](double x) { return normpdfFn(x, mu, sigma); })};
+    return {appliquerParElements(argumentsNormaux(args, args.size()), "normpdf",
+                                 [](const double* v) {
+                                     if (!(v[2] > 0)) return std::nan("");
+                                     return normpdfFn(v[0], v[1], v[2]);
+                                 })};
 }
 FONCTION(fnNormcdf) {
     INUTILISE
-    exigerArguments(args, 1, 3, "normcdf");
-    double mu = args.size() > 1 ? args[1].scal() : 0.0;
-    double sigma = args.size() > 2 ? args[2].scal() : 1.0;
-    return {appliquerReel(versDouble(args[0]),
-                          [mu, sigma](double x) { return normcdfFn(x, mu, sigma); })};
+    exigerArguments(args, 1, 4, "normcdf");
+    // « normcdf(x,'upper') », « normcdf(x,mu,sigma,'upper') » : la queue
+    // supérieure, calculée par erfc sans soustraction.
+    std::vector<Valeur> numeriques = args;
+    bool superieure = false;
+    if (!numeriques.empty() && (numeriques.back().estTexte() || numeriques.back().estChaine())) {
+        std::string t = numeriques.back().versTexte();
+        if (t == "upper") superieure = true;
+        else if (t != "lower")
+            erreur("stats:normcdf:BadTail", "Tail must be \"lower\" or \"upper\".");
+        numeriques.pop_back();
+    }
+    if (numeriques.empty() || numeriques.size() > 3)
+        erreur("stats:normcdf:TooManyInputs", "normcdf(X,MU,SIGMA,'upper') at most.");
+    return {appliquerParElements(argumentsNormaux(numeriques, numeriques.size()), "normcdf",
+                                 [superieure](const double* v) {
+                                     if (!(v[2] > 0)) return std::nan("");
+                                     double z = (v[0] - v[1]) / (v[2] * std::sqrt(2.0));
+                                     return 0.5 * std::erfc(superieure ? z : -z);
+                                 })};
 }
 FONCTION(fnNorminv) {
     INUTILISE
     exigerArguments(args, 1, 3, "norminv");
-    double mu = args.size() > 1 ? args[1].scal() : 0.0;
-    double sigma = args.size() > 2 ? args[2].scal() : 1.0;
-    return {appliquerReel(versDouble(args[0]), [mu, sigma](double p) {
-        return mu + sigma * std::sqrt(2.0) * erfinvLocal(2 * p - 1);
-    })};
+    return {appliquerParElements(argumentsNormaux(args, args.size()), "norminv",
+                                 [](const double* v) {
+                                     if (!(v[2] > 0)) return std::nan("");
+                                     return v[1] + v[2] * quantileNormal(v[0]);
+                                 })};
 }
 FONCTION(fnNormrnd) {
     INUTILISE

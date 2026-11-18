@@ -52,9 +52,13 @@ struct Portee {
     // Portée de la fonction englobante : une fonction imbriquée lit et écrit
     // les variables de son parent à travers ce chaînage.
     std::shared_ptr<Portee> englobante;
-    // Vraie pour l'activation d'une fonction anonyme : sa table n'est qu'une
-    // copie de la capture, ce n'est pas là que vivent les variables partagées.
+    // Vraie pour l'activation d'une fonction anonyme : sa table ne porte
+    // que ses paramètres, ce n'est pas là que vivent les variables partagées.
     bool anonyme = false;
+    // Les variables capturées par une fonction anonyme, lues en place : une
+    // activation ne les recopie pas — un tableau d'un million d'éléments
+    // cité dans le corps coûterait sinon sa copie à chaque appel.
+    std::shared_ptr<const std::unordered_map<std::string, Valeur>> capture;
 };
 
 enum class Format { Court, Long, CourtE, LongE, CourtG, LongG, Hex, Rationnel, Plus, Banque };

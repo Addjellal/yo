@@ -240,7 +240,7 @@ assert(abs(pointFixe - 0.7390851332151607) < 1e-9);
 assert(abs(cos(pointFixe) - pointFixe) < 1e-12);
 % Sur un polynôme, il rend toutes les racines, exactement celles de ROOTS.
 deuxRacines = vpasolve(x^2 - 2, x);
-valeurs = sort([double(deuxRacines{1}), double(deuxRacines{2})]);
+valeurs = sort(double(deuxRacines)');
 assert(max(abs(valeurs - [-sqrt(2) sqrt(2)])) < 1e-12);
 % Le point de départ choisit la racine quand il y en a plusieurs.
 assert(abs(double(vpasolve(x^2 - 4, x, 1.5)) - 2) < 1e-9);
@@ -248,8 +248,8 @@ assert(abs(double(vpasolve(x^2 - 4, x, -1.5)) + 2) < 1e-9);
 % Une équation transcendante balayée sans point de départ trouve ses
 % racines : sin annule en 0, pi, -pi, 2pi...
 racinesSin = vpasolve(sin(x), x);
-assert(iscell(racinesSin));
-trouvees = sort(cellfun(@double, racinesSin));
+assert(isa(racinesSin, 'sym') && iscolumn(racinesSin));   % une colonne, comme MATLAB
+trouvees = sort(double(racinesSin));
 assert(any(abs(trouvees) < 1e-9));
 assert(any(abs(trouvees - pi) < 1e-6));
 

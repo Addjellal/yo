@@ -27,15 +27,24 @@ fprintf('\nDecomposition sur %d niveaux (db4) :\n', niveaux);
 fprintf('  longueurs : %s\n', mat2str(longueurs));
 fprintf('  total des coefficients : %d (signal : %d)\n', numel(coefficients), n);
 % La transformée est inversible : reconstruire rend le signal de départ.
-% Les coefficients et le signal reconstruit sortent en ligne, quelle que
-% soit l'orientation de l'entrée : on compare donc en colonne.
+% Comme dans MATLAB, les coefficients et le signal reconstruit gardent
+% l'orientation de l'entrée, ici une colonne.
 reconstruit = waverec(coefficients, longueurs, 'db4');
-fprintf('  reconstruction : ecart max %.3e\n', max(abs(reconstruit(:) - bruite(:))));
-assert(max(abs(reconstruit(:) - bruite(:))) < 1e-10);
-% L'énergie se conserve : c'est une base orthonormale.
-fprintf('  energie : signal %.6f, coefficients %.6f\n', ...
-        sum(bruite .^ 2), sum(coefficients .^ 2));
-assert(abs(sum(coefficients .^ 2) - sum(bruite .^ 2)) / sum(bruite .^ 2) < 1e-10);
+fprintf('  reconstruction : ecart max %.3e\n', max(abs(reconstruit - bruite)));
+assert(iscolumn(coefficients) && iscolumn(reconstruit));
+assert(max(abs(reconstruit - bruite)) < 1e-10);
+% Le mode par défaut, 'sym', prolonge le signal par symétrie aux bords :
+% il garde un peu plus de coefficients que d'échantillons, et la
+% transformée n'est pas une isométrie. En mode 'per', le prolongement est
+% périodique, il y a exactement N coefficients, et l'énergie se conserve :
+% c'est une base orthonormale.
+dwtmode('per', 'nodisp');
+coefficientsPer = wavedec(bruite, niveaux, 'db4');
+dwtmode('sym', 'nodisp');
+fprintf('  energie : signal %.6f, coefficients en mode per %.6f (%d coefficients)\n', ...
+        sum(bruite .^ 2), sum(coefficientsPer .^ 2), numel(coefficientsPer));
+assert(numel(coefficientsPer) == n);
+assert(abs(sum(coefficientsPer .^ 2) - sum(bruite .^ 2)) / sum(bruite .^ 2) < 1e-10);
 
 % Chaque niveau porte une bande de fréquences. Le détail de niveau j
 % couvre [Fe/2^(j+1), Fe/2^j].

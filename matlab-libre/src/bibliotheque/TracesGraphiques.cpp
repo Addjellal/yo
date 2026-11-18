@@ -144,6 +144,18 @@ void nouveauTrace(Interpreteur& it) {
     }
 }
 
+// La couleur de face ou de bord d'un marqueur : « none », « auto », ou une
+// couleur que MATLAB accepte.
+std::string couleurMarqueurDepuis(const Valeur& v) {
+    if (v.estTexte() || v.estChaine()) {
+        std::string t = v.versTexte();
+        for (auto& c : t) c = (char)std::tolower((unsigned char)c);
+        if (t == "none" || t == "auto") return t;
+    }
+    std::string couleur = couleurDepuisValeur(v);
+    return couleur.empty() ? std::string("none") : couleur;
+}
+
 std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTrace genre,
                            bool logX, bool logY, int nargout) {
     exigerArguments(args, 1, 0, "plot");
@@ -217,6 +229,12 @@ std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTra
                 s.style = args[k + 1].versTexte();
             } else if (nom == "marker") {
                 s.marqueur = args[k + 1].versTexte();
+            } else if (nom == "markersize") {
+                s.tailleMarqueur = args[k + 1].scal();
+            } else if (nom == "markerfacecolor") {
+                s.couleurFaceMarqueur = couleurMarqueurDepuis(args[k + 1]);
+            } else if (nom == "markeredgecolor") {
+                s.couleurBordMarqueur = couleurMarqueurDepuis(args[k + 1]);
             }
             k += 2;
         }
@@ -234,7 +252,167 @@ FONCTION(fnPlot) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, f
 FONCTION(fnSemilogx) { INUTILISE return tracer(it, args, GenreTrace::Ligne, true, false, nargout); }
 FONCTION(fnSemilogy) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, true, nargout); }
 FONCTION(fnLoglog) { INUTILISE return tracer(it, args, GenreTrace::Ligne, true, true, nargout); }
-FONCTION(fnBar) { INUTILISE return tracer(it, args, GenreTrace::Barres, false, false, nargout); }
+// bar(y), bar(x,y), bar(...,largeur), bar(...,'grouped'|'stacked'),
+// bar(...,couleur), et les paires FaceColor, EdgeColor, BarWidth,
+// LineWidth, DisplayName, FaceAlpha. Une matrice Y trace une série par
+// colonne : groupées côte à côte autour de chaque abscisse, ou empilées.
+// Le tracé générique de plot lisait la largeur comme une série de plus —
+// une barre parasite de hauteur 0,4 — et ignorait les couleurs de face.
+FONCTION(fnBar) {
+    INUTILISE
+    exigerArguments(args, 1, 0, "bar");
+    std::size_t k = 0;
+    std::vector<const Valeur*> nombres;
+    while (k < args.size() && args[k].estNumerique() && nombres.size() < 3)
+        nombres.push_back(&args[k++]);
+    if (nombres.empty())
+        erreur("MATLAB:bar:InvalidData", "bar attend des données numériques.");
+    double largeur = 0.8;
+    Valeur X, Y;
+    bool xDonne = false;
+    if (nombres.size() == 1) {
+        Y = *nombres[0];
+    } else if (nombres.size() == 2) {
+        if (nombres[1]->estScalaire() && !nombres[0]->estScalaire()) {
+            Y = *nombres[0];
+            largeur = nombres[1]->scal();
+        } else {
+            X = *nombres[0];
+            Y = *nombres[1];
+            xDonne = true;
+        }
+    } else {
+        X = *nombres[0];
+        Y = *nombres[1];
+        largeur = nombres[2]->scal();
+        xDonne = true;
+    }
+    bool empile = false;
+    std::string couleurFace, couleurBord = "#000000", etiquette;
+    double epaisseur = 0.5, opacite = 1.0;
+    while (k < args.size()) {
+        if (!args[k].estTexte() && !args[k].estChaine())
+            erreur("MATLAB:bar:InvalidArgument", "Argument de bar inattendu.");
+        std::string nom = args[k].versTexte();
+        std::string bas = nom;
+        for (auto& c : bas) c = (char)std::tolower((unsigned char)c);
+        if (bas == "grouped" || bas == "stacked") {
+            empile = bas == "stacked";
+            ++k;
+            continue;
+        }
+        if (bas == "hist" || bas == "histc")
+            erreur("MatLibre:bar:Hist",
+                   "bar(...,'" + nom +
+                       "') n'est pas fait : employez histogram, ou bar sans style.");
+        bool paire = bas == "facecolor" || bas == "edgecolor" || bas == "barwidth" ||
+                     bas == "linewidth" || bas == "displayname" || bas == "facealpha" ||
+                     bas == "basevalue";
+        if (!paire && estSpecificationStyle(nom)) {
+            Serie temporaire;
+            temporaire.couleur.clear();
+            decoderStyle(nom, temporaire);
+            if (!temporaire.couleur.empty()) couleurFace = temporaire.couleur;
+            ++k;
+            continue;
+        }
+        if (k + 1 >= args.size())
+            erreur("MATLAB:bar:InvalidArgument", "L'option " + nom + " attend une valeur.");
+        const Valeur& valeur = args[k + 1];
+        if (bas == "facecolor") {
+            std::string c = couleurDepuisValeur(valeur);
+            if (!c.empty() && c != "flat") couleurFace = c;
+        } else if (bas == "edgecolor") {
+            std::string c = couleurDepuisValeur(valeur);
+            if (!c.empty()) couleurBord = c;
+        } else if (bas == "barwidth") {
+            largeur = valeur.scal();
+        } else if (bas == "linewidth") {
+            epaisseur = valeur.scal();
+        } else if (bas == "displayname") {
+            etiquette = valeur.versTexte();
+        } else if (bas == "facealpha") {
+            opacite = valeur.scal();
+        } else if (bas == "basevalue") {
+            if (valeur.scal() != 0)
+                erreur("MatLibre:bar:BaseValue",
+                       "bar : une ligne de base non nulle n'est pas faite.");
+        } else {
+            erreur("MATLAB:bar:InvalidArgument", "Option de bar inconnue : " + nom + ".");
+        }
+        k += 2;
+    }
+    // Les séries : une par colonne d'une matrice, une seule pour un vecteur.
+    int lignes = Y.nlignes(), colonnes = Y.ncolonnes();
+    bool matrice = lignes > 1 && colonnes > 1;
+    if (!matrice) {
+        lignes = (int)Y.nelem();
+        colonnes = 1;
+    }
+    std::vector<double> positions;
+    if (xDonne) {
+        positions = valeursDe(X);
+        if ((int)positions.size() != lignes)
+            erreur("MATLAB:bar:XYSizeMismatch",
+                   "X doit avoir autant d'éléments que Y a de lignes.");
+    } else {
+        for (int i = 0; i < lignes; ++i) positions.push_back((double)(i + 1));
+    }
+    double ecart = 1.0;
+    if (positions.size() > 1) {
+        std::vector<double> tri = positions;
+        std::sort(tri.begin(), tri.end());
+        ecart = INFINITY;
+        for (std::size_t i = 1; i < tri.size(); ++i)
+            if (tri[i] > tri[i - 1]) ecart = std::min(ecart, tri[i] - tri[i - 1]);
+        if (!std::isfinite(ecart)) ecart = 1.0;
+    }
+    nouveauTrace(it);
+    auto axes = axesCourants(it);
+    std::size_t indexCouleur = axes->series.size();
+    std::vector<int> identifiants;
+    std::vector<double> hautPositif((std::size_t)lignes, 0.0);
+    std::vector<double> hautNegatif((std::size_t)lignes, 0.0);
+    // Groupées : le groupe occupe min(0,8, n/(n+1,5)) de l'écart, partagé
+    // entre ses n barres, comme le fait MATLAB.
+    double groupe = colonnes > 1 && !empile
+                        ? std::min(0.8, (double)colonnes / (colonnes + 1.5)) : 0.0;
+    for (int c = 0; c < colonnes; ++c) {
+        Serie s;
+        s.genre = GenreTrace::Barres;
+        s.couleur = couleurFace.empty() ? palette(indexCouleur++) : couleurFace;
+        s.couleurBord = couleurBord;
+        s.epaisseur = epaisseur;
+        s.opacite = opacite;
+        s.etiquette = etiquette;
+        double decalage = 0.0;
+        if (groupe > 0) {
+            decalage = (-groupe / 2 + (c + 0.5) * groupe / colonnes) * ecart;
+            s.largeurBarre = groupe / colonnes * largeur / 0.8;
+        } else {
+            s.largeurBarre = largeur;
+        }
+        for (int i = 0; i < lignes; ++i) {
+            double y = matrice ? Y.re[(std::size_t)i + (std::size_t)c * Y.nlignes()]
+                               : Y.re[(std::size_t)i];
+            s.x.push_back(positions[(std::size_t)i] + decalage);
+            if (empile) {
+                double& haut = y >= 0 ? hautPositif[(std::size_t)i] : hautNegatif[(std::size_t)i];
+                s.basesBarres.push_back(haut);
+                haut += y;
+                s.y.push_back(haut);
+            } else {
+                s.y.push_back(y);
+            }
+        }
+        identifiants.push_back(ajouterSerie(it, s));
+    }
+    if (nargout <= 0 || identifiants.empty()) return {};
+    int numeroFigure = figureCourante(it)->numero;
+    if (identifiants.size() == 1)
+        return {poigneeLigne(numeroFigure, axes->identifiant, identifiants[0])};
+    return {poigneeLignes(numeroFigure, axes->identifiant, identifiants)};
+}
 FONCTION(fnScatter) { INUTILISE return tracer(it, args, GenreTrace::Points, false, false, nargout); }
 FONCTION(fnStairs) { INUTILISE return tracer(it, args, GenreTrace::Escalier, false, false, nargout); }
 FONCTION(fnStem) { INUTILISE return tracer(it, args, GenreTrace::Tige, false, false, nargout); }
@@ -404,17 +582,54 @@ std::vector<Valeur> sansProprietes(Arguments args, const char* fonction) {
 // Le corps commun de « imagesc », « image », « pcolor » et « surf ».
 // « sensMatrice » dit si la premiere ligne va en haut — c'est le cas
 // d'une image, ce ne l'est pas d'une surface, dont les ordonnees montent.
-std::vector<Valeur> traceImage(Interpreteur& it, Arguments args, int nargout,
-                               bool sensMatrice) {
+std::vector<Valeur> traceImage(Interpreteur& it, Arguments argsBruts, int nargout,
+                               bool sensMatrice, bool direct) {
+    std::vector<Valeur> args(argsBruts.begin(), argsBruts.end());
+    // « imagesc(C, clims) » et « imagesc(x, y, C, clims) » : les bornes de
+    // couleur viennent en dernier, deux nombres.
+    std::vector<double> bornesCouleur;
+    if (!direct && (args.size() == 2 || args.size() == 4) && args.back().nelem() == 2 &&
+        args.back().estNumerique() && args[args.size() - 2].nelem() > 2) {
+        bornesCouleur = valeursDe(args.back());
+        args.pop_back();
+    }
     exigerArguments(args, 1, 3, "imagesc");
     const Valeur& z = args[args.size() - 1];
-    exigerNumerique(z, "imagesc");
+    if (!(z.estNumerique() || z.classe == Classe::Logique))
+        erreur("MATLAB:image:InvalidCData", "Image data must be numeric or logical.");
     nouveauTrace(it);
     Serie s;
     s.genre = GenreTrace::Image;
     s.hauteurImage = z.nlignes();
     s.largeurImage = z.ncolonnes();
     s.z = valeursDe(z);
+    // Un tableau m x n x 3 est une image en couleurs vraies : ses valeurs
+    // sont des intensités, dans [0,1] pour un double, sur toute l'étendue
+    // du type pour un entier.
+    if (z.dims.size() == 3 && z.dims[2] == 3) {
+        s.imageRvb = true;
+        // « ncolonnes » compte les colonnes de toutes les pages : la largeur
+        // de l'image est la deuxième dimension seule.
+        s.largeurImage = z.dims[1];
+        double echelle = 1.0;
+        if (z.classe == Classe::UInt8) echelle = 255.0;
+        else if (z.classe == Classe::UInt16) echelle = 65535.0;
+        if (echelle != 1.0)
+            for (auto& v : s.z) v /= echelle;
+    } else if (z.dims.size() > 2) {
+        erreur("MATLAB:image:InvalidCData",
+               "Image data must be an m-by-n matrix or an m-by-n-by-3 array.");
+    }
+    s.imageDirecte = direct;
+    s.imageEntiere = classeEntiere(z.classe);
+    if (!bornesCouleur.empty()) {
+        auto a = axesCourants(it);
+        if (!(bornesCouleur[1] > bornesCouleur[0]))
+            erreur("MATLAB:imagesc:InvalidCLim", "CLim must be increasing.");
+        a->climManuelle = true;
+        a->cmin = bornesCouleur[0];
+        a->cmax = bornesCouleur[1];
+    }
     s.x = {0.5, (double)s.largeurImage + 0.5};
     s.y = {0.5, (double)s.hauteurImage + 0.5};
     // « imagesc(x,y,Z) » : les deux premiers arguments donnent l'etendue
@@ -440,7 +655,38 @@ std::vector<Valeur> traceImage(Interpreteur& it, Arguments args, int nargout,
 FONCTION(fnImagesc) {
     INUTILISE
     std::vector<Valeur> donnees = sansProprietes(args, "imagesc");
-    return traceImage(it, donnees, nargout, true);
+    return traceImage(it, donnees, nargout, true, false);
+}
+
+// « image(C) » : comme dans MATLAB, les valeurs de C sont des rangs dans la
+// palette (CDataMapping 'direct'), à partir de 1 pour un double et de 0
+// pour un entier ; « 'CDataMapping','scaled' » les met à l'échelle comme
+// imagesc. Un tableau m x n x 3 est en couleurs vraies.
+FONCTION(fnImage) {
+    INUTILISE
+    bool direct = true;
+    std::vector<Valeur> restants;
+    for (std::size_t k = 0; k < args.size(); ++k) {
+        if ((args[k].estTexte() || args[k].estChaine()) && k + 1 < args.size()) {
+            std::string nom = args[k].versTexte();
+            for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+            if (nom == "cdatamapping") {
+                std::string mode = args[k + 1].versTexte();
+                for (auto& c : mode) c = (char)std::tolower((unsigned char)c);
+                direct = mode != "scaled";
+                ++k;
+                continue;
+            }
+            if (nom == "cdata" || nom == "xdata" || nom == "ydata") {
+                restants.push_back(args[k + 1]);
+                ++k;
+                continue;
+            }
+        }
+        restants.push_back(args[k]);
+    }
+    std::vector<Valeur> donnees = sansProprietes(restants, "image");
+    return traceImage(it, donnees, nargout, true, direct);
 }
 
 // « pcolor » suit les ordonnees croissantes vers le haut, comme une
@@ -448,7 +694,7 @@ FONCTION(fnImagesc) {
 FONCTION(fnPcolor) {
     INUTILISE
     std::vector<Valeur> donnees = sansProprietes(args, "pcolor");
-    return traceImage(it, donnees, nargout, false);
+    return traceImage(it, donnees, nargout, false, false);
 }
 
 FONCTION(surfDonnees) {
@@ -479,7 +725,7 @@ FONCTION(surfDonnees) {
     } else {
         a = {args[args.size() - 1]};
     }
-    return traceImage(it, a, nargout, false);
+    return traceImage(it, a, nargout, false, false);
 }
 
 FONCTION(fnSurf) {
@@ -746,26 +992,46 @@ std::vector<Valeur> tracerContours(Interpreteur& it, std::vector<Valeur>& args,
 
     std::vector<std::pair<double, std::pair<std::vector<double>, std::vector<double>>>>
         courbes;
-    std::size_t indexCouleur = 0;
+    // Comme dans MATLAB, un appel à « contour » fait un seul objet : la
+    // légende n'en montre que la première ligne, et chaque niveau prend sa
+    // couleur dans la palette, par CLim — l'étendue de Z. Un style qui
+    // nomme une couleur (« 'k' ») l'impose à tous les niveaux ; contourf
+    // trace ses lignes en noir sur le fond coloré.
+    double zBas = INFINITY, zHaut = -INFINITY;
+    for (double v : Z.re)
+        if (std::isfinite(v)) {
+            zBas = std::min(zBas, v);
+            zHaut = std::max(zHaut, v);
+        }
+    bool couleurImposee = remplir;
+    for (char c : style)
+        if (!couleurDeLettre(c).empty()) couleurImposee = true;
     std::vector<int> identifiants;
+    bool premiere = true;
     for (double niveau : niveaux) {
         auto segments = segmentsNiveau(x, y, Z, niveau);
-        if (segments.empty()) { ++indexCouleur; continue; }
+        if (segments.empty()) continue;
         auto polylignes = chainer(segments, tolerance);
-        std::string couleur = remplir ? std::string("#000000")
-                                      : std::string(palette(indexCouleur));
         for (const auto& courbe : polylignes) {
             Serie s;
             s.genre = GenreTrace::Ligne;
             s.x = courbe.first;
             s.y = courbe.second;
-            s.couleur = couleur;
+            s.couleur = "#000000";
             if (!style.empty()) decoderStyle(style, s);
-            s.etiquette = formater("%g", niveau);
+            if (!couleurImposee) {
+                s.couleurIndexee = true;
+                s.valeurCouleur = niveau;
+                if (premiere) {
+                    s.cBas = zBas;
+                    s.cHaut = zHaut;
+                }
+            }
+            s.horsLegende = !premiere;
+            premiere = false;
             identifiants.push_back(ajouterSerie(it, s));
             courbes.push_back({niveau, courbe});
         }
-        ++indexCouleur;
     }
     if (nargout <= 0) return {};
     Valeur C = matriceContours(courbes);
@@ -1075,23 +1341,149 @@ FONCTION(fnTitle) {
     return {};
 }
 
+// Les axes que désigne une poignée graphique : celle d'un axe, ou d'une
+// courbe (son axe). Nul si la valeur n'est pas une poignée graphique.
+std::shared_ptr<Axes> axesDeLaPoignee(Interpreteur& it, const Valeur& p, std::size_t e = 0) {
+    if (p.classe != Classe::Objet || !p.aChamp("NumeroFigure") || !p.aChamp("NumeroAxe"))
+        return nullptr;
+    int numero = (int)p.champ("NumeroFigure", e).scal();
+    auto trouve = it.figures.find(numero);
+    if (trouve == it.figures.end() || !trouve->second)
+        erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
+    int identifiant = (int)p.champ("NumeroAxe", e).scal();
+    for (const auto& a : trouve->second->axes)
+        if (a && a->identifiant == identifiant) return a;
+    erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
+}
+
+bool estPoigneeAxes(const Valeur& p) {
+    return p.classe == Classe::Objet && p.nomObjet == "matlab.graphics.axis.Axes";
+}
+
+bool estPoigneeFigure(const Valeur& p) {
+    return p.classe == Classe::Objet && p.nomObjet == "matlab.ui.Figure";
+}
+
+std::string enMinuscules(std::string t) {
+    for (auto& c : t) c = (char)std::tolower((unsigned char)c);
+    return t;
+}
+
+// Les positions qu'accepte « legend(...,'Location',L) ».
+bool positionLegendeConnue(const std::string& p) {
+    static const std::set<std::string> connues = {
+        "north", "south", "east", "west", "northeast", "northwest", "southeast", "southwest",
+        "northoutside", "southoutside", "eastoutside", "westoutside", "northeastoutside",
+        "northwestoutside", "southeastoutside", "southwestoutside", "best", "bestoutside",
+        "layout", "none"};
+    return connues.count(p) > 0;
+}
+
+// legend(étiquettes...), legend(h, ...), legend(ax, ...), suivies de
+// propriétés — 'Location', 'Orientation', 'Box' et celles, sans effet sur
+// le rendu, que les scripts posent couramment. Les commandes 'off',
+// 'show', 'hide', 'toggle', 'boxoff' et 'boxon'.
 FONCTION(fnLegend) {
     INUTILISE
     auto a = axesCourants(it);
-    a->legende.clear();
-    for (const auto& arg : args) {
-        if (arg.classe == Classe::Cellule) {
-            for (const auto& c : arg.cellules) a->legende.push_back(c.versTexte());
-        } else if (arg.estTexte() || arg.estChaine()) {
-            std::string s = arg.versTexte();
-            if (s == "off") {
-                a->legendeVisible = false;
-                return {};
-            }
-            if (s == "Location" || s == "location") break;
-            a->legende.push_back(s);
+    std::size_t k = 0;
+    std::vector<int> designees;
+    if (k < args.size() && args[k].classe == Classe::Objet && args[k].aChamp("NumeroFigure")) {
+        if (estPoigneeAxes(args[k])) {
+            a = axesDeLaPoignee(it, args[k]);
+        } else if (args[k].aChamp("NumeroSerie")) {
+            a = axesDeLaPoignee(it, args[k]);
+            for (std::size_t e = 0; e < std::max<std::size_t>(args[k].nelem(), 1); ++e)
+                designees.push_back((int)args[k].champ("NumeroSerie", e).scal());
+        }
+        ++k;
+    }
+    if (k + 1 == args.size() && (args[k].estTexte() || args[k].estChaine())) {
+        std::string commande = enMinuscules(args[k].versTexte());
+        if (commande == "off" || commande == "hide") {
+            a->legendeVisible = false;
+            return {};
+        }
+        if (commande == "show" || commande == "toggle") {
+            a->legendeVisible = commande == "show" ? true : !a->legendeVisible;
+            if (nargout > 0) return {poigneeTexteCourant(it, "legend")};
+            return {};
+        }
+        if (commande == "boxoff" || commande == "boxon") {
+            a->boiteLegende = commande == "boxon";
+            a->legendeVisible = true;
+            return {};
         }
     }
+    static const std::set<std::string> proprietes = {
+        "location", "orientation", "box", "fontsize", "textcolor", "color", "edgecolor",
+        "interpreter", "autoupdate", "numcolumns", "title", "fontname", "fontweight",
+        "fontangle", "linewidth", "visible", "position", "units", "direction", "itemhitfcn",
+        "contextmenu", "iconcolumnwidth", "string"};
+    std::vector<std::string> etiquettes;
+    bool etiquettesDonnees = false;
+    for (; k < args.size(); ++k) {
+        const Valeur& arg = args[k];
+        if ((arg.estTexte() || (arg.estChaine() && arg.nelem() == 1)) && k + 1 < args.size() &&
+            proprietes.count(enMinuscules(arg.versTexte())))
+            break;
+        if (arg.classe == Classe::Cellule) {
+            for (const auto& c : arg.cellules) etiquettes.push_back(c.versTexte());
+            etiquettesDonnees = true;
+        } else if (arg.estChaine()) {
+            for (const auto& c : arg.chaines) etiquettes.push_back(c);
+            etiquettesDonnees = true;
+        } else if (arg.estTexte()) {
+            // Un tableau de caractères à plusieurs lignes : une étiquette par ligne.
+            if (arg.nlignes() > 1) {
+                int l = arg.nlignes(), c = arg.ncolonnes();
+                for (int i = 0; i < l; ++i) {
+                    std::string ligne;
+                    for (int j = 0; j < c; ++j)
+                        ligne += (char)(int)arg.re[(std::size_t)i + (std::size_t)j * l];
+                    while (!ligne.empty() && ligne.back() == ' ') ligne.pop_back();
+                    etiquettes.push_back(ligne);
+                }
+            } else {
+                etiquettes.push_back(arg.versTexte());
+            }
+            etiquettesDonnees = true;
+        } else {
+            erreur("MATLAB:legend:InvalidInput",
+                   "legend : les étiquettes sont des textes, une cellule ou un tableau "
+                   "de chaînes.");
+        }
+    }
+    for (; k + 1 < args.size(); k += 2) {
+        std::string nom = enMinuscules(args[k].versTexte());
+        const Valeur& valeur = args[k + 1];
+        if (nom == "location") {
+            std::string position = enMinuscules(valeur.versTexte());
+            if (!positionLegendeConnue(position))
+                erreur("MATLAB:legend:InvalidLocation",
+                       "'" + valeur.versTexte() + "' n'est pas une position de légende.");
+            a->positionLegende =
+                (position == "layout" || position == "none") ? "northeast" : position;
+        } else if (nom == "orientation") {
+            a->legendeHorizontale = enMinuscules(valeur.versTexte()) == "horizontal";
+        } else if (nom == "box") {
+            a->boiteLegende = enMinuscules(valeur.versTexte()) != "off";
+        } else if (nom == "visible") {
+            a->legendeVisible = enMinuscules(valeur.versTexte()) != "off";
+        } else if (nom == "string") {
+            etiquettes.clear();
+            if (valeur.classe == Classe::Cellule)
+                for (const auto& c : valeur.cellules) etiquettes.push_back(c.versTexte());
+            else
+                etiquettes.push_back(valeur.versTexte());
+            etiquettesDonnees = true;
+        } else if (!proprietes.count(nom)) {
+            erreur("MATLAB:legend:UnknownParameter",
+                   "legend : propriété inconnue '" + args[k].versTexte() + "'.");
+        }
+    }
+    if (etiquettesDonnees || !designees.empty()) a->legende = etiquettes;
+    a->seriesLegende = designees;
     a->legendeVisible = true;
     // MATLAB rend la poignee de la legende : « l = legend(...) » sert a
     // la deplacer ou a la masquer ensuite.
@@ -1136,28 +1528,7 @@ FONCTION(fnHold) {
 // donnees. C'est ce que rend « v = axis », et ce que fige « axis manual ».
 static void bornesAffichees(const Axes& a, double& xmin, double& xmax, double& ymin,
                             double& ymax) {
-    xmin = INFINITY;
-    xmax = -INFINITY;
-    ymin = INFINITY;
-    ymax = -INFINITY;
-    for (const auto& s : a.series) {
-        for (double v : s.x) {
-            if (!std::isfinite(v)) continue;
-            xmin = std::min(xmin, v);
-            xmax = std::max(xmax, v);
-        }
-        for (double v : s.y) {
-            if (!std::isfinite(v)) continue;
-            ymin = std::min(ymin, v);
-            ymax = std::max(ymax, v);
-        }
-    }
-    if (!std::isfinite(xmin)) { xmin = 0; xmax = 1; }
-    if (!std::isfinite(ymin)) { ymin = 0; ymax = 1; }
-    if (xmax == xmin) { xmin -= 0.5; xmax += 0.5; }
-    if (ymax == ymin) { ymin -= 0.5; ymax += 0.5; }
-    if (a.limitesManuellesX) { xmin = a.xmin; xmax = a.xmax; }
-    if (a.limitesManuellesY) { ymin = a.ymin; ymax = a.ymax; }
+    limitesAxe(a, xmin, xmax, ymin, ymax);
 }
 
 FONCTION(fnAxis) {
@@ -1181,7 +1552,8 @@ FONCTION(fnAxis) {
             // « tight » serre sur les donnees et fige ; « manual » fige ce
             // qui est affiche ; « image » y ajoute des echelles egales.
             double xmin, xmax, ymin, ymax;
-            bornesAffichees(*a, xmin, xmax, ymin, ymax);
+            if (s == "manual") bornesAffichees(*a, xmin, xmax, ymin, ymax);
+            else etendueDonnees(*a, xmin, xmax, ymin, ymax);
             a->xmin = xmin;
             a->xmax = xmax;
             a->ymin = ymin;
@@ -1289,6 +1661,28 @@ std::vector<Valeur> surfaceRemplie(Interpreteur& it, Arguments args, GenreTrace 
             estSpecificationStyle(args[k].versTexte())) {
             decoderStyle(args[k].versTexte(), s);
             ++k;
+        } else if (genre == GenreTrace::Polygone && k < args.size() && args[k].estNumerique() &&
+                   !args[k].estVide()) {
+            // « fill(X,Y,C) » : C est la couleur, non un autre polygone. Un
+            // triplet est une couleur RVB ; un scalaire ou une valeur par
+            // sommet passent par la palette et CLim, comme dans MATLAB (le
+            // polygone prend ici une seule couleur, celle de la moyenne).
+            const Valeur& C = args[k];
+            if (C.nelem() == 3 && C.nlignes() == 1) {
+                s.couleur = couleurDepuisValeur(C);
+            } else {
+                double somme = 0;
+                std::size_t compte = 0;
+                for (double c : valeursDe(C))
+                    if (std::isfinite(c)) {
+                        somme += c;
+                        ++compte;
+                    }
+                s.couleurIndexee = true;
+                s.valeurCouleur = compte ? somme / (double)compte : NAN;
+                s.couleur = "#000000";
+            }
+            ++k;
         }
         // Les paires « nom, valeur » : « fill(x,y,'FaceColor',[0 0 1]) ».
         while (k + 1 < args.size() && (args[k].estTexte() || args[k].estChaine())) {
@@ -1353,6 +1747,12 @@ FONCTION(fnLine) {
             s.style = args[k + 1].versTexte();
         } else if (propriete == "marker") {
             s.marqueur = args[k + 1].versTexte();
+        } else if (propriete == "markersize") {
+            s.tailleMarqueur = args[k + 1].scal();
+        } else if (propriete == "markerfacecolor") {
+            s.couleurFaceMarqueur = couleurMarqueurDepuis(args[k + 1]);
+        } else if (propriete == "markeredgecolor") {
+            s.couleurBordMarqueur = couleurMarqueurDepuis(args[k + 1]);
         }
     }
     int identifiant = ajouterSerie(it, s);
@@ -1549,7 +1949,137 @@ FONCTION(fnDrawnow) {
     return {};
 }
 
-FONCTION(fnColormap) { INUTILISE return {}; }
+// Une palette donnée par son nom — « gray », « jet » : une fonction qu'on
+// appelle — ou par une matrice m x 3 de valeurs dans [0,1]. « default »
+// rend la palette vide : celle par défaut.
+std::vector<double> paletteDepuis(Interpreteur& it, const Valeur& v) {
+    Valeur carte = v;
+    if (v.estTexte() || v.estChaine()) {
+        std::string nom = enMinuscules(v.versTexte());
+        if (nom == "default") return {};
+        if (nom == "parula")
+            erreur("MatLibre:colormap:parula",
+                   "parula est propre à MathWorks ; MatLibre emploie viridis par défaut "
+                   "(colormap('default')).");
+        auto r = it.appeler(nom, {}, 1);
+        if (r.empty()) erreur("MATLAB:colormap:InvalidColormap", "Palette inconnue : " + nom + ".");
+        carte = r[0];
+    }
+    if (!carte.estNumerique() || carte.dims.size() != 2 || carte.ncolonnes() != 3 ||
+        carte.nlignes() < 1)
+        erreur("MATLAB:colormap:InvalidColormap", "Colormap must have 3 columns: [R,G,B].");
+    std::vector<double> palette;
+    int m = carte.nlignes();
+    palette.reserve((std::size_t)m * 3);
+    for (int i = 0; i < m; ++i)
+        for (int j = 0; j < 3; ++j) {
+            double c = carte.re[(std::size_t)i + (std::size_t)j * (std::size_t)m];
+            if (!(c >= 0 && c <= 1))
+                erreur("MATLAB:colormap:InvalidColormap",
+                       "Colormap values must be between 0 and 1.");
+            palette.push_back(c);
+        }
+    return palette;
+}
+
+Valeur paletteEnValeur(const std::vector<double>& palette) {
+    int m = (int)(palette.size() / 3);
+    Valeur v = Valeur::matrice(m, 3);
+    for (int i = 0; i < m; ++i)
+        for (int j = 0; j < 3; ++j)
+            v.re[(std::size_t)i + (std::size_t)j * (std::size_t)m] =
+                palette[3 * (std::size_t)i + j];
+    return v;
+}
+
+// colormap(map), colormap(nom), colormap(cible, map), cmap = colormap(...).
+// Sans cible, la palette est celle de la figure ; une cible axe lui donne
+// sa propre palette, comme « imshow » le fait.
+FONCTION(fnColormap) {
+    INUTILISE
+    auto figure = figureCourante(it);
+    std::shared_ptr<Axes> axe;
+    std::size_t k = 0;
+    if (!args.empty() && args[0].classe == Classe::Objet && args[0].aChamp("NumeroFigure")) {
+        if (estPoigneeFigure(args[0])) {
+            int numero = (int)args[0].champ("NumeroFigure").scal();
+            auto trouve = it.figures.find(numero);
+            if (trouve == it.figures.end() || !trouve->second)
+                erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
+            figure = trouve->second;
+        } else {
+            axe = axesDeLaPoignee(it, args[0]);
+            int numero = (int)args[0].champ("NumeroFigure").scal();
+            figure = it.figures[numero];
+        }
+        k = 1;
+    }
+    if (k < args.size()) {
+        std::vector<double> palette = paletteDepuis(it, args[k]);
+        if (axe) axe->palette = palette;
+        else figure->palette = palette;
+    }
+    if (nargout > 0 || k >= args.size()) {
+        if (axe) return {paletteEnValeur(paletteEnVigueur(*figure, *axe))};
+        return {paletteEnValeur(figure->palette.size() >= 3 ? figure->palette
+                                                            : paletteParDefaut())};
+    }
+    return {};
+}
+
+// clim([bas haut]), clim('auto'), clim('manual'), clim(ax, ...), et
+// « lims = clim » : les bornes de couleur de l'axe, que la palette suit.
+// caxis est le nom ancien.
+std::vector<Valeur> bornesCouleur(Interpreteur& it, const Arguments& args, int nargout,
+                                  const char* nom) {
+    auto a = axesCourants(it);
+    std::size_t k = 0;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        a = axesDeLaPoignee(it, args[0]);
+        k = 1;
+    }
+    if (k < args.size()) {
+        const Valeur& v = args[k];
+        if (v.estTexte() || v.estChaine()) {
+            std::string mode = enMinuscules(v.versTexte());
+            if (mode == "auto") {
+                a->climManuelle = false;
+            } else if (mode == "manual") {
+                double bas, haut;
+                limitesCouleur(*a, bas, haut);
+                a->climManuelle = true;
+                a->cmin = bas;
+                a->cmax = haut;
+            } else if (mode == "mode") {
+                return {Valeur::texte(a->climManuelle ? "manual" : "auto")};
+            } else {
+                erreur(formater("MATLAB:%s:InvalidInput", nom),
+                       formater("%s : 'auto', 'manual', ou deux bornes croissantes.", nom));
+            }
+        } else {
+            if (!v.estNumerique() || v.nelem() != 2 || !(v.re[1] > v.re[0]))
+                erreur(formater("MATLAB:%s:InvalidLimits", nom),
+                       "Color limits must be a 2-element vector of increasing values.");
+            a->climManuelle = true;
+            a->cmin = v.re[0];
+            a->cmax = v.re[1];
+        }
+        if (nargout <= 0) return {};
+    }
+    double bas, haut;
+    limitesCouleur(*a, bas, haut);
+    return {Valeur::ligne({bas, haut})};
+}
+
+FONCTION(fnClim) {
+    INUTILISE
+    return bornesCouleur(it, args, nargout, "clim");
+}
+
+FONCTION(fnCaxis) {
+    INUTILISE
+    return bornesCouleur(it, args, nargout, "caxis");
+}
 FONCTION(fnColorbar) {
     INUTILISE
     // La barre de couleurs n'est pas encore dessinee ; la poignee rendue
@@ -1643,7 +2173,8 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("histogram", fnHistogramme, "graphique", "histogram  Histogramme.");
     it.enregistrer("hist", fnHist, "graphique", "hist  Histogramme (ancienne forme).");
     it.enregistrer("imagesc", fnImagesc, "graphique", "imagesc  Image en fausses couleurs.");
-    it.enregistrer("image", fnImagesc, "graphique", "image  Affiche une matrice comme image.");
+    it.enregistrer("image", fnImage, "graphique",
+                   "image  Affiche une image : indices de palette, ou couleurs vraies.");
     it.enregistrer("surf", fnSurf, "graphique", "surf  Surface (rendue en carte de couleurs).");
     it.enregistrer("mesh", fnSurf, "graphique", "mesh  Maillage (rendu en carte de couleurs).");
     it.enregistrer("contourf", fnContourf, "graphique",
@@ -1692,6 +2223,8 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("saveas", fnSaveas, "graphique", "saveas  Enregistre la figure.");
     it.enregistrer("drawnow", fnDrawnow, "graphique", "drawnow  Rafraichit l'affichage.");
     it.enregistrer("colormap", fnColormap, "graphique", "colormap  Palette de couleurs.");
+    it.enregistrer("clim", fnClim, "graphique", "clim  Bornes de couleur de l'axe.");
+    it.enregistrer("caxis", fnCaxis, "graphique", "caxis  Bornes de couleur (nom ancien de clim).");
     it.enregistrer("colorbar", fnColorbar, "graphique", "colorbar  Barre de couleurs.");
     it.enregistrer("box", fnBox, "graphique", "box  Cadre autour des axes.");
     it.enregistrer("shading", fnShading, "graphique", "shading  Mode d'ombrage.");

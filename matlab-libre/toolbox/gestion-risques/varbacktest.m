@@ -14,7 +14,11 @@ classdef varbacktest
 %   POF la proportion de dépassements de Kupiec, TUFF le temps jusqu'au
 %   premier, CCI l'indépendance de Christoffersen, CC la couverture
 %   conditionnelle, TBFI et TBF les temps entre dépassements de Haas.
-%   RUNTESTS les passe tous, SUMMARY compte.
+%   RUNTESTS les passe tous, SUMMARY compte. Chacune rend une table aux
+%   colonnes de MATLAB — POF rend POF (accept/reject), LRatioPOF,
+%   PValuePOF, Observations, Failures et TestLevel, par exemple — et
+%   accepte 'TestLevel' (0,95 par défaut). Les périodes où une donnée
+%   manque (NaN) sont retirées.
 %
 %   Exemple :
 %      rng(1);
@@ -102,8 +106,8 @@ classdef varbacktest
 
         function resultats = runtests(obj, varargin)
         %RUNTESTS Passe les huit tests d'un coup.
-        %   R = RUNTESTS(V) rend une cellule par test, chacune portant son
-        %   nom, sa statistique, sa valeur critique et son verdict.
+        %   R = RUNTESTS(V) rend la table de MATLAB : PortfolioID, VaRID,
+        %   VaRLevel et les verdicts TL, Bin, POF, TUFF, CC, CCI, TBF, TBFI.
             resultats = matlibre_lancer_tests(obj, varargin{:});
         end
     end

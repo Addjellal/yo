@@ -81,4 +81,7 @@ function modele = fitcecoc(X, y, varargin)
     modele = struct('type', 'ecoc', 'Classes', classes, 'Coding', codage, ...
                     'Modeles', {modeles}, 'Paires', paires, ...
                     'NumObservations', numel(y));
+    modele.ClassNames = classes;
+    modele.X = X;
+    modele.Y = y;
 end

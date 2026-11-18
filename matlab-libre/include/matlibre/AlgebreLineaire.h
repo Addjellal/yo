@@ -25,7 +25,10 @@ Valeur determinantMatrice(const Valeur& a);
 // premier pivot fautif, et le facteur rendu est celui du bloc de tete.
 Valeur cholesky(const Valeur& a, bool inferieure = false, int* defaut = nullptr);
 void factorisationLU(const Valeur& a, Valeur& l, Valeur& u, Valeur& p);
-void factorisationQR(const Valeur& a, Valeur& q, Valeur& r, bool economique = false);
+// Avec « permutation », la factorisation pivote les colonnes : A(:,P) = Q*R,
+// P rendu en indices à partir de zéro.
+void factorisationQR(const Valeur& a, Valeur& q, Valeur& r, bool economique = false,
+                     std::vector<int>* permutation = nullptr);
 void decompositionSVD(const Valeur& a, Valeur& u, Valeur& s, Valeur& v, bool economique = false);
 void valeursPropres(const Valeur& a, Valeur& valeurs, Valeur* vecteurs);
 Valeur normeMatrice(const Valeur& a, const Valeur& type);
@@ -40,5 +43,6 @@ Valeur noyau(const Valeur& a);
 Valeur imageOrthonormale(const Valeur& a);
 Valeur formeEchelonnee(const Valeur& a);
 bool estSymetrique(const Valeur& a);
+bool estHermitienne(const Valeur& a);
 
 }  // namespace matlibre

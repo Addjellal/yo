@@ -21,8 +21,8 @@ function racines = vpasolve(equation, variable, depart)
 %   Exemple :
 %      syms x
 %      double(vpasolve(cos(x) - x, x, 1))     % 0.739085..., le point fixe
-%      deux = vpasolve(x^2 - 2, x);
-%      abs(double(deux{2}) - sqrt(2)) < 1e-12
+%      deux = vpasolve(x^2 - 2, x);    % une colonne de SYM
+%      abs(double(deux(2)) - sqrt(2)) < 1e-12
 %
 %   Voir aussi SOLVE, FZERO, ROOTS, DOUBLE.
     equation = sym(equation);
@@ -73,7 +73,14 @@ function valeurs = balayer(fonction)
         end
         precedente = courante;
     end
-    valeurs = unique(round(valeurs * 1e12) / 1e12);
+    % Une racine trouvée deux fois — sur un nœud de la grille et par fzero
+    % juste à côté — ne compte qu'une fois. On ne l'arrondit pas pour
+    % autant : arrondir à douze décimales jetterait quatre chiffres justes.
+    valeurs = sort(valeurs);
+    if numel(valeurs) > 1
+        garder = [true, diff(valeurs) > 1e-10 * max(1, abs(valeurs(2:end)))];
+        valeurs = valeurs(garder);
+    end
 end
 
 function v = valeurEvaluee(fonction, x)
@@ -88,17 +95,11 @@ function v = valeurEvaluee(fonction, x)
 end
 
 function r = enSym(valeurs)
+%ENSYM Les racines en colonne de SYM, comme MATLAB les rend.
     valeurs = valeurs(:);
     if isempty(valeurs)
-        r = sym([]);
+        r = sym(zeros(0, 1));
         return
     end
-    if numel(valeurs) == 1
-        r = sym(valeurs(1));
-        return
-    end
-    r = cell(numel(valeurs), 1);
-    for k = 1:numel(valeurs)
-        r{k} = sym(valeurs(k));
-    end
+    r = sym(valeurs);
 end

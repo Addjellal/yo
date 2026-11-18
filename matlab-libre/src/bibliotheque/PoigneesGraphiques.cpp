@@ -185,6 +185,32 @@ Valeur marche(bool actif) { return Valeur::texte(actif ? "on" : "off"); }
 
 bool ecrireAxes(Interpreteur& it, const Valeur& p, const std::string& nom,
                 const Valeur& v) {
+    {
+        auto axe = axesDe(it, p);
+        if (memeNom(nom, "CLim")) {
+            auto b = versVecteur(v);
+            if (b.size() != 2 || !(b[1] > b[0]))
+                erreur("MATLAB:hg:InvalidCLim", "CLim must be a 2-element increasing vector.");
+            axe->climManuelle = true;
+            axe->cmin = b[0];
+            axe->cmax = b[1];
+            return true;
+        }
+        if (memeNom(nom, "CLimMode")) {
+            axe->climManuelle = v.versTexte() == "manual";
+            return true;
+        }
+        if (memeNom(nom, "Colormap")) {
+            if (!v.estNumerique() || v.ncolonnes() != 3)
+                erreur("MATLAB:hg:InvalidColormap", "Colormap must have 3 columns: [R,G,B].");
+            int m = v.nlignes();
+            axe->palette.clear();
+            for (int r = 0; r < m; ++r)
+                for (int c = 0; c < 3; ++c)
+                    axe->palette.push_back(v.re[(std::size_t)r + (std::size_t)c * (std::size_t)m]);
+            return true;
+        }
+    }
     auto a = axesDe(it, p);
     if (memeNom(nom, "XTick")) { a->ticksX = versVecteur(v); return true; }
     if (memeNom(nom, "YTick")) { a->ticksY = versVecteur(v); return true; }
@@ -320,11 +346,21 @@ bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
         s->alignement = a.empty() ? 'l' : (a[0] == 'c' ? 'c' : (a[0] == 'r' ? 'r' : 'l'));
         return true;
     }
+    if (memeNom(nom, "MarkerSize")) { s->tailleMarqueur = v.scal(); return true; }
+    if (memeNom(nom, "MarkerFaceColor") || memeNom(nom, "MarkerEdgeColor")) {
+        std::string couleur;
+        std::string texte = (v.estTexte() || v.estChaine()) ? v.versTexte() : std::string();
+        for (auto& c : texte) c = (char)std::tolower((unsigned char)c);
+        if (texte == "none" || texte == "auto") couleur = texte;
+        else couleur = couleurDepuisValeur(v);
+        if (couleur.empty()) couleur = "none";
+        if (memeNom(nom, "MarkerFaceColor")) s->couleurFaceMarqueur = couleur;
+        else s->couleurBordMarqueur = couleur;
+        return true;
+    }
     // Ce que le rendu de MatLibre n'emploie pas encore, mais qu'un script
     // pose couramment : accepte sans effet plutot que de s'arreter.
-    if (memeNom(nom, "MarkerSize") || memeNom(nom, "MarkerFaceColor") ||
-        memeNom(nom, "MarkerEdgeColor") || memeNom(nom, "Visible") ||
-        memeNom(nom, "Tag") || memeNom(nom, "UserData"))
+    if (memeNom(nom, "Visible") || memeNom(nom, "Tag") || memeNom(nom, "UserData"))
         return true;
     erreur("MATLAB:hg:InvalidProperty",
            "Unrecognized property '" + nom + "' for class 'Line'.");
@@ -332,6 +368,15 @@ bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
 
 bool lireLigne(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
     Serie* s = serieDe(it, p);
+    if (memeNom(nom, "MarkerSize")) { sortie = Valeur::scalaire(s->tailleMarqueur); return true; }
+    if (memeNom(nom, "MarkerFaceColor")) {
+        sortie = Valeur::texte(s->couleurFaceMarqueur.empty() ? "none" : s->couleurFaceMarqueur);
+        return true;
+    }
+    if (memeNom(nom, "MarkerEdgeColor")) {
+        sortie = Valeur::texte(s->couleurBordMarqueur.empty() ? "auto" : s->couleurBordMarqueur);
+        return true;
+    }
     // Une courbe de l'espace garde ses vraies coordonnees a cote de la
     // projection : ce sont elles qu'on rend.
     if (memeNom(nom, "XData")) {
@@ -391,6 +436,26 @@ bool ecrireFigure(Interpreteur& it, const Valeur& p, const std::string& nom,
 
 bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
     auto a = axesDe(it, p);
+    if (memeNom(nom, "CLim")) {
+        double bas, haut;
+        limitesCouleur(*a, bas, haut);
+        sortie = Valeur::ligne({bas, haut});
+        return true;
+    }
+    if (memeNom(nom, "CLimMode")) {
+        sortie = Valeur::texte(a->climManuelle ? "manual" : "auto");
+        return true;
+    }
+    if (memeNom(nom, "Colormap")) {
+        const auto& palette = paletteEnVigueur(*figureDe(it, p), *a);
+        int m = (int)(palette.size() / 3);
+        sortie = Valeur::matrice(m, 3);
+        for (int i = 0; i < m; ++i)
+            for (int j = 0; j < 3; ++j)
+                sortie.re[(std::size_t)i + (std::size_t)j * (std::size_t)m] =
+                    palette[3 * (std::size_t)i + (std::size_t)j];
+        return true;
+    }
     if (memeNom(nom, "XTick")) { sortie = depuisVecteur(a->ticksX); return true; }
     if (memeNom(nom, "YTick")) { sortie = depuisVecteur(a->ticksY); return true; }
     if (memeNom(nom, "XLim") || memeNom(nom, "YLim")) {
@@ -560,9 +625,20 @@ bool lireLegende(Interpreteur& it, const Valeur& p, const std::string& nom, Vale
         sortie = Valeur::scalaire(a->taillePolice);
         return true;
     }
-    if (memeNom(nom, "Location") || memeNom(nom, "Box") ||
-        memeNom(nom, "Orientation") || memeNom(nom, "Interpreter")) {
-        sortie = Valeur::texte("");
+    if (memeNom(nom, "Location")) {
+        sortie = Valeur::texte(a->positionLegende);
+        return true;
+    }
+    if (memeNom(nom, "Orientation")) {
+        sortie = Valeur::texte(a->legendeHorizontale ? "horizontal" : "vertical");
+        return true;
+    }
+    if (memeNom(nom, "Box")) {
+        sortie = Valeur::texte(a->boiteLegende ? "on" : "off");
+        return true;
+    }
+    if (memeNom(nom, "Interpreter")) {
+        sortie = Valeur::texte("tex");
         return true;
     }
     return false;
@@ -590,10 +666,24 @@ bool ecrireLegende(Interpreteur& it, const Valeur& p, const std::string& nom,
         a->taillePolice = v.scal();
         return true;
     }
+    if (memeNom(nom, "Location")) {
+        std::string position = v.versTexte();
+        for (auto& c : position) c = (char)std::tolower((unsigned char)c);
+        a->positionLegende = (position == "layout" || position == "none") ? "northeast" : position;
+        return true;
+    }
+    if (memeNom(nom, "Orientation")) {
+        std::string o = v.versTexte();
+        a->legendeHorizontale = !o.empty() && (o[0] == 'h' || o[0] == 'H');
+        return true;
+    }
+    if (memeNom(nom, "Box")) {
+        a->boiteLegende = v.versTexte() != "off";
+        return true;
+    }
     // Les autres proprietes sont acceptees sans effet : le rendu n'en a
     // pas l'usage, et un programme qui les pose ne doit pas s'arreter.
-    if (memeNom(nom, "Location") || memeNom(nom, "Box") ||
-        memeNom(nom, "Orientation") || memeNom(nom, "Interpreter") ||
+    if (memeNom(nom, "Interpreter") ||
         memeNom(nom, "Color") || memeNom(nom, "Position") ||
         memeNom(nom, "NumColumns") || memeNom(nom, "AutoUpdate"))
         return true;

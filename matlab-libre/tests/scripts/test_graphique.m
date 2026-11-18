@@ -1080,4 +1080,154 @@ figure('NumberTitle', 'off', 'MenuBar', 'none', 'Position', [0 0 500 500]);
 assert(isequal(get(gcf, 'Position'), [0 0 500 500]));
 close all;
 
+%% ------------------------------------------------- palettes et CLim
+% colormap agit enfin : la figure, ou un axe ; la palette par défaut est
+% viridis (domaine public), parula étant propre à MathWorks.
+close all;
+figure;
+imagesc([1 2; 3 4]);
+carte = colormap;
+assert(isequal(size(carte), [256 3]));
+assert(max(abs(carte(1, :) - [0.267004 0.004874 0.329415])) < 1e-6);
+colormap(gray);
+assert(isequal(colormap, gray(256)));
+colormap(gca, jet(16));
+assert(isequal(size(get(gca, 'Colormap')), [16 3]));
+colormap('default');
+refuse = false;
+try
+    colormap('parula');
+catch
+    refuse = true;
+end
+assert(refuse);
+% CLim : les bornes de couleur suivent les données, ou ce qu'on fixe.
+assert(isequal(clim, [1 4]));
+clim([0 10]);
+assert(isequal(clim, [0 10]) && isequal(get(gca, 'CLim'), [0 10]));
+assert(strcmp(clim('mode'), 'manual'));
+caxis('auto');
+assert(isequal(caxis, [1 4]));
+imagesc([5 6; 7 8], [0 20]);
+assert(isequal(clim, [0 20]));
+
+%% ---------------------------------------------------------- imshow
+% Une image uint8 s'affiche en gris sur [0 255], axes masqués : la valeur
+% 128 donne le gris 128.
+close all;
+figure;
+imshow(uint8([0 128; 255 64]));
+assert(isequal(clim, [0 255]));
+assert(isequal(get(gca, 'Colormap'), gray(256)));
+dessinGris = matlibre_svg();
+assert(~isempty(strfind(dessinGris, 'rgb(128,128,128)')));
+assert(~isempty(strfind(dessinGris, 'rgb(255,255,255)')) && ~isempty(strfind(dessinGris, 'rgb(0,0,0)')));
+% Une image binaire est noire et blanche ; [] prend l'étendue des données.
+imshow([true false]);
+assert(isequal(clim, [0 1]));
+imshow(magic(4), []);
+assert(isequal(clim, [1 16]));
+% Couleurs vraies : rouge pur.
+imshow(cat(3, uint8(255), uint8(0), uint8(0)));
+assert(~isempty(strfind(matlibre_svg(), 'rgb(255,0,0)')));
+% image : les valeurs sont des rangs dans la palette.
+figure;
+image([1 2; 3 4]);
+colormap([1 0 0; 0 1 0; 0 0 1; 1 1 1]);
+dessinDirect = matlibre_svg();
+assert(~isempty(strfind(dessinDirect, 'rgb(0,255,0)')) && ~isempty(strfind(dessinDirect, 'rgb(0,0,255)')));
+
+%% ---------------------------------------------- légende et marqueurs
+% Autant d'entrées que d'étiquettes ; les textes n'en sont pas ; le style
+% et le marqueur de chaque courbe y sont repris.
+close all;
+figure;
+plot(1:3, 'b-'); hold on
+plot(1:3, 2:4, 'ro', 'MarkerSize', 9, 'MarkerFaceColor', 'r');
+plot(1:3, 3:5, 'k:');
+text(2, 2, 'note');
+legend({'un', 'deux'}, 'Location', 'southeast');
+dessinLegende = matlibre_svg();
+assert(~isempty(strfind(dessinLegende, '>un<')) && ~isempty(strfind(dessinLegende, '>deux<')));
+assert(isempty(strfind(dessinLegende, '>data3<')) && isempty(strfind(dessinLegende, '>data4<')));
+assert(strcmp(get(legend, 'Location'), 'southeast'));
+h = get(gca, 'Children');
+assert(get(h(3), 'MarkerSize') == 9);
+% legend(h, ...) désigne les courbes.
+figure;
+h1 = plot(1:3); hold on
+h2 = plot(3:-1:1);
+legend(h2, 'descente');
+assert(~isempty(strfind(matlibre_svg(), '>descente<')));
+% Les marqueurs 'x' et '*' ne sont pas des '+'.
+figure;
+plot(1, 1, 'x');
+dessinCroix = matlibre_svg();
+assert(~isempty(strfind(dessinCroix, 'M 67.00')) || ~isempty(regexp(dessinCroix, 'M [0-9.]+ [0-9.]+ L [0-9.]+ [0-9.]+ M', 'once')));
+% fill(X,Y,C) : C est une couleur, pas un second polygone ; bord noir.
+figure;
+fill([0 1 1], [0 0 1], [0.8 0.9 1]);
+assert(numel(get(gca, 'Children')) == 1);
+dessinFill = matlibre_svg();
+assert(~isempty(strfind(dessinFill, 'fill="#CCE6FF"')) && ~isempty(strfind(dessinFill, 'stroke="#000000"')));
+% contour : un seul objet dans la légende, des niveaux colorés par la palette.
+figure;
+[X, Y] = meshgrid(-2:0.25:2);
+contour(X, Y, X .^ 2 + Y .^ 2, 5);
+legend('niveaux');
+dessinContour = matlibre_svg();
+assert(~isempty(strfind(dessinContour, '>niveaux<')) && isempty(strfind(dessinContour, '>data2<')));
+
+%% ------------------------------------------------ bornes automatiques
+% Comme MATLAB, les bornes tombent sur des graduations ; « axis tight »
+% serre sur les données ; une image serre sur son étendue.
+close all;
+figure;
+plot([-3.2 3.8], [-1.3 1.4]);
+assert(isequal(xlim, [-4 4]) && isequal(ylim, [-1.5 1.5]));
+plot([30 55], [0 17]);
+assert(isequal(ylim, [0 20]));
+plot(1:64, sin(1:64));
+assert(isequal(xlim, [0 70]));
+axis tight
+assert(isequal(xlim, [1 64]));
+figure;
+imagesc(rand(5, 7));
+assert(isequal(xlim, [0.5 7.5]) && isequal(ylim, [0.5 5.5]));
+figure;
+semilogx([20 500], [1 2]);
+assert(isequal(xlim, [10 1000]));
+% Une graduation nulle s'écrit 0, non -2.78e-17.
+figure;
+plot(1:18, [-0.443 0.39 zeros(1, 16)]);
+assert(isempty(strfind(matlibre_svg(), 'e-17')));
+close all;
+
+%% ------------------------------------------------------------- barres
+% bar(x, y, largeur) : la largeur n'est pas une serie de plus. Le trace
+% generique de plot la lisait comme des donnees, et dessinait une barre
+% parasite de hauteur 0,4.
+close all;
+figure;
+bar((1:3) - 0.2, [5 6 7], 0.4);
+hold on
+bar((1:3) + 0.2, [5 6 7], 0.4);
+assert(numel(get(gca, 'Children')) == 2);
+% Une matrice : une serie par colonne, groupees ou empilees.
+figure;
+bar([1 2 3; 4 5 6]);
+assert(numel(get(gca, 'Children')) == 3);
+figure;
+bar([1 2 3; 4 5 6], 'stacked');
+assert(isequal(ylim, [0 16]));          % les piles montent a 6 et 15
+% FaceColor et EdgeColor sont lus, et dessines.
+figure;
+bar(1:5, [3 1 4 1 5], 'FaceColor', [0.2 0.7 0.2], 'EdgeColor', 'none');
+fichierBarres = [tempname() '.svg'];
+print(fichierBarres);
+texteBarres = fileread(fichierBarres);
+delete(fichierBarres);
+assert(contains(texteBarres, '#33B333') && contains(texteBarres, 'stroke="none"'));
+close all;
+
 disp('graphique : toutes les verifications passent');

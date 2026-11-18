@@ -42,8 +42,11 @@ function [contenu, facteurs, reste] = matlibre_sym_facteurs(coefficients)
         reste = coefficients / contenu;
     end
     facteurs = matlibre_sym_racines_rationnelles(reste);
+    % Diviser par (q*x - p) garde des entiers exacts ; (x - p/q) en vaut
+    % le 1/q, qu'on remet dans le reste pour que contenu * prod(x - r) *
+    % reste redonne exactement le polynôme.
     for r = facteurs
-        reste = deconv(reste, [1 -r]);
+        [p, q] = rat(r);
+        reste = round(deconv(reste, [q -p])) * q;
     end
-    reste = round(reste * 1e9) / 1e9;
 end

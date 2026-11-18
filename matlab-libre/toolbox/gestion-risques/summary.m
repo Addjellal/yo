@@ -1,8 +1,11 @@
 function resume = summary(modele)
 %SUMMARY Résumé d'un contrôle a posteriori.
-%   S = SUMMARY(V) compte les observations, les dépassements observés et
-%   attendus, et le niveau effectivement atteint. Sans sortie, le résumé
-%   est écrit.
+%   S = SUMMARY(V), V un VARBACKTEST, rend la table de MATLAB : PortfolioID,
+%   VaRID, VaRLevel, ObservedLevel (part des périodes sans dépassement),
+%   Observations, Failures, Expected, Ratio (dépassements sur attendus),
+%   FirstFailure (période du premier dépassement) et Missing (périodes
+%   retirées pour valeur manquante). Pour un ESBACKTEST, une structure aux
+%   mêmes comptes. Sans sortie, le résumé est écrit.
 %
 %   Exemple :
 %      rng(1);
@@ -14,6 +17,24 @@ function resume = summary(modele)
     if ~isa(modele, 'varbacktest') && ~isa(modele, 'esbacktest')
         error('risque:summary:Modele', ...
               'SUMMARY attend un contrôle de valeur en risque ou de perte moyenne.');
+    end
+    if isa(modele, 'varbacktest')
+        % La table de MATLAB : niveau observé, comptes, rapport à l'attendu,
+        % premier dépassement, valeurs manquantes retirées.
+        [echecs, N, x, attendu, manquants] = matlibre_var_echecs(modele);
+        premier = find(echecs, 1);
+        if isempty(premier)
+            premier = NaN;
+        end
+        resume = table(string(modele.PortfolioID), string(modele.VaRID), modele.VaRLevel, ...
+            1 - x / N, N, x, attendu, x / attendu, premier, manquants, 'VariableNames', ...
+            {'PortfolioID', 'VaRID', 'VaRLevel', 'ObservedLevel', 'Observations', ...
+             'Failures', 'Expected', 'Ratio', 'FirstFailure', 'Missing'});
+        if nargout == 0
+            disp(resume);
+            clear resume
+        end
+        return
     end
     depassements = modele.PortfolioData < -modele.VaRData;
     N = numel(depassements);

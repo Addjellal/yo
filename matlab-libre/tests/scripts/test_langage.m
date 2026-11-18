@@ -1190,6 +1190,53 @@ for q = 1:size(refusNV, 1)
 end
 disp('nom=valeur : ok');
 
+%% ------------------------------------------- vides dans une concatenation
+% Dès qu'un opérande a des éléments, MATLAB omet les vides, quelles que
+% soient leurs dimensions ; s'ils sont tous vides, leurs tailles comptent.
+assert(isequal([ones(2, 1); zeros(1, 0)], [1; 1]));
+assert(isequal([zeros(0, 3), 5], 5));
+assert(isequal(size([zeros(1, 0), zeros(1, 0)]), [1 0]));
+assert(isequal(size([zeros(1, 0); zeros(2, 0)]), [3 0]));
+assert(isequal(size([zeros(1, 0); zeros(0, 3)]), [0 0]));
+assert(isequal(class([int8(5), zeros(1, 0)]), 'int8'));
+
+%% ------------------------------------------- affichage des zeros exacts
+% Un zéro exact s'écrit 0 parmi des décimaux, et -0 s'écrit 0.
+format short
+assert(~isempty(regexp(evalc('disp([1.5 0])'), '1\.5000\s+0\s*$', 'once')));
+assert(strcmp(strtrim(evalc('disp(-0)')), '0'));
+assert(contains(evalc('z = [1.5+2i 0]'), '0.0000 + 0.0000i'));
+format
+% Les nombres d'une table : cinq chiffres significatifs, comme MATLAB.
+affichageTable = evalc('disp(table([0.0016297; 15.0618722713733], [-3482258.6346; 1.13], ''VariableNames'', {''a'', ''b''}))');
+assert(contains(affichageTable, '0.0016297') && contains(affichageTable, '15.062'));
+assert(contains(affichageTable, '-3.4823e+06') && contains(affichageTable, '1.13'));
+
+%% ------------------------------------- capture des fonctions anonymes
+% Comme MATLAB, une fonction anonyme ne capture que les variables que son
+% corps cite, à leur valeur du moment. Elle capturait tout l'espace de
+% travail et le recopiait à chaque appel : après un tableau d'un million
+% d'éléments, deux mille appels prenaient plusieurs secondes.
+grosTableau = rand(1e6, 1);
+anonymeLegere = @(x) x + 1;
+anonymeCitant = @(k) grosTableau(k);
+tic;
+for k = 1:2000
+    anonymeLegere(k);
+    anonymeCitant(k);
+end
+assert(toc < 1, 'un appel ne doit pas recopier l''espace de travail');
+clear grosTableau
+assert(anonymeCitant(3) > 0, 'la capture survit a la variable');
+facteurCapture = 2;
+doubleur = @(x) facteurCapture * x;
+facteurCapture = 10;
+assert(doubleur(3) == 6, 'la valeur capturee est celle de la creation');
+imbriquee = @(x) @(y) facteurCapture * x + y;
+assert(imbriquee(2)(1) == 21, 'une anonyme dans une anonyme capture aussi');
+parametreMasque = @(facteurCapture) facteurCapture + 1;
+assert(parametreMasque(1) == 2, 'un parametre masque la variable capturee');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

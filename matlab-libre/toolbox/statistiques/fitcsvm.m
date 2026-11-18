@@ -29,6 +29,7 @@ function modele = fitcsvm(X, y, varargin)
 %   Voir aussi PREDICT, FITRSVM, FITCECOC, DISCARDSUPPORTVECTORS, FITCNB.
     X = double(X);
     y = y(:);
+    Xorigine = X;
     classes = unique(y);
     if numel(classes) ~= 2
         error('stats:fitcsvm:DeuxClasses', ...
@@ -47,6 +48,9 @@ function modele = fitcsvm(X, y, varargin)
                     'Bias', biais, 'Options', options, 'Centre', centre, ...
                     'Echelle', echelle, 'Beta', [], 'Regression', false, ...
                     'NumObservations', numel(y));
+    modele.ClassNames = classes;
+    modele.X = Xorigine;
+    modele.Y = y;
     if strcmp(options.KernelFunction, 'linear')
         % Un noyau linéaire a un vecteur de poids explicite : c'est lui
         % qui permet de se passer des points.

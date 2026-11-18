@@ -5,7 +5,7 @@ Un interpréteur libre du langage MATLAB, écrit de zéro en C++17, avec
 
 ```bash
 make            # compile — aucune dépendance obligatoire
-make test       # 57 verifications C++ + 46 suites en langage MATLAB
+make test       # 57 verifications C++ + 47 suites en langage MATLAB
 ./build/bin/matlibre
 ```
 
@@ -194,11 +194,22 @@ make test
 ```
 
 57 vérifications C++ sur le lexeur, l'analyseur, l'indexation, l'algèbre
-et les messages d'erreur ; 46 suites en langage MATLAB dont une qui
+et les messages d'erreur ; 47 suites en langage MATLAB dont une qui
 contrôle **un résultat exact par toolbox** : `blsprice(100,100,0.05,1,0.2)`
 doit rendre 10,4506 ; `butter(2,0.2)` les coefficients de la référence ;
 `atmosisa(0)` 288,15 K et 101 325 Pa ; l'encodeur convolutif suivi du
 décodeur de Viterbi doit restituer le message exact.
+
+`test_litterature.m` va plus loin : il rejoue des **cas publiés**, toolbox
+par toolbox, et les confronte à une référence indépendante — les
+coefficients certifiés du NIST pour les régressions de Longley, Misra1a
+et MGH09, les iris de Fisher contre scikit-learn, les valeurs critiques
+de MacKinnon pour Dickey-Fuller, l'exemple de Hull pour Black-Scholes, la
+décomposition db2 de PyWavelets, le seuil d'Otsu de scikit-image, les
+lignes géodésiques de Vincenty contre GeographicLib, les alignements de
+Durbin et al. contre Biopython, l'atmosphère type de 1976, la colonne à
+distiller de Skogestad, et les exemples chiffrés de la documentation de
+MathWorks (`pdepe`, `nwalign`, `varbacktest`, `atmosisa`).
 
 ## Origine
 

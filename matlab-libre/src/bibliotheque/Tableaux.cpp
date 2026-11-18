@@ -731,11 +731,149 @@ FONCTION(fnUnique) {
     return {u, Valeur::colonne(ia), Valeur::colonne(ic)};
 }
 
+// ---------------------------------------------- union, intersect, setdiff
+//
+// Les éléments comparés sont les valeurs une à une, ou, avec 'rows', les
+// lignes entières. Le résultat est trié (défaut, 'sorted') ou dans l'ordre
+// d'apparition ('stable'). Comme dans MATLAB, IA et IB sont toujours des
+// colonnes, et C n'est une ligne que si les entrées en sont (les deux pour
+// union et intersect, A pour setdiff).
+
+struct OptionsEnsemble {
+    bool lignes = false;
+    bool stable = false;
+};
+
+static OptionsEnsemble lireOptionsEnsemble(const std::vector<Valeur>& args, std::size_t debut,
+                                           const char* nom) {
+    OptionsEnsemble o;
+    for (std::size_t k = debut; k < args.size(); ++k) {
+        if (!(args[k].estTexte() || args[k].estChaine()))
+            erreur(formater("MATLAB:%s:UnknownInput", nom),
+                   formater("Unknown input to %s : options are 'rows', 'stable', 'sorted'.", nom));
+        std::string t = args[k].versTexte();
+        std::transform(t.begin(), t.end(), t.begin(),
+                       [](unsigned char c) { return (char)std::tolower(c); });
+        if (t == "rows") o.lignes = true;
+        else if (t == "stable") o.stable = true;
+        else if (t == "sorted") o.stable = false;
+        else if (t == "legacy")
+            erreur(formater("MATLAB:%s:LegacyNotSupported", nom),
+                   formater("%s : MatLibre ne reproduit pas le comportement 'legacy'.", nom));
+        else
+            erreur(formater("MATLAB:%s:UnknownFlag", nom),
+                   formater("Unknown flag '%s' to %s.", t.c_str(), nom));
+    }
+    return o;
+}
+
+static bool estZeroParZeroEnsemble(const Valeur& v) {
+    return v.dims.size() == 2 && v.dims[0] == 0 && v.dims[1] == 0;
+}
+
+static bool estLigneEnsemble(const Valeur& v) {
+    return v.dims.size() == 2 && v.dims[0] == 1;
+}
+
+// Un texte seul face à une cellule de textes compte pour un élément.
+static Valeur commeEnsemble(const Valeur& v, bool commeTexte) {
+    if (commeTexte && v.classe == Classe::Caractere) {
+        Valeur c = Valeur::celluleDims(Dims{1, 1});
+        c.cellules[0] = v;
+        return c;
+    }
+    return v;
+}
+
+struct ElementsEnsemble {
+    const Valeur* v = nullptr;
+    bool lignes = false;
+    std::size_t nombre() const {
+        if (!lignes) return v->nelem();
+        return estZeroParZeroEnsemble(*v) ? 0 : (std::size_t)v->nlignes();
+    }
+    std::vector<CleValeur> cle(std::size_t i) const {
+        if (!lignes) return {cleDe(*v, i)};
+        const std::size_t m = (std::size_t)v->nlignes(), c = (std::size_t)v->ncolonnes();
+        std::vector<CleValeur> r(c);
+        for (std::size_t j = 0; j < c; ++j) r[j] = cleDe(*v, i + j * m);
+        return r;
+    }
+};
+
+using ElementSource = std::pair<const Valeur*, std::size_t>;
+
+// Le résultat, élément par élément ou ligne par ligne, depuis A ou B.
+static Valeur rassemblerEnsemble(const std::vector<ElementSource>& elements, const Valeur& a,
+                                 const Valeur& b, bool lignes, bool enLigne) {
+    const Valeur& modele = (a.nelem() > 0 || b.nelem() == 0) ? a : b;
+    const std::size_t k = elements.size();
+    if (lignes) {
+        const int c = estZeroParZeroEnsemble(a) ? b.ncolonnes() : a.ncolonnes();
+        Valeur r = Valeur::matrice((int)k, c);
+        r.classe = modele.classe;
+        for (std::size_t i = 0; i < k; ++i) {
+            const Valeur& src = *elements[i].first;
+            const std::size_t m = (std::size_t)src.nlignes();
+            for (int j = 0; j < c; ++j)
+                r.re[i + (std::size_t)j * k] = src.re[elements[i].second + (std::size_t)j * m];
+        }
+        return r;
+    }
+    const Dims forme = enLigne ? Dims{1, (int)k} : Dims{(int)k, 1};
+    if (modele.classe == Classe::Cellule) {
+        Valeur r = Valeur::celluleDims(forme);
+        for (std::size_t i = 0; i < k; ++i)
+            r.cellules[i] = elements[i].first->cellules[elements[i].second];
+        return r;
+    }
+    if (modele.classe == Classe::Chaine) {
+        Valeur r;
+        r.classe = Classe::Chaine;
+        r.dims = forme;
+        for (const auto& e : elements) r.chaines.push_back(e.first->chaines[e.second]);
+        return r;
+    }
+    Valeur r = Valeur::matriceDims(forme);
+    r.classe = modele.classe;
+    for (std::size_t i = 0; i < k; ++i) r.re[i] = elements[i].first->re[elements[i].second];
+    return r;
+}
+
 FONCTION(fnIsmember) {
     INUTILISE
-    exigerArguments(args, 2, 3, "ismember");
+    exigerArguments(args, 2, 4, "ismember");
     const Valeur& a = args[0];
     const Valeur& b = args[1];
+    OptionsEnsemble options = lireOptionsEnsemble(args, 2, "ismember");
+    if (a.estComplexe() || b.estComplexe())
+        erreur("MATLAB:ismember:ComplexNotSupported",
+               "ismember : MatLibre ne compare pas encore des complexes.");
+    if (options.lignes) {
+        // Une ligne de A est membre si elle est une ligne de B ; LOCB est
+        // le plus petit rang de cette ligne dans B.
+        if (a.classe == Classe::Cellule || b.classe == Classe::Cellule)
+            erreur("MATLAB:ismember:RowsFlagAndCell",
+                   "The 'rows' flag is not supported for cell array inputs.");
+        if (!estZeroParZeroEnsemble(a) && !estZeroParZeroEnsemble(b) &&
+            a.ncolonnes() != b.ncolonnes())
+            erreur("MATLAB:ismember:AandBColnumAgree",
+                   "A and B must have the same number of columns.");
+        ElementsEnsemble ea{&a, true}, eb{&b, true};
+        std::map<std::vector<CleValeur>, std::size_t> premierB;
+        for (std::size_t k = 0; k < eb.nombre(); ++k) premierB.emplace(eb.cle(k), k + 1);
+        const std::size_t na = ea.nombre();
+        Valeur r = Valeur::matrice((int)na, 1);
+        r.classe = Classe::Logique;
+        Valeur pos = Valeur::matrice((int)na, 1);
+        for (std::size_t k = 0; k < na; ++k) {
+            auto t = premierB.find(ea.cle(k));
+            r.re[k] = t == premierB.end() ? 0 : 1;
+            pos.re[k] = t == premierB.end() ? 0 : (double)t->second;
+        }
+        if (nargout >= 2) return {r, pos};
+        return {r};
+    }
     bool commeTexte = ensembleDeTextes(a) || ensembleDeTextes(b);
     std::vector<CleValeur> clesA = clesDe(a, commeTexte);
     std::vector<CleValeur> clesB = clesDe(b, commeTexte);
@@ -758,110 +896,122 @@ FONCTION(fnIsmember) {
 }
 
 std::vector<Valeur> operationEnsemble(std::vector<Valeur>& args, int nargout, int genre) {
-    const Valeur& a = args[0];
-    const Valeur& b = args[1];
+    static const char* noms[] = {"union", "intersect", "setdiff"};
+    const char* nom = noms[genre];
+    OptionsEnsemble options = lireOptionsEnsemble(args, 2, nom);
     // Une cellule et un tableau de nombres ne se melangent pas : le
     // resultat aurait des elements des deux, et l'un des deux n'a pas de
     // cellules ou pas de reels a offrir. MATLAB le refuse aussi.
-    if ((a.classe == Classe::Cellule) != (b.classe == Classe::Cellule))
+    bool commeTexte = ensembleDeTextes(args[0]) || ensembleDeTextes(args[1]);
+    const Valeur a = commeEnsemble(args[0], commeTexte);
+    const Valeur b = commeEnsemble(args[1], commeTexte);
+    const bool aVideNumerique = a.nelem() == 0 && a.classe != Classe::Cellule;
+    const bool bVideNumerique = b.nelem() == 0 && b.classe != Classe::Cellule;
+    if ((a.classe == Classe::Cellule) != (b.classe == Classe::Cellule) && !aVideNumerique &&
+        !bVideNumerique)
         erreur("MATLAB:CELLFUN:NotACell",
                "Inputs must be of the same class : either both cell arrays of character "
                "vectors, or both numeric.");
-    std::set<CleValeur> ensembleB;
-    for (std::size_t k = 0; k < b.nelem(); ++k) ensembleB.insert(cleDe(b, k));
-    std::set<CleValeur> ensembleA;
-    for (std::size_t k = 0; k < a.nelem(); ++k) ensembleA.insert(cleDe(a, k));
-    std::vector<std::size_t> gardes;
-    std::set<CleValeur> deja;
-    auto ajouter = [&](const Valeur& source, std::size_t k) {
-        CleValeur c = cleDe(source, k);
-        if (deja.count(c)) return false;
-        deja.insert(c);
-        return true;
-    };
-    std::vector<std::pair<const Valeur*, std::size_t>> resultat;
-    if (genre == 0) {  // union
-        std::vector<std::pair<const Valeur*, std::size_t>> tout;
-        for (std::size_t k = 0; k < a.nelem(); ++k) tout.push_back({&a, k});
-        for (std::size_t k = 0; k < b.nelem(); ++k) tout.push_back({&b, k});
-        std::stable_sort(tout.begin(), tout.end(),
-                         [&](const std::pair<const Valeur*, std::size_t>& x,
-                             const std::pair<const Valeur*, std::size_t>& y) {
-                             return cleDe(*x.first, x.second) < cleDe(*y.first, y.second);
-                         });
-        for (auto& p : tout)
-            if (ajouter(*p.first, p.second)) resultat.push_back(p);
-    } else {
-        std::vector<std::size_t> indices;
-        for (std::size_t k = 0; k < a.nelem(); ++k) indices.push_back(k);
-        std::stable_sort(indices.begin(), indices.end(),
-                         [&](std::size_t x, std::size_t y) { return cleDe(a, x) < cleDe(a, y); });
-        for (auto k : indices) {
-            bool dansB = ensembleB.count(cleDe(a, k)) > 0;
-            if ((genre == 1 && dansB) || (genre == 2 && !dansB))
-                if (ajouter(a, k)) resultat.push_back({&a, k});
-        }
+    if (a.estComplexe() || b.estComplexe())
+        erreur(formater("MATLAB:%s:ComplexNotSupported", nom),
+               formater("%s : MatLibre ne compare pas encore des ensembles de complexes.", nom));
+    if (options.lignes) {
+        if (a.classe == Classe::Cellule || b.classe == Classe::Cellule)
+            erreur(formater("MATLAB:%s:RowsFlagAndCell", nom),
+                   "The 'rows' flag is not supported for cell array inputs.");
+        if (a.dims.size() > 2 || b.dims.size() > 2)
+            erreur(formater("MATLAB:%s:NotAMatrix", nom),
+                   "Inputs must be 2-D matrices with 'rows'.");
+        if (!estZeroParZeroEnsemble(a) && !estZeroParZeroEnsemble(b) &&
+            a.ncolonnes() != b.ncolonnes())
+            erreur(formater("MATLAB:%s:AandBColnumAgree", nom),
+                   "A and B must have the same number of columns.");
     }
-    // Reconstitution
-    bool colonne = !(a.dims.size() == 2 && a.dims[0] == 1);
+    ElementsEnsemble ea{&a, options.lignes}, eb{&b, options.lignes};
+    const std::size_t na = ea.nombre(), nb = eb.nombre();
 
-    // Les indices que MATLAB rend en plus : « C = A(IA) » et « C = B(IB) ».
-    // Pour l'intersection, chaque element vient de A, mais se retrouve
-    // aussi dans B — on note sa premiere position la-bas.
-    std::map<CleValeur, std::size_t> premierB;
-    for (std::size_t k = b.nelem(); k-- > 0;) premierB[cleDe(b, k)] = k;
+    // Premières positions de chaque clé dans B (et dans A).
+    std::map<std::vector<CleValeur>, std::size_t> premierB, premierA;
+    for (std::size_t k = 0; k < nb; ++k) premierB.emplace(eb.cle(k), k);
+    for (std::size_t k = 0; k < na; ++k) premierA.emplace(ea.cle(k), k);
+
+    // Les candidats, dans l'ordre d'apparition, sans doublon.
+    std::vector<ElementSource> resultat;
+    std::vector<std::vector<CleValeur>> cles;
+    std::set<std::vector<CleValeur>> deja;
+    auto prendre = [&](const ElementsEnsemble& e, std::size_t k) {
+        std::vector<CleValeur> c = e.cle(k);
+        if (deja.count(c)) return;
+        deja.insert(c);
+        resultat.push_back({e.v, k});
+        cles.push_back(std::move(c));
+    };
+    for (std::size_t k = 0; k < na; ++k) {
+        bool dansB = premierB.count(ea.cle(k)) > 0;
+        if (genre == 0 || (genre == 1 && dansB) || (genre == 2 && !dansB)) prendre(ea, k);
+    }
+    if (genre == 0)
+        for (std::size_t k = 0; k < nb; ++k) prendre(eb, k);
+    if (!options.stable) {
+        std::vector<std::size_t> ordre(resultat.size());
+        std::iota(ordre.begin(), ordre.end(), 0);
+        std::stable_sort(ordre.begin(), ordre.end(),
+                         [&](std::size_t x, std::size_t y) { return cles[x] < cles[y]; });
+        std::vector<ElementSource> trie;
+        for (auto i : ordre) trie.push_back(resultat[i]);
+        resultat.swap(trie);
+    }
+
+    bool enLigne;
+    if (genre == 2) {
+        enLigne = estLigneEnsemble(a);
+    } else {
+        enLigne = (estLigneEnsemble(a) || estZeroParZeroEnsemble(a)) &&
+                  (estLigneEnsemble(b) || estZeroParZeroEnsemble(b)) &&
+                  !(estZeroParZeroEnsemble(a) && estZeroParZeroEnsemble(b));
+    }
+    Valeur c = rassemblerEnsemble(resultat, a, b, options.lignes, enLigne);
+    if (!options.lignes && resultat.empty() && estZeroParZeroEnsemble(a) &&
+        (genre == 2 || estZeroParZeroEnsemble(b)))
+        c.dims = Dims{0, 0};
+
     std::vector<double> ia, ib;
-    for (auto& p : resultat) {
-        if (p.first == &a) {
-            ia.push_back((double)(p.second + 1));
+    for (const auto& e : resultat) {
+        if (e.first == &a) {
+            ia.push_back((double)(e.second + 1));
             if (genre == 1) {
-                auto t = premierB.find(cleDe(a, p.second));
-                if (t != premierB.end()) ib.push_back((double)(t->second + 1));
+                auto t = premierB.find(ea.cle(e.second));
+                ib.push_back((double)(t->second + 1));
             }
         } else {
-            ib.push_back((double)(p.second + 1));
+            ib.push_back((double)(e.second + 1));
         }
     }
-    auto indices = [&](const std::vector<double>& v) {
-        return colonne ? Valeur::colonne(v) : Valeur::ligne(v);
-    };
-
-    std::vector<Valeur> sorties;
-    if (a.classe == Classe::Cellule) {
-        Valeur r = Valeur::celluleDims(colonne ? Dims{(int)resultat.size(), 1}
-                                               : Dims{1, (int)resultat.size()});
-        for (std::size_t k = 0; k < resultat.size(); ++k)
-            r.cellules[k] = resultat[k].first->cellules[resultat[k].second];
-        sorties.push_back(r);
-    } else {
-        std::vector<double> x;
-        for (auto& p : resultat) x.push_back(p.first->re[p.second]);
-        sorties.push_back(colonne ? Valeur::colonne(x) : Valeur::ligne(x));
-    }
+    std::vector<Valeur> sorties{c};
+    if (nargout >= 2) sorties.push_back(Valeur::colonne(ia));
     // « setdiff » n'a pas de troisieme sortie : ses elements ne sont, par
     // definition, dans aucune position de B.
-    if (nargout >= 2) sorties.push_back(indices(ia));
-    if (nargout >= 3 && genre != 2) sorties.push_back(indices(ib));
+    if (nargout >= 3 && genre != 2) sorties.push_back(Valeur::colonne(ib));
     return sorties;
 }
 
 FONCTION(fnUnion) {
     INUTILISE
-    exigerArguments(args, 2, 3, "union");
+    exigerArguments(args, 2, 4, "union");
     exigerSansObjet(args[0], "union");
     exigerSansObjet(args[1], "union");
     return operationEnsemble(args, nargout, 0);
 }
 FONCTION(fnIntersect) {
     INUTILISE
-    exigerArguments(args, 2, 3, "intersect");
+    exigerArguments(args, 2, 4, "intersect");
     exigerSansObjet(args[0], "intersect");
     exigerSansObjet(args[1], "intersect");
     return operationEnsemble(args, nargout, 1);
 }
 FONCTION(fnSetdiff) {
     INUTILISE
-    exigerArguments(args, 2, 3, "setdiff");
+    exigerArguments(args, 2, 4, "setdiff");
     exigerSansObjet(args[0], "setdiff");
     if (args.size() > 1) exigerSansObjet(args[1], "setdiff");
     return operationEnsemble(args, nargout, 2);
@@ -938,28 +1088,77 @@ FONCTION(fnKron) {
     const Valeur& b = enDouble(args[1]);
     int la = a.nlignes(), ca = a.ncolonnes(), lb = b.nlignes(), cb = b.ncolonnes();
     Valeur r = Valeur::matrice(la * lb, ca * cb);
+    // Un facteur complexe donne un produit complexe : (x+iy)(u+iv).
+    bool complexe = a.estComplexe() || b.estComplexe();
+    if (complexe) r.im.assign(r.re.size(), 0.0);
     for (int i = 0; i < la; ++i)
         for (int j = 0; j < ca; ++j)
             for (int p = 0; p < lb; ++p)
-                for (int q = 0; q < cb; ++q)
-                    r.re[(std::size_t)(i * lb + p) + (std::size_t)(j * cb + q) * (la * lb)] =
-                        a.re[(std::size_t)i + (std::size_t)j * la] *
-                        b.re[(std::size_t)p + (std::size_t)q * lb];
+                for (int q = 0; q < cb; ++q) {
+                    std::size_t ia = (std::size_t)i + (std::size_t)j * la;
+                    std::size_t ib = (std::size_t)p + (std::size_t)q * lb;
+                    std::size_t ir = (std::size_t)(i * lb + p) +
+                                     (std::size_t)(j * cb + q) * (la * lb);
+                    double ar = a.re[ia], br = b.re[ib];
+                    double ai = a.im.empty() ? 0.0 : a.im[ia];
+                    double bi = b.im.empty() ? 0.0 : b.im[ib];
+                    r.re[ir] = ar * br - ai * bi;
+                    if (complexe) r.im[ir] = ar * bi + ai * br;
+                }
+    if (complexe) r.compacter();
     return {r};
 }
 
 FONCTION(fnCross) {
     INUTILISE
     exigerArguments(args, 2, 3, "cross");
-    const Valeur& a = enDouble(args[0]);
-    const Valeur& b = enDouble(args[1]);
-    if (a.nelem() != 3 || b.nelem() != 3)
-        erreur("MATLAB:cross:InvalidDimAorBForCrossProd",
-               "A and B must have at least one dimension of length 3.");
-    std::vector<double> r = {a.re[1] * b.re[2] - a.re[2] * b.re[1],
-                             a.re[2] * b.re[0] - a.re[0] * b.re[2],
-                             a.re[0] * b.re[1] - a.re[1] * b.re[0]};
-    return {a.estColonne() ? Valeur::colonne(r) : Valeur::ligne(r)};
+    Valeur a = enDouble(args[0]);
+    Valeur b = enDouble(args[1]);
+    // Deux vecteurs à trois éléments, l'un ligne et l'autre colonne : le
+    // résultat prend la forme du premier, comme dans MATLAB.
+    if (a.nelem() == 3 && b.nelem() == 3 && a.estVecteur() && b.estVecteur()) b.dims = a.dims;
+    if (a.dims != b.dims)
+        erreur("MATLAB:cross:InvalidDimAorB", "A and B must be of the same size.");
+    // La dimension : celle donnée, ou la première de longueur trois.
+    int dim = -1;
+    if (args.size() > 2) {
+        dim = (int)args[2].scal() - 1;
+        if (dim < 0 || dim >= (int)a.dims.size() || a.dims[(std::size_t)dim] != 3)
+            erreur("MATLAB:cross:InvalidDimAorBForCrossProd",
+                   "A and B must be of length 3 in the dimension in which the cross product "
+                   "is taken.");
+    } else {
+        for (std::size_t d = 0; d < a.dims.size(); ++d)
+            if (a.dims[d] == 3) { dim = (int)d; break; }
+        if (dim < 0)
+            erreur("MATLAB:cross:InvalidDimAorBForCrossProd",
+                   "A and B must have at least one dimension of length 3.");
+    }
+    std::size_t pas = 1;
+    for (int d = 0; d < dim; ++d) pas *= (std::size_t)a.dims[(std::size_t)d];
+    std::size_t n = a.nelem();
+    bool complexe = a.estComplexe() || b.estComplexe();
+    Valeur r = a;
+    r.re.assign(n, 0.0);
+    r.im.assign(complexe ? n : 0, 0.0);
+    auto lire = [](const Valeur& v, std::size_t k) {
+        return std::complex<double>(v.re[k], v.im.empty() ? 0.0 : v.im[k]);
+    };
+    // Chaque fibre de longueur trois le long de dim : base + k*pas.
+    for (std::size_t base = 0; base < n; ++base) {
+        if ((base / pas) % 3 != 0) continue;
+        std::size_t i0 = base, i1 = base + pas, i2 = base + 2 * pas;
+        auto a0 = lire(a, i0), a1 = lire(a, i1), a2 = lire(a, i2);
+        auto b0 = lire(b, i0), b1 = lire(b, i1), b2 = lire(b, i2);
+        std::complex<double> c[3] = {a1 * b2 - a2 * b1, a2 * b0 - a0 * b2, a0 * b1 - a1 * b0};
+        std::size_t indices[3] = {i0, i1, i2};
+        for (int k = 0; k < 3; ++k) {
+            r.re[indices[k]] = c[k].real();
+            if (complexe) r.im[indices[k]] = c[k].imag();
+        }
+    }
+    r.compacter();
+    return {r};
 }
 
 FONCTION(fnDot) {
