@@ -134,6 +134,11 @@ qu'ils ne font pas encore comme MATLAB.
   MATLAB ; la mise à jour automatique (`AutoUpdate`) et `NumColumns` sont
   acceptées sans effet, et une légende de contour montre un trait, non
   l'icône de MATLAB.
+- **Pas d'interpréteur TeX** dans les titres, étiquettes, légendes et
+  textes : `Z_L` ou `10^{-3}` s'écrivent tels quels, là où MATLAB
+  (`Interpreter` vaut `'tex'` par défaut) met en indice et en exposant et
+  traduit `\alpha`, `\pi`... Seules les graduations des axes
+  logarithmiques écrivent leurs puissances de dix en exposant.
 - **Marqueurs** : les quatorze formes de MATLAB, `MarkerSize`,
   `MarkerFaceColor` et `MarkerEdgeColor` ; `scatter` dessine encore des
   disques pleins, que MATLAB laisse creux par défaut.
@@ -656,6 +661,81 @@ de MatLibre ne fait pas comme celle de MathWorks.
 - **`atmosisa`** couvre l'atmosphère type de -5 km à la mésopause
   (84,852 km), viscosités comprises ; `atmoscoesa`, `atmosnonstd` et les
   modèles de vent manquent.
+
+### Radar et réseaux d'antennes
+
+- **L'équation du radar** suit les signatures de MATLAB : `radareqpow`,
+  `radareqrng` et `radareqsnr` prennent `RCS`, `Ts`, `Gain` (un gain ou
+  deux, émission et réception), `Loss`, `CustomFactor`,
+  `AtmosphericLoss`, `PropagationFactor` et `unitstr`, monostatique ou
+  bistatique ; les exemples de MathWorks sont retrouvés aux chiffres
+  imprimés. Les objets système (`phased.ULA`, `phased.MUSICEstimator`,
+  `phased.RangeDopplerResponse`...) n'existent pas.
+- **Estimation de direction** : `steervec` (réseau quelconque, phases
+  quantifiées), `sensorcov`, `musicdoa`, `rootmusicdoa` et `espritdoa`
+  suivent MATLAB ; `espritdoa` refuse en le disant une pondération des
+  lignes (`RowWeighting`) autre que un. Avec une covariance exacte,
+  `rootmusicdoa` rend les angles à 1e-7 près seulement : ses racines sont
+  doubles sur le cercle unité, ce qui coûte la moitié des chiffres.
+
+### Radiofréquences et antennes
+
+- **Conversions de paramètres** : `s2z`, `z2s`, `s2y`, `y2s`, `s2abcd`,
+  `abcd2s`, `gammain` et `gammaout` prennent des tableaux N x N x K, comme
+  MATLAB ; l'objet `sparameters`, la lecture des fichiers Touchstone et
+  les objets de circuit (`rfckt`, `circuit`) manquent.
+- **Pas d'objets d'antenne** : `dipole`, `patchMicrostrip` et le calcul
+  par la méthode des moments (impédance, courants, couplage) de l'Antenna
+  Toolbox n'existent pas. MatLibre calcule les diagrammes analytiques —
+  dipôle de longueur quelconque, facteur de réseau — et en tire
+  directivité et ouverture, conformes à Balanis.
+
+### Traitement du signal en temps réel
+
+- **`firls`** calcule les moindres carrés intégrés en forme fermée, types
+  I à IV et transformateur de Hilbert, comme MATLAB ; l'option
+  `'differentiator'`, qui pondère l'erreur en 1/f², est refusée en le
+  disant (`firpm` la connaît).
+- **Pas d'objets système** (`dsp.FIRFilter`, `dsp.AudioFileReader`,
+  `dsp.SpectrumAnalyzer`...) : le traitement par blocs s'écrit avec les
+  fonctions.
+
+### Audio
+
+- **Descripteurs** : `spectralCentroid` et `zerocrossrate` suivent MATLAB
+  — trames de 30 ms recouvertes de 20 ms, fenêtre rectangulaire, spectre
+  de puissance ; méthodes `'difference'` et `'comparison'`, niveau, seuil,
+  état initial. Le spectre d'une trame est |FFT|² sur les raies de 0 à
+  fs/2. `audioFeatureExtractor`, `mfcc`, `melSpectrogram`, `pitch` et les
+  autres descripteurs spectraux manquent ; `mfccSimple` en tient lieu.
+
+### Communications sans fil
+
+- **`ofdmmod` et `ofdmdemod`** suivent MATLAB : sous-porteuses de la plus
+  négative à la plus positive, porteuses nulles, pilotes, préfixe variable
+  d'un symbole à l'autre, fenêtre avancée dans le préfixe avec la rotation
+  de phase compensée. Le suréchantillonnage (`OversamplingFactor` autre
+  que un) est refusé en le disant.
+- **`qammod` et `qamdemod`** placent les symboles comme MATLAB — le
+  symbole 0 en haut à gauche, en descendant chaque colonne —, en ordre
+  binaire, de Gray ou personnalisé, avec `UnitAveragePower` et l'entrée
+  ou la sortie en bits. Les constellations en croix (M = 8, 32, 128...) et
+  les sorties souples (`'llr'`, `'approxllr'`) sont refusées en le disant.
+
+### Vision par ordinateur
+
+- **Les points sont des tableaux**, non des objets `cornerPoints` : les
+  détecteurs rendent les positions [x y] et la métrique, que
+  `selectStrongest` sait trier. `detectHarrisFeatures` et
+  `detectMinEigenFeatures` lisent `MinQuality`, `FilterSize` et `ROI`,
+  retiennent un seul pixel par plateau et affinent la position au
+  sous-pixel par une parabole dans chaque direction — la méthode de
+  MATLAB n'est pas documentée, et les positions peuvent différer au
+  dixième de pixel près.
+- **`estimateGeometricTransform2D`** est robuste par défaut, comme MATLAB
+  (MSAC, `MaxDistance` 1,5 pixel, `MaxNumTrials`, `Confidence`), et
+  connaît les quatre types ; elle rend la matrice 3 x 3, non l'objet
+  `rigid2d`, `affine2d` ou `projective2d`.
 
 ### Calcul
 

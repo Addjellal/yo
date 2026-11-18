@@ -78,6 +78,12 @@ LAPLACE2D Équation de Laplace avec conditions de Dirichlet constantes.
   la fois le schéma numérique et une propriété exacte de la solution.
   Quatre bords égaux donnent donc une solution constante.
 
+  U est NY x NX, bords compris : la première ligne est le bord du haut.
+  Le système des points intérieurs est résolu directement, en matrice
+  creuse — non par des balayages de Gauss-Seidel arrêtés au bout d'un
+  nombre fixé de tours, qui sur une grille fine s'arrêtent loin de la
+  solution sans le dire.
+
   Exemple :
      u = laplace2D(100, 0, 0, 0, 40, 40);
      max(u(:)) <= 100 && min(u(:)) >= 0      % le principe du maximum

@@ -1,0 +1,45 @@
+function [ordre, o] = matlibre_qam_options(M, arguments, fonction, o)
+%MATLIBRE_QAM_OPTIONS Ordre des symboles et options nom-valeur de QAMMOD et QAMDEMOD.
+%   [ORDRE,O] = MATLIBRE_QAM_OPTIONS(M,ARGUMENTS,FONCTION,O) vérifie que M
+%   est un carré, puissance de deux, lit l'ordre facultatif ('gray' par
+%   défaut, 'bin' ou un vecteur personnalisé) puis les paires nom, valeur
+%   dont O donne les noms et les valeurs par défaut.
+%
+%   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [ordre, o] = matlibre_qam_options(16, {'bin'}, 'qammod', struct('UnitAveragePower', false))
+%
+%   Voir aussi QAMMOD, QAMDEMOD.
+    cote = sqrt(M);
+    if ~isscalar(M) || abs(cote - round(cote)) > 1e-9 || abs(log2(M) - round(log2(M))) > 1e-9 ...
+            || M < 4
+        error(['comm:' fonction ':notSquare'], ...
+              'M est un carré puissance de deux (4, 16, 64...) : MatLibre ne trace pas les constellations en croix.');
+    end
+    ordre = 'gray';
+    if ~isempty(arguments) && (~ischar(arguments{1}) && ~isstring(arguments{1}) ...
+                               || any(strcmpi(arguments{1}, {'gray', 'bin'})))
+        ordre = arguments{1};
+        arguments = arguments(2:end);
+    end
+    if ~ischar(ordre) && ~isstring(ordre)
+        v = ordre(:).';
+        if numel(v) ~= M || ~isequal(sort(v), 0:M - 1)
+            error(['comm:' fonction ':Ordre'], ...
+                  'Un ordre personnalisé est une permutation de 0 à M-1.');
+        end
+    end
+    noms = fieldnames(o);
+    if mod(numel(arguments), 2) ~= 0
+        error(['comm:' fonction ':Options'], 'Les options vont par paires nom, valeur.');
+    end
+    for k = 1:2:numel(arguments)
+        trouve = find(strcmpi(arguments{k}, noms), 1);
+        if isempty(trouve)
+            error(['comm:' fonction ':Option'], '%s ne connaît pas l''option ''%s''.', ...
+                  fonction, char(string(arguments{k})));
+        end
+        o.(noms{trouve}) = arguments{k + 1};
+    end
+end

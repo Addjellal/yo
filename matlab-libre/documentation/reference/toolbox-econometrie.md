@@ -65,13 +65,17 @@ ADFTEST Test de racine unitaire de Dickey-Fuller augmenté.
   l'hypothèse est rejetée : la série est stationnaire.
 
   ADFTEST(...,'Model',M) choisit le modèle — 'AR' sans terme
-  déterministe, 'ARD' avec une constante (défaut), 'TS' avec constante
-  et tendance —, 'Lags',L le nombre de différences retardées ajoutées à
-  la régression (zéro par défaut), 'Test',T la forme de la statistique
-  — 't1', le rapport de Student (défaut), ou 't2', le coefficient
-  normalisé —, 'Alpha',A le seuil (0,05).
+  déterministe (défaut, comme dans MATLAB), 'ARD' avec une constante,
+  'TS' avec constante et tendance —, 'Lags',L le nombre de différences
+  retardées ajoutées à la régression (zéro par défaut), 'Test',T la
+  forme de la statistique — 't1', le rapport de Student (défaut), ou
+  't2', le coefficient normalisé —, 'Alpha',A le seuil (0,05 ; de
+  0,001 à 0,999).
   [H,P,STAT,CRIT] = ADFTEST(...) rend la valeur p, la statistique et la
-  valeur critique.
+  valeur critique. Comme dans MATLAB, elles sont interpolées dans des
+  tables de Monte-Carlo, selon la taille effective de l'échantillon —
+  le nombre d'observations de la régression ; une statistique hors des
+  tables rend une valeur p de 0,001 ou 0,999.
 
   ADFTEST(Y,L), avec L numérique, garde la forme abrégée : L retards.
 
@@ -939,21 +943,7 @@ MATLIBRE_DICKEY_FULLER Régression de Dickey-Fuller augmentée.
 
 ## `matlibre_dickey_table`
 
-```
-MATLIBRE_DICKEY_TABLE Quantiles de la loi de Dickey-Fuller.
-  La statistique ne suit pas une loi de Student : sous racine
-  unitaire, sa loi limite est celle d'une fonctionnelle du mouvement
-  brownien, décalée vers la gauche. Les quantiles rangés ici ont été
-  obtenus en simulant huit mille marches aléatoires de quatre cents
-  pas et en passant chacune par la même régression que le test ; ils
-  s'accordent aux quantiles publiés par Dickey et Fuller à quelques
-  centièmes près.
-
-  FORME vaut 't1', le rapport de Student, ou 't2', le coefficient
-  normalisé. Le test est unilatéral à gauche.
-
-  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
-```
+_Pas de bloc d'aide._
 
 ## `matlibre_diffuser_paire`
 
@@ -967,22 +957,7 @@ MATLIBRE_DIFFUSER_PAIRE Met deux tableaux à la même taille par diffusion.
 
 ## `matlibre_egci_table`
 
-```
-MATLIBRE_EGCI_TABLE Quantiles du test de cointégration d'Engle-Granger.
-  Les résidus testés viennent d'une régression estimée : les moindres
-  carrés ayant déjà cherché la combinaison la plus stationnaire, la
-  statistique est plus négative que celle d'un test de racine unitaire
-  ordinaire, et d'autant plus que les régresseurs sont nombreux. Les
-  quantiles rangés ici ont été obtenus en simulant huit mille jeux de
-  marches aléatoires indépendantes de quatre cents pas et en leur
-  appliquant la procédure complète ; ils s'accordent aux quantiles
-  publiés par MacKinnon à quelques centièmes près.
-
-  REGRESSEURS vaut zéro quand le vecteur de cointégration est donné :
-  le test redevient alors celui d'une racine unitaire ordinaire.
-
-  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
-```
+_Pas de bloc d'aide._
 
 ## `matlibre_etendre_cellules`
 
@@ -1305,9 +1280,12 @@ PPTEST Test de racine unitaire de Phillips et Perron.
   H = PPTEST(Y) teste si Y a une racine unitaire. H vaut un quand
   l'hypothèse est rejetée : la série est stationnaire.
 
-  PPTEST(...,'Lags',L) choisit la fenêtre de la correction,
-  'Model',M le modèle — 'AR' sans constante, 'ARD' avec constante
-  (défaut), 'TS' avec constante et tendance —, 'Alpha',A le seuil.
+  PPTEST(...,'Lags',L) choisit la fenêtre de la correction (zéro par
+  défaut, comme dans MATLAB : sans retard, la statistique est celle de
+  Dickey-Fuller), 'Model',M le modèle — 'AR' sans constante (défaut),
+  'ARD' avec constante, 'TS' avec constante et tendance —, 'Alpha',A le
+  seuil. Les valeurs critiques sont celles d'ADFTEST, à la taille
+  effective de l'échantillon.
   [H,P,STAT,CRIT] = PPTEST(...) rend la valeur p, la statistique et la
   valeur critique.
 

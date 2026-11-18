@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-679 fonctions ecrites en C++, reparties en 22 groupes.
+684 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2978 fonctions ecrites dans le langage, reparties en 54 toolboxes.
+3122 fonctions ecrites dans le langage, reparties en 55 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -43,15 +43,15 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`analyse-de-texte`](reference/toolbox-analyse-de-texte.md) | 8 |
 | [`antennes`](reference/toolbox-antennes.md) | 5 |
 | [`apprentissage-profond`](reference/toolbox-apprentissage-profond.md) | 141 |
-| [`audio`](reference/toolbox-audio.md) | 7 |
+| [`audio`](reference/toolbox-audio.md) | 13 |
 | [`automatique`](reference/toolbox-automatique.md) | 124 |
 | [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 8 |
-| [`bioinformatique`](reference/toolbox-bioinformatique.md) | 8 |
+| [`bioinformatique`](reference/toolbox-bioinformatique.md) | 14 |
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 6 |
-| [`cartographie`](reference/toolbox-cartographie.md) | 4 |
+| [`cartographie`](reference/toolbox-cartographie.md) | 15 |
 | [`coder`](reference/toolbox-coder.md) | 4 |
-| [`communications`](reference/toolbox-communications.md) | 145 |
-| [`communications-sans-fil`](reference/toolbox-communications-sans-fil.md) | 6 |
+| [`communications`](reference/toolbox-communications.md) | 148 |
+| [`communications-sans-fil`](reference/toolbox-communications-sans-fil.md) | 10 |
 | [`compilateur`](reference/toolbox-compilateur.md) | 3 |
 | [`conduite-automatisee`](reference/toolbox-conduite-automatisee.md) | 4 |
 | [`dsp`](reference/toolbox-dsp.md) | 6 |
@@ -70,24 +70,25 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maToolbox`](reference/toolbox-maToolbox.md) | 0 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
-| [`matlab`](reference/toolbox-matlab.md) | 458 |
+| [`matlab`](reference/toolbox-matlab.md) | 457 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
-| [`ondelettes`](reference/toolbox-ondelettes.md) | 129 |
+| [`ondelettes`](reference/toolbox-ondelettes.md) | 134 |
 | [`optimisation`](reference/toolbox-optimisation.md) | 27 |
 | [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 18 |
-| [`radar`](reference/toolbox-radar.md) | 7 |
+| [`radar`](reference/toolbox-radar.md) | 15 |
 | [`renforcement`](reference/toolbox-renforcement.md) | 5 |
-| [`reseaux-antennes`](reference/toolbox-reseaux-antennes.md) | 4 |
-| [`rf`](reference/toolbox-rf.md) | 7 |
+| [`reseaux-antennes`](reference/toolbox-reseaux-antennes.md) | 11 |
+| [`rf`](reference/toolbox-rf.md) | 16 |
 | [`robotique`](reference/toolbox-robotique.md) | 74 |
 | [`robuste`](reference/toolbox-robuste.md) | 93 |
 | [`signal`](reference/toolbox-signal.md) | 208 |
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
-| [`simulink`](reference/toolbox-simulink.md) | 52 |
-| [`stateflow`](reference/toolbox-stateflow.md) | 4 |
-| [`statistiques`](reference/toolbox-statistiques.md) | 293 |
+| [`simulink`](reference/toolbox-simulink.md) | 99 |
+| [`stateflow`](reference/toolbox-stateflow.md) | 19 |
+| [`statistiques`](reference/toolbox-statistiques.md) | 298 |
 | [`symbolique`](reference/toolbox-symbolique.md) | 70 |
-| [`types`](reference/toolbox-types.md) | 44 |
+| [`types`](reference/toolbox-types.md) | 45 |
 | [`vehicule`](reference/toolbox-vehicule.md) | 4 |
-| [`vision`](reference/toolbox-vision.md) | 112 |
+| [`virgule-fixe`](reference/toolbox-virgule-fixe.md) | 17 |
+| [`vision`](reference/toolbox-vision.md) | 113 |

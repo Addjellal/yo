@@ -637,6 +637,29 @@ LASTERR  Message de la dernière erreur.
     Voir aussi ERROR, MEXCEPTION, RETHROW, TRY.
 ```
 
+## `lastwarn`
+
+```
+LASTWARN  Le dernier avertissement : son message et son identifiant.
+    [MSG,ID] = LASTWARN rend le message et l'identifiant du dernier
+    avertissement émis par WARNING — y compris d'un avertissement éteint,
+    qu'on a tu sans l'oublier. LASTWARN(MSG) et LASTWARN(MSG,ID) les
+    remplacent, et LASTWARN('') les efface : c'est ainsi qu'un programme
+    vérifie qu'un calcul a, ou n'a pas, averti.
+
+    Syntaxe
+       [msg, id] = lastwarn
+       lastwarn(msg)
+       lastwarn(msg, id)
+
+    Exemples
+       lastwarn('');
+       warning('essai:un', 'attention %d', 3);
+       [msg, id] = lastwarn()        % 'attention 3', 'essai:un'
+
+    Voir aussi WARNING, LASTERR, ERROR.
+```
+
 ## `load`
 
 ```
@@ -898,6 +921,35 @@ THROW  Lève une erreur construite avec MException.
     Voir aussi MEXCEPTION, ERROR, RETHROW.
 ```
 
+## `unzip`
+
+```
+UNZIP  Extrait une archive ZIP.
+    FICHIERS = UNZIP(ARCHIVE) extrait dans le dossier courant, et rend
+    les chemins des fichiers extraits. UNZIP(ARCHIVE,DOSSIER) extrait
+    dans DOSSIER, créé au besoin, sous-dossiers compris.
+
+    L'archive se lit sans commande extérieure : les entrées stockées et
+    celles compressées par DEFLATE — celles de presque tous les outils,
+    et celles d'un modèle .slx de Simulink — sont reconnues, et le CRC de
+    chacune vérifié. Une entrée qui sortirait du dossier de destination
+    (« ../x ») est refusée.
+
+    Syntaxe
+       fichiers = unzip(archive)
+       fichiers = unzip(archive, dossier)
+
+    Exemples
+
+       dossier = tempname(); mkdir(dossier);
+       fid = fopen(fullfile(dossier, 'a.txt'), 'w'); fprintf(fid, 'bonjour'); fclose(fid);
+       zip(fullfile(dossier, 'paquet.zip'), {'a.txt'}, dossier);
+       extraits = unzip(fullfile(dossier, 'paquet.zip'), fullfile(dossier, 'sortie'));
+       fileread(extraits{1})
+
+    Voir aussi ZIP, FILEREAD.
+```
+
 ## `warning`
 
 ```
@@ -931,5 +983,32 @@ WARNING  Signale un avertissement, sans arrêter.
        warning(avant);               % l'état d'avant, quel qu'il fût
 
     Voir aussi ERROR, TRY, ASSERT, LASTWARN.
+```
+
+## `zip`
+
+```
+ZIP  Fabrique une archive ZIP.
+    NOMS = ZIP(ARCHIVE,FICHIERS) range les fichiers dans l'archive, sous
+    leur chemin relatif au dossier courant ; FICHIERS est un nom ou une
+    cellule de noms, et un dossier y entre avec tout son contenu. NOMS
+    rend les noms des entrées.
+    ZIP(ARCHIVE,FICHIERS,RACINE) prend les chemins relatifs à RACINE.
+    Sans extension, ARCHIVE prend « .zip ».
+
+    L'archive s'écrit sans commande extérieure : les entrées y sont
+    stockées, non compressées, et se relisent avec n'importe quel outil.
+
+    Syntaxe
+       noms = zip(archive, fichiers)
+       noms = zip(archive, fichiers, racine)
+
+    Exemples
+
+       dossier = tempname(); mkdir(dossier);
+       fid = fopen(fullfile(dossier, 'a.txt'), 'w'); fprintf(fid, 'bonjour'); fclose(fid);
+       noms = zip(fullfile(dossier, 'paquet.zip'), {'a.txt'}, dossier)
+
+    Voir aussi UNZIP, FILEREAD.
 ```
 

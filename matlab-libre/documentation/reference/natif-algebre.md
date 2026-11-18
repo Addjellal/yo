@@ -160,6 +160,26 @@ ISDIAG  La matrice est-elle diagonale.
     Voir aussi ISTRIL, ISTRIU, ISSYMMETRIC, DIAG.
 ```
 
+## `ishermitian`
+
+```
+ISHERMITIAN  La matrice est-elle hermitienne.
+    ISHERMITIAN(A) teste A == A' : partie réelle symétrique, partie
+    imaginaire antisymétrique, diagonale réelle. Pour une matrice réelle,
+    c'est la symétrie. EIG en tire ses valeurs propres réelles, rendues
+    croissantes, et CHOL accepte une hermitienne définie positive.
+
+    Syntaxe
+       tf = ishermitian(A)
+
+    Exemples
+       ishermitian([2, 1+1i; 1-1i, 2])    % 1
+       issymmetric([2, 1+1i; 1-1i, 2])    % 0 : A.' n'est pas A
+       eig([2, 1+1i; 1-1i, 2])            % 2 - sqrt(2) et 2 + sqrt(2)
+
+    Voir aussi ISSYMMETRIC, EIG, CHOL, CTRANSPOSE.
+```
+
 ## `issymmetric`
 
 ```

@@ -1,123 +1,232 @@
-function [T, valides] = estimateGeometricTransform2D(points1, points2, type, varargin)
-%ESTIMATEGEOMETRICTRANSFORM2D Transformation géométrique entre deux jeux
-%   de points.
-%   T = ESTIMATEGEOMETRICTRANSFORM2D(P1,P2,TYPE) rend la matrice 3x3 qui
-%   envoie P1 sur P2. TYPE vaut 'similarity', 'affine' ou 'projective'.
+function [T, valides, statut] = estimateGeometricTransform2D(points1, points2, type, varargin)
+%ESTIMATEGEOMETRICTRANSFORM2D Transformation géométrique robuste entre deux jeux de points.
+%   T = ESTIMATEGEOMETRICTRANSFORM2D(P1,P2,TYPE) estime la transformation
+%   qui envoie les points P1 (N x 2) sur les points appariés P2, en
+%   écartant les appariements aberrants par l'algorithme MSAC (Torr et
+%   Zisserman, 2000), comme MATLAB. TYPE vaut 'rigid', 'similarity',
+%   'affine' ou 'projective'.
+%   [T,VALIDES] = ... rend aussi le masque des appariements retenus, et
+%   [T,VALIDES,STATUT] le statut : 0 si tout va bien, 1 s'il y a trop peu
+%   de points, 2 si trop peu d'appariements sont retenus. Sans STATUT,
+%   ces deux cas sont des erreurs.
 %
-%   La convention est celle de MATLAB : les points sont des lignes, et la
-%   transformation s'applique à droite, [x y 1] * T.
+%   MATLAB rend un objet (rigid2d, affine2d, projective2d) ; MatLibre rend
+%   sa matrice T, 3 x 3, dans la convention de MATLAB : les points sont
+%   des lignes et la transformation s'applique à droite, [x y 1] * T.
 %
-%   [T,VALIDES] = ESTIMATEGEOMETRICTRANSFORM2D(...,'MaxDistance',D) écarte
-%   les appariements dont l'erreur de reprojection dépasse D, par tirages
-%   aléatoires, et rend leur masque.
+%   Options, comme MATLAB :
+%      'MaxDistance'   distance de reprojection, en pixels, au-delà de
+%                      laquelle un appariement est aberrant (1.5)
+%      'MaxNumTrials'  nombre maximal de tirages (1000)
+%      'Confidence'    confiance, en pour cent, de trouver le meilleur
+%                      ensemble, qui fixe l'arrêt des tirages (99)
+%
+%   Chaque tirage ajuste la transformation sur le plus petit nombre de
+%   points qui la détermine (2 pour 'rigid' et 'similarity', 3 pour
+%   'affine', 4 pour 'projective') et la note par le coût de MSAC, la
+%   somme des min(d², MaxDistance²). Le nombre de tirages s'adapte à la
+%   proportion d'appariements retenus. La transformation finale est
+%   ajustée sur tous les appariements retenus : par Kabsch (rigide),
+%   moindres carrés exacts (similitude, affine) ou transformation
+%   linéaire directe normalisée de Hartley (projective).
 %
 %   Exemple :
-%      p1 = [0 0; 1 0; 0 1; 2 2];
-%      p2 = p1 * 2 + 3;
-%      T = estimateGeometricTransform2D(p1, p2, 'similarity');
+%      p1 = [0 0; 10 0; 0 10; 20 20; 5 15];
+%      p2 = p1 * 2 + 3;  p2(5, :) = [100 -40];      % un appariement faux
+%      [T, valides] = estimateGeometricTransform2D(p1, p2, 'similarity');
+%      valides.'                                    % 1 1 1 1 0
 %
 %   Voir aussi ESTIMATEGEOMETRICTRANSFORM, ESTIMATEFUNDAMENTALMATRIX.
-    if nargin < 3 || isempty(type), type = 'affine'; end
-    distanceMax = [];
-    tirages = 500;
-    for k = 1:2:numel(varargin)-1
+    if nargin < 3 || isempty(type)
+        error('vision:estimateGeometricTransform2D:Type', ...
+              'Le type est ''rigid'', ''similarity'', ''affine'' ou ''projective''.');
+    end
+    type = lower(char(type));
+    distanceMax = 1.5;
+    tiragesMax = 1000;
+    confiance = 99;
+    if mod(numel(varargin), 2) ~= 0
+        error('vision:estimateGeometricTransform2D:Options', ...
+              'Les options vont par paires nom, valeur.');
+    end
+    for k = 1:2:numel(varargin)
         switch lower(char(varargin{k}))
-            case 'maxdistance', distanceMax = double(varargin{k+1});
-            case 'maxnumtrials', tirages = double(varargin{k+1});
+            case 'maxdistance',  distanceMax = double(varargin{k + 1});
+            case 'maxnumtrials', tiragesMax = double(varargin{k + 1});
+            case 'confidence',   confiance = double(varargin{k + 1});
+            otherwise
+                error('vision:estimateGeometricTransform2D:Option', ...
+                      'Option inconnue : ''%s''.', char(varargin{k}));
         end
+    end
+    if ~(distanceMax > 0) || ~(confiance > 0 && confiance < 100) || tiragesMax < 1
+        error('vision:estimateGeometricTransform2D:Options', ...
+              'MaxDistance est positif, Confidence entre 0 et 100, MaxNumTrials au moins 1.');
     end
     P1 = double(points1);
     P2 = double(points2);
+    if size(P1, 2) ~= 2 || ~isequal(size(P1), size(P2))
+        error('vision:estimateGeometricTransform2D:Points', ...
+              'P1 et P2 sont deux matrices N x 2 de points appariés.');
+    end
     n = size(P1, 1);
     minimum = minimumPoints(type);
+    T = eye(3);
+    valides = false(n, 1);
     if n < minimum
-        error('vision:estimateGeometricTransform2D:TooFewPoints', ...
-              'Il faut au moins %d correspondances pour ce type.', minimum);
-    end
-    if isempty(distanceMax)
-        T = ajuster(P1, P2, type);
-        valides = true(n, 1);
+        statut = 1;
+        signaler(statut, nargout, minimum);
         return
     end
-    meilleurNombre = -1;
-    T = ajuster(P1, P2, type);
-    valides = true(n, 1);
-    for essai = 1:tirages
+    seuil2 = distanceMax ^ 2;
+    meilleurCout = inf;
+    tirages = tiragesMax;
+    essai = 0;
+    while essai < tirages
+        essai = essai + 1;
         indices = randperm(n, minimum);
         candidat = ajuster(P1(indices, :), P2(indices, :), type);
-        if isempty(candidat), continue, end
-        distances = erreursReprojection(candidat, P1, P2);
-        interieurs = distances <= distanceMax;
-        if sum(interieurs) > meilleurNombre
-            meilleurNombre = sum(interieurs);
-            valides = interieurs;
+        if isempty(candidat) || any(~isfinite(candidat(:)))
+            continue
+        end
+        d2 = erreursReprojection(candidat, P1, P2) .^ 2;
+        cout = sum(min(d2, seuil2));
+        if cout < meilleurCout
+            meilleurCout = cout;
+            valides = d2 < seuil2;
+            proportion = nnz(valides) / n;
+            if proportion >= 1
+                tirages = essai;
+            elseif proportion > 0
+                besoin = log(1 - confiance / 100) / log(1 - proportion ^ minimum);
+                tirages = min(tiragesMax, max(essai, ceil(besoin)));
+            end
         end
     end
-    if sum(valides) >= minimum
+    if nnz(valides) < minimum
+        statut = 2;
+        signaler(statut, nargout, minimum);
+        valides = false(n, 1);
+        return
+    end
+    T = ajuster(P1(valides, :), P2(valides, :), type);
+    % Le modèle final peut retenir quelques points de plus, ou de moins.
+    valides = erreursReprojection(T, P1, P2) < distanceMax;
+    if nnz(valides) >= minimum
         T = ajuster(P1(valides, :), P2(valides, :), type);
     end
+    statut = 0;
+end
+
+function signaler(statut, nSorties, minimum)
+    if nSorties >= 3
+        return
+    end
+    if statut == 1
+        error('vision:points:notEnoughMatchedPts', ...
+              'Il faut au moins %d appariements pour ce type de transformation.', minimum);
+    end
+    error('vision:points:notEnoughInlierMatches', ...
+          'Trop peu d''appariements concordent : augmentez MaxDistance, ou MaxNumTrials.');
 end
 
 function m = minimumPoints(type)
-    switch lower(char(type))
-        case 'similarity', m = 2;
-        case 'affine',     m = 3;
-        case 'projective', m = 4;
+    switch type
+        case {'rigid', 'similarity'}, m = 2;
+        case 'affine',                m = 3;
+        case 'projective',            m = 4;
         otherwise
-            error('vision:estimateGeometricTransform2D:BadType', ...
-                  'Le type doit être ''similarity'', ''affine'' ou ''projective''.');
+            error('vision:estimateGeometricTransform2D:Type', ...
+                  'Le type est ''rigid'', ''similarity'', ''affine'' ou ''projective''.');
     end
 end
 
 function T = ajuster(P1, P2, type)
     n = size(P1, 1);
-    switch lower(char(type))
+    switch type
+        case 'rigid'
+            % Kabsch : la rotation qui aligne au mieux les nuages centrés.
+            c1 = mean(P1, 1); c2 = mean(P2, 1);
+            [U, ~, V] = svd((P1 - c1).' * (P2 - c2));
+            D = diag([1, sign(det(V * U.'))]);
+            R = V * D * U.';                   % colonne : q = R p + t
+            t = c2 - c1 * R.';
+            T = [R.', [0; 0]; t, 1];
         case 'similarity'
             % [x' y'] = s R [x y] + t : quatre inconnues, deux équations
-            % par point.
+            % par point ; les moindres carrés linéaires sont exacts.
             A = zeros(2 * n, 4);
             b = zeros(2 * n, 1);
-            for k = 1:n
-                x = P1(k, 1); y = P1(k, 2);
-                A(2*k-1, :) = [x, -y, 1, 0];
-                A(2*k,   :) = [y,  x, 0, 1];
-                b(2*k-1) = P2(k, 1);
-                b(2*k)   = P2(k, 2);
+            A(1:2:end, :) = [P1(:, 1), -P1(:, 2), ones(n, 1), zeros(n, 1)];
+            A(2:2:end, :) = [P1(:, 2), P1(:, 1), zeros(n, 1), ones(n, 1)];
+            b(1:2:end) = P2(:, 1);
+            b(2:2:end) = P2(:, 2);
+            if rank(A) < 4
+                T = [];
+                return
             end
             p = A \ b;
             T = [p(1), p(2), 0; -p(2), p(1), 0; p(3), p(4), 1];
         case 'affine'
             A = [P1, ones(n, 1)];
-            M = A \ P2;
-            T = [M, [0; 0; 1]];
+            if rank(A) < 3
+                T = [];
+                return
+            end
+            T = [A \ P2, [0; 0; 1]];
         otherwise
             T = ajusterProjective(P1, P2);
     end
 end
 
 function T = ajusterProjective(P1, P2)
-%AJUSTERPROJECTIVE Homographie par transformation linéaire directe.
+%AJUSTERPROJECTIVE Homographie par transformation linéaire directe normalisée.
+%   Hartley (1997) : chaque nuage est centré et mis à l'échelle (distance
+%   moyenne racine de deux) avant la décomposition en valeurs singulières,
+%   ce qui rend le système bien conditionné en coordonnées de pixels.
+    [Q1, N1] = normaliser(P1);
+    [Q2, N2] = normaliser(P2);
     n = size(P1, 1);
     A = zeros(2 * n, 9);
-    for k = 1:n
-        x = P1(k, 1); y = P1(k, 2);
-        u = P2(k, 1); v = P2(k, 2);
-        A(2*k-1, :) = [-x, -y, -1, 0, 0, 0, u*x, u*y, u];
-        A(2*k,   :) = [0, 0, 0, -x, -y, -1, v*x, v*y, v];
+    x = Q1(:, 1); y = Q1(:, 2); u = Q2(:, 1); v = Q2(:, 2);
+    o = ones(n, 1); z = zeros(n, 1);
+    A(1:2:end, :) = [-x, -y, -o, z, z, z, u .* x, u .* y, u];
+    A(2:2:end, :) = [z, z, z, -x, -y, -o, v .* x, v .* y, v];
+    % Quatre points donnent huit équations pour neuf inconnues : la SVD
+    % économique n'aurait alors que huit vecteurs, sans celui du noyau.
+    if size(A, 1) >= 9
+        [~, S, V] = svd(A, 0);
+    else
+        [~, S, V] = svd(A);
     end
-    [~, ~, V] = svd(A);
-    H = reshape(V(:, end), 3, 3)';
-    if abs(H(3, 3)) > eps
-        H = H / H(3, 3);
+    s = diag(S);
+    if numel(s) >= 8 && s(8) <= eps * s(1) * 9
+        T = [];                         % points alignés : pas d'homographie
+        return
     end
+    H = reshape(V(:, end), 3, 3).';
+    H = N2 \ H * N1;
+    if abs(H(3, 3)) <= eps * norm(H)
+        T = [];
+        return
+    end
+    H = H / H(3, 3);
     % Convention de MATLAB : les points sont des lignes, donc la matrice
     % est la transposée de l'homographie usuelle.
-    T = H';
+    T = H.';
+end
+
+function [Q, N] = normaliser(P)
+    c = mean(P, 1);
+    echelle = sqrt(2) / max(mean(sqrt(sum((P - c) .^ 2, 2))), eps);
+    N = [echelle, 0, -echelle * c(1); 0, echelle, -echelle * c(2); 0, 0, 1];
+    Q = (P - c) * echelle;
 end
 
 function d = erreursReprojection(T, P1, P2)
     n = size(P1, 1);
     h = [P1, ones(n, 1)] * T;
-    projete = h(:, 1:2) ./ repmat(max(abs(h(:, 3)), eps) .* sign(h(:, 3) + (h(:, 3) == 0)), 1, 2);
-    d = sqrt(sum((projete - P2) .^ 2, 2));
+    w = h(:, 3);
+    w(w == 0) = eps;
+    d = sqrt(sum((h(:, 1:2) ./ w - P2) .^ 2, 2));
 end

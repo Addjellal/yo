@@ -193,6 +193,51 @@
 %   indicesSymboles                     - Idem
 ```
 
+## `LinearModel`
+
+```
+LINEARMODEL Modèle de régression linéaire, tel que le rend FITLM.
+  Un LinearModel porte les propriétés de celui de MATLAB :
+     Coefficients         table : Estimate, SE, tStat, pValue, une ligne
+                          par coefficient, nommée comme lui
+     CoefficientNames, CoefficientCovariance, NumCoefficients,
+     NumEstimatedCoefficients (moins que NumCoefficients quand les
+                          termes sont liés : les coefficients de trop
+                          valent zéro, sans écart type)
+     Rsquared             structure : Ordinary (SSR/SST) et Adjusted
+     RMSE, MSE, SSE, SSR, SST, DFE
+     LogLikelihood        sous l'hypothèse d'erreurs normales de
+                          variance MSE
+     ModelCriterion       structure : AIC, AICc, BIC, CAIC, avec pour
+                          nombre de paramètres NumEstimatedCoefficients
+     Fitted, Residuals    table : Raw, Pearson, Studentized, Standardized
+     Diagnostics          table : Leverage, CooksDistance, Dffits, S2_i,
+                          CovRatio, Dfbetas (MatLibre ne range pas
+                          HatMatrix, une matrice N×N)
+     Formula              un objet CLASSREG.REGR.LINEARFORMULA
+     NumObservations, NumPredictors, NumVariables, ObservationInfo,
+     ObservationNames, PredictorNames, ResponseName, VariableNames,
+     Variables, VariableInfo
+  Les lignes écartées (valeur manquante, option Exclude) ont des
+  résidus NaN.
+
+  Méthodes : PREDICT (avec intervalles de confiance ou de prédiction,
+  ponctuels ou simultanés), FEVAL, RANDOM, COEFCI, COEFTEST, ANOVA,
+  DISP. MatLibre n'a pas encore les méthodes graphiques (PLOT,
+  PLOTRESIDUALS...) ni STEP, ADDTERMS, REMOVETERMS.
+
+  LINEARMODEL.FIT(...) est le nom ancien de FITLM.
+
+  Exemple :
+     x = (1:10)';
+     y = 2 + 3 * x + 0.1 * sin(x);
+     mdl = fitlm(x, y);
+     mdl.Coefficients.Estimate'     % proche de [2 3]
+     predict(mdl, 11)               % proche de 35
+
+  Voir aussi FITLM, CLASSREG.REGR.LINEARFORMULA, REGRESS, FITGLM.
+```
+
 ## `anova1`
 
 ```
@@ -619,7 +664,10 @@ CDF Fonction de répartition d'une loi nommée.
 ```
 CHI2CDF Répartition du khi-deux : gamma incomplète régularisée.
   P = CHI2CDF(X,V) rend la probabilité qu'une variable du khi-deux à V
-  degrés de liberté soit inférieure à X.
+  degrés de liberté soit inférieure à X. X et V ont la même taille, ou
+  l'un est scalaire.
+  P = CHI2CDF(X,V,'upper') rend la queue supérieure, calculée
+  directement : c'est la p-valeur d'un test du khi-deux.
 
   Le khi-deux est la somme des carrés de V normales centrées réduites :
   c'est de là que viennent tous ses emplois — test d'ajustement, test
@@ -1287,9 +1335,15 @@ EXPSTAT Moyenne et variance de la loi exponentielle.
 ```
 FCDF Répartition de la loi de Fisher.
   F(x) = I_{d1 x / (d1 x + d2)}(d1/2, d2/2).
+  X, D1 et D2 ont la même taille, ou sont scalaires.
+
+  P = FCDF(X,D1,D2,'upper') rend la queue supérieure P(F > x), calculée
+  directement par I_{d2/(d2 + d1 x)}(d2/2, d1/2) : c'est la p-valeur
+  d'un test F, juste même quand elle vaut 1e-12.
 
   Exemple :
      fcdf(1, 10, 10)             % 0.5 : a degres egaux, la mediane est en un
+     fcdf(330.285, 6, 9, 'upper')   % 4.98e-10 : la regression de Longley
 
   Voir aussi FPDF, FINV, FRND, FSTAT, PDF, CDF.
 ```
@@ -1324,7 +1378,9 @@ FITCDISCR Analyse discriminante.
   d'une diagonale, ce qui la rend inversible quand les variables sont
   peu nombreuses devant les dimensions.
 
-  PREDICT applique le modèle.
+  PREDICT applique le modèle ; RESUBPREDICT et RESUBLOSS le jugent sur
+  ses propres données d'apprentissage, que le modèle garde (champs X et
+  Y), et LOSS sur d'autres. Les classes sont dans ClassNames.
 
   La règle est celle de Bayes, écrite pour des gaussiennes : on classe
   x dans la classe qui maximise
@@ -1337,14 +1393,19 @@ FITCDISCR Analyse discriminante.
   variantes : ce n'est pas le modèle qui change de nature, seulement ce
   qui survit à la soustraction.
 
-  Exemple :
+  Exemples :
      rng(1);
      X = [randn(50, 2); randn(50, 2) + 3];
      y = [ones(50, 1); 2 * ones(50, 1)];
      m = fitcdiscr(X, y);
      mean(predict(m, X) == y)
 
-  Voir aussi PREDICT, FITCNB, FITCSVM, FITCKNN, PCA.
+     % Les iris de Fisher (1936) :
+     load fisheriris
+     Md = fitcdiscr(meas, species);
+     resubLoss(Md)      % 0.02 : trois fleurs sur cent cinquante
+
+  Voir aussi PREDICT, RESUBLOSS, LOSS, CLASSIFY, FITCNB, FITCSVM, FITCKNN.
 ```
 
 ## `fitcecoc`
@@ -1608,17 +1669,55 @@ FITGMDIST Ajuste un mélange gaussien par l'algorithme EM.
 ## `fitlm`
 
 ```
-FITLM Modèle linéaire avec ordonnée à l'origine.
-  M = FITLM(X,Y) ajuste Y = b0 + X*b et rend une structure décrivant le
-  modèle : coefficients, R2, résidus, écarts types.
+FITLM Régression linéaire.
+  MDL = FITLM(X,Y) ajuste Y = b0 + b1*x1 + ... + bp*xp par moindres
+  carrés et rend un objet LINEARMODEL : MDL.Coefficients est une table
+  (Estimate, SE, tStat, pValue), MDL.Rsquared.Ordinary le R², MDL.RMSE
+  l'écart type résiduel, et PREDICT, COEFCI, COEFTEST, ANOVA s'y
+  appliquent.
+
+  MDL = FITLM(TBL) prend la dernière variable de la table pour réponse
+  et les autres pour prédicteurs ; FITLM(TBL,FORMULE) suit une formule
+  de Wilkinson :
+     'y ~ x1 + x2'       termes additifs (la constante est implicite)
+     'y ~ x1*x2'         x1 + x2 + x1:x2
+     'y ~ x1:x2'         l'interaction seule
+     'y ~ x1^2'          x1 + x1^2
+     'y ~ x1 + x2 - 1'   sans constante
+  MDL = FITLM(X,Y,MODELE) : 'constant', 'linear' (défaut),
+  'interactions', 'purequadratic', 'quadratic', 'polyIJK' (degré I pour
+  x1, J pour x2...), ou une matrice de termes (une ligne par terme, une
+  colonne par variable, la puissance de chacune).
+
+  Options, par paires nom-valeur :
+     'Intercept'        faux : pas de constante
+     'Weights'          poids des observations (moindres carrés pondérés)
+     'Exclude'          observations écartées (indices ou logiques)
+     'VarNames'         noms des colonnes de X puis de Y
+     'PredictorVars', 'ResponseVar'   variables d'une table à employer
+     'CategoricalVars'  variables numériques à traiter en catégories
+  Les variables catégorielles, logiques ou de texte entrent par des
+  indicatrices, la première catégorie servant de référence : un
+  coefficient 'Sexe_M' mesure l'écart de M à la référence.
+
+  Les termes liés entre eux (matrice de conception de rang déficient)
+  sont détectés par une factorisation QR pivotée : leurs coefficients
+  valent zéro, sans écart type, et NumEstimatedCoefficients le dit.
 
   Exemple :
-     rng(1);
-     x = (1:50)';
-     m = fitlm(x, 2 + 3 * x + randn(50, 1));
-     abs(m.Coefficients(2) - 3) < 0.1
+     % Le ciment de Hald (Draper et Smith) : chaleur dégagée selon
+     % quatre composants.
+     X = [7 26 6 60; 1 29 15 52; 11 56 8 20; 11 31 8 47; 7 52 6 33;
+          11 55 9 22; 3 71 17 6; 1 31 22 44; 2 54 18 22; 21 47 4 26;
+          1 40 23 34; 11 66 9 12; 10 68 8 12];
+     y = [78.5 74.3 104.3 87.6 95.9 109.2 102.7 72.5 93.1 115.9 ...
+          83.8 113.3 109.4]';
+     mdl = fitlm(X, y);
+     mdl.Coefficients.Estimate'   % 62.4054 1.5511 0.5102 0.1019 -0.1441
+     mdl.Rsquared.Ordinary        % 0.9824
+     mdl.RMSE                     % 2.4460
 
-  Voir aussi REGRESS, ROBUSTFIT, STEPWISEFIT, ANOVA1.
+  Voir aussi LINEARMODEL, REGRESS, FITGLM, STEPWISEFIT, ROBUSTFIT.
 ```
 
 ## `fitlme`
@@ -3150,6 +3249,42 @@ LOGNSTAT Moyenne et variance de la loi log-normale.
   Voir aussi LOGNPDF, LOGNCDF, LOGNINV, LOGNRND, PDF, CDF.
 ```
 
+## `loss`
+
+```
+LOSS Erreur d'un classifieur sur des données étiquetées.
+  L = LOSS(MDL,X,Y) applique le classifieur MDL aux observations X et
+  rend son erreur de classement : la part, pondérée, des observations
+  dont la classe prédite n'est pas Y.
+
+  Comme MATLAB, LOSS pondère chaque observation pour que les poids de
+  chaque classe totalisent sa probabilité a priori (champ Prior du
+  modèle). Avec les a priori empiriques, qui sont le défaut, c'est la
+  simple proportion d'erreurs ; avec 'Prior','uniform', chaque classe
+  pèse autant, quelle que soit sa taille.
+
+  L = LOSS(...,'LossFun',F) choisit la perte :
+     'classiferror'  l'erreur de classement ;
+     'mincost'       le coût minimal attendu — avec les coûts par défaut
+                     (zéro pour une bonne réponse, un sinon), c'est
+                     l'erreur de classement, ce qui est le défaut ;
+     une fonction    F(C,S,W,COST), où C est l'indicatrice logique des
+                     classes (une ligne par observation), S les scores,
+                     W les poids normalisés et COST la matrice des coûts.
+  L = LOSS(...,'Weights',W) pondère les observations avant
+  normalisation.
+
+  Les observations dont l'étiquette n'est pas une classe du modèle ne
+  comptent pas.
+
+  Exemple :
+     load fisheriris
+     Md = fitcdiscr(meas(1:2:end, :), species(1:2:end));
+     loss(Md, meas(2:2:end, :), species(2:2:end))   % erreur sur l'autre moitié
+
+  Voir aussi RESUBLOSS, RESUBPREDICT, PREDICT, CONFUSIONMAT.
+```
+
 ## `lsline`
 
 ```
@@ -3262,6 +3397,10 @@ MATLIBRE_ARBRE_REDUIT L'arbre des GARDE derniers groupes seulement.
   DENDROGRAM s'en sert pour ne dessiner que le haut de l'arbre quand
   les observations sont trop nombreuses pour tenir sur un axe.
 ```
+
+## `matlibre_classify`
+
+_Pas de bloc d'aide._
 
 ## `matlibre_diffuser_deux`
 
@@ -4507,17 +4646,58 @@ NOYAUSVM Matrice de noyau entre deux jeux de points.
 
 ```
 PCA Analyse en composantes principales.
-  [C,S,L] = PCA(X) centre les colonnes de X, puis rend les vecteurs
-  propres de la covariance (C), les coordonnées des individus (S) et les
-  valeurs propres (L), triés par variance décroissante.
+  COEFF = PCA(X) rend les axes principaux de X, une observation par
+  ligne et une variable par colonne : chaque colonne de COEFF est un
+  axe, rangés par variance décroissante.
+
+  [COEFF,SCORE,LATENT,TSQUARED,EXPLAINED,MU] = PCA(X) rend aussi
+     SCORE      les coordonnées des observations sur les axes ;
+     LATENT     la variance portée par chaque axe — les valeurs propres
+                de la covariance de X ;
+     TSQUARED   le T² de Hotelling de chaque observation, la somme des
+                carrés de ses coordonnées réduites, sur tous les axes
+                même quand NumComponents en garde moins ;
+     EXPLAINED  la part de la variance totale portée par chaque axe, en
+                pour cent ;
+     MU         la moyenne retranchée, une valeur par variable.
+  C'est l'ordre de MATLAB : le pourcentage expliqué est la cinquième
+  sortie, non la quatrième.
+
+  Comme MATLAB, PCA fixe le signe de chaque axe, que la décomposition
+  laisse libre : le coefficient de plus grande valeur absolue y est
+  positif.
+
+  Options, par paires nom-valeur :
+     'Algorithm'       'svd' (défaut) décompose les données centrées ;
+                       'eig' diagonalise leur covariance.
+     'Centered'        vrai (défaut) retranche la moyenne ; faux
+                       analyse X tel quel, et MU est nul.
+     'Economy'         vrai (défaut) : quand il y a moins de degrés de
+                       liberté que de variables, seuls les axes porteurs
+                       de variance sont rendus.
+     'NumComponents'   le nombre d'axes rendus dans COEFF et SCORE.
+     'Rows'            'complete' (défaut) écarte les lignes portant
+                       un NaN, dont SCORE et TSQUARED valent NaN ;
+                       'all' refuse les NaN.
+     'VariableWeights' 'variance' réduit chaque variable : l'analyse
+                       porte alors sur la matrice de corrélation, et
+                       COEFF vaut DIAG(STD(X)) fois les axes
+                       orthonormés.
+  MatLibre refuse en le disant ce qu'il ne calcule pas : 'Weights', un
+  vecteur de 'VariableWeights', 'Rows','pairwise' et l'algorithme
+  'als'.
 
   Exemple :
-     rng(1);
-     X = randn(200, 2) * [2 0; 0 0.1];
-     [c, s, v, expliquee] = pca(X);
-     expliquee(1) > 95           % le premier axe porte presque tout
+     % Les données de Hald (1960) :
+     X = [7 26 6 60; 1 29 15 52; 11 56 8 20; 11 31 8 47; 7 52 6 33;
+          11 55 9 22; 3 71 17 6; 1 31 22 44; 2 54 18 22; 21 47 4 26;
+          1 40 23 34; 11 66 9 12; 10 68 8 12];
+     [coeff, ~, ~, t2, expliquee] = pca(X);
+     coeff(:, 1)'      % -0.0678 -0.6785 0.0290 0.7309
+     expliquee(1)      % 86.5974
+     t2(1)             % 5.6803
 
-  Voir aussi PCACOV, CMDSCALE, CANONCORR.
+  Voir aussi PCACOV, PCARES, CMDSCALE, FACTORAN, SVD.
 ```
 
 ## `pcacov`
@@ -5047,8 +5227,12 @@ PRINCOMP Analyse en composantes principales (nom historique).
   mesurée dans la métrique des composantes. C'est ce qui sert à
   repérer les individus atypiques.
 
+  PRINCOMP(X,'econ') ne rend que les axes porteurs de variance quand
+  les observations sont moins nombreuses que les variables ; sans
+  'econ', COEFF est carré, comme le rendait PRINCOMP.
+
   PRINCOMP est le nom que la fonction portait avant R2012b ; PCA lui a
-  succédé, avec les mêmes trois premières sorties. MatLibre garde les
+  succédé, avec les mêmes quatre premières sorties. MatLibre garde les
   deux, pour que les programmes anciens tournent sans retouche.
 
   Exemples :
@@ -5411,6 +5595,50 @@ RESOUDRESMO Optimisation minimale séquentielle du dual d'une SVM.
      abs(sum(alpha .* cible)) < 1e-6      % la contrainte d'egalite est tenue
 
   Voir aussi FITCSVM, NOYAUSVM, PREDICTSVM.
+```
+
+## `resubLoss`
+
+```
+RESUBLOSS Erreur d'un classifieur sur ses propres données d'apprentissage.
+  L = RESUBLOSS(MDL) applique MDL aux observations qui ont servi à
+  l'ajuster et rend son erreur de classement, pondérée par les a priori
+  comme le fait LOSS. C'est une erreur apparente : optimiste, puisque
+  le modèle a vu ces données. Une validation croisée en donne une
+  estimation honnête.
+
+  L = RESUBLOSS(MDL,'LossFun',F) et RESUBLOSS(MDL,'Weights',W) passent
+  ces options à LOSS.
+
+  Le modèle doit garder ses données d'apprentissage (champs X et Y),
+  comme le font FITCDISCR, FITCNB, FITCSVM, FITCECOC et FITCKNN.
+
+  Exemple :
+     % Les iris de Fisher ; l'exemple de MathWorks donne 0.0200.
+     load fisheriris
+     Md = fitcdiscr(meas, species);
+     resubLoss(Md)      % 0.02
+
+  Voir aussi LOSS, RESUBPREDICT, PREDICT, CVPARTITION.
+```
+
+## `resubPredict`
+
+```
+RESUBPREDICT Prédictions d'un modèle sur ses propres données d'apprentissage.
+  LABEL = RESUBPREDICT(MDL) applique MDL aux observations qui ont servi
+  à l'ajuster.
+  [LABEL,SCORE] = RESUBPREDICT(MDL) rend aussi les scores, comme
+  PREDICT : pour une analyse discriminante, les probabilités a
+  posteriori de chaque classe.
+
+  Exemple :
+     load fisheriris
+     Md = fitcdiscr(meas, species);
+     etiquettes = resubPredict(Md);
+     confusionmat(species, etiquettes)
+
+  Voir aussi RESUBLOSS, PREDICT, LOSS.
 ```
 
 ## `ridge`
@@ -5881,6 +6109,11 @@ STATSET Structure d'options des fonctions statistiques.
   OPTIONS = STATSET(ANCIENNES,'nom',valeur,...) part d'une structure
   existante et n'en change que ce qui est nommé.
 
+  OPTIONS = STATSET('nlinfit') rend les valeurs par défaut de la
+  fonction nommée — 'nlinfit' et 'fitnlm' (MaxIter 100, TolFun et TolX
+  1e-8, DerivStep eps^(1/3)), 'kmeans', 'mle', 'fitgmdist' —, qu'on
+  modifie ensuite champ par champ.
+
   V = STATSET(OPTIONS,'nom') n'est pas la forme de MATLAB ; pour lire
   un champ, employez STATGET.
 
@@ -5890,7 +6123,7 @@ STATSET Structure d'options des fonctions statistiques.
      MaxFunEvals    nombre maximal d'évaluations ;
      TolFun         tolérance sur la fonction ;
      TolX           tolérance sur les paramètres ;
-     TolBound       tolérance sur les bornes ;
+     TolBnd         tolérance sur les bornes ;
      GradObj        'on' si le gradient est fourni ;
      DerivStep      pas des différences finies ;
      FunValCheck    'on' pour refuser un NaN ou un infini ;
@@ -5907,6 +6140,9 @@ STATSET Structure d'options des fonctions statistiques.
      b = nlinfit(x, y, @(p, t) p(1) * exp(-p(2) * t), [1 1], options);
 
      serrees = statset(options, 'TolX', 1e-14);
+
+     parDefaut = statset('nlinfit');
+     parDefaut.MaxIter              % 100
 
   Voir aussi STATGET, NLINFIT, MLE, KMEANS, OPTIMSET.
 ```
@@ -6006,9 +6242,16 @@ TCDF Fonction de répartition de la loi de Student.
   P = TCDF(T,NU) utilise la relation avec la fonction beta incomplète :
      P(T <= t) = 1 - I_{nu/(nu+t^2)}(nu/2, 1/2) / 2   pour t >= 0
   ce qui est exact et rapide, contrairement à une intégration numérique.
+  T et NU ont la même taille, ou l'un est scalaire. NU infini donne la
+  loi normale.
+
+  P = TCDF(T,NU,'upper') rend la queue supérieure P(T > t), calculée
+  directement : une p-valeur de 1e-12 garde ses chiffres, ce que
+  1 - TCDF(T,NU) ne peut pas faire.
 
   Exemple :
      tcdf(0, 10)                 % 0.5 : la loi de Student est symetrique
+     tcdf(8, 10, 'upper')        % 5.9e-06
 
   Voir aussi TINV, TRND, TSTAT, PDF, CDF, ICDF.
 ```

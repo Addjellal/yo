@@ -1,7 +1,8 @@
 function [a, e] = lpc(x, p)
 %LPC Coefficients de prédiction linéaire.
 %   [A,E] = LPC(X,P) rend le prédicteur d'ordre P qui minimise l'erreur
-%   quadratique, et E la variance de cette erreur.
+%   quadratique, et E la variance de cette erreur. P vaut par défaut
+%   numel(X) - 1, comme dans MATLAB.
 %
 %   A est le polynôme du filtre inverse : FILTER(A,1,X) rend l'erreur de
 %   prédiction, et FILTER(1,A,E) reconstruit le signal à partir d'elle.
@@ -27,7 +28,7 @@ function [a, e] = lpc(x, p)
     x = x(:).';
     n = numel(x);
     if nargin < 2 || isempty(p)
-        p = 1;
+        p = n - 1;
     end
     if p >= n
         error('dsp:lpc:Ordre', ...

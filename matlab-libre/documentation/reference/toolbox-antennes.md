@@ -65,12 +65,14 @@ BEAMWIDTH Ouverture à mi-puissance (-3 dB), en radians.
   l'ouverture par deux. C'est la résolution angulaire, et elle ne
   s'achète qu'en étendue physique.
 
-  La mesure se fait sur l'échantillonnage fourni : un maillage trop
-  grossier la surestime.
+  Les deux points à mi-puissance sont interpolés linéairement entre
+  les échantillons qui les encadrent : l'erreur décroît comme le carré
+  du pas de THETA. S'ils sortent du domaine échantillonné, l'ouverture
+  n'est pas mesurable et BEAMWIDTH le dit.
 
   Exemple :
      theta = linspace(1e-6, pi - 1e-6, 20001);
-     rad2deg(beamwidth(theta, dipolePattern(theta, 0.5)))   % 78
+     rad2deg(beamwidth(theta, dipolePattern(theta, 0.5)))   % 78.08
 
   Voir aussi DIRECTIVITY, DIPOLEPATTERN, ARRAYFACTOR.
 ```
@@ -87,9 +89,10 @@ DIPOLEPATTERN Diagramme de rayonnement d'un dipôle de longueur L/lambda.
   le fil par le bout, ce qui est une conséquence directe du rayonnement
   d'un élément de courant.
 
-  Le demi-onde ouvre à 78 degrés à mi-puissance et a une directivité de
-  1,64, soit 2,15 dBi : ces deux nombres du cours se retrouvent en
-  passant le diagramme à BEAMWIDTH et DIRECTIVITY.
+  Le demi-onde ouvre à 78,08 degrés à mi-puissance et a une directivité
+  de 4 / Cin(2 pi) = 1,6409, soit 2,15 dBi (Balanis, Antenna Theory,
+  § 4.6) : ces deux nombres du cours se retrouvent en passant le
+  diagramme à BEAMWIDTH et DIRECTIVITY.
 
   Allonger le dipôle resserre le faisceau et augmente la directivité,
   jusqu'à une longueur d'onde environ ; au-delà, des lobes secondaires

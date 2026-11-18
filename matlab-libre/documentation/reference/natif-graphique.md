@@ -130,6 +130,24 @@ BOX  Cadre des axes.
     Voir aussi GRID, AXIS.
 ```
 
+## `caxis`
+
+```
+CAXIS  Bornes de la palette des couleurs (nom ancien de CLIM).
+    CAXIS fait exactement ce que fait CLIM : CAXIS([BAS HAUT]),
+    CAXIS('auto'), CAXIS('manual'), L = CAXIS.
+
+    Syntaxe
+       caxis([bas haut])
+       caxis('auto')
+       lims = caxis
+
+    Exemples
+       surf(peaks(30)); caxis([-2 2]); colorbar
+
+    Voir aussi CLIM, COLORMAP.
+```
+
 ## `cla`
 
 ```
@@ -169,6 +187,33 @@ CLF  Efface la figure courante.
        clf                        % la fenêtre reste, vide
 
     Voir aussi FIGURE, CLOSE, CLA, HOLD.
+```
+
+## `clim`
+
+```
+CLIM  Bornes de la palette des couleurs.
+    Une image en couleurs indirectes (IMAGESC, SURF, PCOLOR, CONTOURF)
+    met la borne basse au premier ton de la palette et la borne haute au
+    dernier ; ce qui sort des bornes prend le ton de l'extrémité.
+    CLIM([BAS HAUT]) fixe les bornes de l'axe courant.
+    CLIM('auto') les rend aux données : du minimum au maximum de CData.
+    CLIM('manual') fige les bornes du moment.
+    L = CLIM rend les bornes ; M = CLIM('mode') rend 'auto' ou 'manual'.
+    CLIM(AX,...) agit sur l'axe AX.
+
+    Syntaxe
+       clim([bas haut])
+       clim('auto')
+       clim('manual')
+       lims = clim
+       clim(ax, ...)
+
+    Exemples
+       imagesc(magic(4)); clim([0 8]); colorbar
+       lims = clim
+
+    Voir aussi CAXIS, COLORMAP, IMAGESC, COLORBAR.
 ```
 
 ## `close`
@@ -211,20 +256,28 @@ COLORBAR  Barre de couleurs, avec son échelle.
 
 ```
 COLORMAP  Palette de couleurs.
-    COLORMAP(NOM) choisit une palette : 'parula', 'jet', 'hot', 'cool',
-    'gray', 'bone', 'copper', 'spring', 'summer', 'autumn', 'winter'.
+    COLORMAP(NOM) choisit une palette : 'jet', 'hot', 'cool', 'gray',
+    'bone', 'copper', 'pink', 'hsv', 'spring', 'summer', 'autumn',
+    'winter', 'prism', 'flag', ou 'default'.
     COLORMAP(M) impose une matrice N par 3 de valeurs entre 0 et 1.
+    COLORMAP(AX,...) donne sa propre palette à l'axe AX ; sans axe, la
+    palette est celle de la figure, que tous ses axes partagent.
     M = COLORMAP rend la palette courante.
+
+    La palette par défaut est viridis (256 tons, du violet au jaune),
+    du domaine public : parula, celle de MATLAB, appartient à MathWorks
+    et COLORMAP('parula') le dit par une erreur.
 
     Syntaxe
        colormap(nom)
        colormap(M)
+       colormap(ax, M)
        M = colormap
 
     Exemples
        imagesc(peaks(40)); colormap('hot'); colorbar
 
-    Voir aussi COLORBAR, IMAGESC, SURF, SHADING.
+    Voir aussi COLORBAR, CLIM, IMAGESC, SURF, SHADING.
 ```
 
 ## `contour`

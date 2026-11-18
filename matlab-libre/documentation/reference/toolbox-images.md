@@ -1777,14 +1777,33 @@ IMSHARPEN Accentue les contours par masque flou.
 ## `imshow`
 
 ```
-IMSHOW Affiche une image dans les axes courants.
-  Le rendu se fait en SVG : « print » écrit le fichier.
+IMSHOW Affiche une image, comme MATLAB : en niveaux de gris, en couleurs
+vraies, binaire ou indexée.
+  IMSHOW(I) affiche l'image d'intensités I en niveaux de gris, sur la
+  plage de son type : [0 255] pour un uint8, [0 65535] pour un uint16,
+  [-32768 32767] pour un int16, [0 1] pour un double, un single ou un
+  logical — une image binaire est donc noire et blanche.
+  IMSHOW(I,[BAS HAUT]) fixe la plage : BAS s'affiche en noir, HAUT en
+  blanc. IMSHOW(I,[]) la prend de min(I(:)) à max(I(:)).
+  IMSHOW(RGB) affiche un tableau m x n x 3 en couleurs vraies.
+  IMSHOW(X,MAP) affiche l'image indexée X avec la palette MAP.
+  IMSHOW(NOMFICHIER) lit l'image avec IMREAD puis l'affiche.
+  IMSHOW(...,'DisplayRange',[BAS HAUT]) et 'Colormap',MAP comme
+  ci-dessus ; 'InitialMagnification', 'Border', 'Interpolation',
+  'Parent', 'XData', 'YData' et 'Reduce' sont acceptés.
+  H = IMSHOW(...) rend la poignée de l'image.
+
+  Comme MATLAB, IMSHOW donne à l'axe une palette grise (sauf pour une
+  image indexée ou en couleurs vraies), des échelles égales et serrées
+  sur l'image, et cache les graduations ; le titre reste.
 
   Exemple :
-     imshow(rand(16));
-     close all;
+     I = uint8(magic(64));
+     imshow(I);                  % plage [0 255] : une image sombre
+     imshow(I, []);              % plage [min max] : tout le contraste
+     imshow(I > 128);            % noir et blanc
 
-  Voir aussi IMREAD.
+  Voir aussi IMAGE, IMAGESC, COLORMAP, CLIM, IMREAD.
 ```
 
 ## `imsplit`

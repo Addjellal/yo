@@ -132,8 +132,9 @@ assert(isequal(vitdec(code, [7 5], 3), [1 0 1 1 0 0]));
 assert(abs(berawgn(6, 'psk', 2) - 0.00239) < 1e-4);
 
 % Wireless
-signal = ofdmMod([1; 1i; -1; -1i], 8);
-assert(max(abs(ofdmDemod(signal, 8, 1, 4) - [1; 1i; -1; -1i])) < 1e-10);
+signal = ofdmmod([1; 1i; -1; -1i], 8, 1, [1 2 5 8].');
+assert(numel(signal) == 9);
+assert(max(abs(ofdmdemod(signal, 8, 1, 0, [1 2 5 8].') - [1; 1i; -1; -1i])) < 1e-10);
 
 % Phased Array
 assert(abs(abs(steeringVector(4, 0.5, 0)(2)) - 1) < 1e-12);
@@ -344,7 +345,10 @@ assert(~isempty(strfind(reponse, 'MatLibre')));
 
 % Audio
 son = 0.5 * sin(2 * pi * 440 * (0:999) / 8000);
-assert(abs(spectralCentroid(son, 8000) - 440) < 5);
+% Trames de 30 ms a fenetre rectangulaire, comme MATLAB : la fuite
+% spectrale ecarte chaque centroide de quelques hertz.
+centroidesSon = spectralCentroid(son, 8000);
+assert(numel(centroidesSon) == 10 && all(abs(centroidesSon - 440) < 10));
 fichier = [tempname() '.wav'];
 audiowrite(fichier, son, 8000);
 [relu, fs] = audioread(fichier);

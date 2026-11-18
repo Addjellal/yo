@@ -463,4 +463,250 @@ assert(round(tl(varbacktest([-ones(4, 1); zeros(246, 1)], 0.5 * ones(250, 1), ..
        'VaRLevel', 0.99)).Probability, 4) == 0.8922);
 fprintf('risques : exemples de MathWorks, feu tricolore de Bale\n');
 
+%% ----------------------------------------------------------------- radar
+% Exemples de la documentation de MathWorks (Radar Toolbox) : radareqpow,
+% radareqrng et radareqsnr, aux quatre chiffres imprimés, monostatique et
+% bistatique ; l'équation du radar (Skolnik, Introduction to Radar
+% Systems) les relie : les trois se recoupent à 1e-12 près.
+c = physconst('LightSpeed');
+assert(round(radareqpow(c / 1e9, 50e3, 6, 1e-6), -1) == 2.1996e5);
+assert(round(radareqpow(c / 10e9, 50e3, 10, 1e-6, 'RCS', 0.5, 'Gain', 30, 'Ts', 300, ...
+                        'Loss', 3), -2) == 2.2809e6);
+assert(round(radareqpow(c / 10e9, [50e3 75e3], 6, 10e-6, 'Gain', [40 20]), 0) == 49492);
+assert(round(radareqrng(c / 10e9, 6, 1e6, 10e-6)) == 41057);
+assert(round(radareqrng(c / 10e9, 6, 1e6, 10e-6, 'Gain', 40, 'RCS', 0.1, 'Loss', 3), -1) ...
+       == 1.9426e5);
+assert(round(radareqsnr(c / 1e9, 50e3, 1e6, 0.2e-6), 4) == 5.5868);
+assert(round(radareqsnr(c / 10e9, 100e3, 1e6, 1e-6, 'RCS', 0.5, 'Gain', 40, 'Ts', 300, ...
+                        'Loss', 3), 4) == 14.3778);
+assert(round(radareqsnr(c / 10e9, [50e3 75e3], 1e6, 1e-6, 'Gain', [40 20]), 4) == 9.0547);
+% Une valeur de RSB par cible donne une puissance par cible ; une perte
+% atmosphérique scalaire vaut pour l'aller et compte aussi au retour.
+P = radareqpow(c / 10e9, 50e3, [6; 10], 1e-6, 'RCS', 0.5, 'Gain', 30, 'Ts', 300, 'Loss', 3);
+assert(isequal(size(P), [2 1]) && round(P(2), -2) == 2.2809e6);
+assert(abs(radareqsnr(c / 1e9, 50e3, 1e6, 0.2e-6) - ...
+           radareqsnr(c / 1e9, 50e3, 1e6, 0.2e-6, 'AtmosphericLoss', 1) - 2) < 1e-12);
+portee = radareqrng(c / 10e9, 13, 1e6, 1e-6, 'Gain', 30);
+assert(abs(radareqsnr(c / 10e9, portee, 1e6, 1e-6, 'Gain', 30) - 13) < 1e-12);
+assert(abs(radareqpow(c / 10e9, portee, 13, 1e-6, 'Gain', 30) / 1e6 - 1) < 1e-12);
+% Compression d'impulsion d'un chirp (Cook et Bernfeld, Radar Signals) :
+% premier lobe secondaire à -13,26 dB pour un produit BT grand ; ici
+% BT = 200, -13,39 dB recoupé par NumPy. Résolution c / 2B.
+fe = 100e6; duree = 10e-6; bande = 20e6;
+n = round(duree * fe);
+t = ((0:n - 1) - n / 2) / fe;
+chirp = exp(1i * pi * (bande / duree) * t .^ 2);
+[sortie, retards] = pulseCompression([zeros(1, 100), chirp, zeros(1, 100)], chirp);
+module = abs(sortie);
+[sommet, ip] = max(module);
+assert(retards(ip) == 100);
+droite = ip;
+while module(droite + 1) < module(droite), droite = droite + 1; end
+gauche = ip;
+while module(gauche - 1) < module(gauche), gauche = gauche - 1; end
+pslr = 20 * log10(max(max(module(1:gauche - 1)), max(module(droite + 1:end))) / sommet);
+assert(abs(pslr - (-13.392875439097)) < 1e-9);
+assert(abs(bw2rangeres(20e6) - c / 40e6) < 1e-12 && abs(rangeres2bw(bw2rangeres(5e6)) - 5e6) < 1e-6);
+fprintf('radar : exemples de MathWorks, chirp a -13,39 dB\n');
+
+%% -------------------------------------------------------------------- rf
+% Pozar, Microwave Engineering : une charge de 100 ohms sur une ligne de
+% 50 ohms réfléchit un tiers de l'onde, ROS 2, perte de retour 9,54 dB.
+% L'atténuateur adapté de 3 dB en T (R1 = 8,55 ohms, R2 = 141,9 ohms) a
+% S11 = 0 et S21 = 10^(-3/20) ; les conversions S, Z, Y et ABCD
+% (tableau 4.2) se défont l'une l'autre.
+gamma = z2gamma(100, 50);
+assert(abs(gamma - 1/3) < 1e-15 && abs(vswr(gamma) - 2) < 1e-14);
+assert(abs(-20 * log10(gamma) - 9.5424250943932) < 1e-12);
+K = 10 ^ (3 / 20);
+R1 = 50 * (K - 1) / (K + 1);
+R2 = 100 * K / (K ^ 2 - 1);
+assert(round(R1, 2) == 8.55 && round(R2, 1) == 141.9);
+Sattenuateur = z2s([R1 + R2, R2; R2, R1 + R2]);
+assert(max(abs(diag(Sattenuateur))) < 1e-14 && abs(Sattenuateur(2, 1) - 1 / K) < 1e-14);
+assert(norm(s2z(Sattenuateur) - [R1 + R2, R2; R2, R1 + R2]) < 1e-10);
+assert(norm(abcd2s(s2abcd(Sattenuateur)) - Sattenuateur) < 1e-14);
+assert(norm(y2s(s2y(Sattenuateur)) - Sattenuateur) < 1e-14);
+assert(abs(gammain([0 1; 1 0], 50, 100) - 1/3) < 1e-15);
+% L'impédance série de 100 ohms : ABCD = [1 100 ; 0 1], S11 = 1/2.
+Sserie = abcd2s([1 100; 0 1]);
+assert(abs(Sserie(1, 1) - 0.5) < 1e-15 && abs(Sserie(2, 1) - 0.5) < 1e-15);
+fprintf('rf : Pozar, attenuateur de 3 dB en T\n');
+
+%% --------------------------------------------------------------- antennes
+% Balanis, Antenna Theory, § 4.6 : le dipôle demi-onde a une directivité
+% de 4 / Cin(2 pi) = 1,6409 (2,15 dBi) et ouvre à 78° ; un réseau
+% uniforme de dix éléments à lambda/2 a une directivité de N = 10, une
+% ouverture de 10,21° et son premier zéro à asin(1/(N d)) = 11,54°.
+% Valeurs exactes recoupées par scipy.special.sici et scipy.optimize.
+theta = linspace(1e-9, pi - 1e-9, 200001);
+E = dipolePattern(theta, 0.5);
+assert(abs(directivity(theta, E) - 1.6409223769845853) < 1e-9);
+assert(abs(rad2deg(beamwidth(theta, E)) - 78.07771889112405) < 1e-4);
+AF = arrayFactor(10, 0.5, theta);
+assert(abs(directivity(theta, AF) - 10) < 1e-9);
+assert(abs(rad2deg(beamwidth(theta, AF)) - 10.209175947792808) < 1e-4);
+assert(abs(friis(1, 1, 1, 1, 1 / (4 * pi)) - 1) < 1e-15);
+fprintf('antennes : dipole demi-onde de Balanis, reseau de dix elements\n');
+
+%% ---------------------------------------------------- reseaux d'antennes
+% Exemples de la documentation de MathWorks : steervec (avec et sans
+% quantification des phases sur 3 bits), sensorcov, rootmusicdoa et
+% espritdoa. Avec la covariance exacte, MUSIC (Schmidt, 1986) et ESPRIT
+% (Roy et Kailath, 1989) retrouvent les directions -25, 0 et 30 degrés.
+sv = steervec((0:0.1:0.4) / (c / 1e9), [45; 0]);
+assert(max(abs(round(sv * 1e4) / 1e4 - [1; 0.0887 + 0.9961i; -0.9843 + 0.1767i; ...
+                                         -0.2633 - 0.9647i; 0.9376 - 0.3478i])) < 1e-12);
+assert(max(abs(steervec((0:0.1:0.4) / (c / 1e9), [45; 0], 3) - [1; 1i; -1; -1i; 1])) < 1e-12);
+xcov = sensorcov((0:2) * 0.5, [30 60]);
+assert(abs(round(xcov(1, 2) * 1e4) / 1e4 - (-0.9127 - 1.4086i)) < 1e-12);
+xcov = sensorcov((0:2) * 0.5, [30 35], db2pow(-10), [1 0.8; 0.8 1]);
+assert(round(real(xcov(2, 2)), 4) == 3.6574 && round(real(xcov(3, 3)), 4) == 3.5321);
+R = sensorcov((0:9) * 0.5, [0 -25 30], db2pow(-5));
+assert(max(abs(sort(rootmusicdoa(R, 3)) - [-25 0 30])) < 1e-6);
+assert(max(abs(sort(espritdoa(R, 3)) - [-25 0 30])) < 1e-10);
+R = sensorcov((0:9) * 0.4, [0 -25 30], db2pow(-5));
+assert(max(abs(sort(espritdoa(R, 3, 'ElementSpacing', 0.4)) - [-25 0 30])) < 1e-10);
+covmat = sensorcov((0:10) * 0.5, [-60.2 -20.7 0.5 84.8], db2pow(-5));
+assert(isequal(round(sort(musicdoa(covmat, 4, 'ScanAngles', -70:0.1:90)) * 10), ...
+               [-602 -207 5 848]));
+% La super-résolution : deux sources à 0 et 6 degrés, plus proches que
+% l'ouverture (10,2 degrés) ; la formation de voies n'y voit qu'un pic,
+% MUSIC en voit deux.
+Rproche = sensorcov((0:9) * 0.5, [0 6], db2pow(-20));
+[~, ~, angles] = musicdoa(Rproche, 2, 'ScanAngles', -30:0.1:30);
+A = steervec((0:9) * 0.5, angles);
+voies = real(sum(conj(A) .* (Rproche * A), 1));
+% Un seul lobe, centré entre les deux sources, sans creux qui les sépare.
+[~, ipic] = max(voies);
+entre = voies(angles > 0 & angles < 6);
+creux = nnz(entre(2:end - 1) < entre(1:end - 2) & entre(2:end - 1) < entre(3:end));
+assert(abs(angles(ipic) - 3) < 1e-9 && creux == 0);
+assert(isequal(sort(musicdoa(Rproche, 2)), [0 6]));
+fprintf('reseaux d''antennes : exemples de MathWorks, MUSIC et ESPRIT\n');
+
+%% -------------------------------------------------------------------- dsp
+% firls (moindres carrés intégrés, Parks et Burrus, Digital Filter
+% Design) recoupé avec scipy.signal.firls pour le type I, et avec une
+% quadrature de Gauss-Legendre indépendante pour les types II et III ;
+% le transformateur de Hilbert approche h(±1) = ±2/pi. levinson résout le
+% système de Toeplitz hermitien comme scipy.linalg.solve_toeplitz ;
+% upfirdn rend la longueur et les valeurs de scipy.signal.upfirdn.
+b = firls(40, [0 .3 .4 1], [1 1 0 0]);
+assert(max(abs([b(1) b(11) b(21) sum(b) sum(b .^ 2)] - [0.00025702984090014095 ...
+       -0.021924854828191596 0.3491555470669215 1.003700623758178 0.3337777638736499])) < 1e-14);
+b = firls(40, [0 .3 .4 1], [1 1 0 0], [1 100]);
+assert(max(abs([b(1) b(11) b(21)] - [0.0015157599889283526 -0.020877935359264244 ...
+       0.33979526753844197])) < 1e-13);
+b = firls(41, [0 .3 .4 1], [1 1 0 0]);
+assert(max(abs([b(1) b(21) b(22)] - [-0.0012514185211521043 0.3328986093953944 ...
+       0.3328986093953944])) < 1e-13);
+b = firls(30, [.1 .9], [1 1], 'hilbert');
+assert(max(abs([b(1) b(13) b(15) b(17) b(31)] - [0.0025778536998605946 0.19530983926210657 ...
+       0.6308181948790426 -0.6308181948790426 -0.0025778536998605946])) < 1e-13);
+assert(b(16) == 0 && abs(b(15) - 2 / pi) < 0.01);
+[a, e, k] = levinson([3, 1 + 1i, 0.5 - 0.25i, 0.1i], 3);
+assert(max(abs(a(2:end) - [-0.5234449760765549 - 0.7205741626794258i, ...
+       -0.38038277511961716 + 0.6849282296650716i, 0.5023923444976075 - 0.05837320574162678i])) ...
+       < 1e-14);
+assert(abs(e - 1.3887200956937802) < 1e-14 && abs(k(end) - a(end)) < 1e-15);
+[a, e] = levinson([16 8 -2] / 9, 2);
+assert(max(abs(a - [1 -0.75 0.5])) < 1e-15 && abs(e - 1) < 1e-15);
+assert(isequal(upfirdn([1 2 3], [1 1 1], 2), [1 1 3 2 5 3 3]));
+assert(max(abs(upfirdn(1:7, [.5 1 .5 .25], 3, 2) - [0.5 0.5 2 2 1.5 4 3.5 2.5 6 5 3.5])) < 1e-15);
+fprintf('dsp : firls, levinson et upfirdn comme SciPy\n');
+
+%% ------------------------------------------------------------------ audio
+% Exemples de la documentation de MathWorks pour zerocrossrate ; échelles
+% perceptives d'O'Shaughnessy (Mel, 1987 : 1000 Hz valent 1000 mels),
+% de Traunmüller (Bark, 1990, avec ses corrections aux deux bouts) et de
+% Glasberg et Moore (ERB, 1990) ; centroïde spectral de Peeters (2004).
+x = [1 -1 1 -1 1 -1 1 -1 1 -1];
+assert(abs(zerocrossrate(x) - 0.95) < 1e-15);
+assert(abs(zerocrossrate(x, 'Method', 'comparison') - 0.9) < 1e-15);
+assert(abs(zerocrossrate(x, 'ZeroPositive', true) - 0.9) < 1e-15);
+assert(abs(zerocrossrate(x, 'InitialState', 1) - 0.9) < 1e-15);
+assert(abs(hz2mel(1000) - 999.9855371396244) < 1e-12);
+assert(abs(hz2bark(1000) - 8.527432432432432) < 1e-13);
+assert(abs(hz2bark(50) - 0.4163781094527363) < 1e-13);
+assert(abs(hz2bark(15000) - 23.859642924528302) < 1e-12);
+assert(abs(hz2erb(1000) - 15.572016680910268) < 1e-12);
+f = [20 100 500 1000 4000 8000 15000];
+assert(max(abs(mel2hz(hz2mel(f)) - f) ./ f) < 1e-14);
+assert(max(abs(bark2hz(hz2bark(f)) - f) ./ f) < 1e-13);
+assert(max(abs(erb2hz(hz2erb(f)) - f) ./ f) < 1e-13);
+fe = 8000;
+t = (0:fe - 1).' / fe;
+centroides = spectralCentroid(sin(2 * pi * 1000 * t), fe);
+assert(numel(centroides) == 98 && max(abs(centroides - 1000)) < 1e-9);
+fprintf('audio : zerocrossrate de MathWorks, echelles de Mel, Bark et ERB\n');
+
+%% ------------------------------------------------ communications sans fil
+% fspl : l'exemple de la documentation de MathWorks (radar à 10 GHz sur
+% 10 km, 132,4478 dB). OFDM à la numérologie d'IEEE 802.11a : 64
+% sous-porteuses, 48 de données, pilotes à -21, -7, 7 et 21, préfixe de
+% 16 ; le canal plus court que le préfixe s'égalise exactement, un
+% coefficient par sous-porteuse. Capacité de Shannon (1948).
+assert(round(fspl(10e3, c / 10e9), 4) == 132.4478);
+assert(fspl(1e-3, 0.1) == 0);
+rng(7);
+nulles = [1:6 33 60:64].';
+pilotes = [12 26 40 54].';
+porteuses = setdiff((1:64).', [nulles; pilotes]);
+donnees = qammod(randi([0 15], 48, 10), 16, 'UnitAveragePower', true);
+emis = ofdmmod(donnees, 64, 16, nulles, pilotes, repmat([1; 1; 1; -1], 1, 10));
+assert(numel(porteuses) == 48 && size(emis, 1) == 800);
+canal = [1; 0.5; -0.3; 0.15];
+recu = conv(emis, canal);
+H = fftshift(fft(canal, 64));
+egalise = ofdmdemod(recu(1:800), 64, 16, 16, nulles, pilotes) ./ H(porteuses);
+assert(max(abs(egalise(:) - donnees(:))) < 1e-13);
+[deDemi, pilotesRecus] = ofdmdemod(emis, 64, 16, 9, nulles, pilotes);
+assert(max(abs(deDemi(:) - donnees(:))) < 1e-13 && all(pilotesRecus(4, :) == -1 + 0i | ...
+       abs(pilotesRecus(4, :) + 1) < 1e-13));
+assert(abs(throughputShannon(20e6, 20) / 1e6 - 20 * log2(101)) < 1e-12);
+assert(abs(qammod(0, 16) - (-3 + 3i)) == 0 && qamdemod(1 - 1i, 16) == 15);
+fprintf('sans fil : fspl de MathWorks, OFDM d''IEEE 802.11a\n');
+
+%% ----------------------------------------------------------------- vision
+% bboxOverlapRatio : l'exemple de la documentation de MathWorks (0,0833).
+% Détecteur de Harris et Stephens (1988) sur le damier : les 49
+% intersections intérieures, sans faux coin ; à l'écart de la couture
+% entre les deux moitiés (où le contraste change), chaque coin tombe au
+% centième de pixel près entre ses quatre pixels. Transformation
+% géométrique robuste (MSAC, Torr et Zisserman, 2000) : similitude,
+% rigide et projective (DLT normalisée de Hartley) retrouvées malgré
+% vingt appariements aberrants sur soixante-dix.
+bboxA = [150 80 100 100];
+assert(round(bboxOverlapRatio(bboxA, bboxA + 50), 4) == 0.0833);
+assert(bboxOverlapRatio(bboxA, bboxA + 50, 'Min') == 0.25);
+coins = detectHarrisFeatures(checkerboard(10));
+[gx, gy] = meshgrid(10.5:10:70.5);
+attendus = [gx(:) gy(:)];
+assert(size(coins, 1) == 49);
+ecarts = zeros(49, 1);
+for k = 1:49
+    ecarts(k) = min(sqrt(sum((coins - attendus(k, :)) .^ 2, 2)));
+end
+assert(max(ecarts(attendus(:, 1) ~= 40.5)) < 1e-12 && max(ecarts) < 1);
+rng(5);
+p1 = 400 * rand(50, 2);
+aberrantsA = 400 * rand(20, 2);
+aberrantsB = 400 * rand(20, 2);
+for type = {'similarity', 'rigid', 'projective'}
+    switch type{1}
+        case 'similarity'
+            Tvrai = [1.5 * cosd(30), 1.5 * sind(30), 0; -1.5 * sind(30), 1.5 * cosd(30), 0; 10 -5 1];
+        case 'rigid'
+            Tvrai = [cosd(30), sind(30), 0; -sind(30), cosd(30), 0; 10 -5 1];
+        otherwise
+            Tvrai = [1 0.2 0.0004; -0.1 1.1 0.0002; 30 -20 1];
+    end
+    q = [p1 ones(50, 1)] * Tvrai;
+    p2 = q(:, 1:2) ./ q(:, 3);
+    [T, retenus] = estimateGeometricTransform2D([p1; aberrantsA], [p2; aberrantsB], type{1});
+    assert(norm(T - Tvrai) < 1e-9 && all(retenus(1:50)) && ~any(retenus(51:end)));
+end
+fprintf('vision : IoU de MathWorks, Harris sur damier, MSAC\n');
+
 disp('litterature : toutes les verifications passent');

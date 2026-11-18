@@ -1938,6 +1938,53 @@ MATLIBRE_POIDS_BINAIRE Nombre de bits à un d'un entier.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_qam_options`
+
+```
+MATLIBRE_QAM_OPTIONS Ordre des symboles et options nom-valeur de QAMMOD et QAMDEMOD.
+  [ORDRE,O] = MATLIBRE_QAM_OPTIONS(M,ARGUMENTS,FONCTION,O) vérifie que M
+  est un carré, puissance de deux, lit l'ordre facultatif ('gray' par
+  défaut, 'bin' ou un vecteur personnalisé) puis les paires nom, valeur
+  dont O donne les noms et les valeurs par défaut.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [ordre, o] = matlibre_qam_options(16, {'bin'}, 'qammod', struct('UnitAveragePower', false))
+
+  Voir aussi QAMMOD, QAMDEMOD.
+```
+
+## `matlibre_qam_place`
+
+```
+MATLIBRE_QAM_PLACE Colonne et ligne d'un symbole sur la grille QAM de MATLAB.
+  [C,L] = MATLIBRE_QAM_PLACE(S,COTE,ORDRE) : colonnes comptées de la
+  gauche, lignes du haut, à partir de zéro.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [c, l] = matlibre_qam_place(13, 4, 'gray')    % colonne 2, ligne 1
+
+  Voir aussi QAMMOD, MATLIBRE_QAM_SYMBOLE.
+```
+
+## `matlibre_qam_symbole`
+
+```
+MATLIBRE_QAM_SYMBOLE Symbole porté par un point de la grille QAM de MATLAB.
+  S = MATLIBRE_QAM_SYMBOLE(C,L,COTE,ORDRE), l'inverse de
+  MATLIBRE_QAM_PLACE.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_qam_symbole(2, 1, 4, 'gray')         % 13
+
+  Voir aussi QAMDEMOD, MATLIBRE_QAM_PLACE.
+```
+
 ## `matlibre_rs_coder`
 
 ```
@@ -2284,18 +2331,28 @@ PSKMOD Modulation de phase à M états.
 ## `qamdemod`
 
 ```
-QAMDEMOD Démodulation QAM par décision sur la grille.
-  X = QAMDEMOD(Y,M) rend le symbole du point de la grille le plus
-  proche.
-  X = QAMDEMOD(Y,M,ORDRE) reprend l'ordre employé à la modulation ;
-  ORDRE vaut 'gray' (défaut) ou 'bin'.
+QAMDEMOD Démodulation QAM par décision sur la grille de MATLAB.
+  Z = QAMDEMOD(Y,M) rend, pour chaque échantillon reçu, le symbole du
+  point le plus proche de la grille carrée de QAMMOD (ordre de Gray).
+  Z = QAMDEMOD(Y,M,SYMORDER) reprend l'ordre employé à la modulation :
+  'gray', 'bin' ou un vecteur personnalisé.
+
+  Options (nom, valeur) :
+     'OutputType'        'integer' (défaut) ou 'bit' : chaque symbole
+                         rend log2(M) bits, le plus fort en tête, les uns
+                         sous les autres
+     'UnitAveragePower'  true si la constellation émise était ramenée à
+                         un watt (défaut false)
+     'OutputDataType'    'double' (défaut)
+  Les sorties souples de MATLAB ('llr', 'approxllr') ne sont pas
+  encore là : QAMDEMOD les refuse en le disant.
 
   La grille étant un produit de deux axes, la décision se prend axe par
-  axe : arrondir la partie réelle et la partie imaginaire suffit, et
-  aucune recherche du plus proche point n'est nécessaire.
+  axe : arrondir la partie réelle et la partie imaginaire suffit.
 
   Exemple :
-     qamdemod(qammod(0:15, 16), 16)      % 0:15
+     qamdemod(qammod(0:15, 16), 16)          % 0:15
+     qamdemod(-3 + 3i, 16)                   % 0
 
   Voir aussi QAMMOD, PSKDEMOD, GENQAMDEMOD.
 ```
@@ -2304,23 +2361,35 @@ QAMDEMOD Démodulation QAM par décision sur la grille.
 
 ```
 QAMMOD Modulation d'amplitude en quadrature à M états (M carré).
-  Y = QAMMOD(X,M) place le symbole X sur une grille carrée centrée,
-  d'espacement deux.
-  Y = QAMMOD(X,M,ORDRE) où ORDRE vaut 'gray' (défaut, comme MATLAB) ou
-  'bin'.
+  Y = QAMMOD(X,M) place chaque symbole entier de X (0 à M-1) sur la
+  grille carrée de M points, d'espacement deux, comme MATLAB : en ordre
+  de Gray par défaut.
+  Y = QAMMOD(X,M,SYMORDER) choisit l'ordre : 'gray', 'bin', ou un
+  vecteur d'ordre personnalisé dont le premier élément est le symbole du
+  point en haut à gauche, les suivants descendant chaque colonne, de la
+  gauche vers la droite.
 
-  Contrairement à une modulation de phase, l'amplitude porte ici de
-  l'information : on gagne des points, donc des bits par symbole, mais
-  on les rapproche, donc on perd en résistance au bruit. C'est
-  l'arbitrage qui décide de la modulation d'un lien.
+  Options (nom, valeur) :
+     'InputType'         'integer' (défaut) ou 'bit' : X porte alors
+                         log2(M) bits par symbole, le plus fort en tête,
+                         sur un nombre de lignes multiple de log2(M)
+     'UnitAveragePower'  true ramène la puissance moyenne de la
+                         constellation à un watt (défaut false)
+     'OutputDataType'    'double' (défaut) ou 'single'
+     'PlotConstellation' true trace la constellation et ses étiquettes
 
-  Le codage de Gray s'applique à chaque axe séparément : deux points
-  voisins de la grille, en abscisse comme en ordonnée, ne diffèrent que
-  d'un bit.
+  La place d'un symbole : en ordre binaire, le symbole s occupe la
+  colonne floor(s/racine(M)) et la ligne mod(s,racine(M)), comptées
+  depuis le coin en haut à gauche ; en ordre de Gray, les bits forts
+  portent le code de Gray de la colonne, les bits faibles celui de la
+  ligne, si bien que deux points voisins ne diffèrent que d'un bit.
+  En 16-QAM de Gray, les colonnes portent de haut en bas 0 1 3 2,
+  4 5 7 6, 12 13 15 14 et 8 9 11 10.
 
   Exemple :
-     c = qammod(0:15, 16);
-     mean(abs(c) .^ 2)               % energie moyenne
+     qammod(0, 16)                          % -3 + 3i : le coin en haut à gauche
+     c = qammod(0:63, 64, 'UnitAveragePower', true);
+     mean(abs(c) .^ 2)                      % 1
 
   Voir aussi QAMDEMOD, PSKMOD, GENQAMMOD, MODNORM.
 ```

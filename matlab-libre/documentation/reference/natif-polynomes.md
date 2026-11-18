@@ -46,25 +46,6 @@ INTERP1  Interpolation en une dimension.
     Voir aussi INTERP2, SPLINE, PCHIP, POLYFIT.
 ```
 
-## `interp2`
-
-```
-INTERP2  Interpolation sur une grille à deux dimensions.
-    INTERP2(X,Y,Z,XQ,YQ) interpole Z, défini sur la grille (X,Y), aux
-    points demandés.
-
-    Syntaxe
-       zq = interp2(X,Y,Z,xq,yq)
-       zq = interp2(X,Y,Z,xq,yq,methode)
-
-    Exemples
-       [X, Y] = meshgrid(0:4);
-       Z = X + Y;
-       abs(interp2(X, Y, Z, 1.5, 2.5) - 4) < 1e-12
-
-    Voir aussi INTERP1, MESHGRID, SURF, SPLINE.
-```
-
 ## `makima`
 
 ```

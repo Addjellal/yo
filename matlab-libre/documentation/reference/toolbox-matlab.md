@@ -628,33 +628,6 @@ CALENDAR Calendrier d'un mois.
   Voir aussi EOMDAY, WEEKDAY, DATENUM, DATESTR.
 ```
 
-## `caxis`
-
-```
-CAXIS Bornes de l'échelle de couleurs.
-  CAXIS([CMIN CMAX]) fixe les valeurs qui correspondent aux deux bouts
-  de la carte de couleurs : tout ce qui est sous CMIN prend la première
-  couleur, tout ce qui est au-dessus de CMAX la dernière.
-
-  CAXIS('auto') revient au choix automatique, qui prend le minimum et
-  le maximum des données.
-
-  BORNES = CAXIS rend les bornes courantes.
-
-  Depuis R2022a, MATLAB nomme cette fonction CLIM ; CAXIS reste valable.
-
-  Fixer les bornes sert quand on compare plusieurs images : sans cela,
-  chacune emploie toute l'échelle et deux couleurs identiques
-  représentent des valeurs différentes.
-
-  Exemples :
-     subplot(1,2,1); imagesc(peaks(30)); caxis([-8 8]);
-     subplot(1,2,2); imagesc(2 * peaks(30)); caxis([-8 8]);
-     % les deux images se comparent maintenant couleur pour couleur
-
-  Voir aussi CLIM, COLORMAP, COLORBAR, IMAGESC, XLIM, YLIM.
-```
-
 ## `celldisp`
 
 ```
@@ -748,30 +721,6 @@ CLEARALLMEMOIZEDCACHES Vide les caches de toutes les fonctions mémoïsées.
      s.CacheOccupancyPercent         % le cache s'est rempli a nouveau
 
   Voir aussi MEMOIZE, CLEARCACHE, STATS.
-```
-
-## `clim`
-
-```
-CLIM Bornes de l'échelle de couleurs.
-  CLIM([CMIN CMAX]) fixe les valeurs qui correspondent aux deux bouts
-  de la carte de couleurs.
-
-  CLIM('auto') revient au choix automatique.
-
-  BORNES = CLIM rend les bornes courantes.
-
-  C'est le nom que MATLAB donne à CAXIS depuis R2022a. MatLibre garde
-  les deux ; les bornes sont retenues et rendues, mais son rendu des
-  images emploie encore l'étendue des données, si bien que les fixer ne
-  change pas encore les couleurs.
-
-  Exemples :
-     imagesc(peaks(30));
-     clim([-8 8]);
-     clim
-
-  Voir aussi CAXIS, COLORMAP, COLORBAR, IMAGESC.
 ```
 
 ## `colamd`
@@ -2891,6 +2840,85 @@ INPUTDLG Demande des valeurs à l'utilisateur.
      r = inputdlg({'Nom', 'Âge'}, 'Fiche', 1, {'', '30'});
 
   Voir aussi INPUT, LISTDLG, UIEDITFIELD, KEYBOARD.
+```
+
+## `interp2`
+
+```
+INTERP2 Interpolation sur une grille du plan.
+  VQ = INTERP2(X,Y,V,XQ,YQ) interpole les valeurs V, données sur la
+  grille de MESHGRID — X varie le long des colonnes, Y le long des
+  lignes —, aux points (XQ,YQ). X et Y sont les vecteurs de la grille ou
+  ses tableaux ; un vecteur ligne XQ et un vecteur colonne YQ décrivent
+  une grille, que MESHGRID déplie.
+  VQ = INTERP2(V,XQ,YQ) prend X = 1:size(V,2) et Y = 1:size(V,1).
+  VQ = INTERP2(V,K) raffine la grille de V K fois, en insérant à chaque
+  fois un point au milieu de chaque intervalle ; VQ = INTERP2(V) le fait
+  une fois.
+
+  VQ = INTERP2(...,METHODE) : 'linear' (le défaut, bilinéaire),
+  'nearest', 'cubic', 'makima' ou 'spline'. VQ = INTERP2(...,METHODE,
+  EXTRAPVAL) : la valeur hors de la grille, NaN par défaut.
+
+  Exemple :
+     [X, Y] = meshgrid(0:2, 0:1);
+     V = X + 10 * Y;
+     interp2(X, Y, V, 1.5, 0.5)                  % 6.5
+     interp2(X, Y, V, 3, 0)                      % NaN : hors de la grille
+
+  Voir aussi INTERP1, INTERP3, INTERPN, MESHGRID, GRIDDEDINTERPOLANT.
+```
+
+## `interp3`
+
+```
+INTERP3 Interpolation sur une grille de l'espace.
+  VQ = INTERP3(X,Y,Z,V,XQ,YQ,ZQ) interpole les valeurs V, données sur la
+  grille de MESHGRID — X varie le long des colonnes, Y le long des
+  lignes, Z le long des pages —, aux points (XQ,YQ,ZQ). X, Y et Z sont
+  les vecteurs de la grille ou ses tableaux ; des vecteurs XQ, YQ, ZQ de
+  tailles différentes décrivent une grille, que MESHGRID déplie.
+  VQ = INTERP3(V,XQ,YQ,ZQ) prend X = 1:size(V,2), Y = 1:size(V,1),
+  Z = 1:size(V,3).
+
+  VQ = INTERP3(...,METHODE) : 'linear' (le défaut) ou 'nearest' ;
+  VQ = INTERP3(...,METHODE,EXTRAPVAL) : la valeur hors de la grille, NaN
+  par défaut.
+
+  Exemple :
+     [X, Y, Z] = meshgrid(0:2, 0:1, 0:3);
+     V = X + 10 * Y + 100 * Z;
+     interp3(X, Y, Z, V, 1.5, 0.5, 2)            % 206.5
+
+  Voir aussi INTERPN, INTERP2, MESHGRID.
+```
+
+## `interpn`
+
+```
+INTERPN Interpolation sur une grille à N dimensions.
+  VQ = INTERPN(X1,X2,...,XN,V,XQ1,XQ2,...,XQN) interpole les valeurs V,
+  données sur la grille de NDGRID — X1 à XN sont ses vecteurs, ou les
+  tableaux qu'en fait NDGRID —, aux points (XQ1(k),...,XQN(k)). Les XQ
+  ont une même taille, qui est celle de VQ ; des vecteurs de tailles ou
+  d'orientations différentes décrivent une grille, que NDGRID déplie.
+  VQ = INTERPN(V,XQ1,...,XQN) prend la grille 1:size(V,D).
+
+  VQ = INTERPN(...,METHODE) choisit 'linear' (le défaut, multilinéaire),
+  'nearest' (le point le plus proche), 'pchip', 'makima', 'spline' ou
+  'cubic' — ces quatre-là appliquent l'interpolation de même nom
+  dimension après dimension ; 'cubic' est la convolution cubique sur une
+  grille à pas constant, la spline sinon. VQ = INTERPN(...,METHODE,
+  EXTRAPVAL) donne la valeur des points hors de la grille, NaN par
+  défaut.
+
+  Exemple :
+     [x1, x2, x3] = ndgrid(0:1, 0:2, 0:3);
+     V = x1 + 10 * x2 + 100 * x3;
+     interpn(0:1, 0:2, 0:3, V, 0.5, 1.5, 2)      % 215.5 : V est affine
+     interpn(0:1, 0:2, 0:3, V, 2, 0, 0)          % NaN : hors de la grille
+
+  Voir aussi INTERP1, INTERP2, INTERP3, NDGRID, GRIDDEDINTERPOLANT.
 ```
 
 ## `invhilb`
@@ -9274,23 +9302,6 @@ UNIQUETOL Valeurs distinctes à une tolérance près.
   Voir aussi ISMEMBERTOL.
 ```
 
-## `unzip`
-
-```
-UNZIP Extrait une archive ZIP.
-  UNZIP(ARCHIVE,DOSSIER) extrait dans le dossier donné, le dossier
-  courant par défaut.
-
-  Exemple :
-     f = fopen('a.txt', 'w'); fprintf(f, 'bonjour'); fclose(f);
-     zip('archive.zip', {'a.txt'});
-     delete('a.txt');
-     unzip('archive.zip');
-     fileread('a.txt')           % 'bonjour'
-
-  Voir aussi ZIP.
-```
-
 ## `usejava`
 
 ```
@@ -9763,25 +9774,6 @@ YYYYMMDD Date écrite comme un nombre AAAAMMJJ.
      yyyymmdd(datetime(2024, 2, 3))     % 20240203
 
   Voir aussi DATENUM, DATESTR, DATEVEC, YEAR, MONTH, DAY.
-```
-
-## `zip`
-
-```
-ZIP Fabrique une archive ZIP.
-  ZIP(ARCHIVE,FICHIERS) empaquette les fichiers donnés. FICHIERS peut
-  être un nom, une cellule de noms ou un motif.
-
-  L'archive est produite par la commande « zip » du système ; sans
-  elle, la fonction le dit clairement plutôt que d'écrire un fichier
-  incomplet.
-
-  Exemple :
-     f = fopen('b.txt', 'w'); fprintf(f, 'x'); fclose(f);
-     fichier = zip('archive.zip', {'b.txt'});
-     isfile(fichier)             % 1
-
-  Voir aussi UNZIP.
 ```
 
 ## `zoom`

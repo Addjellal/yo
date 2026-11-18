@@ -176,8 +176,10 @@ assert(numel(resample(bruite, 3, 2)) == floor(101 * 3 / 2), ...
        'et rend floor(N P / Q) echantillons');
 assert(iscolumn(resample(bruite.', 3, 2)), 'dans les deux sens');
 % upfirdn enchaîne sur-échantillonnage, filtrage et décimation.
+% Comme MATLAB et SciPy, la sortie a ceil(((10 - 1) * 3 + 1) / 1) = 28
+% echantillons : les zeros inseres apres le dernier ne sont pas filtres.
 sortie = upfirdn([1 zeros(1, 9)], 1, 3, 1);
-assert(numel(sortie) == 30, 'sur-echantillonner par 3 triple la longueur');
+assert(numel(sortie) == 28, 'sur-echantillonner par 3 : (N - 1) P + numel(H)');
 assert(abs(sortie(1) - 1) < 1e-12 && abs(sortie(2)) < 1e-12, ...
        'et insere P-1 zeros entre les echantillons');
 

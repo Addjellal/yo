@@ -258,22 +258,7 @@ LSQLIN Moindres carrés linéaires avec contraintes de bornes.
 
 ## `lsqnonlin`
 
-```
-LSQNONLIN Moindres carrés non linéaires.
-  X = LSQNONLIN(F,X0) minimise la somme des carrés des composantes de
-  F(X). LSQNONLIN(F,X0,LB,UB) impose des bornes.
-
-  La méthode est celle de Levenberg-Marquardt : le jacobien est estimé
-  par différences finies, et l'amortissement passe de la descente de
-  gradient à Gauss-Newton selon que le pas améliore ou non le critère.
-
-  Exemple :
-     % Ajustement de a*exp(b*t) sur des données exactes.
-     t = (0:0.5:2)';  y = 3 * exp(-0.5 * t);
-     p = lsqnonlin(@(p) p(1) * exp(p(2) * t) - y, [1; -1]);
-
-  Voir aussi LSQCURVEFIT, LSQLIN, FSOLVE, FMINSEARCH.
-```
+_Pas de bloc d'aide._
 
 ## `matlibre_bornes_en_contraintes`
 

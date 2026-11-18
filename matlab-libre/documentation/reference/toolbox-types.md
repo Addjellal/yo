@@ -774,6 +774,37 @@ TIMERANGE Sélecteur de lignes d'une table temporelle, par intervalle.
   Voir aussi WITHTOL, VARTYPE, TIMETABLE.
 ```
 
+## `timeseries`
+
+```
+TIMESERIES Un signal échantillonné : ses valeurs et leurs instants.
+  TS = TIMESERIES(DATA) crée une série dont les instants sont 0, 1, 2...
+  TS = TIMESERIES(DATA,TIME) donne les instants, croissants. DATA porte
+  un échantillon par ligne — un scalaire, ou une ligne de valeurs, par
+  instant — ou, pour des échantillons matriciels, un tableau m-par-n-
+  par-N, l'instant en dernier.
+  TS = TIMESERIES(...,'Name',NOM) nomme la série.
+
+  Ses propriétés : Name ('unnamed'), Data, Time, Length (le nombre
+  d'instants), TimeInfo (Units, Start, End, Length, Increment),
+  DataInfo (Units, Interpolation) et IsTimeFirst.
+
+  GETDATASAMPLES(TS,I) rend les échantillons de rangs I ; RESAMPLE(TS,T)
+  rééchantillonne par interpolation linéaire, et PLOT(TS) trace la série
+  contre son temps.
+
+  C'est la forme que prennent, dans Simulink, les signaux d'un bloc To
+  Workspace au format 'Timeseries', et que lit un From Workspace.
+
+  Exemple :
+     ts = timeseries([0; 2; 4], [0 1 2], 'Name', 'vitesse');
+     ts.Length                         % 3
+     v = resample(ts, 0.5);
+     v.Data                            % 1
+
+  Voir aussi SIM, ADD_BLOCK.
+```
+
 ## `timetable`
 
 ```

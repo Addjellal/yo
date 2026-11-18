@@ -17,6 +17,21 @@
 %   friisNoise       - Facteur de bruit d'une chaîne d'étages
 ```
 
+## `abcd2s`
+
+```
+ABCD2S Paramètres ABCD d'un quadripôle vers paramètres S.
+  S = ABCD2S(ABCD) pour 50 ohms, ABCD2S(ABCD,Z0) sinon (Pozar, tableau
+  4.2) : avec Q = A + B/z0 + C z0 + D,
+     S11 = (A + B/z0 - C z0 - D)/Q    S12 = 2 (AD - BC)/Q
+     S21 = 2/Q                        S22 = (-A + B/z0 - C z0 + D)/Q
+
+  Exemple :
+     abcd2s([1 100; 0 1])          % impédance série de 100 ohms : S11 = 0.5
+
+  Voir aussi S2ABCD.
+```
+
 ## `dbm2w`
 
 ```
@@ -83,6 +98,95 @@ GAMMA2Z Impédance à partir du coefficient de réflexion.
      gamma2z(z2gamma(37 + 12i))      % 37 + 12i
 
   Voir aussi Z2GAMMA, VSWR.
+```
+
+## `gammain`
+
+```
+GAMMAIN Coefficient de réflexion à l'entrée d'un quadripôle chargé.
+  G = GAMMAIN(S,Z0,ZL) : Gin = S11 + S12 S21 GL / (1 - S22 GL), avec
+  GL = (ZL - Z0)/(ZL + Z0) (Pozar, équation 11.3). S est 2 x 2 ou
+  2 x 2 x K.
+
+  Exemple :
+     gammain([0 1; 1 0], 50, 100)  % une ligne adaptée transmet GL : 1/3
+
+  Voir aussi GAMMAOUT, Z2GAMMA.
+```
+
+## `gammaout`
+
+```
+GAMMAOUT Coefficient de réflexion à la sortie d'un quadripôle.
+  G = GAMMAOUT(S,Z0,ZS) : Gout = S22 + S12 S21 GS / (1 - S11 GS), avec
+  GS = (ZS - Z0)/(ZS + Z0) (Pozar, équation 11.4).
+
+  Exemple :
+     gammaout([0 1; 1 0], 50, 25)  % -1/3
+
+  Voir aussi GAMMAIN, Z2GAMMA.
+```
+
+## `matlibre_rf_matrices`
+
+```
+MATLIBRE_RF_MATRICES Applique une conversion de paramètres à chaque fréquence.
+  R = MATLIBRE_RF_MATRICES(M,FONCTION) : M est N x N, ou N x N x K pour K
+  fréquences ; FONCTION transforme une matrice N x N.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     R = matlibre_rf_matrices(eye(2), @(m) 2 * m)
+
+  Voir aussi S2Z, Z2S, S2Y, Y2S.
+```
+
+## `s2abcd`
+
+```
+S2ABCD Paramètres S d'un quadripôle vers paramètres ABCD (chaîne).
+  ABCD = S2ABCD(S) pour 50 ohms, S2ABCD(S,Z0) sinon ; S est 2 x 2 ou
+  2 x 2 x K. Les formules de Pozar (tableau 4.2) :
+     A = ((1+S11)(1-S22) + S12 S21) / (2 S21)
+     B = z0 ((1+S11)(1+S22) - S12 S21) / (2 S21)
+     C = ((1-S11)(1-S22) - S12 S21) / (2 S21 z0)
+     D = ((1-S11)(1+S22) + S12 S21) / (2 S21)
+  Les matrices ABCD de quadripôles en cascade se multiplient.
+
+  Exemple :
+     s2abcd([0 1; 1 0])            % une ligne adaptée sans retard : eye(2)
+
+  Voir aussi ABCD2S, S2Z.
+```
+
+## `s2y`
+
+```
+S2Y Paramètres S vers paramètres Y : Y = (1/z0) (I - S)(I + S)^-1.
+  Y = S2Y(S) pour 50 ohms, S2Y(S,Z0) pour une autre référence ; S est
+  N x N ou N x N x K.
+
+  Exemple :
+     Y = s2y([0 1; 1 0])           % une ligne adaptée sans pertes
+
+  Voir aussi Y2S, S2Z.
+```
+
+## `s2z`
+
+```
+S2Z Paramètres S vers paramètres Z : Z = z0 (I + S)(I - S)^-1.
+  Z = S2Z(S) convertit les paramètres S, N x N ou N x N x K (K
+  fréquences), en paramètres Z, pour une impédance de référence de
+  50 ohms ; S2Z(S,Z0) la choisit. Comme MATLAB (Pozar, Microwave
+  Engineering, tableau 4.2).
+
+  Exemple :
+     S = [0 0.7079; 0.7079 0];     % atténuateur adapté de 3 dB
+     Z = s2z(S)                    % réseau en T : 150.3, 141.9, 150.3
+
+  Voir aussi Z2S, S2Y, S2ABCD, Z2GAMMA.
 ```
 
 ## `sparam2zparam`
@@ -155,6 +259,18 @@ W2DBM Conversion watts vers dBm.
   Voir aussi DBM2W, FRIISNOISE.
 ```
 
+## `y2s`
+
+```
+Y2S Paramètres Y vers paramètres S : S = (I - z0 Y)(I + z0 Y)^-1.
+  S = Y2S(Y) pour 50 ohms, Y2S(Y,Z0) pour une autre référence.
+
+  Exemple :
+     S = y2s([1 -1; -1 1] / 100)   % une impédance série de 100 ohms
+
+  Voir aussi S2Y, Z2S.
+```
+
 ## `z2gamma`
 
 ```
@@ -180,5 +296,21 @@ Z2GAMMA Coefficient de réflexion d'une impédance.
      abs(z2gamma(100))^2             % 1/9 de la puissance revient
 
   Voir aussi GAMMA2Z, VSWR, SPARAM2ZPARAM.
+```
+
+## `z2s`
+
+```
+Z2S Paramètres Z vers paramètres S : S = (Z - z0 I)(Z + z0 I)^-1.
+  S = Z2S(Z) convertit des paramètres Z, N x N ou N x N x K, en
+  paramètres S pour 50 ohms ; Z2S(Z,Z0) choisit la référence.
+
+  Exemple :
+     % Pozar, l'atténuateur de 3 dB en T.
+     K = 10 ^ (3 / 20);
+     R1 = 50 * (K - 1) / (K + 1);  R3 = 100 * K / (K ^ 2 - 1);
+     S = z2s([R1 + R3, R3; R3, R1 + R3])   % S11 = 0, S21 = 0.7079
+
+  Voir aussi S2Z, Y2S, ABCD2S.
 ```
 

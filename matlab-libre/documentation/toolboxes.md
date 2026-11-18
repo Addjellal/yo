@@ -14,15 +14,15 @@ existant appellera.
 | `analyse-de-texte` | Text Analytics Toolbox — analyse de textes. | 8 |
 | `antennes` | Antenna Toolbox — rayonnement et réseaux. | 5 |
 | `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 141 |
-| `audio` | Audio Toolbox — sons et descripteurs. | 7 |
+| `audio` | Audio Toolbox — sons et descripteurs. | 13 |
 | `automatique` | Control System Toolbox — systèmes asservis linéaires. | 124 |
 | `base-de-donnees` | Database Toolbox — stockage tabulaire. | 8 |
-| `bioinformatique` | Bioinformatics Toolbox — séquences biologiques. | 8 |
+| `bioinformatique` | Bioinformatics Toolbox — séquences biologiques. | 14 |
 | `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 6 |
-| `cartographie` | Mapping Toolbox — géodésie et cartographie. | 4 |
+| `cartographie` | Mapping Toolbox — géodésie et cartographie. | 15 |
 | `coder` | MATLAB Coder — génération de code C. | 4 |
-| `communications` | Communications Toolbox — transmissions numériques. | 145 |
-| `communications-sans-fil` | Wireless (5G / LTE / WLAN) — couche physique. | 6 |
+| `communications` | Communications Toolbox — transmissions numériques. | 148 |
+| `communications-sans-fil` | Wireless (5G / LTE / WLAN) — couche physique. | 10 |
 | `compilateur` | MATLAB Compiler — distribution d'un programme. | 3 |
 | `conduite-automatisee` | Automated Driving Toolbox — aide à la conduite. | 4 |
 | `dsp` | DSP System Toolbox — traitement du signal en temps réel. | 6 |
@@ -39,28 +39,28 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 459 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 457 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
-| `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 129 |
+| `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 134 |
 | `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 27 |
 | `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 18 |
-| `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |
+| `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 15 |
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |
-| `reseaux-antennes` | Phased Array System Toolbox — réseaux d'antennes. | 4 |
-| `rf` | RF Toolbox — grandeurs de radiofréquence. | 7 |
+| `reseaux-antennes` | Phased Array System Toolbox — réseaux d'antennes. | 11 |
+| `rf` | RF Toolbox — grandeurs de radiofréquence. | 16 |
 | `robotique` | Robotics System Toolbox — cinématique et transformations. | 74 |
 | `robuste` | Robust Control Toolbox — analyse de robustesse. | 93 |
 | `signal` | Signal Processing Toolbox — traitement du signal. | 208 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
-| `simulink` | Simulink — simulation de schémas-blocs. | 82 |
+| `simulink` | Simulink — simulation de schémas-blocs. | 99 |
 | `stateflow` | Stateflow — machines à états finis. | 19 |
-| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 293 |
+| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 298 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 70 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `virgule-fixe` | Fixed-Point Designer — nombres à virgule fixe. | 17 |
-| `vision` | Computer Vision Toolbox — vision par ordinateur. | 112 |
-Les fonctions natives — 682, écrites en C++ — couvrent le MATLAB de base :
+| `vision` | Computer Vision Toolbox — vision par ordinateur. | 113 |
+Les fonctions natives — 684, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

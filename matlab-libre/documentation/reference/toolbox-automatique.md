@@ -1562,7 +1562,9 @@ MATLIBRE_GRILLE_TEMPS Grille de temps d'une simulation.
   simuler le modèle SYS. TEMPS vide la fait choisir d'après les pôles :
   huit fois la constante de temps la plus lente, bornée entre une
   seconde et mille, en quatre cents points. Un scalaire donne l'horizon,
-  un vecteur donne la grille elle-même.
+  un vecteur donne la grille elle-même, qui doit être à pas fixe — la
+  réponse se calcule pas à pas, comme dans MATLAB, qui refuse de même
+  des instants inégalement espacés.
 
   Cette fonction est un utilitaire interne de la boîte à outils
   Automatique : elle n'existe pas dans MATLAB.

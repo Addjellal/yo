@@ -255,6 +255,7 @@ MATLABFUNCTION Poignée de fonction à partir d'une expression symbolique.
 
 ```
 MATLIBRE_SYM_APPLIQUER Applique une fonction élémentaire à une expression.
+  Un tableau de SYM, ou de nombres, est traité élément par élément.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
@@ -1010,8 +1011,24 @@ SYMFUN Application d'une fonction élémentaire.
 ## `symint`
 
 ```
-SYMINT Primitive des formes polynomiales et élémentaires.
-  Reconnaît les constantes, x^n, sin, cos, exp et les sommes.
+SYMINT Primitive d'une expression, quand une règle exacte s'applique.
+  P = SYMINT(E, NOM) rend une primitive de E par rapport à la variable
+  NOM. Les règles reconnues :
+     - ce qui ne dépend pas de NOM : c*x ;
+     - les sommes, différences, et produits ou quotients par une
+       constante ;
+     - (a*x+b)^n, et 1/(a*x+b), qui donne log(a*x+b)/a ;
+     - c^(a*x+b), une base constante ;
+     - sin, cos, exp, sinh, cosh et log d'un argument affine a*x+b,
+       divisés par a ;
+     - exp(-a*x^2 + b*x + c), a > 0 : la gaussienne, par la fonction
+       d'erreur après avoir complété le carré ;
+     - c/(polynôme de degré 1 ou 2) : logarithme ou arc tangente.
+
+  Les règles de la composition ne valent que pour un argument affine :
+  la primitive de exp(-x^2) n'est pas exp(-x^2), ni celle de sin(x^2)
+  -cos(x^2). Quand aucune règle ne s'applique, SYMINT le dit par une
+  erreur au lieu de rendre une primitive fausse.
 
   Exemple :
      x = sym('x');
@@ -1327,16 +1344,18 @@ SYMVAR Variables d'une expression symbolique.
 ```
 TAYLOR Développement de Taylor d'une expression symbolique.
   T = TAYLOR(F) développe F autour de zéro jusqu'au degré cinq.
-  T = TAYLOR(F,X) nomme la variable, TAYLOR(F,X,A) choisit le point,
-  TAYLOR(F,X,A,N) le nombre de termes — le développement va alors
-  jusqu'au degré N-1, comme dans MATLAB.
+  T = TAYLOR(F,X) nomme la variable, TAYLOR(F,X,A) choisit le point.
+  TAYLOR(...,'Order',N) fixe l'ordre : le développement va jusqu'au
+  degré N-1, comme dans MATLAB (N vaut 6 par défaut).
+  TAYLOR(...,'ExpansionPoint',A) donne le point par son nom.
+  TAYLOR(F,X,A,N), avec l'ordre en quatrième position, est accepté.
 
   Les coefficients viennent des dérivées successives évaluées au
   point : c'est la définition, non une table.
 
   Exemple :
      syms x
-     pretty(taylor(exp(x), x, 0, 4))   % 1 + x + x^2/2 + x^3/6
+     pretty(taylor(exp(x), x, 0, 'Order', 4))   % 1 + x + x^2/2 + x^3/6
      pretty(taylor(sin(x), x, 0, 6))
 
   Voir aussi DIFF, SUBS, SIMPLIFY, LIMIT.
@@ -1392,8 +1411,8 @@ VPASOLVE Résolution numérique d'une équation symbolique.
   Exemple :
      syms x
      double(vpasolve(cos(x) - x, x, 1))     % 0.739085..., le point fixe
-     deux = vpasolve(x^2 - 2, x);
-     abs(double(deux{2}) - sqrt(2)) < 1e-12
+     deux = vpasolve(x^2 - 2, x);    % une colonne de SYM
+     abs(double(deux(2)) - sqrt(2)) < 1e-12
 
   Voir aussi SOLVE, FZERO, ROOTS, DOUBLE.
 ```

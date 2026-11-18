@@ -1,33 +1,40 @@
 function y = upfirdn(x, h, p, q)
-%UPFIRDN Sur-échantillonne d'un facteur P, filtre par H, décime par Q.
-%   Y = UPFIRDN(X,H,P,Q) enchaîne les trois opérations d'un changement de
-%   cadence rationnel, dans cet ordre : insérer P-1 zéros entre les
-%   échantillons, filtrer par H, ne garder qu'un échantillon sur Q.
+%UPFIRDN Sur-échantillonne, filtre, puis décime.
+%   Y = UPFIRDN(X,H,P,Q) insère P-1 zéros entre les échantillons de X,
+%   filtre par le RIF H, puis garde un échantillon sur Q, en une seule
+%   opération polyphase dans MATLAB. P et Q valent un par défaut.
+%   La sortie a ceil(((numel(X) - 1) * P + numel(H)) / Q) échantillons,
+%   comme dans MATLAB : les zéros insérés après le dernier échantillon
+%   ne sont pas filtrés. Une matrice X est traitée colonne par colonne ;
+%   un vecteur garde son orientation.
 %
-%   L'ordre importe. Sur-échantillonner d'abord crée des images du spectre
-%   qu'il faut supprimer ; décimer ensuite replierait ce qui reste
-%   au-dessus de la nouvelle demi-bande. Le même filtre H fait donc deux
-%   choses à la fois, et sa coupure doit être la plus basse des deux :
-%   pi/max(P,Q).
-%
-%   Faire les trois d'un coup évite aussi de calculer des échantillons
-%   qu'on jetterait : c'est pourquoi la fonction existe au lieu d'une
-%   composition de trois autres.
-%
-%   Le gain du filtre doit valoir P pour conserver l'amplitude : insérer
-%   des zéros divise l'énergie par P.
+%   C'est l'opération de base du changement de cadence : RESAMPLE
+%   l'emploie avec un filtre passe-bas conçu pour P/Q.
 %
 %   Exemple :
-%      x = sin(2*pi*0.05*(0:99));
-%      h = 3 * fir1(30, 1/3);          % gain P = 3, coupure pi/3
-%      y = upfirdn(x, h, 3, 2);        % cadence multipliee par 3/2
+%      y = upfirdn([1 2 3], [1 1 1], 2)     % 1 1 3 2 5 3 3 : 7 échantillons
 %
-%   Voir aussi RESAMPLE, DECIMATE, INTERP, FFTFILT.
+%   Voir aussi RESAMPLE, INTERP, DECIMATE, FILTER.
     if nargin < 3, p = 1; end
     if nargin < 4, q = 1; end
-    x = x(:).';
-    sur = zeros(1, numel(x) * p);
-    sur(1:p:end) = x;
-    filtre = conv(sur, h(:).');
-    y = filtre(1:q:end);
+    if ~isscalar(p) || ~isscalar(q) || p < 1 || q < 1 || p ~= fix(p) || q ~= fix(q)
+        error('signal:upfirdn:Facteurs', 'P et Q sont des entiers positifs.');
+    end
+    ligne = isrow(x);
+    if ligne
+        x = x(:);
+    end
+    h = h(:);
+    nx = size(x, 1);
+    y = [];
+    for c = 1:size(x, 2)
+        sur = zeros((nx - 1) * p + 1, 1);
+        sur(1:p:end) = x(:, c);
+        filtre = conv(sur, h);
+        colonne = filtre(1:q:end);
+        y = [y, colonne];                                      %#ok<AGROW>
+    end
+    if ligne
+        y = y.';
+    end
 end

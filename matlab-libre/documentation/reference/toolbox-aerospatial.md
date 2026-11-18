@@ -41,28 +41,41 @@ ANGLE2DCM Angles d'Euler (radians) vers matrice de cosinus directeurs.
 ## `atmosisa`
 
 ```
-ATMOSISA Atmosphère type internationale (troposphère et stratosphère).
+ATMOSISA Atmosphère type internationale, du sol à la mésopause.
   [T,A,P,RHO] = ATMOSISA(H) rend la température (K), la vitesse du son
-  (m/s), la pression (Pa) et la masse volumique (kg/m^3) à l'altitude H,
-  en mètres.
+  (m/s), la pression (Pa) et la masse volumique (kg/m^3) à l'altitude
+  géopotentielle H, en mètres. H peut être un tableau.
+  [T,A,P,RHO,NU,MU] = ATMOSISA(H) rend aussi la viscosité cinématique
+  (m^2/s) et la viscosité dynamique (Pa*s), par la loi de Sutherland.
 
-  L'atmosphère type est une convention, non une mesure : elle fixe au
-  niveau de la mer 288,15 K et 101325 Pa, puis une décroissance de
-  6,5 K par kilomètre jusqu'à 11 km — la tropopause —, et une
-  température constante au-dessus. C'est ce modèle qui sert à étalonner
-  les altimètres et à comparer des performances d'avions.
+  L'atmosphère type est une convention, non une mesure : celle de 1976
+  (U.S. Standard Atmosphere, identique à l'atmosphère OACI jusqu'à 32 km)
+  fixe au niveau de la mer 288,15 K et 101325 Pa, puis la température
+  par morceaux affines de l'altitude géopotentielle :
+     0 - 11 km    -6,5 K/km  (troposphère)
+    11 - 20 km     isotherme 216,65 K
+    20 - 32 km    +1,0 K/km
+    32 - 47 km    +2,8 K/km
+    47 - 51 km     isotherme 270,65 K
+    51 - 71 km    -2,8 K/km
+    71 - 84,852 km -2,0 K/km
+  La pression suit l'équilibre hydrostatique dans chaque couche ; la
+  constante de l'air est celle de l'OACI, R = 287,05287 J/(kg K).
+
+  ATMOSISA(...,'action',ACT) dit quoi faire hors du domaine
+  [-5000, 84852] m : 'warning' (par défaut) avertit et rend les valeurs
+  de la borne, 'none' les rend sans rien dire, 'error' refuse.
+  ATMOSISA(...,'extended',false) revient à l'ancien domaine [0, 20000] m,
+  au-delà duquel température et pression restent celles de la borne.
 
   La vitesse du son ne dépend que de la température : elle tombe à
-  295 m/s à la tropopause, contre 340 au sol, et n'y bouge plus. C'est
-  pourquoi un avion de ligne y vole à Mach constant.
-
-  Le modèle s'arrête à 20 km ; au-delà, la valeur rendue est celle de la
-  tropopause prolongée.
+  295 m/s à la tropopause, contre 340 au sol, et n'y bouge plus jusqu'à
+  20 km. C'est pourquoi un avion de ligne y vole à Mach constant.
 
   Exemple :
-     [T, a, P, rho] = atmosisa(0);       % 288.15 K, 340 m/s
-     [T, a] = atmosisa(11000);           % 216.65 K, 295 m/s
-     atmosisa(11000) - atmosisa(15000)   % 0 : isotherme au-dessus
+     [T, a, P, rho] = atmosisa(1000)    % 281.65 K, 336.434 m/s, 89874.6 Pa
+     [T, a] = atmosisa(11000);          % 216.65 K, 295.07 m/s
+     T32 = atmosisa(32000)              % 228.65 K : la stratosphère se réchauffe
 
   Voir aussi MACHNUMBER, DPRESSURE.
 ```

@@ -139,27 +139,29 @@ assert(max(lobes) <= 1 + 1e-9, ...
 % la puissance quatrième, l'aller et le retour se composant. Doubler la
 % portée demande donc seize fois plus de puissance.
 lambda = longueurOnde;
-gain = 1000;                          % 30 dB
+gain = 30;                            % dB, a l'emission comme a la reception
 surface = 1;                          % 1 m^2
-puissanceMin = 1e-13;
-portee = radareqrng(lambda, 1e6, gain, surface, puissanceMin);
+duree = 1e-6;                         % impulsion d'une microseconde
+snr = 13;                             % dB, le seuil de detection vise
+portee = radareqrng(lambda, snr, 1e6, duree, 'Gain', gain, 'RCS', surface);
 fprintf('\nEquation du radar :\n');
-fprintf('  1 MW, gain %g, cible de %g m2 : portee %.1f km\n', ...
-        gain, surface, portee / 1e3);
+fprintf('  1 MW, gain %g dB, cible de %g m2, %g dB : portee %.1f km\n', ...
+        gain, surface, snr, portee / 1e3);
 % Verification par l'autre sens : la puissance necessaire pour cette
-% portee doit valoir un megawatt.
-puissance = radareqpow(lambda, portee, gain, surface, puissanceMin);
+% portee doit valoir un megawatt, et le rapport signal sur bruit 13 dB.
+puissance = radareqpow(lambda, portee, snr, duree, 'Gain', gain, 'RCS', surface);
 fprintf('  puissance recalculee : %.4f MW\n', puissance / 1e6);
 assert(abs(puissance - 1e6) / 1e6 < 1e-9, ...
        'les deux formes de l''equation sont inverses');
+assert(abs(radareqsnr(lambda, portee, 1e6, duree, 'Gain', gain, 'RCS', surface) - snr) < 1e-9);
 % La loi en puissance quatrieme : seize fois plus de puissance pour deux
 % fois la portee.
-puissanceDouble = radareqpow(lambda, 2 * portee, gain, surface, puissanceMin);
+puissanceDouble = radareqpow(lambda, 2 * portee, snr, duree, 'Gain', gain, 'RCS', surface);
 fprintf('  pour doubler la portee : %.2f fois plus de puissance\n', ...
         puissanceDouble / puissance);
 assert(abs(puissanceDouble / puissance - 16) < 1e-9);
 % Et une cible deux fois plus grosse ne gagne que la racine quatrieme.
-porteeGrosse = radareqrng(lambda, 1e6, gain, 2 * surface, puissanceMin);
+porteeGrosse = radareqrng(lambda, snr, 1e6, duree, 'Gain', gain, 'RCS', 2 * surface);
 fprintf('  cible deux fois plus grosse : portee x %.4f (2^(1/4) = %.4f)\n', ...
         porteeGrosse / portee, 2 ^ 0.25);
 assert(abs(porteeGrosse / portee - 2 ^ 0.25) < 1e-9);

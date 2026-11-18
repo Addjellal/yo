@@ -102,12 +102,19 @@ BBOX2POINTS Coins d'une boîte englobante.
 ## `bboxOverlapRatio`
 
 ```
-BBOXOVERLAPRATIO Recouvrement de boîtes englobantes (intersection/union).
-  Les boîtes s'écrivent [x y largeur hauteur].
+BBOXOVERLAPRATIO Recouvrement de boîtes englobantes.
+  R = BBOXOVERLAPRATIO(A,B) rend, pour chaque boîte de A (M x 4) et
+  chaque boîte de B (N x 4), le rapport de l'aire de leur intersection à
+  celle de leur union : l'indice de Jaccard, ou IoU. Les boîtes
+  s'écrivent [x y largeur hauteur] ; R est M x N.
+  R = BBOXOVERLAPRATIO(A,B,RATIOTYPE) choisit le dénominateur : 'Union'
+  (défaut) ou 'Min', la plus petite des deux aires.
 
   Exemple :
-     bboxOverlapRatio([0 0 10 10], [0 0 10 10])     % 1 : deux boites identiques
-     bboxOverlapRatio([0 0 10 10], [20 20 5 5])     % 0 : disjointes
+     % Documentation de MATLAB.
+     bboxA = [150 80 100 100];
+     bboxOverlapRatio(bboxA, bboxA + 50)             % 0.0833
+     bboxOverlapRatio(bboxA, bboxA + 50, 'Min')      % 0.25
 
   Voir aussi BBOXOVERLAPRATIOMATRIX, SELECTSTRONGESTBBOX, BBOX2POINTS.
 ```
@@ -279,35 +286,50 @@ DETECTFASTFEATURES Coins FAST (cercle de Bresenham de rayon 3).
 ## `detectHarrisFeatures`
 
 ```
-DETECTHARRISFEATURES Points d'intérêt par le détecteur de Harris.
-  [P,R] = DETECTHARRISFEATURES(I) rend les coordonnées [x y] des coins et
-  leur réponse. Option 'MinQuality' (0.01 par défaut).
+DETECTHARRISFEATURES Coins par le détecteur de Harris et Stephens (1988).
+  [P,M] = DETECTHARRISFEATURES(I) rend les positions [x y] des coins, une
+  ligne par coin, affinées au sous-pixel, et leur métrique
+     M = det(T) - 0.04 trace(T)^2,
+  T étant le tenseur de structure lissé par une gaussienne. MATLAB rend
+  un objet cornerPoints ; MatLibre rend ses deux champs Location et
+  Metric comme deux tableaux, que SELECTSTRONGEST sait trier.
+
+  Options, comme MATLAB : 'MinQuality' (0.01, la fraction du maximum de
+  la métrique sous laquelle un coin est écarté), 'FilterSize' (5, la
+  taille de la gaussienne, d'écart type FilterSize/3) et 'ROI'
+  ([x y largeur hauteur], la zone examinée).
+
+  Un coin est un maximum local de la métrique ; sur un plateau — un coin
+  de damier tombe entre quatre pixels de même métrique —, un seul pixel
+  est retenu, et la parabole qui passe par ses voisins place le coin
+  entre eux : à x = 10.5 pour une case de dix pixels.
 
   Exemple :
-     I = zeros(40);
-     I(15:25, 15:25) = 1;
-     [p, r] = detectHarrisFeatures(I);
-     size(p, 2)                  % 2
+     [p, m] = detectHarrisFeatures(checkerboard(10));
+     size(p, 1)                  % 49 : les intersections intérieures
 
-  Voir aussi DETECTFASTFEATURES, EXTRACTFEATURES, MATCHFEATURES.
+  Voir aussi DETECTMINEIGENFEATURES, DETECTFASTFEATURES, SELECTSTRONGEST.
 ```
 
 ## `detectMinEigenFeatures`
 
 ```
-DETECTMINEIGENFEATURES Coins de Shi et Tomasi.
-  [P,R] = DETECTMINEIGENFEATURES(I) rend les coordonnées [x y] des coins
-  et leur réponse. Le critère est la plus petite valeur propre de la
-  matrice d'autocorrélation locale
+DETECTMINEIGENFEATURES Coins de Shi et Tomasi (1994).
+  [P,M] = DETECTMINEIGENFEATURES(I) rend les coordonnées [x y] des coins,
+  affinées au sous-pixel, et leur métrique : la plus petite valeur
+  propre du tenseur de structure lissé
 
-     M = [ Sxx Sxy ; Sxy Syy ]
+     T = [ Sxx Sxy ; Sxy Syy ],
 
   qui vaut ((Sxx+Syy) - sqrt((Sxx-Syy)^2 + 4 Sxy^2)) / 2. Un coin est un
   point où les deux valeurs propres sont grandes : prendre la plus
   petite est plus direct que la combinaison de Harris, et c'est ce
   critère qui décide des points à suivre dans un flot optique.
+  MATLAB rend un objet cornerPoints ; MatLibre rend ses champs Location
+  et Metric comme deux tableaux.
 
-  Options : 'MinQuality' (0.01), 'FilterSize' (5).
+  Options, comme MATLAB : 'MinQuality' (0.01), 'FilterSize' (5) et
+  'ROI' ([x y largeur hauteur]).
 
   Exemple :
      I = zeros(20); I(6:15, 6:15) = 1;
@@ -542,22 +564,42 @@ ESTIMATEGEOMETRICTRANSFORM Transformation entre deux jeux de points.
 ## `estimateGeometricTransform2D`
 
 ```
-ESTIMATEGEOMETRICTRANSFORM2D Transformation géométrique entre deux jeux
-  de points.
-  T = ESTIMATEGEOMETRICTRANSFORM2D(P1,P2,TYPE) rend la matrice 3x3 qui
-  envoie P1 sur P2. TYPE vaut 'similarity', 'affine' ou 'projective'.
+ESTIMATEGEOMETRICTRANSFORM2D Transformation géométrique robuste entre deux jeux de points.
+  T = ESTIMATEGEOMETRICTRANSFORM2D(P1,P2,TYPE) estime la transformation
+  qui envoie les points P1 (N x 2) sur les points appariés P2, en
+  écartant les appariements aberrants par l'algorithme MSAC (Torr et
+  Zisserman, 2000), comme MATLAB. TYPE vaut 'rigid', 'similarity',
+  'affine' ou 'projective'.
+  [T,VALIDES] = ... rend aussi le masque des appariements retenus, et
+  [T,VALIDES,STATUT] le statut : 0 si tout va bien, 1 s'il y a trop peu
+  de points, 2 si trop peu d'appariements sont retenus. Sans STATUT,
+  ces deux cas sont des erreurs.
 
-  La convention est celle de MATLAB : les points sont des lignes, et la
-  transformation s'applique à droite, [x y 1] * T.
+  MATLAB rend un objet (rigid2d, affine2d, projective2d) ; MatLibre rend
+  sa matrice T, 3 x 3, dans la convention de MATLAB : les points sont
+  des lignes et la transformation s'applique à droite, [x y 1] * T.
 
-  [T,VALIDES] = ESTIMATEGEOMETRICTRANSFORM2D(...,'MaxDistance',D) écarte
-  les appariements dont l'erreur de reprojection dépasse D, par tirages
-  aléatoires, et rend leur masque.
+  Options, comme MATLAB :
+     'MaxDistance'   distance de reprojection, en pixels, au-delà de
+                     laquelle un appariement est aberrant (1.5)
+     'MaxNumTrials'  nombre maximal de tirages (1000)
+     'Confidence'    confiance, en pour cent, de trouver le meilleur
+                     ensemble, qui fixe l'arrêt des tirages (99)
+
+  Chaque tirage ajuste la transformation sur le plus petit nombre de
+  points qui la détermine (2 pour 'rigid' et 'similarity', 3 pour
+  'affine', 4 pour 'projective') et la note par le coût de MSAC, la
+  somme des min(d², MaxDistance²). Le nombre de tirages s'adapte à la
+  proportion d'appariements retenus. La transformation finale est
+  ajustée sur tous les appariements retenus : par Kabsch (rigide),
+  moindres carrés exacts (similitude, affine) ou transformation
+  linéaire directe normalisée de Hartley (projective).
 
   Exemple :
-     p1 = [0 0; 1 0; 0 1; 2 2];
-     p2 = p1 * 2 + 3;
-     T = estimateGeometricTransform2D(p1, p2, 'similarity');
+     p1 = [0 0; 10 0; 0 10; 20 20; 5 15];
+     p2 = p1 * 2 + 3;  p2(5, :) = [100 -40];      % un appariement faux
+     [T, valides] = estimateGeometricTransform2D(p1, p2, 'similarity');
+     valides.'                                    % 1 1 1 1 0
 
   Voir aussi ESTIMATEGEOMETRICTRANSFORM, ESTIMATEFUNDAMENTALMATRIX.
 ```
@@ -1028,6 +1070,31 @@ MATLIBRE_CENSUS Transformée de recensement d'une image.
      size(C)    % 6 6 8
 
   Voir aussi DISPARITYSGM, DISPARITYBM.
+```
+
+## `matlibre_coins`
+
+```
+MATLIBRE_COINS Détecteur de coins de Harris ou de Shi et Tomasi, à la manière de MATLAB.
+  [P,M] = MATLIBRE_COINS(I,ARGUMENTS,CRITERE,FONCTION) : CRITERE vaut
+  'harris' ou 'mineigen', ARGUMENTS les options 'MinQuality',
+  'FilterSize' et 'ROI'. Rend les positions [x y], affinées au
+  sous-pixel, et la métrique de chaque coin.
+
+  Les dérivées sont des différences centrées [-1 0 1], le tenseur de
+  structure est lissé par une gaussienne de FilterSize points et d'écart
+  type FilterSize/3, les bords étant prolongés par réplication : une
+  bordure d'image ne fait pas de coin. Un coin est un maximum local de
+  la métrique, au-dessus de MinQuality fois son maximum ; sur un
+  plateau, un seul pixel est retenu. Sa position est affinée par une
+  parabole dans chaque direction, sur ses deux voisins.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [p, m] = matlibre_coins(checkerboard(10), {}, 'harris', 'detectHarrisFeatures');
+
+  Voir aussi DETECTHARRISFEATURES, DETECTMINEIGENFEATURES.
 ```
 
 ## `matlibre_contraste_local`

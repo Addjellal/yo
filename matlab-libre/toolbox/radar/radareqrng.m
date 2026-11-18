@@ -1,25 +1,34 @@
-function R = radareqrng(lambda, Pt, G, sigma, Pmin)
-%RADAREQRNG Portée maximale d'un radar, en mètres.
-%   R = RADAREQRNG(LAMBDA,PT,G,SIGMA,PMIN) applique l'équation du radar :
+function portee = radareqrng(lambda, SNR, Pt, tau, varargin)
+%RADAREQRNG Portée maximale théorique, par l'équation du radar.
+%   R = RADAREQRNG(LAMBDA,SNR,PT,TAU) rend la portée (m) à laquelle une
+%   cible donne le rapport signal sur bruit SNR (dB), pour une longueur
+%   d'onde LAMBDA (m), une puissance crête PT (W) et une durée d'impulsion
+%   TAU (s) — la signature de MATLAB :
 %
-%      R = ((Pt G^2 lambda^2 sigma) / ((4 pi)^3 Pmin))^(1/4)
+%      R = (Pt tau Gt Gr lambda^2 sigma / ((4 pi)^3 k Ts L SNR))^(1/4)
 %
-%      LAMBDA  la longueur d'onde, en mètres
-%      PT      la puissance émise, en watts
-%      G       le gain de l'antenne, linéaire
-%      SIGMA   la surface équivalente radar de la cible, en mètres carrés
-%      PMIN    la plus petite puissance détectable, en watts
+%   Options : 'RCS' (m^2, 1), 'Ts' (K, 290), 'Gain' (dB, 20, ou [Gt Gr]),
+%   'Loss' (dB, 0), 'CustomFactor' (dB, 0), 'unitstr' ('m', 'km', 'mi',
+%   'nmi') pour l'unité de la portée rendue.
 %
-%   La racine quatrième est ce qu'il faut retenir : l'onde s'étale à
-%   l'aller et au retour, si bien que doubler la portée demande seize fois
-%   plus de puissance. C'est pourquoi on gagne davantage sur l'antenne —
-%   dont le gain intervient au carré — que sur l'émetteur.
+%   La portée varie comme la racine quatrième de la puissance : doubler la
+%   portée demande seize fois plus de puissance.
 %
 %   Exemple :
-%      radareqrng(0.03, 1e3, 1e4, 1, 1e-12)
-%      radareqrng(0.03, 16e3, 1e4, 1, 1e-12)   % seize fois la puissance,
-%                                              % deux fois la portee
+%      % Documentation de MATLAB.
+%      lambda = physconst('LightSpeed') / 10e9;
+%      radareqrng(lambda, 6, 1e6, 10e-6)              % 4.1057e+04 m
 %
-%   Voir aussi RADAREQPOW, TIME2RANGE, RANGE2TIME.
-    R = ((Pt .* G .^ 2 .* lambda .^ 2 .* sigma) ./ ((4 * pi) ^ 3 .* Pmin)) .^ 0.25;
+%   Voir aussi RADAREQPOW, RADAREQSNR, PHYSCONST.
+    o = matlibre_radar_options(varargin, 'radareqrng', ...
+        {'RCS', 'Ts', 'Gain', 'Loss', 'CustomFactor', 'unitstr'});
+    matlibre_radar_cibles('radareqrng', o, SNR(:));
+    portee = (Pt .* tau .* 10 .^ ((o.Gain(1) + o.Gain(2)) / 10) .* lambda .^ 2 .* o.RCS(:) ./ ...
+              ((4 * pi) ^ 3 * physconst('Boltzmann') .* o.Ts .* ...
+               10 .^ ((SNR(:) + o.Loss - o.CustomFactor(:)) / 10))) .^ 0.25;
+    switch o.unitstr
+        case 'km', portee = portee / 1000;
+        case 'mi', portee = portee / 1609.344;
+        case 'nmi', portee = portee / 1852;
+    end
 end

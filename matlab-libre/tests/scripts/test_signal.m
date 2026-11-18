@@ -150,7 +150,10 @@ assert(peak2peak([1 5 2]) == 4);
 assert(abs(peak2rms([1 -1 1 -1]) - 1) < 1e-12);
 assert(abs(rssq([3 4]) - 5) < 1e-12);
 assert(abs(bandpower([1 -1 1 -1]) - 1) < 1e-12);
-assert(abs(zerocrossrate([1 -1 1 -1]) - 0.75) < 1e-12);
+% Comme MATLAB, l'echantillon initial vaut zero : le premier echantillon
+% non nul compte pour un demi passage (3,5 passages sur 4 echantillons).
+assert(abs(zerocrossrate([1 -1 1 -1]) - 0.875) < 1e-12);
+assert(abs(zerocrossrate([1 -1 1 -1], 'InitialState', 1) - 0.75) < 1e-12);
 assert(finddelay([1 2 3 0 0], [0 0 1 2 3]) == 2);
 assert(finddelay([0 0 1 2 3], [1 2 3 0 0]) == -2);
 assert(seqperiod([1 2 1 2 1 2]) == 2);
