@@ -8,7 +8,18 @@ function p = genpath(dossier)
 %   Sans argument, GENPATH part du dossier courant.
 %
 %   Exemple :
-%      addpath(genpath(fullfile(matlabroot, 'toolbox', 'monlot')));
+%      % Un dossier et tous ses sous-dossiers d'un coup : une fonction
+%      % rangée deux crans plus bas devient appelable, puis ne l'est plus.
+%      racine = tempname();
+%      mkdir(fullfile(racine, 'outils', 'calcul'));
+%      f = fopen(fullfile(racine, 'outils', 'calcul', 'septProfond.m'), 'w');
+%      fprintf(f, 'function y = septProfond()\ny = 7;\nend\n');
+%      fclose(f);
+%      addpath(genpath(racine));
+%      septProfond()                 % 7
+%      rmpath(genpath(racine));
+%      exist('septProfond')          % 0
+%      rmdir(racine, 's');
 %
 %   Voir aussi PATH, ADDPATH, PATHSEP, DIR.
     if nargin < 1

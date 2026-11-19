@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#include <set>
 #include <vector>
 
 #include "matlibre/Bibliotheque.h"
@@ -64,19 +65,48 @@ std::string racineToolboxes(const std::string& executable) {
     return std::string();
 }
 
+// Les dossiers d'un niveau, triés. Avec « ordinaires », seuls ceux que
+// GENPATH garde : il écarte un nom qui commence par un point, « @classe »,
+// « +paquet » et « private » — l'index explore « @ » et « + » à part.
+// Les deux listes doivent s'accorder : installToolbox ajoute une toolbox
+// par « addpath(genpath(d)) », et uninstallToolbox la retire de même.
+static std::vector<fs::path> sousDossiers(const fs::path& dossier, bool ordinaires) {
+    std::error_code ec;
+    std::vector<fs::path> trouves;
+    for (const auto& e : fs::directory_iterator(dossier, ec)) {
+        std::error_code e2;
+        if (!e.is_directory(e2)) continue;
+        const std::string nom = e.path().filename().string();
+        if (ordinaires && (nom.empty() || nom[0] == '.' || nom[0] == '@' || nom[0] == '+' ||
+                           nom == "private"))
+            continue;
+        trouves.push_back(e.path());
+    }
+    std::sort(trouves.begin(), trouves.end());
+    return trouves;
+}
+
+// Un dossier puis ses sous-dossiers ordinaires, en profondeur, dans l'ordre
+// de GENPATH. Un lien symbolique qui remonterait vers un parent ferait
+// tourner la descente sans fin : un dossier déjà vu n'est pas revisité.
+static void avecSousDossiers(const fs::path& dossier, std::set<fs::path>& vus,
+                             std::vector<std::string>& dossiers) {
+    std::error_code ec;
+    if (!vus.insert(fs::weakly_canonical(dossier, ec)).second) return;
+    dossiers.push_back(dossier.string());
+    for (const auto& sous : sousDossiers(dossier, true)) avecSousDossiers(sous, vus, dossiers);
+}
+
 void chargerToolboxes(Interpreteur& it, const std::string& racine) {
     if (racine.empty()) return;
     it.definirRacineToolbox(racine);
-    std::error_code ec;
-    std::vector<std::string> dossiers;
-    for (const auto& e : fs::directory_iterator(racine, ec))
-        if (e.is_directory()) dossiers.push_back(e.path().string());
-    std::sort(dossiers.begin(), dossiers.end());
-    // Ajoutés en tête, du dernier au premier : l'ordre final est
-    // alphabétique, et la racine passe devant.
-    for (auto rit = dossiers.rbegin(); rit != dossiers.rend(); ++rit)
-        it.ajouterChemin(*rit, true);
-    it.ajouterChemin(racine, true);
+    // La racine devant, puis chaque module dans l'ordre alphabétique, suivi
+    // de ses sous-dossiers : une toolbox installée qui range ses fonctions
+    // dans « outils/ » les retrouve au démarrage suivant.
+    std::vector<std::string> dossiers = {racine};
+    std::set<fs::path> vus;
+    for (const auto& module : sousDossiers(racine, false)) avecSousDossiers(module, vus, dossiers);
+    it.ajouterChemins(dossiers, true);
 }
 
 }  // namespace matlibre

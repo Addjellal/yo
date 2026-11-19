@@ -5,6 +5,7 @@
 // ctest.
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <sstream>
@@ -17,6 +18,7 @@
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Console.h"
 #include "matlibre/Erreur.h"
+#include "matlibre/Installation.h"
 #include "matlibre/Interpreteur.h"
 #include "matlibre/Lexeur.h"
 #include "matlibre/Operations.h"
@@ -269,6 +271,29 @@ void testErreurs() {
     verifier(leve, "dimensions incompatibles : identifiant MATLAB:innerdim");
 }
 
+// Le démarrage met sur le chemin chaque module et ses sous-dossiers
+// ordinaires, avec les règles de GENPATH : une toolbox installée qui range
+// ses fonctions dans « outils/ » les retrouve après un redémarrage.
+void testChargerToolboxes() {
+    namespace fs = std::filesystem;
+    const fs::path racine = fs::temp_directory_path() / "matlibre_essai_racine_toolboxes";
+    fs::remove_all(racine);
+    for (const char* d : {"beta", "alpha/outils/calcul", "alpha/private", "alpha/+paquet",
+                          "alpha/@Classe", "alpha/.cache"})
+        fs::create_directories(racine / d);
+    Interpreteur it;
+    chargerToolboxes(it, racine.string());
+    const std::vector<std::string> attendu = {
+        racine.string(), (racine / "alpha").string(), (racine / "alpha/outils").string(),
+        (racine / "alpha/outils/calcul").string(), (racine / "beta").string()};
+    verifier(it.chemin() == attendu,
+             "la racine, puis chaque module suivi de ses sous-dossiers ordinaires");
+    it.retirerChemins({(racine / "alpha").string(), (racine / "alpha/outils").string(),
+                       (racine / "alpha/outils/calcul").string()});
+    verifier(it.chemin().size() == 2, "un module se retire avec ses sous-dossiers");
+    fs::remove_all(racine);
+}
+
 }  // namespace
 
 int main() {
@@ -283,6 +308,7 @@ int main() {
         {"fonctions", testFonctions},   {"algebre", testAlgebre},
         {"texte", testTexte},           {"affichage", testAffichage},
         {"signal", testSignal},         {"erreurs", testErreurs},
+        {"toolboxes", testChargerToolboxes},
     };
     for (const auto& c : cas) {
         std::cout << "[" << c.nom << "]\n";

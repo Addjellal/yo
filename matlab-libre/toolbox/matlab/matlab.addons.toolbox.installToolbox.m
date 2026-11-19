@@ -1,8 +1,9 @@
 function identifiant = matlab.addons.toolbox.installToolbox(source, varargin)
 %MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX Installe une toolbox.
 %   ID = ...INSTALLTOOLBOX(DOSSIER) copie le dossier donné dans la racine
-%   des toolboxes et l'ajoute au chemin de recherche. Le dossier doit
-%   contenir un fichier Contents.m, comme toute toolbox MATLAB.
+%   des toolboxes et l'ajoute au chemin de recherche, avec ses
+%   sous-dossiers — ceux que garde GENPATH, comme au démarrage suivant. Le
+%   dossier doit contenir un fichier Contents.m, comme toute toolbox MATLAB.
 %
 %   Exemple :
 %      % Une toolbox est un dossier qui porte un Contents.m. On la
@@ -34,7 +35,7 @@ function identifiant = matlab.addons.toolbox.installToolbox(source, varargin)
               'A toolbox named ''%s'' is already installed.', nom);
     end
     copyfile(source, cible);
-    addpath(cible);
+    addpath(genpath(cible));
     rehash;
     identifiant = nom;
 end

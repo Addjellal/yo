@@ -1,6 +1,7 @@
 function matlab.addons.toolbox.uninstallToolbox(identifiant)
 %MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX Retire une toolbox installée.
-%   ...UNINSTALLTOOLBOX(ID) efface le dossier et le retire du chemin.
+%   ...UNINSTALLTOOLBOX(ID) efface le dossier et le retire du chemin, avec
+%   les sous-dossiers que l'installation y avait mis.
 %
 %   Exemple :
 %      % Desinstaller ce qui n'est pas installe ne fait rien de mal.
@@ -16,7 +17,7 @@ function matlab.addons.toolbox.uninstallToolbox(identifiant)
         error('MATLAB:addons:NotInstalled', ...
               'No toolbox named ''%s'' is installed.', identifiant);
     end
-    rmpath(cible);
+    rmpath(genpath(cible));
     rmdir(cible, 's');
     rehash;
 end

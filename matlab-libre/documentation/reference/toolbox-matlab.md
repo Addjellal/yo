@@ -2092,7 +2092,18 @@ GENPATH Chemin d'un dossier et de tous ses sous-dossiers.
   Sans argument, GENPATH part du dossier courant.
 
   Exemple :
-     addpath(genpath(fullfile(matlabroot, 'toolbox', 'monlot')));
+     % Un dossier et tous ses sous-dossiers d'un coup : une fonction
+     % rangée deux crans plus bas devient appelable, puis ne l'est plus.
+     racine = tempname();
+     mkdir(fullfile(racine, 'outils', 'calcul'));
+     f = fopen(fullfile(racine, 'outils', 'calcul', 'septProfond.m'), 'w');
+     fprintf(f, 'function y = septProfond()\ny = 7;\nend\n');
+     fclose(f);
+     addpath(genpath(racine));
+     septProfond()                 % 7
+     rmpath(genpath(racine));
+     exist('septProfond')          % 0
+     rmdir(racine, 's');
 
   Voir aussi PATH, ADDPATH, PATHSEP, DIR.
 ```
@@ -3616,8 +3627,9 @@ MATLAB.ADDONS.INSTALLEDADDONS Liste les toolboxes installées.
 ```
 MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX Installe une toolbox.
   ID = ...INSTALLTOOLBOX(DOSSIER) copie le dossier donné dans la racine
-  des toolboxes et l'ajoute au chemin de recherche. Le dossier doit
-  contenir un fichier Contents.m, comme toute toolbox MATLAB.
+  des toolboxes et l'ajoute au chemin de recherche, avec ses
+  sous-dossiers — ceux que garde GENPATH, comme au démarrage suivant. Le
+  dossier doit contenir un fichier Contents.m, comme toute toolbox MATLAB.
 
   Exemple :
      % Une toolbox est un dossier qui porte un Contents.m. On la
@@ -3659,7 +3671,8 @@ MATLAB.ADDONS.TOOLBOX.PACKAGETOOLBOX Empaquette une toolbox.
 
 ```
 MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX Retire une toolbox installée.
-  ...UNINSTALLTOOLBOX(ID) efface le dossier et le retire du chemin.
+  ...UNINSTALLTOOLBOX(ID) efface le dossier et le retire du chemin, avec
+  les sous-dossiers que l'installation y avait mis.
 
   Exemple :
      % Desinstaller ce qui n'est pas installe ne fait rien de mal.

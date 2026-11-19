@@ -326,18 +326,54 @@ static std::string dossierAbsolu(const std::string& dossier) {
     return r;
 }
 
+// Les dossiers d'une liste, en absolu et sans doublon : la première
+// occurrence l'emporte, comme dans l'ordre de recherche. Un nom vide ne
+// désigne aucun dossier.
+static std::vector<std::string> dossiersDistincts(const std::vector<std::string>& dossiers) {
+    std::vector<std::string> distincts;
+    for (const auto& dossier : dossiers) {
+        std::string d = dossierAbsolu(dossier);
+        if (!d.empty() && std::find(distincts.begin(), distincts.end(), d) == distincts.end())
+            distincts.push_back(std::move(d));
+    }
+    return distincts;
+}
+
+static void oterDuChemin(std::vector<std::string>& chemin,
+                         const std::vector<std::string>& dossiers) {
+    chemin.erase(std::remove_if(chemin.begin(), chemin.end(),
+                                [&](const std::string& c) {
+                                    return std::find(dossiers.begin(), dossiers.end(), c) !=
+                                           dossiers.end();
+                                }),
+                 chemin.end());
+}
+
 void Interpreteur::ajouterChemin(const std::string& dossier, bool enTete) {
-    const std::string d = dossierAbsolu(dossier);
-    auto it = std::find(chemin_.begin(), chemin_.end(), d);
-    if (it != chemin_.end()) chemin_.erase(it);
-    if (enTete) chemin_.insert(chemin_.begin(), d);
-    else chemin_.push_back(d);
-    reindexerChemin();
+    ajouterChemins({dossier}, enTete);
 }
 
 void Interpreteur::retirerChemin(const std::string& dossier) {
-    auto it = std::find(chemin_.begin(), chemin_.end(), dossierAbsolu(dossier));
-    if (it != chemin_.end()) chemin_.erase(it);
+    retirerChemins({dossier});
+}
+
+void Interpreteur::ajouterChemins(const std::vector<std::string>& dossiers, bool enTete) {
+    const std::vector<std::string> bloc = dossiersDistincts(dossiers);
+    if (bloc.empty()) return;
+    oterDuChemin(chemin_, bloc);
+    chemin_.insert(enTete ? chemin_.begin() : chemin_.end(), bloc.begin(), bloc.end());
+    reindexerChemin();
+}
+
+void Interpreteur::retirerChemins(const std::vector<std::string>& dossiers) {
+    const std::vector<std::string> cibles = dossiersDistincts(dossiers);
+    if (cibles.empty()) return;
+    oterDuChemin(chemin_, cibles);
+    reindexerChemin();
+}
+
+void Interpreteur::definirChemin(const std::vector<std::string>& dossiers) {
+    chemin_ = dossiersDistincts(dossiers);
     reindexerChemin();
 }
 

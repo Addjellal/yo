@@ -1042,6 +1042,92 @@ assert(any(strcmp(strsplit(path, pathsep), dossierPersistant)), 'et il y est en 
 rmpath(dossierPersistant);
 assert(~any(strcmp(strsplit(path, pathsep), dossierPersistant)), 'rmpath le retire');
 
+% Un argument d'ADDPATH, de RMPATH ou de PATH peut nommer plusieurs
+% dossiers, séparés par PATHSEP : c'est ce que rend GENPATH. Une fonction
+% rangée deux crans plus bas devient appelable, puis ne l'est plus.
+arbre = tempname();
+mkdir(fullfile(arbre, 'a', 'b'));
+fid = fopen(fullfile(arbre, 'a', 'b', 'fonctionProfonde.m'), 'w');
+fprintf(fid, 'function y = fonctionProfonde()\n    y = 7;\nend\n');
+fclose(fid);
+cheminInitial = path();
+listeArbre = genpath(arbre);
+assert(listeArbre(end) == pathsep(), 'genpath finit par un separateur');
+ancienChemin = addpath(listeArbre);
+assert(strcmp(ancienChemin, cheminInitial), 'addpath rend le chemin d''avant');
+assert(exist('fonctionProfonde') == 2 && fonctionProfonde() == 7, ...
+       'addpath(genpath(d)) atteint les sous-dossiers');
+morceaux = strsplit(path, pathsep);
+assert(isequal(morceaux(1:3), {arbre, fullfile(arbre, 'a'), fullfile(arbre, 'a', 'b')}), ...
+       'les dossiers de la liste passent en tete, dans leur ordre');
+assert(~any(cellfun(@isempty, morceaux)), 'le separateur final ne donne pas de dossier vide');
+assert(strcmp(path, strjoin(morceaux, pathsep)), 'path joint les dossiers par pathsep');
+ancienChemin = rmpath(genpath(arbre));
+assert(~isempty(strfind(ancienChemin, fullfile(arbre, 'a', 'b'))), ...
+       'rmpath rend le chemin d''avant');
+assert(exist('fonctionProfonde') == 0, 'rmpath(genpath(d)) les retire');
+assert(strcmp(path, cheminInitial), 'le chemin est revenu a son etat');
+% Un argument vide, ou fait de separateurs, ne nomme aucun dossier.
+addpath('');
+addpath([pathsep pathsep]);
+rmpath('');
+assert(strcmp(path, cheminInitial), 'un argument vide ne change rien');
+
+% Plusieurs arguments : le premier passe devant. « -end » ou 1 range à la
+% fin, « -begin » ou 0 en tête ; la dernière option donnée l'emporte, et
+% un dossier déjà présent change de place.
+dossierA = fullfile(arbre, 'a');
+dossierB = fullfile(arbre, 'a', 'b');
+addpath(dossierA, dossierB);
+morceaux = strsplit(path, pathsep);
+assert(isequal(morceaux(1:2), {dossierA, dossierB}), 'addpath(d1, d2) : d1 en premier');
+addpath(dossierA, '-end');
+morceaux = strsplit(path, pathsep);
+assert(strcmp(morceaux{end}, dossierA) && strcmp(morceaux{1}, dossierB) && ...
+       sum(strcmp(morceaux, dossierA)) == 1, '-end deplace le dossier a la fin');
+addpath(dossierA, 0);
+assert(strcmp(strtok(path, pathsep), dossierA), '0 le remet en tete');
+addpath(dossierA, 1);
+morceaux = strsplit(path, pathsep);
+assert(strcmp(morceaux{end}, dossierA), '1 vaut -end');
+addpath(dossierA, '-END', '-begin');
+assert(strcmp(strtok(path, pathsep), dossierA), 'la derniere option l''emporte');
+addpath(string(dossierB), true, '-frozen');
+morceaux = strsplit(path, pathsep);
+assert(strcmp(morceaux{end}, dossierB), 'une chaine, un logique et -frozen sont compris');
+rmpath(dossierA, string(dossierB));
+assert(strcmp(path, cheminInitial), 'rmpath de plusieurs dossiers');
+refusChemin = '';
+try
+    addpath(dossierA, 2);
+catch err
+    refusChemin = err.identifier;
+end
+assert(strcmp(refusChemin, 'MATLAB:catdirs:ArgNotString'), 'un nombre n''est pas un dossier');
+assert(strcmp(path, cheminInitial), 'un appel refuse ne touche pas au chemin');
+
+% PATH(P) remplace le chemin : c'est ce qui remet un chemin noté plus tôt.
+% PATH(PATH, D) ajoute D à la fin, PATH(D, PATH) en tête.
+ancienChemin = addpath(genpath(arbre));
+path(ancienChemin);
+assert(strcmp(path, cheminInitial) && exist('fonctionProfonde') == 0, ...
+       'path(p) remet le chemin note');
+path(path, dossierB);
+morceaux = strsplit(path, pathsep);
+assert(strcmp(morceaux{end}, dossierB), 'path(path, d) ajoute a la fin');
+path(dossierB, path);
+morceaux = strsplit(path, pathsep);
+assert(strcmp(morceaux{1}, dossierB) && sum(strcmp(morceaux, dossierB)) == 1, ...
+       'path(d, path) le deplace en tete');
+path(path, [dossierA pathsep dossierB]);
+morceaux = strsplit(path, pathsep);
+assert(isequal(morceaux(end-1:end), {dossierA, dossierB}), ...
+       'path(path, liste) : la liste va a la fin');
+nouveauChemin = path(cheminInitial);
+assert(strcmp(nouveauChemin, cheminInitial) && strcmp(path, cheminInitial), ...
+       'p = path(...) rend le chemin obtenu');
+rmdir(arbre, 's');
+
 % Les fonctions d'un fichier vivent ensemble : une poignée vers l'une
 % d'elles garde le fichier entier, même quand le cache du chemin l'a
 % oublié ; et un fichier oublié de tous se libère — rehash ne fait plus

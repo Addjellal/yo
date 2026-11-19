@@ -38,6 +38,26 @@ int identifiantProcessus() {
     std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
+// Le séparateur des listes de dossiers, celui que rend PATHSEP : sous
+// Windows, « : » suit déjà la lettre du lecteur.
+#ifdef _WIN32
+constexpr char separateurChemin = ';';
+#else
+constexpr char separateurChemin = ':';
+#endif
+
+std::string sansBlancs(const std::string& s) {
+    std::size_t a = s.find_first_not_of(" \t\r\n");
+    if (a == std::string::npos) return std::string();
+    std::size_t b = s.find_last_not_of(" \t\r\n");
+    return s.substr(a, b - a + 1);
+}
+
+std::string enMinuscules(std::string s) {
+    for (auto& c : s) c = (char)std::tolower((unsigned char)c);
+    return s;
+}
+
 FONCTION(fnPwd) {
     INUTILISE
     std::error_code ec;
@@ -209,11 +229,7 @@ FONCTION(fnFilesep) {
 
 FONCTION(fnPathsep) {
     INUTILISE
-#ifdef _WIN32
-    return {Valeur::texte(";")};
-#else
-    return {Valeur::texte(":")};
-#endif
+    return {Valeur::texte(std::string(1, separateurChemin))};
 }
 
 FONCTION(fnTempdir) {
@@ -329,38 +345,93 @@ FONCTION(fnIsmac) {
 
 // ------------------------------------------------------ chemin de recherche
 
+bool estTexteSimple(const Valeur& v) {
+    return v.estTexte() || (v.estChaine() && v.estScalaire());
+}
+
+// Les dossiers que nomment les arguments [debut, fin). Comme dans MATLAB,
+// un argument peut en nommer plusieurs, séparés par PATHSEP : c'est ce que
+// rend GENPATH, et ce qui fait marcher « addpath(genpath(d)) ». Les blancs
+// autour d'un nom sont ôtés ; un morceau vide — le séparateur final de
+// GENPATH, un argument vide — ne nomme rien.
+std::vector<std::string> dossiersNommes(const std::vector<Valeur>& args, std::size_t debut,
+                                        std::size_t fin) {
+    std::vector<std::string> dossiers;
+    for (std::size_t k = debut; k < fin; ++k) {
+        if (!estTexteSimple(args[k]))
+            erreur("MATLAB:catdirs:ArgNotString", "All arguments must be character vectors.");
+        std::istringstream liste(args[k].versTexte());
+        std::string morceau;
+        while (std::getline(liste, morceau, separateurChemin)) {
+            morceau = sansBlancs(morceau);
+            if (!morceau.empty()) dossiers.push_back(morceau);
+        }
+    }
+    return dossiers;
+}
+
+std::string texteChemin(const Interpreteur& it) {
+    std::string s;
+    for (std::size_t k = 0; k < it.chemin().size(); ++k) {
+        if (k > 0) s += separateurChemin;
+        s += it.chemin()[k];
+    }
+    return s;
+}
+
 FONCTION(fnAddpath) {
     INUTILISE
-    for (const auto& a : args) {
-        std::string s = a.versTexte();
-        if (s == "-end" || s == "-begin") continue;
-        it.ajouterChemin(s, true);
+    exigerArguments(args, 1, 0, "addpath");
+    // Les options se lisent en partant de la fin, comme dans MATLAB :
+    // « -end » ou 1 range à la fin, « -begin » ou 0 en tête, ce qui est le
+    // défaut, et la dernière donnée l'emporte. « -frozen » ne règle que la
+    // surveillance des dossiers par Windows : accepté, il n'a rien à faire
+    // ici. Le premier argument reste un dossier quoi qu'il dise.
+    std::size_t n = args.size();
+    int aLaFin = -1;
+    while (n > 1) {
+        const Valeur& option = args[n - 1];
+        const bool nombre = (option.estNumerique() || option.classe == Classe::Logique) &&
+                            option.estScalaire() && option.estReel();
+        const std::string mot =
+            estTexteSimple(option) ? enMinuscules(option.versTexte()) : std::string();
+        int position = -1;
+        if (mot == "-end" || (nombre && option.scal() == 1.0)) position = 1;
+        else if (mot == "-begin" || (nombre && option.scal() == 0.0)) position = 0;
+        else if (mot != "-frozen") break;
+        if (aLaFin < 0) aLaFin = position;
+        --n;
     }
+    const std::string avant = texteChemin(it);
+    it.ajouterChemins(dossiersNommes(args, 0, n), aLaFin != 1);
+    if (nargout >= 1) return {Valeur::texte(avant)};
     return {};
 }
 
 FONCTION(fnRmpath) {
     INUTILISE
-    for (const auto& a : args) it.retirerChemin(a.versTexte());
+    exigerArguments(args, 1, 0, "rmpath");
+    const std::string avant = texteChemin(it);
+    it.retirerChemins(dossiersNommes(args, 0, args.size()));
+    if (nargout >= 1) return {Valeur::texte(avant)};
     return {};
 }
 
 FONCTION(fnPath) {
     INUTILISE
-    if (!args.empty()) {
-        for (const auto& a : args) it.ajouterChemin(a.versTexte(), false);
-        return {};
+    exigerArguments(args, 0, 2, "path");
+    if (args.size() == 2 && dossiersNommes(args, 0, 1) == it.chemin()) {
+        // « path(path, d) » : d va à la fin, et la quitte s'il y était.
+        it.ajouterChemins(dossiersNommes(args, 1, 2), false);
+    } else if (!args.empty()) {
+        // « path(p) » remplace le chemin ; « path(d, path) » met d en tête,
+        // la première occurrence d'un dossier étant celle qui reste.
+        it.definirChemin(dossiersNommes(args, 0, args.size()));
     }
-    std::string s;
-    for (const auto& d : it.chemin()) {
-        if (!s.empty()) s += ":";
-        s += d;
-    }
-    if (nargout == 0) {
+    if (nargout >= 1) return {Valeur::texte(texteChemin(it))};
+    if (args.empty())
         for (const auto& d : it.chemin()) it.sortie() << "        " << d << "\n";
-        return {};
-    }
-    return {Valeur::texte(s)};
+    return {};
 }
 
 FONCTION(fnRehash) {
@@ -704,18 +775,6 @@ std::vector<std::string> desindenter(const std::vector<std::string>& lignes) {
     for (const std::string& l : lignes)
         sortie.push_back(l.size() >= creux ? l.substr(creux) : std::string());
     return sortie;
-}
-
-std::string sansBlancs(const std::string& s) {
-    std::size_t a = s.find_first_not_of(" \t\r\n");
-    if (a == std::string::npos) return std::string();
-    std::size_t b = s.find_last_not_of(" \t\r\n");
-    return s.substr(a, b - a + 1);
-}
-
-std::string enMinuscules(std::string s) {
-    for (auto& c : s) c = (char)std::tolower((unsigned char)c);
-    return s;
 }
 
 // Le nom d'une section, ou vide. On accepte le francais et l'anglais :

@@ -205,48 +205,81 @@ FILESEP  Séparateur de chemin du système : « / » ou « \ ».
     Voir aussi FULLFILE, FILEPARTS, PATHSEP.
 
 ### addpath
-ADDPATH  Ajoute un dossier au chemin de recherche.
+ADDPATH  Ajoute des dossiers au chemin de recherche.
     ADDPATH(D) ajoute D en tête du chemin : les fonctions qui s'y trouvent
-    deviennent appelables.
-    ADDPATH(D,'-end') l'ajoute à la fin.
+    deviennent appelables. Un dossier déjà présent passe en tête.
+    ADDPATH(D1,D2,...) en ajoute plusieurs, D1 en premier. Chaque argument
+    peut lui-même en nommer plusieurs, séparés par PATHSEP : c'est ce que
+    rend GENPATH, d'où ADDPATH(GENPATH(D)) pour D et ses sous-dossiers.
+    ADDPATH(...,'-end') ou ADDPATH(...,1) les ajoute à la fin ;
+    ADDPATH(...,'-begin') ou ADDPATH(...,0) en tête, comme sans option.
+    P = ADDPATH(...) rend le chemin d'avant, que PATH(P) remet.
 
     Syntaxe
        addpath(dossier)
-       addpath(dossier,'-end')
+       addpath(dossier1,...,dossierN)
+       addpath(genpath(dossier))
+       addpath(...,'-end')
+       p = addpath(...)
 
     Exemples
-       d = tempdir;
-       addpath(d);
-       rmpath(d);
+       d = tempname;
+       mkdir(fullfile(d, 'sous'));
+       ancien = addpath(genpath(d));
+       c = strsplit(path, pathsep);
+       isequal(c(1:2), {d, fullfile(d, 'sous')})
+       path(ancien);
+       rmdir(d, 's');
 
-    Voir aussi RMPATH, PATH, WHICH, REHASH.
+    Voir aussi RMPATH, PATH, GENPATH, PATHSEP, WHICH, REHASH.
 
 ### rmpath
-RMPATH  Retire un dossier du chemin de recherche.
+RMPATH  Retire des dossiers du chemin de recherche.
+    RMPATH(D) retire D du chemin. RMPATH(D1,D2,...) en retire plusieurs,
+    et chaque argument peut en nommer plusieurs, séparés par PATHSEP :
+    RMPATH(GENPATH(D)) défait ADDPATH(GENPATH(D)). Un dossier absent du
+    chemin est laissé de côté.
+    P = RMPATH(...) rend le chemin d'avant.
 
     Syntaxe
        rmpath(dossier)
+       rmpath(dossier1,...,dossierN)
+       rmpath(genpath(dossier))
+       p = rmpath(...)
 
     Exemples
-       d = tempdir;
-       addpath(d);
-       rmpath(d);
+       d = tempname;
+       mkdir(fullfile(d, 'sous'));
+       addpath(genpath(d));
+       rmpath(genpath(d));
+       any(startsWith(strsplit(path, pathsep), d))
+       rmdir(d, 's');
 
-    Voir aussi ADDPATH, PATH, WHICH.
+    Voir aussi ADDPATH, PATH, GENPATH, WHICH.
 
 ### path
 PATH  Chemin de recherche.
     PATH affiche le chemin ; P = PATH le rend en texte, les dossiers
     séparés par PATHSEP.
+    PATH(P) remplace le chemin par les dossiers de P : c'est ainsi qu'on
+    remet un chemin noté plus tôt.
+    PATH(PATH,D) ajoute D à la fin du chemin, PATH(D,PATH) en tête ; s'il
+    y était déjà, D change de place.
 
     Syntaxe
        path
        p = path
+       path(p)
+       path(path,dossier)
+       path(dossier,path)
 
     Exemples
        p = path;
        dossiers = strsplit(p, pathsep);
        numel(dossiers) > 0
+       path(path, tempdir);
+       path(p);
+       isequal(path, p)
 
     Voir aussi ADDPATH, RMPATH, PATHSEP, WHICH, REHASH.
 

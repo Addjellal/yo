@@ -37,6 +37,12 @@ fprintf(f, '%%DOUBLEDESSAI Rend le double de son argument.\n');
 fprintf(f, '    y = 2 * x;\n');
 fprintf(f, 'end\n');
 fclose(f);
+% Une fonction rangée dans un sous-dossier : l'installation la met sur le
+% chemin, comme le fera le démarrage suivant.
+mkdir(fullfile(source, 'outils'));
+f = fopen(fullfile(source, 'outils', 'tripleDEssai.m'), 'w');
+fprintf(f, 'function y = tripleDEssai(x)\n    y = 3 * x;\nend\n');
+fclose(f);
 
 avant = height(matlab.addons.installedAddons());
 identifiant = matlab.addons.toolbox.installToolbox(source);
@@ -44,6 +50,7 @@ assert(strcmp(identifiant, 'toolboxDEssai'));
 apres = height(matlab.addons.installedAddons());
 assert(apres == avant + 1);
 assert(doubleDEssai(21) == 42);
+assert(tripleDEssai(5) == 15, 'les sous-dossiers d''une toolbox sont sur le chemin');
 
 % Réinstaller la même toolbox est refusé, avec un message clair.
 essai = false;
@@ -70,6 +77,9 @@ rmdir(sansContents, 's');
 matlab.addons.toolbox.uninstallToolbox(identifiant);
 assert(height(matlab.addons.installedAddons()) == avant);
 assert(~isfolder(fullfile(racine, 'toolboxDEssai')));
+assert(exist('tripleDEssai') == 0, 'la desinstallation retire les sous-dossiers');
+assert(~any(contains(strsplit(path, pathsep), 'toolboxDEssai')), ...
+       'aucun dossier de la toolbox ne reste sur le chemin');
 rmdir(source, 's');
 
 %% --------------------------------------------------------- inspection

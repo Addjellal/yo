@@ -100,6 +100,15 @@ public:
     void installerBibliotheque();
     void ajouterChemin(const std::string& dossier, bool enTete = true);
     void retirerChemin(const std::string& dossier);
+    // Plusieurs dossiers d'un coup, rangés dans l'ordre donné, en tête ou à
+    // la fin ; un dossier déjà présent quitte sa place. L'index n'est
+    // reconstruit qu'une fois : « addpath(genpath(d)) » en ajoute des
+    // dizaines, et le démarrage une soixantaine.
+    void ajouterChemins(const std::vector<std::string>& dossiers, bool enTete = true);
+    void retirerChemins(const std::vector<std::string>& dossiers);
+    // Remplace le chemin entier : c'est « path(p) », qui remet un chemin
+    // noté plus tôt.
+    void definirChemin(const std::vector<std::string>& dossiers);
     const std::vector<std::string>& chemin() const { return chemin_; }
     void reindexerChemin();
     std::string racineToolbox() const { return racineToolbox_; }
