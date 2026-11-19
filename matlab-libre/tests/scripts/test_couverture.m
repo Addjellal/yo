@@ -29,8 +29,9 @@ assert(max(abs(tform2eul(eul2tform([0.3 0.2 0.1])) - [0.3 0.2 0.1])) < 1e-13, ..
 % autre rend la rotation relative.
 assert(norm(quatdivide(q, q) - [1 0 0 0]) < 1e-13, 'q / q vaut l''identite');
 p = axang2quat([1 0 0 0.4]);
-assert(norm(quatmultiply(quatdivide(q, p), p) - q) < 1e-13, ...
-       '(q / p) * p rend q');
+% Comme MATLAB, quatdivide divise a gauche : inv(p) * q.
+assert(norm(quatmultiply(p, quatdivide(q, p)) - q) < 1e-13, ...
+       'p * (p \ q) rend q');
 assert(abs(norm(quatnormalize([2 0 0 0])) - 1) < 1e-15, 'quatnormalize normalise');
 
 % Trajectoires : la B-spline reste dans l'enveloppe convexe de ses points

@@ -781,26 +781,73 @@ FONCTION(fnSpline) {
     return {r};
 }
 
+// PPVAL comme MATLAB : un polynome par morceaux a valeurs dans R^d range
+// ses coefficients par lignes, la composante variant la premiere (ligne
+// d*(i-1)+c pour le morceau i, composante c), puissances decroissantes.
+// Un point de rupture interieur appartient au morceau qui commence : la
+// valeur est celle de droite, ce qui compte pour un polynome discontinu.
+// Hors des ruptures, le premier et le dernier morceau prolongent.
 FONCTION(fnPpval) {
     INUTILISE
     exigerArguments(args, 2, 2, "ppval");
     const Valeur& pp = args[0];
-    std::vector<double> ruptures;
-    Valeur b = pp.champ("breaks");
-    for (std::size_t k = 0; k < b.nelem(); ++k) ruptures.push_back(b.re[k]);
-    Valeur coefs = pp.champ("coefs");
-    int morceaux = coefs.nlignes(), ordre = coefs.ncolonnes();
+    if (!pp.estStructure() || !pp.aChamp("breaks") || !pp.aChamp("coefs"))
+        throw ErreurMatlab("MATLAB:ppval:Forme",
+                           "ppval : le premier argument est un polynome par morceaux, de MKPP, "
+                           "SPLINE ou PCHIP.");
+    Valeur b = versDouble(pp.champ("breaks"));
+    std::vector<double> ruptures(b.re.begin(), b.re.end());
+    Valeur coefs = versDouble(pp.champ("coefs"));
+    if (coefs.ndims() > 2)
+        throw ErreurMatlab("MATLAB:ppval:Coefficients",
+                           "ppval : les coefficients forment une matrice (d*L) x k.");
+    int dim = 1;
+    if (pp.aChamp("dim")) {
+        Valeur d = versDouble(pp.champ("dim"));
+        double produit = 1.0;
+        for (double v : d.re) produit *= v;
+        dim = (int)std::llround(produit);
+    }
+    int lignes = coefs.nlignes(), ordre = coefs.ncolonnes();
+    if (dim < 1 || lignes % dim != 0 || ruptures.size() != (std::size_t)(lignes / dim) + 1 ||
+        lignes == 0)
+        throw ErreurMatlab("MATLAB:ppval:Coherence",
+                           "ppval : il faut une ligne de coefficients par morceau et par "
+                           "composante, et un point de rupture de plus que de morceaux.");
+    int morceaux = lignes / dim;
     const Valeur& cible = versDouble(args[1]);
-    Valeur r = cible;
-    for (std::size_t k = 0; k < cible.nelem(); ++k) {
+    if (cible.estComplexe())
+        throw ErreurMatlab("MATLAB:ppval:Abscisses",
+                           "ppval : les abscisses sont reelles.");
+    std::size_t n = cible.nelem();
+    Valeur r;
+    if (dim == 1) {
+        r = Valeur::matriceDims(cible.dims);
+    } else if (cible.dims.size() == 2 && (cible.dims[0] == 1 || cible.dims[1] == 1)) {
+        r = Valeur::matrice(dim, (int)n);
+    } else {
+        Dims d{dim};
+        d.insert(d.end(), cible.dims.begin(), cible.dims.end());
+        r = Valeur::matriceDims(d);
+    }
+    bool complexe = coefs.estComplexe();
+    if (complexe) r.im.assign(r.re.size(), 0.0);
+    for (std::size_t k = 0; k < n; ++k) {
         double xi = cible.re[k];
-        int i = 0;
-        while (i + 1 < morceaux && ruptures[(std::size_t)i + 1] < xi) ++i;
+        int i = (int)(std::upper_bound(ruptures.begin() + 1, ruptures.begin() + morceaux, xi) -
+                      (ruptures.begin() + 1));
         double dx = xi - ruptures[(std::size_t)i];
-        double acc = 0;
-        for (int j = 0; j < ordre; ++j)
-            acc = acc * dx + coefs.re[(std::size_t)i + (std::size_t)j * morceaux];
-        r.re[k] = acc;
+        for (int c = 0; c < dim; ++c) {
+            std::size_t ligne = (std::size_t)i * (std::size_t)dim + (std::size_t)c;
+            double acc = 0.0, accIm = 0.0;
+            for (int j = 0; j < ordre; ++j) {
+                std::size_t idx = ligne + (std::size_t)j * (std::size_t)lignes;
+                acc = acc * dx + coefs.re[idx];
+                if (complexe) accIm = accIm * dx + coefs.im[idx];
+            }
+            r.re[(std::size_t)c + k * (std::size_t)dim] = acc;
+            if (complexe) r.im[(std::size_t)c + k * (std::size_t)dim] = accIm;
+        }
     }
     return {r};
 }

@@ -31,10 +31,7 @@ function modele = procest(donnees, type, varargin)
     residus = matlibre_id_proc_residu(p, poser, jeu);
     modele.NoiseVariance = sum(residus .^ 2) / max(numel(residus) - numel(p), 1);
     modele.Ts = jeu.Ts;
-    erreur = mean(residus .^ 2);
     ajustement = compareFit(jeu.OutputData, jeu.OutputData - residus);
     modele.Report = struct('Method', 'procest', 'OrderInfo', type, ...
-                           'Fit', struct('FitPercent', ajustement, 'MSE', erreur, ...
-                                         'FPE', erreur, 'AIC', 0, ...
-                                         'nobs', numel(residus), 'nparams', numel(p)));
+                           'Fit', matlibre_id_criteres(ajustement, residus(:), numel(p)));
 end
