@@ -14,10 +14,19 @@ function modele = matlibre_id_estimer(donnees, ordres, methode, arguments)
     donnees = iddata(donnees);
     iterations = 200;
     tolerance = 1e-10;
-    for k = 1:2:numel(arguments) - 1
+    if mod(numel(arguments), 2) ~= 0
+        error('ident:polyest:Options', ...
+              ['Les options vont par paires nom, valeur : MatLibre n''a pas les objets ' ...
+               'd''options de MATLAB (armaxOptions, oeOptions...).']);
+    end
+    for k = 1:2:numel(arguments)
         switch lower(char(arguments{k}))
             case 'maxiter',   iterations = round(double(arguments{k + 1}));
             case 'tolerance', tolerance = double(arguments{k + 1});
+            otherwise
+                error('ident:polyest:Option', ...
+                      ['%s n''est pas pris en charge : seules MaxIter et Tolerance le sont ' ...
+                       '(conditions initiales nulles, Levenberg-Marquardt).'], char(arguments{k}));
         end
     end
     if ordres(1) == 0 && ordres(2) == 0 && ordres(3) == 0 && ...

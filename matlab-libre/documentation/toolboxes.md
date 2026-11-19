@@ -30,26 +30,26 @@ existant appellera.
 | `edp` | Partial Differential Equation Toolbox — équations aux dérivées partielles. | 5 |
 | `finance` | Financial Toolbox — finance quantitative. | 172 |
 | `flou` | Fuzzy Logic Toolbox — logique floue. | 70 |
-| `fusion-capteurs` | Sensor Fusion and Tracking Toolbox — fusion de capteurs. | 4 |
+| `fusion-capteurs` | Sensor Fusion and Tracking Toolbox — fusion de capteurs. | 5 |
 | `gestion-risques` | Risk Management Toolbox — mesures de risque. | 69 |
-| `identification` | System Identification Toolbox — identification de modèles. | 106 |
+| `identification` | System Identification Toolbox — identification de modèles. | 107 |
 | `imagerie-medicale` | Medical Imaging Toolbox — imagerie médicale. | 5 |
 | `images` | Image Processing Toolbox — traitement d'images. | 140 |
 | `instruments` | Instrument Control Toolbox — pilotage d'instruments (simulé). | 4 |
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 457 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 459 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 134 |
 | `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 27 |
 | `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 18 |
-| `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 15 |
+| `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 16 |
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |
 | `reseaux-antennes` | Phased Array System Toolbox — réseaux d'antennes. | 11 |
 | `rf` | RF Toolbox — grandeurs de radiofréquence. | 16 |
-| `robotique` | Robotics System Toolbox — cinématique et transformations. | 74 |
+| `robotique` | Robotics System Toolbox — cinématique et transformations. | 77 |
 | `robuste` | Robust Control Toolbox — analyse de robustesse. | 93 |
 | `signal` | Signal Processing Toolbox — traitement du signal. | 208 |
 | `simscape` | Simscape — réseaux physiques. | 9 |

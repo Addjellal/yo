@@ -9,7 +9,26 @@
 %   madgwickUpdate      - Attitude en quaternion, par descente de gradient
 %
 % Suivi de plusieurs objets
-%   trackAssign         - Association mesures / pistes, avec seuil
+%   trackAssign         - Association mesures / pistes, optimale, avec seuil
+%   assignmunkres       - Affectation optimale de Munkres (signature de MATLAB)
+```
+
+## `assignmunkres`
+
+```
+ASSIGNMUNKRES Affectation optimale par l'algorithme de Munkres.
+  [ASSIGNMENTS,UNASSIGNEDROWS,UNASSIGNEDCOLUMNS] = ASSIGNMUNKRES(COUTS,C)
+  apparie les lignes de COUTS (les pistes) à ses colonnes (les
+  détections) en minimisant le coût total, comme MATLAB : laisser une
+  ligne ou une colonne seule coûte C. ASSIGNMENTS porte une ligne [ligne
+  colonne] par couple retenu ; les deux autres sorties, en colonne, les
+  lignes et les colonnes restées seules. Kuhn (1955), Munkres (1957) : la
+  solution est exacte, en temps cubique.
+
+  Exemple :
+     [a, l, c] = assignmunkres([1 2; 1.5 10], 20)   % [1 2; 2 1] : total 3.5
+
+  Voir aussi ASSIGNDETECTIONSTOTRACKS, TRACKASSIGN.
 ```
 
 ## `complementaryFilter`
@@ -136,11 +155,15 @@ TRACKASSIGN Association mesures / pistes par plus proche voisin global.
   quelle piste. Sans cette étape, deux objets qui se croisent échangent
   leurs identités et les deux trajectoires deviennent fausses.
 
-  Une mesure attribuée ne l'est qu'une fois : les pistes se servent dans
-  l'ordre, chacune prenant la plus proche encore libre. Ce n'est pas
-  l'optimum global de l'affectation — l'algorithme hongrois le
-  donnerait — mais il ne peut pas attribuer la même mesure deux fois,
-  ce qui est l'erreur qui coûte le plus cher.
+  L'affectation est celle du plus proche voisin global (Blackman, 1986) :
+  la somme des distances des couples retenus est la plus petite
+  possible, chaque mesure servant au plus une fois. Elle est calculée
+  exactement par l'algorithme hongrois de Kuhn et Munkres, celui de
+  ASSIGNDETECTIONSTOTRACKS : laisser une piste ou une mesure seule coûte
+  SEUIL/2, si bien qu'aucun couple plus éloigné que SEUIL n'est retenu.
+  Servir les pistes l'une après l'autre, chacune prenant la mesure libre
+  la plus proche, ne donnerait pas l'optimum : une piste peut prendre la
+  mesure dont une autre avait davantage besoin.
 
   Le seuil est ce qui distingue le suivi de l'invention : sans lui, une
   piste dont l'objet a disparu s'accroche à n'importe quoi.
@@ -150,7 +173,9 @@ TRACKASSIGN Association mesures / pistes par plus proche voisin global.
      mesures = [10.2 0.3; 0.1 -0.2];
      trackAssign(pistes, mesures)          % [2 1]
      trackAssign(pistes, [0.1 -0.2; 50 50], 3)   % [1 0]
+     % Le plus proche d'abord prendrait 0.4 pour la première piste :
+     trackAssign([0 0; 1 0], [0.4 0; -0.7 0])    % [2 1], total 1.3 et non 2.1
 
-  Voir aussi KALMANFILTER, PDIST2.
+  Voir aussi ASSIGNDETECTIONSTOTRACKS, ASSIGNMUNKRES, KALMANFILTER.
 ```
 

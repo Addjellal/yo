@@ -31,7 +31,7 @@
 %
 % Bras plan à deux segments
 %   fkine2R             - Cinématique directe
-%   ikine2R             - Cinématique inverse (coude haut ou bas)
+%   ikine2R             - Cinématique inverse (coude bas par défaut, ou haut)
 %   jacobian2R          - Jacobienne
 %
 % Trajectoires
@@ -749,12 +749,21 @@ GENERALIZEDINVERSEKINEMATICS Cinématique inverse sous contraintes.
 
 ```
 IKINE2R Cinématique inverse d'un bras plan à deux segments.
-  Q = IKINE2R(X,Y,L1,L2) rend les deux angles articulaires.
+  Q = IKINE2R(X,Y,L1,L2) rend les deux angles articulaires [Q1 Q2]
+  (radians) qui portent l'effecteur en (X,Y), le coude plié dans le sens
+  direct (Q2 >= 0) : le coude est alors à droite de la droite qui va de
+  l'épaule à l'effecteur — sous elle quand l'effecteur est devant.
+  Q = IKINE2R(X,Y,L1,L2,true) rend l'autre solution, coude haut (Q2 <= 0,
+  le coude à gauche de cette droite) ; false redonne la première, coude
+  bas. C'est la convention de Spong, Robot Modeling and Control :
+     Q2 = atan2(-+sqrt(1 - D^2), D),  D = (X^2 + Y^2 - L1^2 - L2^2) / (2 L1 L2).
+  Un point hors de la couronne |L1-L2| <= r <= L1+L2 est ramené au bord.
 
   Exemple :
-     q = ikine2R(1, 1, 1, 1, true);
+     q = ikine2R(1, 1, 1, 1)                 % [0 pi/2] : coude bas, en (1, 0)
+     q = ikine2R(1, 1, 1, 1, true)           % [pi/2 -pi/2] : coude haut, en (0, 1)
      [x, y] = fkine2R(q, 1, 1);
-     max(abs([x y] - [1 1])) < 1e-9     % la cinematique inverse annule la directe
+     max(abs([x y] - [1 1])) < 1e-9          % la cinematique inverse annule la directe
 
   Voir aussi FKINE2R, DHTRANSFORM, INVERSEKINEMATICS.
 ```
@@ -911,6 +920,21 @@ LOADROBOT Charge un modèle de robot du catalogue.
      T = getTransform(robot, homeConfiguration(robot), 'outil');
 
   Voir aussi IMPORTROBOT, RIGIDBODYTREE, INVERSEKINEMATICS.
+```
+
+## `matlibre_quat_paire`
+
+```
+MATLIBRE_QUAT_PAIRE Met deux tableaux de quaternions à la même taille.
+  [Q,R] = MATLIBRE_QUAT_PAIRE(Q,R,FONCTION) : Q et R sont M x 4, ou l'un
+  d'eux 1 x 4, que l'on répète alors sur les M lignes de l'autre.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [q, r] = matlibre_quat_paire([1 0 0 0], [1 0 1 0; 0 1 0 0], 'quatmultiply')
+
+  Voir aussi QUATMULTIPLY, QUATDIVIDE.
 ```
 
 ## `matlibre_rob_axe`
@@ -1185,8 +1209,9 @@ QUAT2TFORM Quaternion vers matrice homogène 4x4.
 ## `quatconj`
 
 ```
-QUATCONJ Conjugué d'un quaternion.
-  Q = QUATCONJ(A) change le signe de la partie vectorielle.
+QUATCONJ Conjugué de quaternions [w x y z], ligne par ligne.
+  N = QUATCONJ(Q) change le signe de la partie vectorielle de chaque
+  ligne de Q (M x 4).
 
   Pour un quaternion unitaire — donc pour toute rotation — le conjugué
   est l'inverse : c'est ce qui rend l'inversion d'une rotation gratuite,
@@ -1196,6 +1221,7 @@ QUATCONJ Conjugué d'un quaternion.
   divise en plus par le carré de la norme.
 
   Exemple :
+     quatconj([1 0 1 0])             % [1 0 -1 0], documentation de MATLAB
      q = rotm2quat(rotz(30));
      quatmultiply(q, quatconj(q))    % [1 0 0 0]
      quatconj(q) - quatinv(q)        % ~0 : q est unitaire
@@ -1206,14 +1232,23 @@ QUATCONJ Conjugué d'un quaternion.
 ## `quatdivide`
 
 ```
-QUATDIVIDE Division de quaternions.
-  R = QUATDIVIDE(Q,P) rend Q * inv(P).
+QUATDIVIDE Division de quaternions, comme MATLAB : inv(R) x Q.
+  N = QUATDIVIDE(Q,R) rend, ligne par ligne, le produit de l'inverse de
+  R par Q, quatmultiply(quatinv(R), Q) :
+     n0 = (r0 q0 + r1 q1 + r2 q2 + r3 q3) / |r|^2
+     n1 = (r0 q1 - r1 q0 - r2 q3 + r3 q2) / |r|^2
+     n2 = (r0 q2 + r1 q3 - r2 q0 - r3 q1) / |r|^2
+     n3 = (r0 q3 - r1 q2 + r2 q1 - r3 q0) / |r|^2
+  Q et R sont M x 4, ou l'un des deux 1 x 4.
 
   La multiplication des quaternions n'est pas commutative : diviser à
-  droite et diviser à gauche ne donnent pas le même résultat. C'est la
-  division à droite qui est rendue ici, comme dans MATLAB.
+  gauche et diviser à droite ne donnent pas le même résultat. MATLAB
+  divise à gauche, si bien que quatmultiply(R, quatdivide(Q,R)) redonne
+  Q ; quatmultiply(quatdivide(Q,R), R) ne le redonne pas en général.
 
   Exemple :
+     % Documentation de MATLAB : [0.7273 0.1212 0.2424 -0.6061].
+     quatdivide([1 0 1 0], [1 0.5 0.5 0.75])
      q = eul2quat([0.3 0.2 0.1]);
      quatdivide(q, q)                % [1 0 0 0]
 
@@ -1240,12 +1275,32 @@ QUATINV Inverse d'un quaternion.
   Voir aussi QUATCONJ, QUATMULTIPLY, QUATDIVIDE, QUATNORMALIZE.
 ```
 
+## `quatmod`
+
+```
+QUATMOD Module de quaternions : racine de la somme des carrés.
+  M = QUATMOD(Q) rend, pour chaque ligne de Q (M x 4), la racine de
+  q0^2 + q1^2 + q2^2 + q3^2, en colonne.
+
+  Exemple :
+     quatmod([1 0 1 0])              % 1.4142
+
+  Voir aussi QUATNORM, QUATNORMALIZE.
+```
+
 ## `quatmultiply`
 
 ```
-QUATMULTIPLY Produit de deux quaternions [w x y z].
-  Q = QUATMULTIPLY(A,B) compose les deux rotations : le résultat
-  correspond au produit des matrices de rotation, dans le même ordre.
+QUATMULTIPLY Produit de quaternions [w x y z], ligne par ligne.
+  N = QUATMULTIPLY(Q,R) rend le produit de Hamilton Q x R de chaque ligne
+  de Q par la ligne correspondante de R ; Q et R sont M x 4, ou l'un des
+  deux 1 x 4. N = QUATMULTIPLY(Q) rend Q x Q. Comme MATLAB :
+     n0 = r0 q0 - r1 q1 - r2 q2 - r3 q3
+     n1 = r0 q1 + r1 q0 - r2 q3 + r3 q2
+     n2 = r0 q2 + r1 q3 + r2 q0 - r3 q1
+     n3 = r0 q3 - r1 q2 + r2 q1 + r3 q0
+  Pour des quaternions unitaires, le produit compose les rotations :
+  quat2rotm(Q x R) = quat2rotm(Q) * quat2rotm(R).
 
   C'est ce qui fait l'intérêt des quaternions : composer deux rotations
   coûte seize multiplications au lieu de vingt-sept, et le résultat
@@ -1255,18 +1310,33 @@ QUATMULTIPLY Produit de deux quaternions [w x y z].
   Le produit n'est pas commutatif, pas plus que celui des rotations.
 
   Exemple :
-     q1 = rotm2quat(rotz(30));
-     q2 = rotm2quat(roty(-20));
-     quat2rotm(quatmultiply(q1, q2)) - rotz(30) * roty(-20)   % ~0
+     % Documentation de MATLAB : [0.5 1.25 1.5 0.25] et [1.9 1.1 2.1 -0.9].
+     quatmultiply([1 0 1 0], [1 0.5 0.5 0.75; 2 1 0.1 0.1])
+     quatmultiply([1 0 1 0])         % [0 0 2 0]
 
   Voir aussi QUATDIVIDE, QUATCONJ, QUATINV, QUAT2ROTM.
+```
+
+## `quatnorm`
+
+```
+QUATNORM Norme de quaternions au sens de MATLAB : la somme des carrés.
+  N = QUATNORM(Q) rend, pour chaque ligne de Q (M x 4), q0^2 + q1^2 +
+  q2^2 + q3^2, en colonne. Comme dans MATLAB, c'est le carré du module :
+  QUATMOD en est la racine.
+
+  Exemple :
+     quatnorm([.5 -.5 .5 0])         % 0.75, documentation de MATLAB
+
+  Voir aussi QUATMOD, QUATNORMALIZE, QUATINV.
 ```
 
 ## `quatnormalize`
 
 ```
-QUATNORMALIZE Quaternion unitaire.
-  Q = QUATNORMALIZE(A) divise par la norme.
+QUATNORMALIZE Quaternions unitaires, ligne par ligne.
+  N = QUATNORMALIZE(Q) divise chaque ligne de Q (M x 4) par sa norme,
+  racine de q0^2 + q1^2 + q2^2 + q3^2.
 
   Seuls les quaternions unitaires représentent des rotations. Une longue
   suite de produits fait lentement dériver la norme par accumulation
@@ -1274,10 +1344,10 @@ QUATNORMALIZE Quaternion unitaire.
   il est bien moins coûteux que la réorthogonalisation d'une matrice.
 
   Exemple :
-     norm(quatnormalize([2 0 0 0]))  % 1
-     quatnormalize([2 0 0 0])        % [1 0 0 0]
+     quatnormalize([1 0 1 0])        % [0.7071 0 0.7071 0], documentation de MATLAB
+     quatnormalize([2 0 0 0; 0 0 3 4])
 
-  Voir aussi QUATCONJ, QUATINV, QUATMULTIPLY.
+  Voir aussi QUATMOD, QUATNORM, QUATCONJ, QUATINV, QUATMULTIPLY.
 ```
 
 ## `quatrotate`
@@ -1707,31 +1777,39 @@ TRANSFORMTRAJ Interpolation entre deux transformations homogènes.
 
 ```
 TRAPVELTRAJ Trajectoire à profil de vitesse trapézoïdal.
-  [Q,QD,QDD,T] = TRAPVELTRAJ(POINTS,N) relie les points de passage par
-  des segments à vitesse trapézoïdale, et rend N échantillons.
+  [Q,QD,QDD,T,PP] = TRAPVELTRAJ(POINTS,N) relie les points de passage
+  (une colonne par point, une ligne par degré de liberté) par des
+  segments à vitesse trapézoïdale, et rend N échantillons de position,
+  vitesse et accélération, les instants T et le polynôme par morceaux PP
+  (un par degré de liberté, en cellule, quand leurs instants diffèrent),
+  que PPVAL évalue.
 
-  Options :
-     'EndTime'       durée de chaque segment, un par défaut
+  Options, comme MATLAB — deux au plus, chacune un scalaire, un vecteur
+  d'une valeur par degré de liberté, ou une matrice N x (P-1) d'une
+  valeur par degré et par segment :
+     'EndTime'       durée de chaque segment
      'PeakVelocity'  vitesse du palier
      'Acceleration'  accélération des rampes
      'AccelTime'     durée de chaque rampe
+  Deux grandeurs fixent le profil d'un segment de longueur D : la durée
+  T et le temps de rampe ta, liés par la vitesse V = D/(T - ta) et
+  l'accélération a = V/ta. Sans 'EndTime', la durée se déduit des deux
+  autres grandeurs données — PeakVelocity et Acceleration donnent
+  T = D/V + V/a. Avec une seule grandeur, ou aucune, la durée vaut un ;
+  sans autre grandeur, la rampe occupe un tiers du temps de chaque côté.
 
   Le profil monte en rampe, tient un palier, puis redescend. C'est le
   profil des commandes d'axe les plus répandues : il atteint la
-  distance voulue dans le temps voulu sans jamais dépasser une vitesse
-  ni une accélération données — ce qu'aucun polynôme ne garantit.
-
-  Une seule des trois grandeurs vitesse, accélération et temps de rampe
-  suffit à fixer le profil : les deux autres s'en déduisent, la
-  distance et la durée étant imposées. Par défaut la rampe occupe un
-  tiers du temps de chaque côté.
+  distance voulue sans dépasser une vitesse ni une accélération données
+  — ce qu'aucun polynôme ne garantit.
 
   Exemple :
+     [q, qd, ~, t] = trapveltraj([0 1], 101, 'PeakVelocity', 2, 'Acceleration', 8);
+     t(end)                          % 0.75 : 1/2 + 2/8
      [q, qd] = trapveltraj([0 2], 100);
-     max(qd)                         % la vitesse de palier
-     trapz(linspace(0, 1, 100), qd)  % 2 : l'aire vaut la distance
+     max(qd)                         % 3 : la rampe prend un tiers du temps
 
-  Voir aussi CUBICPOLYTRAJ, QUINTICPOLYTRAJ, BSPLINEPOLYTRAJ.
+  Voir aussi CUBICPOLYTRAJ, QUINTICPOLYTRAJ, BSPLINEPOLYTRAJ, PPVAL.
 ```
 
 ## `trvec2tform`

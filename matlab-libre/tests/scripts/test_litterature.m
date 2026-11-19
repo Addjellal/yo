@@ -709,4 +709,226 @@ for type = {'similarity', 'rigid', 'projective'}
 end
 fprintf('vision : IoU de MathWorks, Harris sur damier, MSAC\n');
 
+%% ------------------------------------------------------------- robotique
+% Angles d'Euler, quaternions et axe-angle comparés à
+% scipy.spatial.transform.Rotation (rotations intrinsèques) ; produit,
+% division et rotation de quaternions comparés aux exemples de la
+% documentation de MathWorks ; trajectoires cubique (3 s^2 - 2 s^3) et
+% quintique (10 s^3 - 15 s^4 + 6 s^5) en forme fermée ; profil trapézoïdal
+% de durée D/V + V/a ; cinématique inverse du bras 2R (Spong).
+eul = [0.3 -0.7 1.1];
+Rref = struct('ZYX', [0.7306816499355122 -0.6825356334181358 -0.015793529118639904; ...
+                      0.226026321249623 0.2636694534871921 -0.9377582425124971; ...
+                      0.644217687237691 0.6816329865934228 0.34692944965489886], ...
+              'ZYZ', [0.06806457918412756 -0.7852356838288306 -0.6154446635582734; ...
+                      0.953927573102912 0.23190060505842858 -0.1903793440673726; ...
+                      0.2922146442847723 -0.574131544347986 0.7648421872844884], ...
+              'XYZ', [0.3469294496548989 -0.6816329865934228 -0.644217687237691; ...
+                      0.7650475783754858 0.6030043987602139 -0.22602632124962302; ...
+                      0.5425330955655645 -0.41444199432919854 0.7306816499355123]);
+qref = struct('ZYX', [0.7650621793484506 0.5291698089444968 -0.215672410090385 0.2968915400580633], ...
+              'ZYZ', [0.7184718803695529 -0.1335306957605727 -0.3158297953763279 0.6051605165247341], ...
+              'XYZ', [0.8186292656554958 -0.057539988180335414 -0.36242009435522565 0.4417996722272436]);
+for sequence = {'ZYX', 'ZYZ', 'XYZ'}
+    s0 = sequence{1};
+    assert(norm(eul2rotm(eul, s0) - Rref.(s0)) < 1e-15);
+    q = eul2quat(eul, s0);
+    assert(norm(q * sign(q(1)) - qref.(s0)) < 1e-15);
+    assert(norm(eul2rotm(rotm2eul(Rref.(s0), s0), s0) - Rref.(s0)) < 1e-14);
+    assert(norm(quat2rotm(qref.(s0)) - Rref.(s0)) < 1e-15);
+end
+assert(norm(rotm2axang(Rref.ZYX) - [0.8217478672997409 -0.33491771456250635 ...
+       0.46104291238512146 1.3993168871760486]) < 1e-14);
+assert(norm(quatmultiply([1 0 1 0], [1 0.5 0.5 0.75; 2 1 0.1 0.1]) - ...
+            [0.5 1.25 1.5 0.25; 1.9 1.1 2.1 -0.9]) < 1e-15);
+assert(isequal(quatmultiply([1 0 1 0]), [0 0 2 0]));
+assert(norm(round(quatdivide([1 0 1 0; 2 1 0.1 0.1], [1 0.5 0.5 0.75]) * 1e4) / 1e4 - ...
+            [0.7273 0.1212 0.2424 -0.6061; 1.2727 0.0121 -0.7758 -0.4606]) < 1e-12);
+assert(norm(round(quatrotate([1 0 1 0; 1 0.5 0.3 0.1], [1 1 1; 2 3 4]) * 1e4) / 1e4 - ...
+            [-1 1 1; 1.3333 5.1333 0.9333]) < 1e-12);
+assert(quatnorm([.5 -.5 .5 0]) == 0.75);
+t = linspace(0, 2, 9); s1 = t / 2;
+[q, qd] = cubicpolytraj([0 1], [0 2], t);
+assert(max(abs(q - (3 * s1 .^ 2 - 2 * s1 .^ 3))) < 1e-15 && max(abs(qd - 3 * (s1 - s1 .^ 2))) < 1e-15);
+[q, ~, ~, pp] = quinticpolytraj([0 1 3; 5 2 0], [0 1 2], t);
+assert(max(abs(q(1, 1:5) - (10 * s1(1:5) .^ 3 * 8 - 15 * s1(1:5) .^ 4 * 16 + 6 * s1(1:5) .^ 5 * 32))) < 1e-14);
+assert(max(max(abs(ppval(pp, t) - q))) < 1e-14);
+[q, qd, qdd, tt, pp] = trapveltraj([0 1], 101, 'PeakVelocity', 2, 'Acceleration', 8);
+assert(abs(tt(end) - 0.75) < 1e-15 && abs(max(qd) - 2) < 1e-12 && abs(max(qdd) - 8) < 1e-12);
+assert(max(abs(ppval(pp, tt) - q)) < 1e-15);
+qHaut = ikine2R(1, 1, 1, 1, true);
+assert(norm(ikine2R(1, 1, 1, 1) - [0 pi/2]) < 1e-15 && norm(qHaut - [pi/2 -pi/2]) < 1e-15);
+fprintf('robotique : SciPy Rotation, quaternions de MathWorks, trajectoires exactes\n');
+
+%% -------------------------------------------------------- identification
+% Le système de Ljung, A = 1 - 1.5 q^-1 + 0.7 q^-2, B = q^-1 + 0.5 q^-2,
+% C = 1 - q^-1 + 0.2 q^-2, sur des données déterministes reproduites
+% dans NumPy : ARX coïncide avec numpy.linalg.lstsq, ARMAX avec le
+% minimum du même critère trouvé par scipy.optimize.least_squares ; sans
+% bruit, OE et N4SID retrouvent exactement le système. Les critères
+% d'information suivent les formules de la documentation de MATLAB.
+N = 800; k = (1:N).';
+u = sign(sin(0.7 * k .^ 2)); u(u == 0) = 1;
+e = (mod(k * 7919, 1009) / 1009 - 0.5) * 0.8;
+y = filter([0 1 0.5], [1 -1.5 0.7], u) + filter([1 -1 0.2], [1 -1.5 0.7], e);
+mArx = arx(iddata(y, u, 1), [2 2 1]);
+assert(norm([mArx.A(2:3) mArx.B(2:3)] - [-1.4877558570641585 0.6885056734788418 ...
+       1.004519904155692 0.5083633109218358]) < 1e-12);
+mArmax = armax(iddata(y, u, 1), [2 2 2 1]);
+assert(norm([mArmax.A(2:3) mArmax.B(2:3) mArmax.C(2:3)] - [-1.5004890514741955 ...
+       0.6997720938555467 1.0008661155064025 0.49426965323360017 -0.824855019782917 ...
+       -0.14690297451769144]) < 1e-8);
+ySans = filter([0 1 0.5], [1 -1.5 0.7], u);
+mOe = oe(iddata(ySans, u, 1), [2 2 1]);
+assert(norm(mOe.B - [0 1 0.5]) < 1e-9 && norm(mOe.F - [1 -1.5 0.7]) < 1e-9);
+mSs = n4sid(iddata(ySans, u, 1), 2);
+assert(norm(sort(eig(mSs.A)) - sort(roots([1 -1.5 0.7]))) < 1e-8);
+V = mArx.Report.Fit.LossFcn;
+assert(abs(aic(mArx) - (log(V) + 2 * 4 / N)) < 1e-12);
+assert(abs(aic(mArx, 'aic') - (N * log(V) + 8 + N * (log(2 * pi) + 1))) < 1e-8);
+assert(abs(fpe(mArx) - V * (1 + 4 / N) / (1 - 4 / N)) < 1e-14);
+fprintf('identification : ARX et ARMAX comme NumPy et SciPy, OE et N4SID exacts\n');
+
+%% ------------------------------------------------------------ navigation
+% Distances et caps de grand cercle sur la sphère de 6371 km, contre
+% GeographicLib (aplatissement nul) ; l'exemple de Sinnott (1984), de
+% Nashville à Los Angeles : 2887,26 km sur la sphère de 6372,8 km ; A* sur
+% une grille à deux murs : le coût de Dijkstra (scipy.sparse.csgraph).
+geo = [48.8566 2.3522 40.7128 -74.006 5837240.903825839 291.7938627483058;
+       51.4778 -0.0015 -33.8688 151.2093 16987903.236853257 60.93711274880161;
+       0 0 0 179.5 19959489.332698293 90;
+       89.9 10 -80 -150 18913579.936230656 339.8041819164661;
+       36.12 -86.67 33.94 -118.4 2886444.442837984 274.59357410546284];
+for k = 1:size(geo, 1)
+    assert(abs(haversine(geo(k, 1), geo(k, 2), geo(k, 3), geo(k, 4)) / geo(k, 5) - 1) < 1e-14);
+    ecartCap = mod(azimuthTo(geo(k, 1), geo(k, 2), geo(k, 3), geo(k, 4)) - geo(k, 6) + 180, 360) - 180;
+    assert(abs(ecartCap) < 1e-12);
+end
+assert(abs(haversine(36.12, -86.67, 33.94, -118.40, 6372800) - 2887259.950607111) < 1e-6);
+G = zeros(30, 40);
+[J, I] = meshgrid(1:40, 1:30);
+G(mod(7 * I + 13 * J, 11) == 0) = 1;
+G(10, 1:35) = 1; G(20, 6:40) = 1; G(9:11, 36:40) = 0; G(19:21, 1:5) = 0; G(1, 1) = 0; G(30, 40) = 0;
+[chemin, cout] = astar(G, [1 1], [30 40]);
+assert(cout == 138 && size(chemin, 1) == 139);
+assert(all(sum(abs(diff(chemin)), 2) == 1) && ~any(G(sub2ind(size(G), chemin(:, 1), chemin(:, 2)))));
+fprintf('navigation : GeographicLib, Sinnott, A* comme Dijkstra\n');
+
+%% ---------------------------------------------------- fusion de capteurs
+% Filtre de Kalman (1960) : en régime permanent, la covariance est la
+% solution de l'équation de Riccati discrète (scipy.linalg.solve_discrete_are).
+% Filtre de Madgwick (2010) : la trajectoire du paquet Python ahrs, au
+% dernier chiffre. Affectation au plus proche voisin global : l'optimum
+% de Kuhn et Munkres, comme scipy.optimize.linear_sum_assignment.
+dt = 0.1; A = [1 dt; 0 1]; H = [1 0]; Q = 0.5 * [dt^3/3 dt^2/2; dt^2/2 dt];
+x = [0; 0]; P = eye(2);
+for k = 1:400
+    [x, P] = kalmanFilter(x, P, 0, A, H, Q, 0.04);
+end
+assert(norm(P - [0.015071524210003292 0.035304727580025924; 0.035304727580025924 ...
+       0.1884490936920618]) < 1e-15);
+t = (1:300).' * 0.01;
+gyr = [0.4 * sin(3 * t), 0.3 * cos(2 * t), 0.2 * sin(5 * t + 1)];
+acc = [0.3 + 0.1 * sin(7 * t), -0.2 + 0.1 * cos(4 * t), 9.6 + 0.05 * sin(11 * t)];
+q = [1 0 0 0];
+for k = 1:300
+    q = madgwickUpdate(q, gyr(k, :), acc(k, :), 0.01, 0.1);
+end
+assert(norm(q - [0.9987428027666099 0.0366036609856267 0.009434381564191562 ...
+       0.032923826764932926]) < 1e-14);
+a = trackAssign([0 0; 1 0; 5 5; 6 4], [0.4 0; -0.7 0; 5.5 4.2; 6.2 5.1; 20 20]);
+assert(isequal(a.', [2 1 4 3]));
+assert(isequal(trackAssign([0 0; 10 0], [0.1 -0.2; 50 50], 3).', [1 0]));
+[ap, lignes, colonnes] = assignmunkres([1 2; 1.5 10], 20);
+assert(isequal(sortrows(ap), [1 2; 2 1]) && isempty(lignes) && isempty(colonnes));
+fprintf('fusion : Riccati, Madgwick comme ahrs, affectation de Munkres\n');
+
+%% ------------------------------------------------------------------- mpc
+% Sans contrainte et sur un horizon long, la commande prédictive rend la
+% commande du régulateur LQR de même pondération (Riccati discrète de
+% SciPy) ; sous bornes, le programme quadratique a la solution des
+% moindres carrés bornés de scipy.optimize.lsq_linear, qu'un écrêtage de
+% la solution libre n'atteindrait pas.
+Am = [1 0.1; 0 1]; Bm = [0.005; 0.1]; Cm = [1 0];
+ctrl = mpcSetup(Am, Bm, Cm, 300, 300, 1, 0.1);
+gain = -[mpcmove(ctrl, [1; 0], 0), mpcmove(ctrl, [0; 1], 0)];
+assert(norm(gain - [2.788857174991727 2.3617185162469]) < 1e-9);
+ctrl = mpcSetup(Am, Bm, Cm, 20, 5, 1, 0.1);
+ctrl.umin = -1.5; ctrl.umax = 1.5;
+[~, U] = mpcmove(ctrl, [1; 0], 0);
+assert(norm(U.' - [-1.5 -1.5 -1.5 -1.5 -1.1404399323181036]) < 1e-12);
+ctrl.umin = -inf; ctrl.umax = inf;
+[~, libre] = mpcmove(ctrl, [1; 0], 0);
+assert(abs(min(max(libre(end), -1.5), 1.5) - U(end)) > 0.5);
+fprintf('mpc : LQR a l''horizon infini, contraintes comme lsq_linear\n');
+
+%% ----------------------------------------------------------------- lidar
+% Plan dominant par RANSAC (Fischler et Bolles, 1981), réajusté au sens
+% des moindres carrés orthogonaux sur ses points ralliés : la normale de
+% la décomposition en valeurs singulières des vrais points du plan,
+% malgré les parasites. Recalage ICP (Besl et McKay, 1992) : quand les
+% appariements initiaux sont justes, la transformation exacte (Arun,
+% Huang et Blostein, 1987), et toujours une rotation propre.
+[gx, gy] = meshgrid(-5:0.5:5);
+plan = [gx(:), gy(:), 0.5 * gx(:) - 0.2 * gy(:) + 1 + 0.01 * sin(7 * gx(:) + 3 * gy(:))];
+parasites = [4 * sin(1:60).', 4 * cos(1.7 * (1:60)).', 6 + 3 * sin(2.3 * (1:60)).'];
+rng(1);
+[modele, rallies] = fitPlaneRansac([plan; parasites], 0.05, 300);
+centre = mean(plan, 1);
+[~, ~, Vp] = svd(plan - centre, 0);
+normale = Vp(:, end) * sign(Vp(3, end));
+assert(isequal(sort(rallies(:)).', 1:size(plan, 1)));
+assert(norm(modele(1:3) * sign(modele(3)) - normale) < 1e-13);
+forme = [cos(0:0.1:2*pi).', sin(0:0.1:2*pi).'] .* [2 1];
+Rv = [cosd(1) -sind(1); sind(1) cosd(1)];
+[R, tr] = icpRegister(forme, forme * Rv.' + [0.03 -0.02], 60);
+assert(norm(R - Rv) < 1e-13 && norm(tr - [0.03 -0.02]) < 1e-13 && abs(det(R) - 1) < 1e-13);
+fprintf('lidar : RANSAC reajuste, ICP exact\n');
+
+%% -------------------------------------------------------------- vehicule
+% Formule magique de Pacejka, avec les coefficients publiés par MathWorks
+% pour quatre revêtements (sec, mouillé, neige, glace) : la force culmine
+% à D Fz au glissement où C atan(...) = pi/2 (racine trouvée par
+% scipy.optimize.brentq), et la raideur à l'origine vaut B C D Fz. Le
+% modèle bicyclette cinématique (Rajamani) tourne sur un cercle de rayon
+% L / tan(delta).
+jeux = [10 1.9 1 0.97 0.18019439934006307; 12 2.3 0.82 1 0.08816435953597898;
+        5 2 0.3 1 0.3114815449313295; 4 2 0.1 1 0.3893519311641385];
+for k = 1:4
+    c0 = num2cell(jeux(k, 1:4));
+    assert(abs(tireForce(jeux(k, 5), 4000, c0{:}) - jeux(k, 3) * 4000) < 1e-9);
+    raideur = (tireForce(1e-7, 4000, c0{:}) - tireForce(-1e-7, 4000, c0{:})) / 2e-7;
+    assert(abs(raideur / (prod(jeux(k, 1:3)) * 4000) - 1) < 1e-8);
+end
+L = 2.7; braquage = deg2rad(10); v = 5; pas = 1e-3;
+etat = [0 0 0];
+nPas = round(2 * pi * (L / tan(braquage)) / v / pas);
+for k = 1:nPas
+    etat = bicycleModel(etat, v, braquage, L, pas);
+end
+assert(norm(etat(1:2)) < 0.02 * L / tan(braquage) && abs(etat(3) - 2 * pi) < 1e-2);
+fprintf('vehicule : Pacejka, revetements de MathWorks ; bicyclette\n');
+
+%% ---------------------------------------------------- conduite automatisee
+% Pure pursuit (Coulter, 1992) : sur un cercle de rayon R, la courbure
+% commandée 2 sin(alpha) / L vaut exactement 1/R, quel que soit le point
+% visé. Le lissage de chemin converge vers la solution du système
+% linéaire de ses conditions d'équilibre ; temps avant collision.
+R = 20; th = linspace(0, 2 * pi, 2001).';
+for vise = [1 3 8]
+    assert(abs(purePursuit([R 0 pi/2], [R * cos(th), R * sin(th)], vise, 8) - 8 / R) < 1e-12);
+end
+brut = [0 0; 1 0.8; 2 -0.5; 3 0.6; 4 0; 5 0.4; 6 0];
+lisse = smoothPath(brut, 0.5, 0.3, 1e-14);
+n = size(brut, 1);
+M = zeros(n); b2 = zeros(n, 2);
+M(1, 1) = 1; M(n, n) = 1; b2([1 n], :) = brut([1 n], :);
+for i = 2:n - 1
+    M(i, i - 1:i + 1) = [-0.3, 0.5 + 0.6, -0.3];
+    b2(i, :) = 0.5 * brut(i, :);
+end
+assert(max(max(abs(lisse - M \ b2))) < 1e-12);
+assert(timeToCollision(50, 10) == 5 && isinf(timeToCollision(50, -1)));
+fprintf('conduite : pure pursuit de Coulter, lissage exact\n');
+
 disp('litterature : toutes les verifications passent');

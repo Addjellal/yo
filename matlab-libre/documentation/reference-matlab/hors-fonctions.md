@@ -704,6 +704,68 @@ de MatLibre ne fait pas comme celle de MathWorks.
   connaît les quatre types ; elle rend la matrice 3 x 3, non l'objet
   `rigid2d`, `affine2d` ou `projective2d`.
 
+### Robotique
+
+- **Quaternions** : `quatmultiply`, `quatdivide`, `quatconj`,
+  `quatnormalize`, `quatinv`, `quatrotate`, `quatnorm` et `quatmod`
+  suivent l'Aerospace Toolbox, ligne par ligne sur des tableaux M x 4 :
+  `quatdivide(q,r)` rend inv(r) x q, `quatrotate` fait une rotation
+  passive et `quatnorm` rend la somme des carrés. L'objet `quaternion`
+  n'existe pas.
+- **Trajectoires** : `cubicpolytraj`, `quinticpolytraj` et `trapveltraj`
+  rendent la forme `pp` de MATLAB, que `ppval` évalue. Sans paramètre,
+  `trapveltraj` prend une durée d'un par segment et une rampe d'un tiers
+  du temps — MATLAB ne documente pas sa règle par défaut, les profils
+  peuvent donc différer quand on ne fixe rien.
+- **Arbres de corps rigides** : `rigidBodyTree` lit les URDF
+  (`importrobot`) et porte la cinématique et la dynamique (`massMatrix`,
+  `inverseDynamics`, `gravityTorque`, `forwardDynamics`) ; la détection de
+  collisions (`checkCollision`) manque. `ikine2R`, `fkine2R` et
+  `jacobian2R` sont propres à MatLibre.
+
+### Identification de systèmes
+
+- **Critères** : `aic` rend par défaut le critère normalisé nAIC, comme
+  MATLAB, et `Report.Fit` porte `FitPercent`, `LossFcn`, `MSE`, `FPE`,
+  `AIC`, `AICc`, `nAIC` et `BIC` selon les formules de sa documentation.
+- **Estimation** : ARX par moindres carrés sur les échantillons qui ont
+  tout leur passé ; ARMAX, OE, BJ et PEM minimisent l'erreur de
+  prédiction avec des conditions initiales nulles, par Levenberg-Marquardt.
+  L'option `InitialCondition` de MATLAB (`'estimate'`, `'backcast'`) n'est
+  pas faite : sur des données courtes, les estimations diffèrent des
+  siennes du poids des premiers échantillons.
+
+### Navigation, fusion de capteurs, commande prédictive
+
+- **Fonctions propres à MatLibre** : `haversine`, `azimuthTo`, `astar`,
+  `ekfPredict`, `ekfUpdate`, `kalmanFilter`, `madgwickUpdate`,
+  `complementaryFilter` et `trackAssign` rendent des tableaux ; les objets
+  de MATLAB (`trackingEKF`, `trackingKF`, `imufilter`, `ahrsfilter`,
+  `plannerAStarGrid`, `occupancyMap` complet) n'existent pas.
+  `assignmunkres` suit la signature de MATLAB.
+- **`trackAssign`** affecte au plus proche voisin global, exactement, par
+  l'algorithme de Munkres ; `madgwickUpdate` suit le filtre de Madgwick
+  (2010) au dernier chiffre près du paquet Python `ahrs`.
+- **Commande prédictive** : `mpcSetup`, `mpcmove` et `mpcsim` traitent une
+  entrée et une sortie, sans l'objet `mpc` de MATLAB : pas de poids sur
+  les variations de commande, ni de contraintes sur les sorties. Les
+  bornes de commande sont respectées exactement, par `quadprog`.
+
+### Lidar, véhicule, conduite automatisée
+
+- **ICP point à point** (`icpRegister`, en deux dimensions) : la
+  transformation est exacte quand les appariements initiaux sont justes ;
+  plus loin, sur une courbe échantillonnée régulièrement, il s'arrête dans
+  le minimum local où les points ont glissé d'un pas. `pcregistericp` de
+  la boîte vision traite les nuages 3-D.
+- **Fonctions d'école** : `bicycleModel` (cinématique, pas d'Euler),
+  `tireForce` (formule magique de Pacejka à quatre coefficients),
+  `longitudinal`, `purePursuit`, `smoothPath`, `laneOffset` et
+  `timeToCollision` sont propres à MatLibre ; les blocs et objets du
+  Vehicle Dynamics Blockset et de l'Automated Driving Toolbox
+  (`drivingScenario`, `referencePathFrenet`, `lateralControllerStanley`)
+  manquent.
+
 ### Calcul
 
 - **Décomposition de Schur** (`schur`, `ordschur`, `qz`) : elle manque à

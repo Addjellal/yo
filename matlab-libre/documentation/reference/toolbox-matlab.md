@@ -6357,6 +6357,27 @@ MINRES Résolution itérative par méthode de Krylov.
   Voir aussi PCG, GMRES, MINRES, BICG, MLDIVIDE.
 ```
 
+## `mkpp`
+
+```
+MKPP Construit un polynôme par morceaux.
+  PP = MKPP(BREAKS,COEFS) assemble les L morceaux d'ordre K définis sur
+  les L+1 points de rupture croissants BREAKS : la ligne i de COEFS
+  (L x K) porte les coefficients du morceau i, puissances décroissantes,
+  en la variable x - BREAKS(i).
+  PP = MKPP(BREAKS,COEFS,D) assemble un polynôme à valeurs dans R^D :
+  COEFS a D*L lignes, la ligne D*(i-1)+c portant la composante c du
+  morceau i ; un tableau D x L x K est aussi accepté. PP est la structure
+  de MATLAB, de champs form, breaks, coefs, pieces, order et dim, que
+  PPVAL évalue et UNMKPP défait.
+
+  Exemple :
+     pp = mkpp([0 1 3], [1 0 0; -1 2 1]);   % x^2 sur [0,1], puis -(x-1)^2 + 2(x-1) + 1
+     ppval(pp, [0.5 2])                     % 0.25 et 2
+
+  Voir aussi UNMKPP, PPVAL, SPLINE, PCHIP.
+```
+
 ## `months`
 
 ```
@@ -9300,6 +9321,20 @@ UNIQUETOL Valeurs distinctes à une tolérance près.
      numel(u)                    % 2 : les deux premiers se confondent
 
   Voir aussi ISMEMBERTOL.
+```
+
+## `unmkpp`
+
+```
+UNMKPP Les éléments d'un polynôme par morceaux.
+  [BREAKS,COEFS,L,K,D] = UNMKPP(PP) rend les points de rupture, les
+  coefficients, le nombre de morceaux, l'ordre et la dimension du
+  polynôme par morceaux PP, l'inverse de MKPP.
+
+  Exemple :
+     [b, c, l, k] = unmkpp(spline(0:3, [0 1 8 27]))   % 4 points, 3 morceaux d'ordre 4
+
+  Voir aussi MKPP, PPVAL, SPLINE.
 ```
 
 ## `usejava`

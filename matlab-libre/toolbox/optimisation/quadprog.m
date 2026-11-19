@@ -1,12 +1,18 @@
-function [x, valeur, drapeau] = quadprog(H, f, A, b, Aeq, beq, bas, haut, x0)
+function [x, valeur, drapeau] = quadprog(H, f, A, b, Aeq, beq, bas, haut, x0, options)
 %QUADPROG Programmation quadratique : minimise 0.5*x'Hx + f'x.
 %   X = QUADPROG(H,F) minimise sans contrainte : c'est -H\F.
 %   X = QUADPROG(H,F,A,B,AEQ,BEQ,LB,UB) impose A*x <= b, Aeq*x = beq et
-%   les bornes.
+%   les bornes ; X = QUADPROG(...,X0,OPTIONS) accepte le point de départ
+%   et les options de MATLAB, dont seul 'Display' est sans effet ici.
+%   [X,FVAL,EXITFLAG] = QUADPROG(...) rend aussi la valeur du critère et
+%   le drapeau : 1 si X est admissible, -2 sinon.
 %
-%   Les contraintes d'inégalité et les bornes sont traitées par
-%   pénalisation ; le minimum est cherché par Nelder-Mead à partir de la
-%   solution non contrainte.
+%   Quand H est définie positive, le problème est convexe et MatLibre le
+%   résout exactement par une méthode de contraintes actives : chaque pas
+%   résout le système de Karush-Kuhn-Tucker des contraintes saturées, et
+%   la solution est celle de MATLAB à la précision machine. Sinon, faute
+%   de mieux, les contraintes sont pénalisées et le minimum cherché par
+%   Nelder-Mead : la solution n'est alors qu'approchée.
 %
 %   Exemple :
 %      % Le point le plus proche de [1;1], puis le même sous x1+x2 <= 1.

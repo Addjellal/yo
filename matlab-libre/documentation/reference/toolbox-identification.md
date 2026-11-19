@@ -90,21 +90,28 @@ ADVICE Examine des données avant de les identifier.
 ## `aic`
 
 ```
-AIC Critère d'information d'Akaike.
-  V = AIC(MODELE) rend N log(V) + 2p, où V est l'erreur quadratique, p
-  le nombre de paramètres et N le nombre d'échantillons.
-
-  V = AIC(MODELE,'nAIC') rend le critère normalisé par le nombre
-  d'échantillons, et V = AIC(MODELE,'BIC') remplace la pénalité par
-  p log(N), plus sévère : elle croît avec la taille des données, si bien
-  que le critère finit par désigner le vrai modèle quand il est dans la
-  liste, ce que le critère d'Akaike ne garantit pas.
+AIC Critère d'information d'Akaike, comme MATLAB.
+  V = AIC(MODELE) rend le critère normalisé nAIC = log V + 2 np / N, la
+  valeur par défaut de MATLAB, où V est la perte (l'erreur quadratique
+  moyenne de prédiction, le déterminant de la covariance des erreurs en
+  multisortie), np le nombre de paramètres estimés et N le nombre
+  d'échantillons.
+  V = AIC(M1,M2,...) rend une ligne, un critère par modèle.
+  V = AIC(...,MESURE) choisit le critère :
+     'nAIC'  log V + 2 np / N (défaut)
+     'aic'   N log V + 2 np + N ny (log(2 pi) + 1), le critère brut
+     'AICc'  AIC + 2 np (np + 1) / (N - np - 1), corrigé des petits échantillons
+     'BIC'   N log V + N (ny log(2 pi) + 1) + np log N, de Schwarz
+  On garde le modèle de plus petit critère. La pénalité de BIC croît
+  avec N, si bien qu'il finit par désigner le vrai modèle quand il est
+  dans la liste, ce que le critère d'Akaike ne garantit pas.
 
   Exemple :
      rng(1);
      u = randn(300, 1);
      z = iddata(filter([0 0.5], [1 -0.8], u), u);
-     aic(arx(z, [2 2 1]))
+     aic(arx(z, [1 1 1]), arx(z, [3 3 1]))       % nAIC des deux modèles
+     aic(arx(z, [1 1 1]), 'BIC')
 
   Voir aussi FPE, ARX, POLYEST.
 ```
@@ -678,6 +685,28 @@ MATLIBRE_ID_CRITERE Une mesure du compte rendu d'estimation.
      matlibre_id_critere(arx(z, [1 1 1]), 'MSE')
 
   Voir aussi FPE, AIC.
+```
+
+## `matlibre_id_criteres`
+
+```
+MATLIBRE_ID_CRITERES Le champ Report.Fit de MATLAB : ajustement et critères d'information.
+  F = MATLIBRE_ID_CRITERES(FIT,E,NP) : FIT en pour cent, E les erreurs
+  de prédiction (N échantillons x NY sorties), NP paramètres estimés. La
+  perte V est le déterminant de E'E/N — l'erreur quadratique moyenne pour
+  une sortie. Les formules sont celles de la documentation de MATLAB :
+     FPE  = V (1 + NP/N) / (1 - NP/N)                       (Akaike, 1969)
+     AIC  = N log V + 2 NP + N NY (log(2 pi) + 1)           (Akaike, 1974)
+     AICc = AIC + 2 NP (NP + 1) / (N - NP - 1)
+     nAIC = log V + 2 NP / N
+     BIC  = N log V + N (NY log(2 pi) + 1) + NP log N       (Schwarz, 1978)
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     f = matlibre_id_criteres(95, 0.1 * randn(300, 1), 4)
+
+  Voir aussi AIC, FPE.
 ```
 
 ## `matlibre_id_decaler`

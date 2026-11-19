@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-3122 fonctions ecrites dans le langage, reparties en 55 toolboxes.
+3130 fonctions ecrites dans le langage, reparties en 55 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -59,9 +59,9 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`edp`](reference/toolbox-edp.md) | 5 |
 | [`finance`](reference/toolbox-finance.md) | 172 |
 | [`flou`](reference/toolbox-flou.md) | 70 |
-| [`fusion-capteurs`](reference/toolbox-fusion-capteurs.md) | 4 |
+| [`fusion-capteurs`](reference/toolbox-fusion-capteurs.md) | 5 |
 | [`gestion-risques`](reference/toolbox-gestion-risques.md) | 69 |
-| [`identification`](reference/toolbox-identification.md) | 106 |
+| [`identification`](reference/toolbox-identification.md) | 107 |
 | [`imagerie-medicale`](reference/toolbox-imagerie-medicale.md) | 5 |
 | [`images`](reference/toolbox-images.md) | 140 |
 | [`instruments`](reference/toolbox-instruments.md) | 4 |
@@ -70,17 +70,17 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maToolbox`](reference/toolbox-maToolbox.md) | 0 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
-| [`matlab`](reference/toolbox-matlab.md) | 457 |
+| [`matlab`](reference/toolbox-matlab.md) | 459 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 134 |
 | [`optimisation`](reference/toolbox-optimisation.md) | 27 |
 | [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 18 |
-| [`radar`](reference/toolbox-radar.md) | 15 |
+| [`radar`](reference/toolbox-radar.md) | 16 |
 | [`renforcement`](reference/toolbox-renforcement.md) | 5 |
 | [`reseaux-antennes`](reference/toolbox-reseaux-antennes.md) | 11 |
 | [`rf`](reference/toolbox-rf.md) | 16 |
-| [`robotique`](reference/toolbox-robotique.md) | 74 |
+| [`robotique`](reference/toolbox-robotique.md) | 77 |
 | [`robuste`](reference/toolbox-robuste.md) | 93 |
 | [`signal`](reference/toolbox-signal.md) | 208 |
 | [`simscape`](reference/toolbox-simscape.md) | 9 |

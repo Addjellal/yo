@@ -101,6 +101,27 @@ MATCHEDFILTER Filtre adapté : corrélation avec la réplique retournée.
   Voir aussi PULSECOMPRESSION, XCORR, CONV.
 ```
 
+## `matlibre_radar_cibles`
+
+```
+MATLIBRE_RADAR_CIBLES Nombre de cibles J et pertes de trajet aller et retour.
+  [J,PERTES] = MATLIBRE_RADAR_CIBLES(FONCTION,O,A,B,...) vérifie que les
+  grandeurs par cible (A, B... et les options RCS, CustomFactor,
+  AtmosphericLoss, PropagationFactor de O) ont une valeur, ou J. PERTES
+  est la somme, en dB, des pertes atmosphériques moins les facteurs de
+  propagation, sur les deux trajets : une valeur scalaire ou une colonne
+  vaut pour un trajet aller, et compte donc à l'aller et au retour ; deux
+  colonnes donnent l'aller puis le retour, comme MATLAB.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = matlibre_radar_options({'AtmosphericLoss', 1}, 'radareqsnr', {'AtmosphericLoss'});
+     [J, pertes] = matlibre_radar_cibles('radareqsnr', o, 50e3)   % 1, 2 dB
+
+  Voir aussi RADAREQPOW, RADAREQSNR, RADAREQRNG.
+```
+
 ## `matlibre_radar_options`
 
 ```
@@ -187,9 +208,15 @@ RADAREQPOW Puissance crête nécessaire, par l'équation du radar.
 
      Pt = SNR (4 pi)^3 k Ts Rt^2 Rr^2 L / (tau Gt Gr lambda^2 sigma)
 
-  TGTRNG est une portée, ou [Rt Rr] pour un radar bistatique.
+  TGTRNG est une portée, ou [Rt Rr] pour un radar bistatique ; une
+  colonne de J portées, ou une matrice J x 2, décrit J cibles, et SNR,
+  'RCS', 'CustomFactor', 'AtmosphericLoss' et 'PropagationFactor'
+  peuvent alors avoir une valeur par cible : PT est une colonne de J
+  puissances.
   Options : 'RCS' (m^2, 1), 'Ts' (K, 290), 'Gain' (dB, 20, ou [Gt Gr]),
-  'Loss' (dB, 0), 'CustomFactor' (dB, 0).
+  'Loss' (dB, 0), 'CustomFactor' (dB, 0), 'AtmosphericLoss' et
+  'PropagationFactor' (dB, 0 ; une valeur vaut pour un trajet aller, et
+  compte à l'aller et au retour ; [aller retour] les distingue).
 
   Exemple :
      % Documentation de MATLAB.
@@ -239,8 +266,11 @@ RADAREQSNR Rapport signal sur bruit par l'équation du radar, en dB.
   l'émetteur et du récepteur (bistatique), ou une colonne / une matrice
   J x 2 de telles portées.
   Options : 'RCS' (m^2, 1), 'Ts' (K, 290), 'Gain' (dB, 20, ou [Gt Gr]),
-  'Loss' (dB, 0), 'AtmosphericLoss' et 'PropagationFactor' (dB, 0, un
-  par trajet ou [aller retour]), 'CustomFactor' (dB, 0).
+  'Loss' (dB, 0), 'AtmosphericLoss' et 'PropagationFactor' (dB, 0 ; une
+  valeur vaut pour un trajet aller, et compte donc à l'aller et au
+  retour ; [aller retour] les distingue), 'CustomFactor' (dB, 0).
+  Pour J cibles, 'RCS', 'CustomFactor' et les pertes de trajet peuvent
+  avoir une valeur par cible ; SNR est alors une colonne de J valeurs.
 
   Exemple :
      % Documentation de MATLAB.

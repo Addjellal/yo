@@ -12,6 +12,15 @@ function [u, sequence] = mpcmove(controleur, x, consigne)
 %   compte faire, et l'écart entre ce plan et ce qu'il fait vraiment
 %   mesure ce que la rétroaction corrige.
 %
+%   Le critère est la somme, sur l'horizon de prédiction, de Q fois le
+%   carré de l'écart à la consigne, plus R fois le carré des commandes de
+%   l'horizon de commande. Avec les bornes CONTROLEUR.umin et umax, c'est
+%   un programme quadratique sous contraintes, résolu exactement par
+%   QUADPROG : écrêter la solution libre ne donnerait pas l'optimum, car les
+%   commandes suivantes doivent compenser celles que la borne retient.
+%   Sans contrainte et sur un horizon long, la première commande tend vers
+%   celle du régulateur LQR de même pondération.
+%
 %   Exemple :
 %      A = [1 0.1; 0 1]; B = [0.005; 0.1]; C = [1 0];
 %      ctrl = mpcSetup(A, B, C, 20, 5, 1, 0.1);
@@ -32,7 +41,17 @@ function [u, sequence] = mpcmove(controleur, x, consigne)
     R = controleur.R * eye(m);
     H = Phi.' * Q * Phi + R;
     g = Phi.' * Q * (F * x(:) - r);
-    sequence = -H \ g;
-    sequence = max(min(sequence, controleur.umax), controleur.umin);
+    bornes = isfinite(controleur.umin) || isfinite(controleur.umax);
+    if bornes
+        bas = repmat(controleur.umin, m, 1);
+        haut = repmat(controleur.umax, m, 1);
+        [sequence, ~, drapeau] = quadprog((H + H.') / 2, g, [], [], [], [], bas, haut);
+        if drapeau ~= 1
+            error('mpc:mpcmove:Infaisable', ...
+                  'Le programme quadratique sous contraintes n''a pas de solution admissible.');
+        end
+    else
+        sequence = -H \ g;
+    end
     u = sequence(1);
 end
