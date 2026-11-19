@@ -388,6 +388,51 @@ int main(int argc, char** argv) {
         verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
     }
 
+    // --- la legende suit « Location » --------------------------------------
+    //
+    // La fenetre placait sa legende en haut a droite quoi qu'on demande. La
+    // parabole ne passe pas dans le coin bas droit : du bleu y vient de
+    // l'echantillon de la legende, et de lui seul.
+    {
+        envoyer(fenetre, QStringLiteral(
+                    "figure(9); plot(1:10, (1:10).^2, 'b-', 'LineWidth', 2); hold on; "
+                    "plot(1:10, 1:10, 'ro'); "
+                    "legend({'une courbe au libelle assez long pour deborder', "
+                    "'des marqueurs'}, 'Location', 'southeast'); "
+                    "text(3, 50, 'note'); xlabel('x_1');"));
+        VueFigure* vueLegende = nullptr;
+        verifier(attendre([&] {
+                     for (FenetreFigure* f : fenetre.findChildren<FenetreFigure*>())
+                         if (!f->isHidden() &&
+                             f->windowTitle().startsWith(QLatin1String("Figure 9")))
+                             vueLegende = f->vue();
+                     return vueLegende != nullptr;
+                 }),
+                 "la figure de la legende s'ouvre");
+        if (vueLegende) {
+            vueLegende->resize(900, 560);
+            QCoreApplication::processEvents();
+            QImage image(900, 560, QImage::Format_ARGB32);
+            image.fill(Qt::white);
+            vueLegende->render(&image);
+            auto bleusDans = [&](int x0, int y0, int x1, int y1) {
+                int n = 0;
+                for (int y = y0; y < y1; ++y)
+                    for (int x = x0; x < x1; ++x) {
+                        QColor c = image.pixelColor(x, y);
+                        if (c.blue() - c.red() > 100) ++n;
+                    }
+                return n;
+            };
+            verifier(bleusDans(450, 420, 880, 530) > 20,
+                     "la legende « southeast » est en bas a droite");
+            const char* capture = std::getenv("MATLIBRE_CAPTURE_LEGENDE");
+            if (capture) image.save(QString::fromLocal8Bit(capture));
+        }
+        envoyer(fenetre, QStringLiteral("close(9)"));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+    }
+
     // --- la vie des fenetres de figure ------------------------------------
     //
     // Trois choses que MATLAB fait, et que le bureau ne faisait pas : une

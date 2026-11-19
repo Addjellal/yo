@@ -105,7 +105,10 @@ void decoderStyle(const std::string& spec, Serie& s) {
             continue;
         }
         if (c == '-' || c == ':' || c == '.') {
-            if (c == '.' && !(k + 1 < spec.size() && spec[k + 1] == '-')) {
+            // Un point n'appartient au trait que derriere un tiret : « -. »
+            // est le trait mixte. Regarder le caractere suivant faisait de
+            // « -. » un trait plein a marqueurs ponctuels.
+            if (c == '.' && !(k > 0 && spec[k - 1] == '-')) {
                 s.marqueur = ".";
                 continue;
             }
@@ -134,12 +137,20 @@ int ajouterSerie(Interpreteur& it, Serie s) {
     return identifiant;
 }
 
+// MATLAB detruit la legende qu'on efface : la suivante repart en haut a
+// droite, sous l'interprete TeX, quoi qu'ait demande la precedente.
+void effacerLegende(Axes& a) {
+    a.legendeVisible = false;
+    a.legende.clear();
+    a.emplacementLegende = "northeast";
+    a.interpreteLegende = Interprete::Tex;
+}
+
 void nouveauTrace(Interpreteur& it) {
     auto a = axesCourants(it);
     if (!a->tenir) {
         a->series.clear();
-        a->legendeVisible = false;
-        a->legende.clear();
+        effacerLegende(*a);
     }
 }
 
@@ -986,20 +997,40 @@ FONCTION(fnAxes) {
                        : std::vector<Valeur>{};
 }
 
+// « title('a_b', 'Interpreter', 'none') » : l'interprete se lit dans les
+// paires qui suivent le texte. Les autres proprietes y restent sans effet,
+// comme avant ; sans paire, l'interprete deja pose demeure, comme celui du
+// texte de MATLAB, dont TITLE ne change que la chaine.
+void lireInterprete(Arguments args, Interprete& interprete) {
+    for (std::size_t k = 1; k + 1 < args.size(); k += 2) {
+        if (!args[k].estTexte() && !args[k].estChaine()) continue;
+        std::string nom = args[k].versTexte();
+        for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+        if (nom == "interpreter")
+            interprete = interpreteDepuisTexte(args[k + 1].versTexte(), "Text");
+    }
+}
+
 FONCTION(fnXlabel) {
-    axesCourants(it)->etiquetteX = args.empty() ? "" : args[0].versTexte();
+    auto a = axesCourants(it);
+    a->etiquetteX = args.empty() ? "" : args[0].versTexte();
+    lireInterprete(args, a->interpreteX);
     // MATLAB rend la poignee du texte : « z = title(...) ; set(z,...) ».
     if (nargout > 0) return {poigneeTexteCourant(it, "xlabel")};
     return {};
 }
 FONCTION(fnYlabel) {
-    axesCourants(it)->etiquetteY = args.empty() ? "" : args[0].versTexte();
+    auto a = axesCourants(it);
+    a->etiquetteY = args.empty() ? "" : args[0].versTexte();
+    lireInterprete(args, a->interpreteY);
     // MATLAB rend la poignee du texte : « z = title(...) ; set(z,...) ».
     if (nargout > 0) return {poigneeTexteCourant(it, "ylabel")};
     return {};
 }
 FONCTION(fnZlabel) {
-    axesCourants(it)->etiquetteZ = args.empty() ? "" : args[0].versTexte();
+    auto a = axesCourants(it);
+    a->etiquetteZ = args.empty() ? "" : args[0].versTexte();
+    lireInterprete(args, a->interpreteZ);
     // Comme TITLE, XLABEL et YLABEL : la poignee du texte pose, pour
     // pouvoir le reprendre ensuite. L'omettre rendait ZLABEL seul de sa
     // famille a ne rien rendre.
@@ -1007,34 +1038,78 @@ FONCTION(fnZlabel) {
     return {};
 }
 FONCTION(fnTitle) {
-    axesCourants(it)->titre = args.empty() ? "" : args[0].versTexte();
+    auto a = axesCourants(it);
+    a->titre = args.empty() ? "" : args[0].versTexte();
+    lireInterprete(args, a->interpreteTitre);
     // MATLAB rend la poignee du texte : « z = title(...) ; set(z,...) ».
     if (nargout > 0) return {poigneeTexteCourant(it, "title")};
     return {};
 }
 
+// « legend » : les libelles d'abord — textes, cellules, tableaux de
+// chaines —, puis les paires « nom, valeur ». La premiere chaine qui nomme
+// une propriete de la legende et qu'un nombre pair d'arguments acheve
+// ouvre les paires : « legend('a', 'Location', 'southeast') » a un
+// libelle, et non trois. Les paires passent par ce qu'emploie « set(l,...) »,
+// faute de quoi « Location » aurait ete lu ici et oublie la.
 FONCTION(fnLegend) {
     INUTILISE
     auto a = axesCourants(it);
-    a->legende.clear();
-    for (const auto& arg : args) {
+    auto poigneeSiDemandee = [&]() -> std::vector<Valeur> {
+        if (nargout > 0) return {poigneeTexteCourant(it, "legend")};
+        return {};
+    };
+    // Les poignees donnees en tete, « legend([h1 h2], ...) », sont
+    // passees : les libelles vont aux courbes dans l'ordre du trace.
+    std::size_t k = 0;
+    while (k < args.size() && args[k].classe == Classe::Objet) ++k;
+    // Un mot seul regle la legende sans la refaire : « legend off »,
+    // « legend show ».
+    if (k + 1 == args.size() && (args[k].estTexte() || args[k].estChaine())) {
+        std::string mot = args[k].versTexte();
+        for (auto& c : mot) c = (char)std::tolower((unsigned char)c);
+        if (mot == "off") {
+            effacerLegende(*a);
+            return {};
+        }
+        if (mot == "hide" || (mot == "toggle" && a->legendeVisible)) {
+            a->legendeVisible = false;
+            return poigneeSiDemandee();
+        }
+        if (mot == "show" || mot == "toggle") {
+            // Une legende qu'on n'avait jamais posee prend toutes les
+            // courbes, sous leurs noms par defaut.
+            if (!a->legendeVisible && a->legende.empty())
+                a->legendeJusqua = a->prochaineSerie;
+            a->legendeVisible = true;
+            return poigneeSiDemandee();
+        }
+        // Le cadre de la legende est toujours trace : « boxoff » est
+        // accepte sans effet, comme la propriete « Box ».
+        if (mot == "boxon" || mot == "boxoff") return poigneeSiDemandee();
+    }
+    std::vector<std::string> libelles;
+    for (; k < args.size(); ++k) {
+        const Valeur& arg = args[k];
+        bool texte = arg.estTexte() || arg.estChaine();
+        bool paires = (args.size() - k) % 2 == 0;
+        if (texte && paires && estProprieteLegende(arg.versTexte())) break;
         if (arg.classe == Classe::Cellule) {
-            for (const auto& c : arg.cellules) a->legende.push_back(c.versTexte());
-        } else if (arg.estTexte() || arg.estChaine()) {
-            std::string s = arg.versTexte();
-            if (s == "off") {
-                a->legendeVisible = false;
-                return {};
-            }
-            if (s == "Location" || s == "location") break;
-            a->legende.push_back(s);
+            for (const auto& c : arg.cellules) libelles.push_back(c.versTexte());
+        } else if (arg.estChaine() && arg.nelem() > 1) {
+            for (const auto& s : arg.chaines) libelles.push_back(s);
+        } else if (texte) {
+            libelles.push_back(arg.versTexte());
         }
     }
+    a->legende = libelles;
+    a->legendeJusqua = a->prochaineSerie;
     a->legendeVisible = true;
+    for (; k + 1 < args.size(); k += 2)
+        ecrireProprieteLegende(*a, args[k].versTexte(), args[k + 1]);
     // MATLAB rend la poignee de la legende : « l = legend(...) » sert a
     // la deplacer ou a la masquer ensuite.
-    if (nargout > 0) return {poigneeTexteCourant(it, "legend")};
-    return {};
+    return poigneeSiDemandee();
 }
 
 FONCTION(fnGrid) {
@@ -1375,8 +1450,7 @@ FONCTION(fnCla) {
     a->titre.clear();
     a->etiquetteX.clear();
     a->etiquetteY.clear();
-    a->legende.clear();
-    a->legendeVisible = false;
+    effacerLegende(*a);
     a->limitesManuellesX = false;
     a->limitesManuellesY = false;
     a->ticksX.clear();
@@ -1522,6 +1596,7 @@ FONCTION(fnText) {
     std::string couleur = "#000000";
     double taille = 0;
     char alignement = 'l';
+    Interprete interprete = Interprete::Tex;
     for (std::size_t k = 3; k + 1 < args.size(); k += 2) {
         std::string propriete = args[k].versTexte();
         for (auto& c : propriete) c = (char)std::tolower((unsigned char)c);
@@ -1533,6 +1608,8 @@ FONCTION(fnText) {
         } else if (propriete == "horizontalalignment") {
             std::string a = args[k + 1].versTexte();
             alignement = a.empty() ? 'l' : (a[0] == 'c' ? 'c' : (a[0] == 'r' ? 'r' : 'l'));
+        } else if (propriete == "interpreter") {
+            interprete = interpreteDepuisTexte(args[k + 1].versTexte(), "Text");
         }
     }
 
@@ -1548,6 +1625,7 @@ FONCTION(fnText) {
         s.couleur = couleur;
         s.taillePoliceTexte = taille;
         s.alignement = alignement;
+        s.interprete = interprete;
         s.identifiant = ++axes->prochaineSerie;
         identifiants.push_back(s.identifiant);
         axes->series.push_back(s);

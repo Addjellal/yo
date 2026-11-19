@@ -223,9 +223,28 @@ bool ecrireAxes(Interpreteur& it, const Valeur& p, const std::string& nom,
     if (memeNom(nom, "Title")) { a->titre = v.versTexte(); return true; }
     if (memeNom(nom, "XLabel")) { a->etiquetteX = v.versTexte(); return true; }
     if (memeNom(nom, "YLabel")) { a->etiquetteY = v.versTexte(); return true; }
+    if (memeNom(nom, "ZLabel")) { a->etiquetteZ = v.versTexte(); return true; }
     if (memeNom(nom, "TitleFontSize")) { a->taillePoliceTitre = v.scal(); return true; }
     erreur("MATLAB:hg:InvalidProperty",
            "Unrecognized property '" + nom + "' for class 'Axes'.");
+}
+
+// La chaine que designe une poignee de titre ou d'etiquette. Les quatre
+// cibles sont nommees : en tenir trois et ranger le reste sous le titre
+// faisait ecrire « set(zlabel(...),'String',...) » dans le titre.
+std::string& chaineDe(Axes& a, const std::string& cible) {
+    if (cible == "xlabel") return a.etiquetteX;
+    if (cible == "ylabel") return a.etiquetteY;
+    if (cible == "zlabel") return a.etiquetteZ;
+    return a.titre;
+}
+
+// L'interprete du texte que designe une poignee de titre ou d'etiquette.
+Interprete& interpreteDe(Axes& a, const std::string& cible) {
+    if (cible == "xlabel") return a.interpreteX;
+    if (cible == "ylabel") return a.interpreteY;
+    if (cible == "zlabel") return a.interpreteZ;
+    return a.interpreteTitre;
 }
 
 // Le titre, l'etiquette en x, celle en y : trois textes, dont on peut
@@ -236,10 +255,7 @@ bool ecrireTexte(Interpreteur& it, const Valeur& p, const std::string& nom,
     auto a = axesDe(it, p);
     std::string cible = p.champ("Cible", 0).versTexte();
     if (memeNom(nom, "String")) {
-        std::string texte = v.versTexte();
-        if (cible == "xlabel") a->etiquetteX = texte;
-        else if (cible == "ylabel") a->etiquetteY = texte;
-        else a->titre = texte;
+        chaineDe(*a, cible) = v.versTexte();
         return true;
     }
     if (memeNom(nom, "FontSize")) {
@@ -247,13 +263,17 @@ bool ecrireTexte(Interpreteur& it, const Valeur& p, const std::string& nom,
         else a->taillePolice = v.scal();
         return true;
     }
-    // Les autres proprietes d'un texte — couleur, police, interprete —
-    // sont acceptees sans effet : le rendu n'en a pas encore l'usage, et
-    // un script qui les pose ne doit pas s'arreter pour autant.
+    if (memeNom(nom, "Interpreter")) {
+        interpreteDe(*a, cible) = interpreteDepuisTexte(v.versTexte(), "Text");
+        return true;
+    }
+    // Les autres proprietes d'un texte — couleur, police — sont acceptees
+    // sans effet : le rendu n'en a pas encore l'usage, et un script qui
+    // les pose ne doit pas s'arreter pour autant.
     if (memeNom(nom, "Color") || memeNom(nom, "FontWeight") ||
-        memeNom(nom, "FontName") || memeNom(nom, "Interpreter") ||
-        memeNom(nom, "Rotation") || memeNom(nom, "HorizontalAlignment") ||
-        memeNom(nom, "VerticalAlignment") || memeNom(nom, "Position"))
+        memeNom(nom, "FontName") || memeNom(nom, "Rotation") ||
+        memeNom(nom, "HorizontalAlignment") || memeNom(nom, "VerticalAlignment") ||
+        memeNom(nom, "Position"))
         return true;
     erreur("MATLAB:hg:InvalidProperty",
            "Unrecognized property '" + nom + "' for class 'Text'.");
@@ -263,9 +283,7 @@ bool lireTexte(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
     auto a = axesDe(it, p);
     std::string cible = p.champ("Cible", 0).versTexte();
     if (memeNom(nom, "String")) {
-        sortie = Valeur::texte(cible == "xlabel"   ? a->etiquetteX
-                               : cible == "ylabel" ? a->etiquetteY
-                                                   : a->titre);
+        sortie = Valeur::texte(chaineDe(*a, cible));
         return true;
     }
     if (memeNom(nom, "FontSize")) {
@@ -276,6 +294,10 @@ bool lireTexte(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
     }
     if (memeNom(nom, "Type")) {
         sortie = Valeur::texte("text");
+        return true;
+    }
+    if (memeNom(nom, "Interpreter")) {
+        sortie = Valeur::texte(nomInterprete(interpreteDe(*a, cible)));
         return true;
     }
     return false;
@@ -318,6 +340,10 @@ bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
     if (memeNom(nom, "HorizontalAlignment")) {
         std::string a = v.versTexte();
         s->alignement = a.empty() ? 'l' : (a[0] == 'c' ? 'c' : (a[0] == 'r' ? 'r' : 'l'));
+        return true;
+    }
+    if (memeNom(nom, "Interpreter")) {
+        s->interprete = interpreteDepuisTexte(v.versTexte(), "Text");
         return true;
     }
     // Ce que le rendu de MatLibre n'emploie pas encore, mais qu'un script
@@ -364,6 +390,10 @@ bool lireLigne(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
     }
     if (memeNom(nom, "Type")) {
         sortie = Valeur::texte(s->genre == GenreTrace::Texte ? "text" : "line");
+        return true;
+    }
+    if (memeNom(nom, "Interpreter")) {
+        sortie = Valeur::texte(nomInterprete(s->interprete));
         return true;
     }
     if (memeNom(nom, "Parent")) {
@@ -429,9 +459,11 @@ bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur&
     }
     // « get(gca,'Title') » rend la poignee du texte, comme MATLAB : c'est
     // sur elle qu'on ecrit ensuite la taille de police.
-    if (memeNom(nom, "Title") || memeNom(nom, "XLabel") || memeNom(nom, "YLabel")) {
+    if (memeNom(nom, "Title") || memeNom(nom, "XLabel") || memeNom(nom, "YLabel") ||
+        memeNom(nom, "ZLabel")) {
         const char* cible = memeNom(nom, "XLabel")   ? "xlabel"
                             : memeNom(nom, "YLabel") ? "ylabel"
+                            : memeNom(nom, "ZLabel") ? "zlabel"
                                                      : "title";
         sortie = poigneeTexte((int)p.champ("NumeroFigure", 0).scal(),
                               (int)p.champ("NumeroAxe", 0).scal(), cible);
@@ -560,8 +592,15 @@ bool lireLegende(Interpreteur& it, const Valeur& p, const std::string& nom, Vale
         sortie = Valeur::scalaire(a->taillePolice);
         return true;
     }
-    if (memeNom(nom, "Location") || memeNom(nom, "Box") ||
-        memeNom(nom, "Orientation") || memeNom(nom, "Interpreter")) {
+    if (memeNom(nom, "Location")) {
+        sortie = Valeur::texte(a->emplacementLegende);
+        return true;
+    }
+    if (memeNom(nom, "Interpreter")) {
+        sortie = Valeur::texte(nomInterprete(a->interpreteLegende));
+        return true;
+    }
+    if (memeNom(nom, "Box") || memeNom(nom, "Orientation")) {
         sortie = Valeur::texte("");
         return true;
     }
@@ -570,35 +609,8 @@ bool lireLegende(Interpreteur& it, const Valeur& p, const std::string& nom, Vale
 
 bool ecrireLegende(Interpreteur& it, const Valeur& p, const std::string& nom,
                    const Valeur& v) {
-    auto a = axesDe(it, p);
-    if (memeNom(nom, "String")) {
-        a->legende.clear();
-        if (v.classe == Classe::Cellule) {
-            for (const auto& c : v.cellules) a->legende.push_back(c.versTexte());
-        } else if (v.classe == Classe::Chaine && v.nelem() > 1) {
-            for (const auto& s : v.chaines) a->legende.push_back(s);
-        } else {
-            a->legende.push_back(v.versTexte());
-        }
-        return true;
-    }
-    if (memeNom(nom, "Visible")) {
-        a->legendeVisible = v.versTexte() != "off";
-        return true;
-    }
-    if (memeNom(nom, "FontSize")) {
-        a->taillePolice = v.scal();
-        return true;
-    }
-    // Les autres proprietes sont acceptees sans effet : le rendu n'en a
-    // pas l'usage, et un programme qui les pose ne doit pas s'arreter.
-    if (memeNom(nom, "Location") || memeNom(nom, "Box") ||
-        memeNom(nom, "Orientation") || memeNom(nom, "Interpreter") ||
-        memeNom(nom, "Color") || memeNom(nom, "Position") ||
-        memeNom(nom, "NumColumns") || memeNom(nom, "AutoUpdate"))
-        return true;
-    erreur("MATLAB:hg:InvalidProperty",
-           "Unrecognized property '" + nom + "' for class 'Legend'.");
+    ecrireProprieteLegende(*axesDe(it, p), nom, v);
+    return true;
 }
 
 // La barre de couleurs n'est pas encore dessinee : ses proprietes se
@@ -646,7 +658,53 @@ FONCTION(fnGetPoignee) {
     return {Valeur::vide()};
 }
 
+// Les proprietes de la legende que MatLibre connait : celles qui changent
+// le dessin, puis celles qu'il accepte sans effet — le rendu n'en a pas
+// l'usage, et un programme qui les pose ne doit pas s'arreter.
+const char* const PROPRIETES_LEGENDE[] = {
+    "String", "Visible", "FontSize", "Location", "Interpreter", "Box",
+    "Orientation", "Color", "Position", "NumColumns", "AutoUpdate"};
+
 }  // namespace
+
+bool estProprieteLegende(const std::string& nom) {
+    for (const char* propriete : PROPRIETES_LEGENDE)
+        if (memeNom(nom, propriete)) return true;
+    return false;
+}
+
+void ecrireProprieteLegende(Axes& a, const std::string& nom, const Valeur& v) {
+    if (memeNom(nom, "String")) {
+        a.legende.clear();
+        if (v.classe == Classe::Cellule) {
+            for (const auto& c : v.cellules) a.legende.push_back(c.versTexte());
+        } else if (v.classe == Classe::Chaine && v.nelem() > 1) {
+            for (const auto& s : v.chaines) a.legende.push_back(s);
+        } else {
+            a.legende.push_back(v.versTexte());
+        }
+        return;
+    }
+    if (memeNom(nom, "Visible")) {
+        a.legendeVisible = v.versTexte() != "off";
+        return;
+    }
+    if (memeNom(nom, "FontSize")) {
+        a.taillePolice = v.scal();
+        return;
+    }
+    if (memeNom(nom, "Location")) {
+        a.emplacementLegende = emplacementLegendeDepuisTexte(v.versTexte());
+        return;
+    }
+    if (memeNom(nom, "Interpreter")) {
+        a.interpreteLegende = interpreteDepuisTexte(v.versTexte(), "Legend");
+        return;
+    }
+    if (estProprieteLegende(nom)) return;
+    erreur("MATLAB:hg:InvalidProperty",
+           "Unrecognized property '" + nom + "' for class 'Legend'.");
+}
 
 Valeur poigneeAxesCourants(Interpreteur& it) {
     auto a = axesCourants(it);

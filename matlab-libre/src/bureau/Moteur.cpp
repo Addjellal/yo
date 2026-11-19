@@ -163,6 +163,13 @@ std::uint64_t empreinteFigure(const Figure& f) {
         h = melangerReels(h, a->ticksY);
         h = melanger(h, (std::uint64_t)a->legendeVisible);
         for (const auto& e : a->legende) h = melangerTexte(h, e);
+        // Deplacer la legende ou changer d'interprete ne touche a aucune
+        // donnee, mais change l'image.
+        h = melangerTexte(h, a->emplacementLegende);
+        h = melanger(h, (std::uint64_t)a->legendeJusqua);
+        for (Interprete i : {a->interpreteTitre, a->interpreteX, a->interpreteY,
+                             a->interpreteLegende})
+            h = melanger(h, (std::uint64_t)i);
         for (const auto& e : a->etiquettesTicksX) h = melangerTexte(h, e);
         for (const auto& e : a->etiquettesTicksY) h = melangerTexte(h, e);
         for (const auto& s : a->series) {
@@ -171,6 +178,8 @@ std::uint64_t empreinteFigure(const Figure& f) {
             h = melangerTexte(h, s.style);
             h = melangerTexte(h, s.marqueur);
             h = melangerTexte(h, s.etiquette);
+            h = melangerTexte(h, s.legendeConstante);
+            h = melanger(h, (std::uint64_t)s.interprete);
             h = melangerReels(h, {s.epaisseur});
             h = melanger(h, (std::uint64_t)s.hauteurImage);
             h = melanger(h, (std::uint64_t)s.largeurImage);

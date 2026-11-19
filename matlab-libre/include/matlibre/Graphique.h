@@ -7,6 +7,7 @@
 // dossier indiqué par MATLIBRE_FIGURES si la variable existe.
 #pragma once
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -17,6 +18,12 @@
 namespace matlibre {
 
 class Interpreteur;
+
+// L'interprete d'un texte de la figure. MATLAB lit par defaut chaque
+// titre, etiquette, libelle de legende et texte pose comme du TeX :
+// « x_1 » met le 1 en indice. « 'Interpreter','none' » garde le texte tel
+// quel, ce qu'on veut pour un nom de fichier.
+enum class Interprete { Tex, Aucun, Latex };
 
 enum class GenreTrace {
     Ligne, Barres, Points, Escalier, Tige, Aire, Image, Contour, Surface,
@@ -68,6 +75,8 @@ struct Serie {
     double taillePoliceTexte = 0;
     // Alignement horizontal d'un texte pose : 'l', 'c' ou 'r'.
     char alignement = 'l';
+    // L'interprete d'un texte pose.
+    Interprete interprete = Interprete::Tex;
 };
 
 struct Axes {
@@ -86,6 +95,16 @@ struct Axes {
     double xmin = 0, xmax = 1, ymin = 0, ymax = 1;
     std::vector<std::string> legende;
     bool legendeVisible = false;
+    // La « Location » de la legende, en minuscules. Les emplacements
+    // « ...outside » se logent hors de l'axe, qui recule d'autant.
+    std::string emplacementLegende = "northeast";
+    // Le compteur des courbes quand la legende a ete posee. Celles d'avant
+    // n'y entrent que si un libelle leur revient ; celles d'apres s'y
+    // ajoutent d'elles-memes, comme le fait l'« AutoUpdate » de MATLAB.
+    int legendeJusqua = 0;
+    Interprete interpreteTitre = Interprete::Tex, interpreteX = Interprete::Tex,
+               interpreteY = Interprete::Tex, interpreteZ = Interprete::Tex,
+               interpreteLegende = Interprete::Tex;
     int rangee = 1, colonne = 1, position = 1;  // découpage subplot
     // « subplot(2,2,[1 2]) » : la case va de « position » à « positionFin ».
     // Zéro veut dire une seule case.
@@ -156,6 +175,92 @@ bool bornesLog(double& bas, double& haut);
 // le SVG et le bureau — passent par la, pour donner la meme image.
 void appliquerProportions(const Axes& a, int& gauche, int& droite, int& haut, int& bas,
                           double& xmin, double& xmax, double& ymin, double& ymax);
+
+// « 'tex' », « 'none' » ou « 'latex' », sans egard a la casse. Une autre
+// valeur est refusee, et le message nomme les trois, comme MATLAB.
+Interprete interpreteDepuisTexte(const std::string& valeur, const std::string& classe);
+const char* nomInterprete(Interprete interprete);
+
+// Un morceau de texte d'un seul tenant. « echelle » est sa taille
+// rapportee a celle du texte, « decalage » la hauteur de sa ligne de base
+// au-dessus de celle du texte, en tailles du texte : un exposant monte, un
+// indice descend, et tous deux sont plus petits.
+struct MorceauTexte {
+    std::string texte;
+    double echelle = 1.0;
+    double decalage = 0.0;
+    bool gras = false;
+    bool italique = false;
+};
+
+// Decoupe un texte selon son interprete. Sous TeX, « _ » et « ^ » font
+// descendre ou monter le caractere qui suit, ou le groupe entre accolades ;
+// « \alpha » s'ecrit α ; « \bf » et « \it » valent jusqu'a la fin du
+// groupe. Les deux rendus peignent les memes morceaux, faute de quoi la
+// fenetre et le SVG ne liraient pas « x_1 » de la meme facon.
+std::vector<MorceauTexte> decouperTexte(const std::string& texte, Interprete interprete);
+
+// Une entree de la legende : la courbe qu'elle montre, et son libelle.
+struct EntreeLegende {
+    const Serie* serie = nullptr;
+    std::string libelle;
+};
+
+// Les entrees de la legende, dans l'ordre ou MATLAB les montre. Un texte
+// pose n'en est jamais une : le compter donnait aux courbes une entree de
+// trop, « data3 ». Les courbes tracees avant « legend » prennent les
+// libelles dans l'ordre et restent dehors s'il en manque ; celles tracees
+// apres s'ajoutent sous leur « DisplayName », ou « dataN ». Les deux
+// rendus passent par la, et montrent donc les memes entrees.
+std::vector<EntreeLegende> entreesLegende(const Axes& a);
+
+// Ce que « Location » accepte, ramene en minuscules. Une autre valeur est
+// refusee, avec la liste de celles qu'on accepte.
+std::string emplacementLegendeDepuisTexte(const std::string& valeur);
+
+// Loge hors de l'axe une legende de largeur et de hauteur donnees, quand
+// son emplacement le veut : le cadre du trace — gauche, haut, droite, bas —
+// recule, et la legende prend la bande liberee au bord de la case, au-dela
+// des graduations, du titre et des etiquettes, qu'elle ne doit pas
+// recouvrir. Rend vrai, et le coin haut-gauche de la boite dans x et y ;
+// faux pour un emplacement dans l'axe, ou une case trop petite pour les
+// deux.
+bool logerLegendeHorsAxe(const std::string& emplacement, double largeur, double hauteur,
+                         double caseGauche, double caseHaut, double caseDroite,
+                         double caseBas, double& gauche, double& haut, double& droite,
+                         double& bas, double& x, double& y);
+
+// Ou tombe un point de donnees, en pixels ; faux s'il ne se place pas — une
+// valeur non finie, ou negative sur un axe logarithmique.
+using VersPixels = std::function<bool(double x, double y, double& px, double& py)>;
+
+// Le coin haut-gauche de la boite d'une legende posee dans le cadre du
+// trace. MATLAB promet a « best » le moins de conflit avec les donnees :
+// des huit places de la rose, on garde celle qui en cache le moins.
+void placerLegendeDansAxe(const Axes& a, double largeur, double hauteur, double gauche,
+                          double haut, double droite, double bas,
+                          const VersPixels& versPixels, double& x, double& y);
+
+// La forme d'un marqueur autour de son centre, en pixels, l'ordonnee vers
+// le bas : un cercle, ou des lignes brisees — fermees pour un polygone.
+// Le SVG et la fenetre la dessinent l'un comme l'autre ; chacun dessinait
+// la sienne, et la fenetre faisait de tout marqueur un point.
+struct FormeMarqueur {
+    double rayonCercle = 0;  // positif : un cercle de ce rayon
+    bool plein = false;      // rempli de la couleur, sinon le contour seul
+    bool ferme = false;      // les lignes sont des polygones
+    std::vector<std::vector<std::pair<double, double>>> lignes;
+};
+// Vide pour « none » ou une chaine vide.
+FormeMarqueur formeMarqueur(const std::string& marqueur);
+
+// Ecrit une propriete de la legende d'un axe : ce que font « set(l, nom,
+// valeur) » et les paires de « legend(..., nom, valeur) ». Un nom inconnu
+// est refuse, comme dans MATLAB.
+void ecrireProprieteLegende(Axes& a, const std::string& nom, const Valeur& valeur);
+// Vrai si « nom » est une propriete de la legende : c'est ce qui dit ou
+// finissent les libelles dans « legend('a', 'Location', 'best') ».
+bool estProprieteLegende(const std::string& nom);
 
 struct Figure {
     int numero = 1;

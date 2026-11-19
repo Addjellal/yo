@@ -124,7 +124,9 @@ function h = open_system(modele)
         xlim(bornesX);
         ylim(bornesY);
     end
-    title(modele.nom);
+    % Simulink écrit le nom du modèle tel quel : « mon_modele » ne met pas
+    % « modele » en indice, comme le ferait l'interprète TeX d'un titre.
+    title(modele.nom, 'Interpreter', 'none');
     poignee = gcf;
     matlibre_sl_ouverts('inscrire', modele.nom, modele, poignee);
     if nargout > 0

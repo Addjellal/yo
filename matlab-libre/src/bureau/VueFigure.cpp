@@ -1,9 +1,11 @@
 // VueFigure.cpp — le rendu des tracés.
 #include "VueFigure.h"
 
+#include <QFontInfo>
 #include <QFontMetricsF>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPolygonF>
 #include <algorithm>
 #include <cmath>
 
@@ -100,6 +102,130 @@ Qt::PenStyle styleDe(const std::string& style) {
     return Qt::SolidLine;
 }
 
+// La police d'un morceau de texte : celle du texte, a l'echelle du morceau
+// — un indice est plus petit —, en gras ou en italique s'il le demande.
+QFont policeDe(const QFont& base, const MorceauTexte& morceau) {
+    QFont police = base;
+    if (morceau.echelle != 1.0) {
+        if (base.pointSizeF() > 0)
+            police.setPointSizeF(base.pointSizeF() * morceau.echelle);
+        else
+            police.setPixelSize(
+                std::max(1, (int)std::lround(base.pixelSize() * morceau.echelle)));
+    }
+    if (morceau.gras) police.setBold(true);
+    if (morceau.italique) police.setItalic(true);
+    return police;
+}
+
+double largeurMorceaux(const QFont& base, const std::vector<MorceauTexte>& morceaux) {
+    double largeur = 0;
+    for (const auto& m : morceaux)
+        largeur += QFontMetricsF(policeDe(base, m))
+                       .horizontalAdvance(QString::fromStdString(m.texte));
+    return largeur;
+}
+
+// Peint un texte decoupe depuis « origine », posee sur sa ligne de base :
+// les morceaux se suivent, chacun dans sa police et a sa hauteur, comme
+// les <tspan> du SVG.
+void peindreMorceaux(QPainter& peintre, QPointF origine,
+                     const std::vector<MorceauTexte>& morceaux) {
+    QFont base = peintre.font();
+    double taille = QFontInfo(base).pixelSize();
+    double x = origine.x();
+    for (const auto& m : morceaux) {
+        QFont police = policeDe(base, m);
+        QString texte = QString::fromStdString(m.texte);
+        peintre.setFont(police);
+        peintre.drawText(QPointF(x, origine.y() - m.decalage * taille), texte);
+        x += QFontMetricsF(police).horizontalAdvance(texte);
+    }
+    peintre.setFont(base);
+}
+
+// Un texte decoupe, aligne dans un rectangle comme « drawText » l'y aurait
+// aligne.
+void peindreMorceauxDans(QPainter& peintre, const QRectF& rect, Qt::Alignment alignement,
+                         const std::vector<MorceauTexte>& morceaux) {
+    QFontMetricsF metrique(peintre.font());
+    double largeur = largeurMorceaux(peintre.font(), morceaux);
+    double x = rect.left();
+    if (alignement & Qt::AlignHCenter) x = rect.center().x() - largeur / 2;
+    else if (alignement & Qt::AlignRight) x = rect.right() - largeur;
+    double y = rect.center().y() + (metrique.ascent() - metrique.descent()) / 2;
+    if (alignement & Qt::AlignTop) y = rect.top() + metrique.ascent();
+    else if (alignement & Qt::AlignBottom) y = rect.bottom() - metrique.descent();
+    peindreMorceaux(peintre, QPointF(x, y), morceaux);
+}
+
+// Un marqueur, tel que la courbe et la legende le peignent : la forme que
+// le SVG dessine aussi, d'un trait plein — celui de la courbe peut etre en
+// tirets, ou absent pour des marqueurs seuls.
+void peindreMarqueur(QPainter& peintre, const std::string& marqueur, QPointF centre,
+                     const QColor& couleur) {
+    FormeMarqueur forme = formeMarqueur(marqueur);
+    if (forme.rayonCercle <= 0 && forme.lignes.empty()) return;
+    peintre.save();
+    peintre.setPen(QPen(couleur, 1));
+    peintre.setBrush(forme.plein ? QBrush(couleur) : QBrush(Qt::NoBrush));
+    if (forme.rayonCercle > 0)
+        peintre.drawEllipse(centre, forme.rayonCercle, forme.rayonCercle);
+    for (const auto& ligne : forme.lignes) {
+        QPolygonF points;
+        for (const auto& p : ligne) points << centre + QPointF(p.first, p.second);
+        if (forme.ferme) peintre.drawPolygon(points);
+        else peintre.drawPolyline(points);
+    }
+    peintre.restore();
+}
+
+// L'echantillon d'une entree de legende, de x0 a x1 sur la ligne y : le
+// trait avec son style et son epaisseur, le marqueur au milieu ; le
+// marqueur seul quand la courbe n'a pas de trait ; un pave plein pour ce
+// qui se remplit. Le SVG dessine le meme.
+void peindreEchantillon(QPainter& peintre, const Serie& serie, int rang, double x0,
+                        double x1, double y) {
+    QColor couleur = couleurDe(serie.couleur, rang);
+    QPointF milieu((x0 + x1) / 2, y);
+    peintre.save();
+    switch (serie.genre) {
+        case GenreTrace::Barres:
+        case GenreTrace::Aire:
+        case GenreTrace::Polygone:
+        case GenreTrace::Image: {
+            QColor remplissage = couleur;
+            if (serie.genre == GenreTrace::Aire) remplissage.setAlpha(90);
+            if (serie.genre == GenreTrace::Polygone) remplissage.setAlphaF(serie.opacite);
+            QColor bord =
+                serie.couleurBord.empty() ? couleur : couleurDe(serie.couleurBord, rang);
+            peintre.setPen(bord);
+            peintre.setBrush(remplissage);
+            peintre.drawRect(QRectF(x0, y - 5, x1 - x0, 10));
+            break;
+        }
+        case GenreTrace::Points:
+            peintre.setPen(QPen(couleur, 1));
+            peintre.setBrush(couleur);
+            peintre.drawEllipse(milieu, 3, 3);
+            break;
+        case GenreTrace::Tige:
+            peintre.setPen(QPen(couleur, serie.epaisseur));
+            peintre.drawLine(QPointF(x0, y), QPointF(x1, y));
+            peintre.drawEllipse(milieu, 3, 3);
+            break;
+        default: {
+            QPen crayon(couleur, serie.epaisseur);
+            crayon.setStyle(styleDe(serie.style));
+            peintre.setPen(crayon);
+            peintre.drawLine(QPointF(x0, y), QPointF(x1, y));
+            peindreMarqueur(peintre, serie.marqueur, milieu, couleur);
+            break;
+        }
+    }
+    peintre.restore();
+}
+
 }  // namespace
 
 VueFigure::VueFigure(QWidget* parent) : QWidget(parent) {
@@ -147,6 +273,38 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                  cadre.width() - margeGauche - margeDroite,
                  cadre.height() - margeHaut - margeBas);
     if (trace.width() < 10 || trace.height() < 10) return;
+
+    // La legende se mesure avant le trace : logee hors de l'axe, elle lui
+    // prend de la place. Sa largeur est celle du plus long libelle.
+    std::vector<EntreeLegende> entrees = entreesLegende(axes);
+    std::vector<std::vector<MorceauTexte>> libelles;
+    std::vector<double> largeursLibelles;
+    double hauteurLigne = metrique.height() + 4;
+    double largeurLegende = 0, hauteurLegende = 0, xLegende = 0, yLegende = 0;
+    bool legendeLogee = false;
+    if (!entrees.empty()) {
+        double plusLong = 0;
+        for (const auto& e : entrees) {
+            libelles.push_back(decouperTexte(e.libelle, axes.interpreteLegende));
+            largeursLibelles.push_back(largeurMorceaux(peintre.font(), libelles.back()));
+            plusLong = std::max(plusLong, largeursLibelles.back());
+        }
+        // L'echantillon de 6 a 28, le libelle a 34, et 10 de marge a
+        // droite : sans elle, la derniere lettre etait rognee.
+        largeurLegende = std::ceil(plusLong) + 44;
+        hauteurLegende = hauteurLigne * (double)entrees.size() + 8;
+        double g = trace.left(), h = trace.top(), d = trace.right(), b = trace.bottom();
+        legendeLogee = logerLegendeHorsAxe(axes.emplacementLegende, largeurLegende,
+                                           hauteurLegende, cadre.left(), cadre.top(),
+                                           cadre.right(), cadre.bottom(), g, h, d, b,
+                                           xLegende, yLegende);
+        if (legendeLogee) trace = QRectF(QPointF(g, h), QPointF(d, b));
+    }
+    // Ce que la case laisse aux graduations, au titre et aux etiquettes :
+    // toute la case, moins la bande d'une legende logee dehors.
+    QRectF bande(trace.left() - margeGauche, trace.top() - margeHaut,
+                 trace.width() + margeGauche + margeDroite,
+                 trace.height() + margeHaut + margeBas);
 
     double xmin, xmax, ymin, ymax;
     bornes(axes, xmin, xmax, ymin, ymax);
@@ -227,7 +385,7 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
         double y = versEcranY(v);
         if (y < trace.top() - 1 || y > trace.bottom() + 1) continue;
         peintre.drawLine(QPointF(trace.left(), y), QPointF(trace.left() + 5, y));
-        peintre.drawText(QRectF(cadre.left() + 4, y - metrique.height() / 2,
+        peintre.drawText(QRectF(bande.left() + 4, y - metrique.height() / 2,
                                 margeGauche - 12, metrique.height()),
                          Qt::AlignRight | Qt::AlignVCenter,
                          k < axes.etiquettesTicksY.size()
@@ -271,14 +429,15 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                 if (serie.taillePoliceTexte > 0)
                     police.setPointSizeF(serie.taillePoliceTexte);
                 peintre.setFont(police);
-                QString texte = QString::fromStdString(serie.legendeConstante);
+                std::vector<MorceauTexte> morceaux =
+                    decouperTexte(serie.legendeConstante, serie.interprete);
                 double x = versEcranX(serie.x[0]);
                 double y = versEcranY(serie.y[0]);
                 if (serie.alignement != 'l') {
-                    int largeur = peintre.fontMetrics().horizontalAdvance(texte);
+                    double largeur = largeurMorceaux(police, morceaux);
                     x -= serie.alignement == 'c' ? largeur / 2.0 : largeur;
                 }
-                peintre.drawText(QPointF(x, y), texte);
+                peindreMorceaux(peintre, QPointF(x, y), morceaux);
                 break;
             }
             case GenreTrace::Barres: {
@@ -437,14 +596,11 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                 peintre.drawPath(chemin);
                 // Les marqueurs ne se dessinent que s'ils se distinguent :
                 // au-dela d'un point par pixel ils forment un trait plein.
-                if (!serie.marqueur.empty() && serie.marqueur != "none" &&
-                    (double)n < trace.width()) {
-                    peintre.setBrush(couleur);
-                    for (std::size_t k = 0; k < n; ++k)
-                        peintre.drawEllipse(
-                            QPointF(versEcranX(serie.x[k]), versEcranY(serie.y[k])), 2.5, 2.5);
-                    peintre.setBrush(Qt::NoBrush);
-                }
+                if ((double)n < trace.width())
+                    for (std::size_t k = 0; k < n; ++k) {
+                        QPointF point(versEcranX(serie.x[k]), versEcranY(serie.y[k]));
+                        peindreMarqueur(peintre, serie.marqueur, point, couleur);
+                    }
                 break;
             }
         }
@@ -452,7 +608,8 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
     }
     peintre.restore();
 
-    // Titres et étiquettes.
+    // Titres et étiquettes, lus par leur interprete : « x_1 » met le 1 en
+    // indice, comme le SVG.
     peintre.setPen(QColor("#101010"));
     if (!axes.titre.empty()) {
         QFont gras = peintre.font();
@@ -461,48 +618,59 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
         if (axes.taillePoliceTitre > 0) gras.setPointSizeF(axes.taillePoliceTitre);
         peintre.save();
         peintre.setFont(gras);
-        peintre.drawText(QRectF(trace.left(), cadre.top() + 4, trace.width(), margeHaut - 6),
-                         Qt::AlignCenter, QString::fromStdString(axes.titre));
+        QRectF place(trace.left(), bande.top() + 4, trace.width(), margeHaut - 6);
+        peindreMorceauxDans(peintre, place, Qt::AlignCenter,
+                            decouperTexte(axes.titre, axes.interpreteTitre));
         peintre.restore();
     }
-    if (!axes.etiquetteX.empty() && axes.axesVisibles)
-        peintre.drawText(QRectF(trace.left(), cadre.bottom() - 20, trace.width(), 18),
-                         Qt::AlignCenter, QString::fromStdString(axes.etiquetteX));
+    if (!axes.etiquetteX.empty() && axes.axesVisibles) {
+        QRectF place(trace.left(), bande.bottom() - 20, trace.width(), 18);
+        peindreMorceauxDans(peintre, place, Qt::AlignCenter,
+                            decouperTexte(axes.etiquetteX, axes.interpreteX));
+    }
     if (!axes.etiquetteY.empty() && axes.axesVisibles) {
         peintre.save();
-        peintre.translate(cadre.left() + 14, trace.center().y());
+        peintre.translate(bande.left() + 14, trace.center().y());
         peintre.rotate(-90);
-        peintre.drawText(QRectF(-trace.height() / 2, -9, trace.height(), 18), Qt::AlignCenter,
-                         QString::fromStdString(axes.etiquetteY));
+        QRectF place(-trace.height() / 2, -9, trace.height(), 18);
+        peindreMorceauxDans(peintre, place, Qt::AlignCenter,
+                            decouperTexte(axes.etiquetteY, axes.interpreteY));
         peintre.restore();
     }
 
-    // Légende.
-    if (axes.legendeVisible && !axes.legende.empty()) {
-        double hauteurLigne = metrique.height() + 4;
-        double largeur = 40;
-        // 32 px pour le trait et sa marge, 10 pour la marge de droite : sans
-        // cette derniere, la derniere lettre etait rognee.
-        for (const auto& e : axes.legende)
-            largeur = std::max(largeur, 42 + metrique.horizontalAdvance(
-                                                 QString::fromStdString(e)));
-        QRectF boite(trace.right() - largeur - 10, trace.top() + 10, largeur,
-                     hauteurLigne * (double)axes.legende.size() + 8);
-        peintre.setBrush(QColor(255, 255, 255, 225));
+    // Légende : les memes entrees que dans le SVG, placees par les memes
+    // regles ; seule la mesure des libelles differe, Qt sachant mesurer.
+    if (!entrees.empty()) {
+        if (!legendeLogee) {
+            VersPixels versPixels = [&](double x, double y, double& px, double& py) {
+                if (!std::isfinite(x) || !std::isfinite(y)) return false;
+                if ((logX && x <= 0) || (logY && y <= 0)) return false;
+                px = versEcranX(x);
+                py = versEcranY(y);
+                return true;
+            };
+            placerLegendeDansAxe(axes, largeurLegende, hauteurLegende, trace.left(),
+                                 trace.top(), trace.right(), trace.bottom(), versPixels,
+                                 xLegende, yLegende);
+        }
+        QRectF boite(xLegende, yLegende, largeurLegende, hauteurLegende);
+        // Peinte apres tout le reste, sur un fond opaque : une courbe qui
+        // passe dans le coin passe dessous, au lieu de transparaitre.
+        peintre.setBrush(Qt::white);
         peintre.setPen(QColor("#909090"));
         peintre.drawRect(boite);
         peintre.setBrush(Qt::NoBrush);
-        for (std::size_t k = 0; k < axes.legende.size(); ++k) {
+        for (std::size_t k = 0; k < entrees.size(); ++k) {
             double y = boite.top() + 4 + hauteurLigne * (double)k + hauteurLigne / 2;
-            QColor couleur = k < axes.series.size() ? couleurDe(axes.series[k].couleur, (int)k)
-                                                    : couleurDe("", (int)k);
-            peintre.setPen(QPen(couleur, 2));
-            peintre.drawLine(QPointF(boite.left() + 6, y), QPointF(boite.left() + 26, y));
+            const Serie& serie = *entrees[k].serie;
+            int rangSerie = (int)(&serie - axes.series.data());
+            peindreEchantillon(peintre, serie, rangSerie, boite.left() + 6,
+                               boite.left() + 28, y);
             peintre.setPen(QColor("#101010"));
-            peintre.drawText(QRectF(boite.left() + 32, y - hauteurLigne / 2,
-                                    boite.width() - 40, hauteurLigne),
-                             Qt::AlignVCenter | Qt::AlignLeft,
-                             QString::fromStdString(axes.legende[k]));
+            peindreMorceauxDans(peintre,
+                                QRectF(boite.left() + 34, y - hauteurLigne / 2,
+                                       largeursLibelles[k] + 1, hauteurLigne),
+                                Qt::AlignVCenter | Qt::AlignLeft, libelles[k]);
         }
     }
 }

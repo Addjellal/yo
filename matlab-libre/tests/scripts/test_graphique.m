@@ -1013,4 +1013,284 @@ figure('NumberTitle', 'off', 'MenuBar', 'none', 'Position', [0 0 500 500]);
 assert(isequal(get(gcf, 'Position'), [0 0 500 500]));
 close all;
 
+%% ------------------------------------------- LEGENDE : son emplacement
+% « legend(..., 'Location', 'southeast') » etait lu puis oublie : la boite
+% restait en haut a droite. Elle va ou on la demande, et « set » la
+% deplace.
+figure('Position', [0 0 900 560]);
+plot(1:10, (1:10) .^ 2); hold on; plot(1:10, 1:10, 'ro');
+lg = legend({'carres', 'droite'}, 'Location', 'southeast');
+assert(strcmp(get(lg, 'Location'), 'southeast'));
+svg = matlibre_svg();
+b = boiteLegende(svg);
+c = cadreTrace(svg);
+assert(b(1) > c(1) + c(3) / 2 && b(1) + b(3) <= c(1) + c(3), 'a droite, dans le cadre');
+assert(b(2) > c(2) + c(4) / 2 && b(2) + b(4) <= c(2) + c(4), 'en bas, dans le cadre');
+set(lg, 'Location', 'northwest');
+b = boiteLegende(matlibre_svg());
+assert(b(1) >= c(1) && b(1) + b(3) < c(1) + c(3) / 2);
+assert(b(2) >= c(2) && b(2) + b(4) < c(2) + c(4) / 2);
+% La casse ne compte pas ; la valeur se relit en minuscules.
+lg.Location = 'SouthWest';
+assert(strcmp(lg.Location, 'southwest'));
+% « best » prend la place qui cache le moins de donnees : la parabole et
+% les ronds laissent libre le coin haut gauche, et lui seul.
+set(lg, 'Location', 'best');
+b = boiteLegende(matlibre_svg());
+assert(b(1) < c(1) + c(3) / 2 && b(2) < c(2) + c(4) / 2);
+% Hors de l'axe, le cadre recule pour lui laisser la place.
+set(lg, 'Location', 'eastoutside');
+svgDehors = matlibre_svg();
+b = boiteLegende(svgDehors);
+cDehors = cadreTrace(svgDehors);
+assert(cDehors(3) < c(3), 'le cadre a recule');
+assert(b(1) >= cDehors(1) + cDehors(3), 'la legende est a sa droite');
+assert(b(1) + b(3) <= 900, 'et dans la figure');
+% Une valeur inconnue est refusee, en la nommant.
+refusEmplacement = false;
+try
+    legend({'a'}, 'Location', 'quelquepart');
+catch err
+    refusEmplacement = ~isempty(strfind(err.message, 'quelquepart'));
+end
+assert(refusEmplacement);
+% Une legende effacee emporte son emplacement, comme dans MATLAB qui la
+% detruit : la suivante repart en haut a droite.
+legend('off');
+lg = legend({'a', 'b'});
+assert(strcmp(get(lg, 'Location'), 'northeast'));
+set(lg, 'Location', 'southwest');
+hold off; plot(1:10);
+lg = legend('seule');
+assert(strcmp(get(lg, 'Location'), 'northeast'));
+close all;
+
+%% --------------------------------- LEGENDE : sa largeur suit le libelle
+% La boite avait une largeur fixe : « MatLibre, modele bati par nom »
+% sortait a droite de la figure. Elle se mesure sur le plus long libelle,
+% et « textLength » y tient le texte quelle que soit la police du lecteur.
+figure('Position', [0 0 900 560]);
+plot(1:10); hold on; plot(10:-1:1);
+legend({'MatLibre, modele bati par nom', 'b'});
+svg = matlibre_svg();
+b = boiteLegende(svg);
+assert(b(3) > 190, 'la boite s''elargit pour le libelle et son echantillon');
+libelles = regexp(groupeLegende(svg), ...
+                  '<text x="([-+\d.e]+)" y="[-+\d.e]+" textLength="([\d.]+)"', 'tokens');
+assert(numel(libelles) == 2);
+for k = 1:2
+    debutTexte = str2double(libelles{k}{1});
+    longueur = str2double(libelles{k}{2});
+    assert(debutTexte > b(1) && debutTexte + longueur <= b(1) + b(3) - 4, ...
+           'le libelle tient dans sa boite');
+end
+% Vingt-neuf caracteres de Helvetica a 12 pixels : 163 pixels.
+assert(abs(str2double(libelles{1}{2}) - 162.73) < 0.1);
+assert(b(1) + b(3) <= 900, 'la boite reste dans la figure');
+% Des libelles courts donnent une boite etroite.
+legend({'a', 'b'});
+bCourte = boiteLegende(matlibre_svg());
+assert(bCourte(3) < 60);
+close all;
+
+%% ----------------------- LEGENDE : l'echantillon montre la courbe
+% Chaque entree etait un trait plein : des marqueurs seuls, des tirets ou
+% des pointilles y devenaient un trait.
+figure;
+plot(1:10, 'b-'); hold on;
+plot(2 * (1:10), 'r--');
+plot(3 * (1:10), 'k:');
+plot(4 * (1:10), 'ro');
+plot(5 * (1:10), 'g-s');
+legend('plein', 'tirets', 'points', 'ronds', 'carres');
+% Chaque morceau porte l'echantillon d'une entree, puis son libelle.
+entrees = strsplit(groupeLegende(matlibre_svg()), '</text>');
+assert(~isempty(strfind(entrees{1}, '<line')));
+assert(isempty(strfind(entrees{1}, 'stroke-dasharray')));
+assert(~isempty(strfind(entrees{2}, 'stroke-dasharray="8,4"')), 'des tirets');
+assert(~isempty(strfind(entrees{3}, 'stroke-dasharray="2,3"')), 'des pointilles');
+assert(isempty(strfind(entrees{4}, '<line')), 'des marqueurs seuls : pas de trait');
+assert(~isempty(strfind(entrees{4}, '<circle')), 'mais le rond');
+assert(~isempty(strfind(entrees{5}, '<line')), 'le trait');
+assert(~isempty(strfind(entrees{5}, '<polygon')), 'et son carre');
+close all;
+
+%% ---------------------- LEGENDE : un texte pose n'est pas une courbe
+% « text » etait compte comme une serie : deux courbes, un texte et deux
+% libelles donnaient une troisieme entree, « data3 ».
+figure;
+plot(1:10, (1:10) .^ 2); hold on; plot(1:10, 1:10);
+text(3, 50, 'note');
+legend({'a', 'b'});
+contenu = groupeLegende(matlibre_svg());
+assert(numel(strfind(contenu, '<text')) == 2);
+assert(isempty(strfind(contenu, 'data3')));
+% Pose avant les courbes, il ne decale pas les libelles : « a » va a la
+% premiere courbe, la bleue.
+figure;
+text(1, 1, 'avant'); hold on;
+plot(1:10, 'b'); plot(10:-1:1, 'r');
+legend('a', 'b');
+entrees = strsplit(groupeLegende(matlibre_svg()), '</text>');
+assert(~isempty(strfind(entrees{1}, '#0072BD')) && ~isempty(strfind(entrees{1}, '>a')));
+assert(~isempty(strfind(entrees{2}, '#D95319')) && ~isempty(strfind(entrees{2}, '>b')));
+% Comme MATLAB : une courbe tracee avant LEGEND sans libelle reste
+% dehors ; une courbe tracee apres s'ajoute d'elle-meme.
+figure;
+plot(1:10); hold on; plot(2:11); plot(3:12);
+legend('un', 'deux');
+assert(numel(strfind(groupeLegende(matlibre_svg()), '<text')) == 2);
+plot(4:13);
+assert(numel(strfind(groupeLegende(matlibre_svg()), '<text')) == 3);
+close all;
+
+%% ------------------------- LEGENDE : par-dessus les courbes, opaque
+% La boite etait translucide : une courbe qui passait dans le coin
+% transparaissait au travers. Elle vient apres tout le trace de l'axe,
+% textes compris, et son fond est plein.
+figure;
+plot(1:10, (1:10) .^ 2, 'LineWidth', 3);
+text(9, 90, 'sous la legende');
+legend('parabole');
+svg = matlibre_svg();
+debutLegende = strfind(svg, '<g class="legende">');
+assert(numel(debutLegende) == 1);
+assert(debutLegende > max(strfind(svg, '<path')), 'la courbe est peinte avant');
+assert(debutLegende > max(strfind(svg, 'sous la legende')), 'le texte aussi');
+fond = regexp(svg, '<g class="legende">\s*<rect[^>]*>', 'match', 'once');
+assert(~isempty(strfind(fond, 'fill="white"')));
+assert(isempty(strfind(fond, 'fill-opacity')), 'le fond est opaque');
+close all;
+
+%% ------------------------------------ TEX : indices, exposants, lettres
+% MATLAB lit titres, etiquettes, legendes et textes en TeX : « x_1 » met
+% le 1 en indice. Le soulignement s'affichait tel quel.
+figure;
+plot(1:10);
+xlabel('x_1');
+svg = matlibre_svg();
+assert(isempty(strfind(svg, 'x_1')));
+indice = regexp(svg, '>x<tspan dy="([-\d.]+)" font-size="([\d.]+)">1</tspan>', ...
+                'tokens', 'once');
+assert(~isempty(indice));
+assert(str2double(indice{1}) > 0, 'l''indice descend');
+assert(str2double(indice{2}) < 12, 'en plus petit');
+% Un exposant monte ; les accolades groupent ; les lettres grecques
+% s'ecrivent.
+title('t^{2a} \alpha');
+ylabel('v_{max}');
+svg = matlibre_svg();
+exposant = '>t<tspan dy="-[\d.]+" font-size="[\d.]+">2a</tspan>';
+assert(~isempty(regexp(svg, exposant, 'once')), 'le groupe monte d''un bloc');
+assert(~isempty(strfind(svg, char([206 177]))), 'alpha, en UTF-8');
+assert(isempty(strfind(svg, '\alpha')));
+assert(~isempty(strfind(svg, '>max</tspan>')));
+% « \_ » echappe le soulignement.
+xlabel('a\_b');
+assert(~isempty(strfind(matlibre_svg(), '>a_b<')));
+% « 'Interpreter','none' » garde le texte tel quel : un nom de fichier.
+xlabel('mon_fichier.m', 'Interpreter', 'none');
+title('nom_de_modele', 'Interpreter', 'none');
+svg = matlibre_svg();
+assert(~isempty(strfind(svg, '>mon_fichier.m<')));
+assert(~isempty(strfind(svg, '>nom_de_modele<')));
+assert(strcmp(get(get(gca, 'XLabel'), 'Interpreter'), 'none'));
+% La legende et les textes poses suivent la meme regle.
+legend('y_1');
+assert(~isempty(regexp(groupeLegende(matlibre_svg()), ...
+                       '>y<tspan dy="[\d.]+"[^>]*>1</tspan>', 'once')));
+t = text(2, 5, 'z_k');
+assert(~isempty(regexp(matlibre_svg(), '>z<tspan dy="[\d.]+"[^>]*>k</tspan>', 'once')));
+set(t, 'Interpreter', 'none');
+assert(~isempty(strfind(matlibre_svg(), '>z_k<')));
+assert(strcmp(get(t, 'Interpreter'), 'none'));
+% Un interprete inconnu est refuse, en le nommant.
+refusInterprete = false;
+try
+    set(t, 'Interpreter', 'markdown');
+catch err
+    refusInterprete = ~isempty(strfind(err.message, 'markdown'));
+end
+assert(refusInterprete);
+close all;
+
+%% ------------------------------- STYLES : trait mixte et marqueurs
+% « -. » etait lu comme un trait plein a marqueurs ponctuels ; « x » se
+% dessinait comme « + », et « * », « d », « ^ »... comme de simples points.
+figure;
+h = plot(1:10, '-.');
+assert(strcmp(get(h, 'LineStyle'), '-.'));
+assert(strcmp(get(h, 'Marker'), 'none'));
+svg = matlibre_svg();
+assert(~isempty(strfind(svg, 'stroke-dasharray="8,3,2,3"')));
+assert(isempty(strfind(svg, '<circle')), 'aucun point sur le trait mixte');
+% « .- » reste un marqueur ponctuel sur un trait plein, comme dans MATLAB.
+h = plot(1:10, 'r.-');
+assert(strcmp(get(h, 'LineStyle'), '-') && strcmp(get(h, 'Marker'), '.'));
+% La croix est en diagonale, le plus droit.
+plot(5, 5, 'x');
+x = str2double(regexp(matlibre_svg(), ...
+    '<path d="\s*M ([-\d.e]+) ([-\d.e]+) L ([-\d.e]+) ([-\d.e]+)', 'tokens', 'once'));
+assert(x(1) ~= x(3) && x(2) ~= x(4), 'x : un trait en diagonale');
+plot(5, 5, '+');
+p = str2double(regexp(matlibre_svg(), ...
+    '<path d="\s*M ([-\d.e]+) ([-\d.e]+) L ([-\d.e]+) ([-\d.e]+)', 'tokens', 'once'));
+assert(p(2) == p(4), '+ : un trait horizontal');
+close all;
+% Les polygones ont chacun leur nombre de sommets, et leur sens.
+assert(sommetsMarqueur('s') == 4 && sommetsMarqueur('d') == 4);
+assert(sommetsMarqueur('p') == 10 && sommetsMarqueur('h') == 12);
+[n, hautTriangle] = sommetsMarqueur('^');
+[~, basTriangle] = sommetsMarqueur('v');
+assert(n == 3 && hautTriangle(2) < basTriangle(2), '^ pointe vers le haut');
+[~, carre] = sommetsMarqueur('s');
+[~, losange] = sommetsMarqueur('d');
+assert(~isequal(carre, losange), 'le losange n''est pas le carre');
+
+%% ------------------------- ZLABEL : sa poignee n'ecrit pas le titre
+% Une poignee de « zlabel » ecrivait et relisait le titre de l'axe.
+figure;
+plot(1:3);
+title('le titre');
+z = zlabel('z');
+set(z, 'String', 'nouveau z');
+assert(strcmp(get(get(gca, 'Title'), 'String'), 'le titre'));
+assert(strcmp(get(z, 'String'), 'nouveau z'));
+assert(strcmp(get(get(gca, 'ZLabel'), 'String'), 'nouveau z'));
+close all;
+
 disp('graphique : toutes les verifications passent');
+
+% Le cadre du trace dans le SVG : gauche, haut, largeur, hauteur.
+function c = cadreTrace(svg)
+    t = regexp(svg, ['<rect x="([-+\d.e]+)" y="([-+\d.e]+)" width="([\d.e+]+)" ' ...
+                     'height="([\d.e+]+)" fill="white" stroke="#222"'], 'tokens', 'once');
+    c = str2double(t);
+end
+
+% La boite de la legende, de meme.
+function b = boiteLegende(svg)
+    t = regexp(svg, ['<g class="legende">\s*<rect x="([-+\d.e]+)" y="([-+\d.e]+)" ' ...
+                     'width="([\d.e+]+)" height="([\d.e+]+)"'], 'tokens', 'once');
+    b = str2double(t);
+end
+
+% Le nombre de sommets du marqueur M, seul trace dans une figure, et son
+% premier sommet en pixels.
+function [n, premier] = sommetsMarqueur(m)
+    figure('Visible', 'off');
+    plot(5, 5, m);
+    points = regexp(matlibre_svg(), '<polygon points="([^"]*)"', 'tokens', 'once');
+    close(gcf);
+    paires = strsplit(strtrim(points{1}), ' ');
+    n = numel(paires);
+    premier = str2double(strsplit(paires{1}, ','));
+end
+
+% Tout ce que dessine la legende, de son groupe ouvrant a son groupe fermant.
+function contenu = groupeLegende(svg)
+    debut = strfind(svg, '<g class="legende">');
+    reste = svg(debut(1):end);
+    fin = strfind(reste, '</g>');
+    contenu = reste(1:fin(1) + 3);
+end
