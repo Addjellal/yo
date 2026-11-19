@@ -17,7 +17,7 @@ classdef MultiStart
 %          'objective', @(x) x ^ 4 - 3 * x ^ 2 + x, 'x0', 0);
 %      [x, f] = run(MultiStart, prob, 20);
 %
-%   Voir aussi GLOBALSEARCH, CREATEOPTIMPROBLEM, MULTISTART, FMINCON.
+%   Voir aussi GLOBALSEARCH, CREATEOPTIMPROBLEM, FMINCON, FMINUNC.
     properties
         Display = 'final'
         UseParallel = false

@@ -39,12 +39,12 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 459 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 460 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 129 |
 | `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 27 |
-| `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 18 |
+| `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 17 |
 | `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |
 | `reseaux-antennes` | Phased Array System Toolbox — réseaux d'antennes. | 4 |

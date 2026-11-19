@@ -19,7 +19,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | matlab-graphique | 142 | 0 | 100 % |
 | matlab-langage | 614 | 0 | 100 % |
 | ondelettes | 112 | 0 | 100 % |
-| optimisation-globale | 15 | 0 | 100 % |
+| optimisation-globale | 14 | 0 | 100 % |
 | optimisation | 31 | 0 | 100 % |
 | robotique | 73 | 0 | 100 % |
 | robuste | 69 | 0 | 100 % |
@@ -29,7 +29,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | symbolique | 36 | 0 | 100 % |
 | types | 100 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2407** | **0** | **100 %** |
+| **ensemble** | **2406** | **0** | **100 %** |
 
 ## Ce qui manque au-delà des fonctions
 

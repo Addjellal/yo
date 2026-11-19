@@ -20,7 +20,9 @@ class Interpreteur;
 std::string racineToolboxes(const std::string& executable);
 
 // Ajoute la racine et chacun de ses sous-dossiers au chemin de recherche,
-// dans l'ordre où MATLAB les résoudrait. Ne fait rien sur une racine vide.
+// dans l'ordre où MATLAB les résoudrait. Un module y entraîne ses propres
+// sous-dossiers ordinaires, selon la règle de « genpath » : ni « @classe »,
+// ni « +paquet », ni « private ». Ne fait rien sur une racine vide.
 void chargerToolboxes(Interpreteur& it, const std::string& racine);
 
 }  // namespace matlibre

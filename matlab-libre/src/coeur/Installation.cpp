@@ -64,16 +64,49 @@ std::string racineToolboxes(const std::string& executable) {
     return std::string();
 }
 
+// Les sous-dossiers ordinaires d'un module, en profondeur et dans l'ordre
+// alphabétique : ceux que garderait « genpath ». Les noms qui commencent
+// par un point, « @ » ou « + », et « private », sont réservés — l'index
+// explore lui-même les classes et les paquets, et une fonction privée
+// n'a pas à devenir publique.
+static void sousDossiersOrdinaires(const fs::path& dossier, std::vector<std::string>& liste) {
+    std::error_code ec;
+    std::vector<std::string> enfants;
+    for (const auto& e : fs::directory_iterator(dossier, ec)) {
+        std::error_code e2;
+        if (!e.is_directory(e2)) continue;
+        const std::string nom = e.path().filename().string();
+        if (nom.empty() || nom[0] == '.' || nom[0] == '@' || nom[0] == '+' || nom == "private")
+            continue;
+        enfants.push_back(e.path().string());
+    }
+    std::sort(enfants.begin(), enfants.end());
+    for (const auto& enfant : enfants) {
+        liste.push_back(enfant);
+        sousDossiersOrdinaires(enfant, liste);
+    }
+}
+
 void chargerToolboxes(Interpreteur& it, const std::string& racine) {
     if (racine.empty()) return;
     it.definirRacineToolbox(racine);
     std::error_code ec;
-    std::vector<std::string> dossiers;
+    std::vector<std::string> modules;
     for (const auto& e : fs::directory_iterator(racine, ec))
-        if (e.is_directory()) dossiers.push_back(e.path().string());
-    std::sort(dossiers.begin(), dossiers.end());
+        if (e.is_directory()) modules.push_back(e.path().string());
+    std::sort(modules.begin(), modules.end());
+    // Un module entraîne ses sous-dossiers : c'est ainsi que deux fonctions
+    // dont le nom ne diffère que par la casse — addmf et addMF — tiennent
+    // dans la même toolbox. Windows et macOS ne savent pas les ranger dans
+    // un même dossier ; MATLAB les sépare de la même façon.
+    std::vector<std::string> dossiers;
+    for (const auto& module : modules) {
+        dossiers.push_back(module);
+        sousDossiersOrdinaires(module, dossiers);
+    }
     // Ajoutés en tête, du dernier au premier : l'ordre final est
-    // alphabétique, et la racine passe devant.
+    // alphabétique, chaque module devant ses sous-dossiers, et la racine
+    // passe devant.
     for (auto rit = dossiers.rbegin(); rit != dossiers.rend(); ++rit)
         it.ajouterChemin(*rit, true);
     it.ajouterChemin(racine, true);

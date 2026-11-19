@@ -115,11 +115,21 @@ Un fichier `.m` dans le dossier de la toolbox, portant le nom de la
 fonction, avec son bloc d'aide juste après la ligne `function`. Rien à
 recompiler. Ajoutez la ligne correspondante au `Contents.m`.
 
+Deux noms qui ne diffèrent que par la casse — `addmf` et `addMF` — ne
+tiennent pas dans un même dossier : Windows et macOS n'en extrairaient
+qu'un, et l'autre fonction disparaîtrait sans bruit. MATLAB les range
+dans deux dossiers ; MatLibre fait de même, l'ancienne forme dans un
+sous-dossier du module, comme `toolbox/flou/ancien/`. Les sous-dossiers
+ordinaires d'un module — ni `@classe`, ni `+paquet`, ni `private` — sont
+sur le chemin avec lui. `tests/scripts/test_ecosysteme.m` refuse deux
+chemins de `toolbox/` qui se confondent une fois en minuscules.
+
 ## Ajouter une toolbox
 
 Un dossier sous `toolbox/`, un `Contents.m` qui nomme la toolbox
 MathWorks correspondante, et les fichiers `.m`. Le dossier est ajouté au
-chemin de recherche au démarrage, sans autre déclaration.
+chemin de recherche au démarrage, avec ses sous-dossiers ordinaires,
+sans autre déclaration.
 
 ## Tests
 

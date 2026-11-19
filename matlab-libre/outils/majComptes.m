@@ -22,7 +22,9 @@ for k = 1:numel(entrees)
     if strcmp(entrees(k).name, 'aide')
         continue
     end
-    fichiers = dir(fullfile(racine, 'toolbox', entrees(k).name, '*.m'));
+    % Un module compte aussi ses sous-dossiers ordinaires, que le chemin
+    % de recherche emporte avec lui.
+    fichiers = matlibre_fichiers_module(fullfile(racine, 'toolbox', entrees(k).name));
     n = 0;
     for j = 1:numel(fichiers)
         if ~strcmp(fichiers(j).name, 'Contents.m')

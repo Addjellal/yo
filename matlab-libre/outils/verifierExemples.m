@@ -44,7 +44,9 @@ function verifierExemples(varargin)
         fprintf('  %s : dossier inconnu\n', demandes{kd});
         continue
     end
-    fichiers = dir(fullfile(dossier, '*.m'));
+    % Les sous-dossiers ordinaires du module en sont : ils sont sur le
+    % chemin avec lui, et test_aide.m les verifie aussi.
+    fichiers = matlibre_fichiers_module(dossier);
     nSans = 0;
     nCasses = 0;
     nOk = 0;

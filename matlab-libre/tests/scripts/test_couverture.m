@@ -938,12 +938,17 @@ catch erreur
     refuse = contains(erreur.identifier, 'fminimax');
 end
 assert(refuse, 'une liste de fonctions est refusee avec un message clair');
-% MULTISTART trouve le minimum global d'une fonction à plusieurs bassins.
+% MULTISTART trouve le minimum global d'une fonction à plusieurs bassins :
+% les départs sont tirés dans les bornes du problème, et le solveur local
+% descend depuis chacun.
 rng(73);
 f = @(v) v(1)^2 + v(2)^2 + 8 * sin(3 * v(1)) * sin(3 * v(2));
-[meilleur, valeurGlobale] = multistart(f, [-3 -3], [3 3], 40);
-assert(valeurGlobale <= f([0 0]) + 1e-9, ...
-       'multistart fait au moins aussi bien que l''origine');
+probleme = createOptimProblem('fminunc', 'objective', f, 'x0', [0 0], ...
+                              'lb', [-3 -3], 'ub', [3 3]);
+[meilleur, valeurGlobale] = run(MultiStart('Display', 'off'), probleme, 40);
+% Le creux le plus profond vaut -7,47, le suivant -5,33. Un départ sur
+% cinq environ y descend : quarante ne le manquent pour ainsi dire jamais.
+assert(valeurGlobale < -7, 'MultiStart trouve le creux le plus profond');
 assert(numel(meilleur) == 2, 'et rend un point du bon nombre de variables');
 fprintf('  optimisation : minimax et departs multiples\n');
 

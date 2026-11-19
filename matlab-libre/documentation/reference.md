@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2978 fonctions ecrites dans le langage, reparties en 54 toolboxes.
+2977 fonctions ecrites dans le langage, reparties en 54 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -75,7 +75,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 129 |
 | [`optimisation`](reference/toolbox-optimisation.md) | 27 |
-| [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 18 |
+| [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 17 |
 | [`radar`](reference/toolbox-radar.md) | 7 |
 | [`renforcement`](reference/toolbox-renforcement.md) | 5 |
 | [`reseaux-antennes`](reference/toolbox-reseaux-antennes.md) | 4 |

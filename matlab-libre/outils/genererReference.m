@@ -86,7 +86,9 @@ lignesIndex = {};
 for t = 1:numel(nomsToolbox)
     nom = nomsToolbox{t};
     dossier = fullfile(dossierToolbox, nom);
-    fichiers = dir(fullfile(dossier, '*.m'));
+    % Avec ses sous-dossiers ordinaires, rangés par nom parmi les autres :
+    % l'ancien addmf, dans flou/ancien, garde sa place dans la page.
+    fichiers = matlibre_fichiers_module(dossier);
     fichier = fullfile(dossierSortie, ['toolbox-' nom '.md']);
     fid = fopen(fichier, 'w');
     fprintf(fid, '# Toolbox `%s`\n\n', nom);
@@ -102,7 +104,7 @@ for t = 1:numel(nomsToolbox)
             continue;
         end
         base = nomFichier(1:end-2);
-        aide = aideDeFichier(fullfile(dossier, nomFichier));
+        aide = aideDeFichier(fullfile(fichiers(k).folder, nomFichier));
         fprintf(fid, '## `%s`\n\n', base);
         if isempty(strtrim(aide))
             fprintf(fid, '_Pas de bloc d''aide._\n\n');

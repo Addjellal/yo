@@ -3,8 +3,7 @@
 %   ga             - Algorithme génétique
 %   particleswarm  - Essaim particulaire
 %   simulannealbnd - Recuit simulé
-%   multistart     - Départs multiples sur un solveur local
-%   MultiStart     - Le même, sous forme d'objet à lancer par RUN
+%   MultiStart     - Départs multiples sur un solveur local, lancés par RUN
 %   GlobalSearch   - Échantillonnage large, puis raffinement des
 %                    meilleurs points
 %   createOptimProblem - Description d'un problème pour ces deux-là

@@ -16,6 +16,12 @@ function fis = addmf(fis, genre, indice, nom, type, parametres)
 %   trou, faute de quoi aucune règle ne se déclenche dans l'intervalle
 %   découvert et la sortie est indéterminée.
 %
+%   C'est la forme d'avant R2018b, que MATLAB déconseille désormais au
+%   profit d'addMF, qui désigne la variable par son nom. Les deux noms ne
+%   diffèrent que par la casse, et Windows comme macOS ne savent pas loger
+%   les deux fichiers dans un même dossier : celui-ci vit dans
+%   flou/ancien, que le chemin de recherche emporte avec flou.
+%
 %   Exemple :
 %      fis = mamfis('Name', 'exemple');
 %      fis = addInput(fis, [0 40], 'Name', 'temperature');

@@ -194,4 +194,80 @@ catch err
 end
 assert(refuseImport);
 
+%% ------------------------------------- des noms que la casse ne confond pas
+% Windows et macOS, par defaut, confondent « addmf.m » et « addMF.m » :
+% git n'extrait qu'un fichier de chaque paire, et l'autre fonction
+% disparait sans un mot. Aucun chemin de toolbox/ ne doit donc en
+% rejoindre un autre une fois mis en minuscules. Deux noms de MATLAB qui
+% ne different que par la casse vivent dans deux dossiers, comme chez
+% MATLAB : l'ancienne forme dans un sous-dossier, que le chemin de
+% recherche emporte avec son module.
+racineToolbox = matlibre_racine();
+cheminsToolbox = fichiersSous(racineToolbox, '');
+% Le parcours descend dans les sous-dossiers, et voit tout.
+assert(numel(cheminsToolbox) > 3000);
+assert(any(strcmp(cheminsToolbox, fullfile('flou', 'ancien', 'addmf.m'))));
+% Le detecteur voit une collision quand il y en a une ; deux dossiers
+% distincts, eux, ne se confondent pas.
+assert(numel(collisionsDeCasse({'flou/addMF.m', 'flou/evalfis.m', 'flou/addmf.m'})) == 1);
+assert(numel(collisionsDeCasse({'Flou/a.m', 'flou/A.m'})) == 1);
+assert(isempty(collisionsDeCasse({'flou/addMF.m', 'flou/ancien/addmf.m'})));
+collisions = collisionsDeCasse(cheminsToolbox);
+for k = 1:numel(collisions)
+    fprintf('  collision de casse : %s\n', collisions{k});
+end
+assert(isempty(collisions), sprintf(['%d paire(s) de chemins ne different que par la ' ...
+       'casse : Windows et macOS n''en extrairaient qu''un. Rangez l''un des deux ' ...
+       'dans un sous-dossier du module, comme flou/ancien.'], numel(collisions)));
+
+% Les deux ecritures restent joignables, chacune depuis son dossier.
+for paire = {{'addmf', 'addMF'}, {'addrule', 'addRule'}}
+    ancienne = which(paire{1}{1});
+    moderne = which(paire{1}{2});
+    assert(endsWith(ancienne, fullfile('flou', 'ancien', [paire{1}{1} '.m'])));
+    assert(endsWith(moderne, fullfile('flou', [paire{1}{2} '.m'])));
+end
+systemeFlou = addOutput(addInput(mamfis, [0 10], 'Name', 'x'), [0 1], 'Name', 'y');
+parNom = addMF(systemeFlou, 'x', 'trimf', [0 0 5], 'Name', 'bas');
+parRang = addmf(systemeFlou, 'input', 1, 'bas', 'trimf', [0 0 5]);
+assert(isequal(parNom, parRang));
+assert(isequal(addRule(parNom, [1 0 1 1]), addrule(parRang, [1 0 1 1])));
+
 disp('ecosysteme : toutes les verifications passent');
+
+% ---------------------------------------------------------------- fonctions
+
+function chemins = fichiersSous(racine, relatif)
+%FICHIERSSOUS Les fichiers d'un dossier et de ses sous-dossiers.
+%   Les chemins sont rendus relatifs a RACINE : c'est sous cette forme que
+%   git les extrait, et qu'ils peuvent se confondre.
+    chemins = {};
+    entrees = dir(fullfile(racine, relatif));
+    for k = 1:numel(entrees)
+        nom = entrees(k).name;
+        if strcmp(nom, '.') || strcmp(nom, '..')
+            continue
+        end
+        chemin = fullfile(relatif, nom);
+        if entrees(k).isdir
+            chemins = [chemins, fichiersSous(racine, chemin)];   %#ok<AGROW>
+        else
+            chemins{end + 1} = chemin;                           %#ok<AGROW>
+        end
+    end
+end
+
+function collisions = collisionsDeCasse(chemins)
+%COLLISIONSDECASSE Les chemins qui se confondent une fois en minuscules.
+%   Le tri des formes en minuscules met cote a cote ceux qui se
+%   confondent : comparer chaque paire couterait le carre du nombre de
+%   fichiers.
+    collisions = {};
+    [minuscules, ordre] = sort(lower(chemins));
+    for k = 2:numel(minuscules)
+        if strcmp(minuscules{k}, minuscules{k - 1})
+            collisions{end + 1} = sprintf('%s et %s', chemins{ordre(k - 1)}, ...
+                                          chemins{ordre(k)});    %#ok<AGROW>
+        end
+    end
+end

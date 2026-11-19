@@ -117,7 +117,9 @@ blocsM = 0;
 echecsM = {};
 for kd = 1:numel(dossiersVerifies)
     dossierM = fullfile(matlibre_racine(), dossiersVerifies{kd});
-    fichiersM = dir(fullfile(dossierM, '*.m'));
+    % Les sous-dossiers ordinaires du module en sont : l'ancien addmf, dans
+    % flou/ancien, doit sa fiche comme les autres.
+    fichiersM = matlibre_fichiers_module(dossierM);
     for kf = 1:numel(fichiersM)
         nomM = fichiersM(kf).name(1:end-2);
         if strcmp(nomM, 'Contents') || strncmp(nomM, 'matlibre_', 9)

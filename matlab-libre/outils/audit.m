@@ -59,7 +59,9 @@ for b = 1:numel(noms)
     if strcmp(nom, 'aide')
         continue
     end
-    fichiers = dir(fullfile(dossierToolbox, nom, '*.m'));
+    % Sous-dossiers ordinaires compris : ils sont sur le chemin avec le
+    % module, et leurs fonctions sont les siennes.
+    fichiers = matlibre_fichiers_module(fullfile(dossierToolbox, nom));
     nFonctions = 0;
     nDocumentees = 0;
     nExemples = 0;
