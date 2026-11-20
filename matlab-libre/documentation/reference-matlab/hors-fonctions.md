@@ -847,8 +847,12 @@ de MatLibre ne fait pas comme celle de MathWorks.
 ### Calcul parallèle, base de données, acquisition, instruments
 
 - **Calcul parallèle** : un pool de fils sur une machine ; le corps d'un
-  `parfor` voit les fonctions locales du fichier qui le contient. Pas de
-  `gpuArray`, et `distributed` est l'identité.
+  `parfor` voit les fonctions locales du fichier qui le contient. Les
+  travailleurs ne survivent pas d'une boucle à l'autre : chaque `parfor`
+  en démarre de neufs, environ une demi-seconde de coût fixe, qu'une
+  boucle courte ne rembourse pas (quatre cœurs : 3,07 fois plus vite sur
+  quatre secondes de calcul). Pas de `gpuArray`, et `distributed` est
+  l'identité.
 - **Base de données** : `dbTable`, `dbSelect`, `dbGroupSum`... sont des
   tables en mémoire propres à MatLibre, sauvées en CSV (RFC 4180, nombres
   à dix-sept chiffres). L'interface SQL de la Database Toolbox
