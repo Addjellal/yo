@@ -1209,4 +1209,333 @@ assert(size(F, 1) >= 40 && max(ecart) < 1e-6);
 assert(min(F(:, 1)) < 0.01 && max(F(:, 1)) > 0.99);
 fprintf('optimisation globale : Rastrigin, front de ZDT1\n');
 
+%% ------------------------------------------------------------ virgule fixe
+% Exemples de la documentation de MathWorks pour FI, recoupés avec numfi
+% (Python) : entiers stockés, types de la pleine précision. Arithmétique
+% Q15 des DSP (Texas Instruments) : -1 x -1 tient en Q30, puis sature à
+% 32767/32768 en Q15. Les six arrondis de Fixed-Point Designer contre le
+% module decimal de Python.
+a = fi(pi);
+assert(a.WordLength == 16 && a.FractionLength == 13 && a.int == 25736);
+assert(strcmp(a.bin, '0110010010001000') && strcmp(a.hex, '6488'));
+b = fi(pi, 1, 8);
+assert(b.FractionLength == 5 && b.int == 101 && strcmp(b.bin, '01100101'));
+e = fi(0.1, 1, 8, 6);
+somme = a + e;
+produit = a * e;
+assert(isequal([somme.WordLength somme.FractionLength somme.int], [17 13 26504]));
+assert(isequal([produit.WordLength produit.FractionLength produit.int], [24 19 154416]));
+q = fi(-1, 1, 16, 15);
+carre = q * q;
+assert(isequal([carre.WordLength carre.FractionLength], [32 30]) && double(carre) == 1);
+assert(double(fi(carre, 1, 16, 15)) == 32767 / 32768);
+milieux = [-2.5 -1.5 -0.5 0.5 1.5 2.5];
+arrondis = {'Nearest', [-2 -1 0 1 2 3]; 'Round', [-3 -2 -1 1 2 3]; ...
+            'Convergent', [-2 -2 0 0 2 2]; 'Floor', [-3 -2 -1 0 1 2]; ...
+            'Ceiling', [-2 -1 0 1 2 3]; 'Zero', [-2 -1 0 0 1 2]};
+for k = 1:size(arrondis, 1)
+    x = fi(milieux, 1, 8, 0, 'RoundingMethod', arrondis{k, 1});
+    assert(isequal(double(x), arrondis{k, 2}));
+end
+assert(double(fi(300, 0, 8, 0)) == 255 && double(fi(300, 0, 8, 0, 'OverflowAction', 'Wrap')) == 44);
+fprintf('virgule fixe : fi de MathWorks et numfi, Q15, six arrondis\n');
+
+%% --------------------------------------------------------------- stateflow
+% Sémantique publiée par MathWorks : sorties du plus profond au plus haut,
+% action de transition, entrées du plus haut au plus profond ; l'action
+% de condition s'exécute avant les sorties ; after(n, tick) compte les
+% réveils depuis l'entrée. Le tourniquet, l'automate d'école, et un feu
+% tricolore temporisé, contre les mêmes machines écrites en Python.
+note = @(c, s) setfield(c, 'j', [c.j s ' ']);
+m = sfchart('ordre');
+m = sfstate(m, 'A', @(c) note(c, 'enA'), @(c) note(c, 'duA'), @(c) note(c, 'exA'));
+m = sfstate(m, 'A.A1', @(c) note(c, 'enA1'), @(c) note(c, 'duA1'), @(c) note(c, 'exA1'));
+m = sfstate(m, 'B', @(c) note(c, 'enB'), @(c) note(c, 'duB'), @(c) note(c, 'exB'));
+m = sfstate(m, 'B.B1', @(c) note(c, 'enB1'), @(c) note(c, 'duB1'), @(c) note(c, 'exB1'));
+m = sftransition(m, 'A', 'B', @(c, u) u == 1, @(c) note(c, 'T'));
+[~, c] = sfrun(m, [0 1 0], struct('j', ''));
+assert(strcmp(strtrim(c.j), 'enA enA1 duA duA1 exA1 exA T enB enB1 duB duB1'));
+m = sfchart('condition');
+m = sfstate(m, 'X', 'ex: k = [k ''exX ''];');
+m = sfstate(m, 'Y', 'en: k = [k ''enY ''];');
+m = sftransition(m, 'X', 'Y', 'go{k = [k ''CA ''];}/k = [k ''TA ''];');
+[~, c] = sfrun(m, {'go'}, struct('k', ''));
+assert(strcmp(strtrim(c.k), 'CA exX TA enY'));
+m = sfchart('tourniquet');
+m = sfstate(m, 'L');
+m = sfstate(m, 'U');
+m = sftransition(m, 'L', 'U', @(c, e) strcmp(e, 'coin'));
+m = sftransition(m, 'U', 'L', @(c, e) strcmp(e, 'push'));
+entrees = cell(1, 30);
+for k = 1:30
+    if mod(k * 7, 5) < 2, entrees{k} = 'coin'; else, entrees{k} = 'push'; end
+end
+historique = sfrun(m, entrees);
+assert(strcmp([historique{:}], 'LLULULLULULLULULLULULLULULLULU'));
+m = sfchart('feu');
+m = sfstate(m, 'R');
+m = sfstate(m, 'G');
+m = sfstate(m, 'Y');
+m = sftransition(m, 'R', 'G', '[after(4, tick)]');
+m = sftransition(m, 'G', 'Y', '[after(3, tick)]');
+m = sftransition(m, 'Y', 'R', '[after(1, tick)]');
+historique = sfrun(m, zeros(1, 16));
+assert(strcmp([historique{:}], 'RRRGGGYRRRRGGGYR'));
+fprintf('stateflow : ordre des actions, tourniquet, feu temporise\n');
+
+%% ---------------------------------------------------------------- simscape
+% Pont de Wheatstone déséquilibré : 126/17 et 116/17 V, comme l'analyse
+% .op de ngspice. RC : 63,2 % à une constante de temps ; RLC série sous-
+% amorti contre ngspice (règle des trapèzes, pas de 0,1 us) et la forme
+% fermée du second ordre ; LC sans perte : l'amplitude se conserve, ce
+% que la règle des trapèzes garantit et qu'Euler implicite perd.
+c = circuit('pont');
+c = addVoltageSource(c, 1, 0, 10);
+c = addResistor(c, 1, 2, 100);
+c = addResistor(c, 1, 3, 200);
+c = addResistor(c, 2, 0, 300);
+c = addResistor(c, 3, 0, 400);
+c = addResistor(c, 2, 3, 500);
+v = solveDC(c);
+assert(abs(v(2) - 126 / 17) < 1e-12 && abs(v(3) - 116 / 17) < 1e-12);
+c = circuit('rc');
+c = addVoltageSource(c, 1, 0, 5);
+c = addResistor(c, 1, 2, 1000);
+c = addCapacitor(c, 2, 0, 1e-6);
+[t, V] = solveTransient(c, 5e-3, 2.5e-6);
+assert(V(1, 2) == 0 && abs(interp1(t, V(:, 2), 1e-3) - 5 * (1 - exp(-1))) < 1e-5);
+c = circuit('rlc');
+c = addVoltageSource(c, 1, 0, 1);
+c = addResistor(c, 1, 2, 10);
+c = addInductor(c, 2, 3, 1e-3);
+c = addCapacitor(c, 3, 0, 1e-6);
+[t, V] = solveTransient(c, 2e-3, 1e-6);
+ngspice = [1.604565832 0.940502043 1.080458455 0.993589243 1.000505535];
+assert(max(abs(interp1(t, V(:, 3), [0.1 0.25 0.5 1 1.5] * 1e-3) - ngspice)) < 5e-4);
+zeta = 10 / 2 * sqrt(1e-6 / 1e-3);
+assert(abs(max(V(:, 3)) - 1 - exp(-pi * zeta / sqrt(1 - zeta^2))) < 1e-4);
+c = circuit('lc');
+c = addVoltageSource(c, 1, 0, 1);
+c = addInductor(c, 1, 2, 1e-3);
+c = addCapacitor(c, 2, 0, 1e-6);
+[t, V] = solveTransient(c, 2e-3, 1e-6);
+[~, Ve] = solveTransient(c, 2e-3, 1e-6, 'Method', 'euler');
+assert(max(V(t > 1.8e-3, 2)) > 1.999 && max(Ve(t > 1.8e-3, 2)) < 1.5);
+fprintf('simscape : pont, RC, RLC comme ngspice, LC sans perte\n');
+
+%% ------------------------------------------------------- calcul parallele
+% L'exemple de MathWorks qui classe les variables d'un parfor (tranches,
+% réduction, diffusée, temporaires effacées après la boucle) ; la somme
+% de Bâle, pi^2/6 - 1/N + 1/(2N^2) par Euler-Maclaurin, en réduction ;
+% une fonction locale appelée du corps, comme MATLAB le permet.
+cDiffusee = pi;
+z = 0;
+r = sin(1:10);
+bTranches = zeros(1, 10);
+parfor i = 1:10
+    aTemporaire = i;
+    z = z + i;
+    bTranches(i) = r(i);
+    if i <= cDiffusee
+        dTemporaire = 2 * aTemporaire; %#ok<NASGU>
+    end
+end
+assert(z == 55 && isequal(bTranches, r));
+assert(~exist('aTemporaire', 'var') && ~exist('dTemporaire', 'var'));
+N = 100000;
+bale = 0;
+parfor k = 1:N
+    bale = bale + 1 / k ^ 2;
+end
+assert(abs(bale - (pi ^ 2 / 6 - 1 / N + 1 / (2 * N ^ 2))) < 1e-13);
+ordre = [];
+parfor k = 1:12
+    ordre = [ordre, k];
+end
+assert(isequal(ordre, 1:12));
+carres = zeros(1, 5);
+parfor k = 1:5
+    carres(k) = carreLitterature(k);
+end
+assert(isequal(carres, (1:5) .^ 2) && isequal(fetchOutputs(parfeval(@magic, 1, 4)), magic(4)));
+fprintf('parallele : exemple de MathWorks, somme de Bale, fonction locale\n');
+
+%% ------------------------------------------------------- base de donnees
+% La base « fournisseurs et pièces » de C. J. Date (An Introduction to
+% Database Systems) : sélection, regroupement, mise à jour, suppression,
+% contre les mêmes requêtes en SQL (sqlite3 de Python). L'aller-retour
+% par un CSV (RFC 4180) rend la table exacte.
+S = dbTable({'SNO', 'SNAME', 'STATUS', 'CITY'});
+fournisseurs = {'S1', 'Smith', 20, 'London'; 'S2', 'Jones', 10, 'Paris'; ...
+                'S3', 'Blake', 30, 'Paris'; 'S4', 'Clark', 20, 'London'; ...
+                'S5', 'Adams', 30, 'Athens'};
+for k = 1:5
+    S = dbInsert(S, fournisseurs(k, :));
+end
+SP = dbTable({'SNO', 'PNO', 'QTY'});
+livraisons = {'S1', 'P1', 300; 'S1', 'P2', 200; 'S1', 'P3', 400; 'S1', 'P4', 200; ...
+              'S1', 'P5', 100; 'S1', 'P6', 100; 'S2', 'P1', 300; 'S2', 'P2', 400; ...
+              'S3', 'P2', 200; 'S4', 'P2', 200; 'S4', 'P4', 300; 'S4', 'P5', 400};
+for k = 1:12
+    SP = dbInsert(SP, livraisons(k, :));
+end
+p2 = dbSelect(SP, @(l) strcmp(l{2}, 'P2'));
+assert(isequal(cellfun(@(l) l{1}, p2, 'UniformOutput', false), {'S1', 'S2', 'S3', 'S4'}));
+[cles, sommes] = dbGroupSum(SP, 'SNO', 'QTY');
+assert(isequal(cles, {'S1', 'S2', 'S3', 'S4'}) && isequal(sommes, [1300 700 200 900]));
+paris = dbSelect(S, @(l) strcmp(l{4}, 'Paris') && l{3} > 20);
+assert(numel(paris) == 1 && strcmp(paris{1}{1}, 'S3'));
+S = dbUpdate(S, @(l) strcmp(l{4}, 'London'), 'STATUS', 40);
+assert(isequal(cellfun(@(l) l{3}, S.lignes), [40 10 30 40 30]));
+SP = dbDelete(SP, @(l) l{3} < 200);
+assert(numel(SP.lignes) == 10 && sum(cellfun(@(l) l{3}, SP.lignes)) == 2900);
+fichierCsv = [tempname() '.csv'];
+dbSave(S, fichierCsv);
+relue = dbLoad(fichierCsv);
+delete(fichierCsv);
+assert(isequal(relue.colonnes, S.colonnes) && isequal(relue.lignes, S.lignes));
+fprintf('base de donnees : fournisseurs et pieces de Date, comme sqlite3\n');
+
+%% ------------------------------------------------------------- acquisition
+% Repliement (Nyquist, Shannon) : un sinus de 900 Hz échantillonné à
+% 1000 Hz ou à 800 Hz apparaît à 100 Hz, à 4000 Hz à sa vraie fréquence.
+% Deux lectures successives font une acquisition continue : elles
+% égalent une seule lecture deux fois plus longue.
+for cadence = [4000 1000 800]
+    s = daq();
+    s.frequence = cadence;
+    s = addAnalogInput(s, 'ai0', @(t) sin(2 * pi * 900 * t));
+    d = readData(s, 4000);
+    spectre = abs(fft(d));
+    [~, pic] = max(spectre(1:2000));
+    assert(abs((pic - 1) * cadence / 4000 - abs(900 - round(900 / cadence) * cadence)) < 1);
+end
+s = daq();
+s.Rate = 2000;
+s = addAnalogInput(s, 'ai0', @(t) sin(2 * pi * 37 * t) + t);
+[d1, t1] = readData(s, 1000);
+[d2, t2] = readData(s, 1000);
+s2 = daq();
+s2.frequence = 2000;
+s2 = addAnalogInput(s2, 'ai0', @(t) sin(2 * pi * 37 * t) + t);
+[dd, tt] = readData(s2, 2000);
+assert(max(abs([t1; t2] - tt)) < 1e-12 && max(abs([d1; d2] - dd)) < 1e-12);
+fprintf('acquisition : repliement de Nyquist, lecture continue\n');
+
+%% ------------------------------------------------------------- instruments
+% IEEE 488.2 : *IDN? rend quatre champs (fabricant, modèle, série,
+% micrologiciel). SCPI-99 : forme courte et forme longue sont la même
+% commande ; une commande inconnue range -113 dans la file d'erreurs, une
+% lecture sans requête -420, et SYST:ERR? les rend dans l'ordre, puis
+% « +0,"No error" ».
+v = visadev('GPIB0::14::INSTR');
+writeline(v, '*IDN?');
+assert(numel(strsplit(char(readline(v)), ',')) == 4);
+writeline(v, 'SOURce:VOLTage 3.3');
+assert(str2double(writeread(v, 'VOLT?')) == 3.3 && str2double(writeread(v, 'volt?')) == 3.3);
+assert(~isnan(str2double(writeread(v, 'MEASure:VOLTage:DC?'))));
+writeline(v, 'FOO:BAR');
+lastwarn('');
+avertissementDejaVu = warning('off', 'instrument:readline:Delai');
+vide = readline(v);
+warning(avertissementDejaVu);
+assert(strlength(vide) == 0);
+assert(strcmp(writeread(v, 'SYST:ERR?'), '-113,"Undefined header"'));
+assert(strcmp(writeread(v, 'SYSTem:ERRor:NEXT?'), '-420,"Query UNTERMINATED"'));
+assert(strcmp(writeread(v, 'SYST:ERR?'), '+0,"No error"'));
+fprintf('instruments : IEEE 488.2, SCPI, file d''erreurs\n');
+
+%% ------------------------------------------------------------------- coder
+% Le C produit, compilé par le compilateur du système, contre
+% l'interpréteur et NumPy : la méthode de Héron, l'algorithme de Goertzel
+% (1958) sur une touche DTMF (N = 205 à 8 kHz), dont la puissance est le
+% |X(k)|^2 de numpy.fft, et l'arithmétique entière de MATLAB (arrondi au
+% plus proche, saturation), que le C tronquait.
+compilateur = compilateurC();
+if ~isempty(compilateur)
+    dossierC = tempname();
+    mkdir(dossierC);
+    textes = {'heronLitt', ['function r = heronLitt(a)\n    r = a;\n    p = 0;\n' ...
+                            '    while r ~= p\n        p = r;\n        r = (r + a / r) / 2;\n' ...
+                            '    end\nend\n'];
+              'goertzelLitt', ['function p = goertzelLitt(x, k)\n' ...
+                               '    c = 2 * cos(2 * pi * k / 205);\n' ...
+                               '    s1 = 0;\n    s2 = 0;\n    for n = 1:205\n' ...
+                               '        s0 = x(n) + c * s1 - s2;\n        s2 = s1;\n' ...
+                               '        s1 = s0;\n    end\n' ...
+                               '    p = s1 * s1 + s2 * s2 - c * s1 * s2;\nend\n'];
+              'entiersLitt', ['function y = entiersLitt(a, b)\n' ...
+                              '    y = [double(int8(a) + int8(b)), ' ...
+                              'double(int16(7) / int16(2)), ' ...
+                              'double(int16(-7) / int16(2)), double(int32(2.5)), ' ...
+                              'double(uint8(200) * uint8(2))];\nend\n']};
+    for k = 1:size(textes, 1)
+        f = fopen(fullfile(dossierC, [textes{k, 1} '.m']), 'w');
+        fprintf(f, textes{k, 2});
+        fclose(f);
+    end
+    ancien = cd(dossierC);
+    signal = sin(2 * pi * 770 * (0:204) / 8000) + 0.5 * sin(2 * pi * 1336 * (0:204) / 8000);
+    codegen('heronLitt', '-args', {0});
+    codegen('goertzelLitt', '-args', {zeros(1, 205), 0});
+    codegen('entiersLitt', '-args', {0, 0});
+    principal = {'#include <math.h>', '#include <stdio.h>', '#include "heronLitt.h"', ...
+                 '#include "goertzelLitt.h"', '#include "entiersLitt.h"', 'int main(void) {', ...
+                 '    double x[205], y[5];', '    for (int n = 0; n < 205; ++n)', ...
+                 '        x[n] = sin(2 * 3.14159265358979323846 * 770 * n / 8000.0)', ...
+                 '               + 0.5 * sin(2 * 3.14159265358979323846 * 1336 * n / 8000.0);', ...
+                 '    entiersLitt(100, 100, y);', ...
+                 ['    printf("%.17g %.17g %.17g\n", heronLitt(2), ' ...
+                  'goertzelLitt(x, 20), goertzelLitt(x, 34));'], ...
+                 '    printf("%g %g %g %g %g\n", y[0], y[1], y[2], y[3], y[4]);', ...
+                 '    return 0;', '}'};
+    f = fopen('principalLitt.c', 'w');
+    fprintf(f, '%s\n', principal{:});
+    fclose(f);
+    commande = sprintf(['%s -O2 -Wall -Werror -o principalLitt principalLitt.c ' ...
+                        'heronLitt.c goertzelLitt.c entiersLitt.c -lm'], compilateur);
+    [statut, message] = system(commande);
+    assert(statut == 0, message);
+    [statut, sortieC] = system('./principalLitt');
+    assert(statut == 0);
+    lignesC = strsplit(strtrim(sortieC), sprintf('\n'));
+    valeursC = sscanf(lignesC{1}, '%f').';
+    assert(valeursC(1) == heronLitt(2) && abs(heronLitt(2) - sqrt(2)) <= eps(sqrt(2)));
+    assert(max(abs(valeursC(2:3) - [goertzelLitt(signal, 20) goertzelLitt(signal, 34)])) < 1e-9);
+    assert(abs(goertzelLitt(signal, 20) - 8163.1533059803724) < 1e-9);
+    assert(abs(goertzelLitt(signal, 34) - 2229.8454295720726) < 1e-9);
+    assert(isequal(sscanf(lignesC{2}, '%f').', entiersLitt(100, 100), [127 4 -4 3 255]));
+    cd(ancien);
+    rmdir(dossierC, 's');
+end
+fprintf('coder : Heron, Goertzel comme numpy.fft, entiers de MATLAB en C\n');
+
+%% --------------------------------------------------------------- compiler
+% MATLAB Compiler : « mcc -m prog.m » fabrique une application qui reçoit
+% ses arguments en texte et où ISDEPLOYED vaut vrai ; le source n'est pas
+% touché. L'application rend ce que rend l'interpréteur.
+if isunix
+    dossierMcc = tempname();
+    mkdir(dossierMcc);
+    source = fullfile(dossierMcc, 'basel.m');
+    f = fopen(source, 'w');
+    fprintf(f, ['function basel(n)\n    s = 0;\n    for k = 1:str2double(n)\n' ...
+                '        s = s + 1 / k ^ 2;\n    end\n' ...
+                '    fprintf(''%%.15g %%d\\n'', s, isdeployed());\nend\n']);
+    fclose(f);
+    avant = fileread(source);
+    lanceur = mcc('-m', source, '-d', dossierMcc);
+    [statut, sortieMcc] = system([lanceur ' 1000']);
+    assert(statut == 0 && strcmp(fileread(source), avant));
+    attendu = sum(1 ./ (1:1000) .^ 2);
+    assert(strcmp(strtrim(sortieMcc), sprintf('%.15g 1', attendu)));
+    rmdir(dossierMcc, 's');
+end
+fprintf('compiler : application autonome, arguments, source intact\n');
+
 disp('litterature : toutes les verifications passent');
+
+function y = carreLitterature(x)
+    y = x ^ 2;
+end
+

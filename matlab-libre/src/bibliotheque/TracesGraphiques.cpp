@@ -164,8 +164,15 @@ std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTra
     exigerArguments(args, 1, 0, "plot");
     nouveauTrace(it);
     auto axes = axesCourants(it);
-    axes->logX = logX;
-    axes->logY = logY;
+    // Sous « hold on », un plot garde l'échelle de l'axe, comme dans
+    // MATLAB : semilogy puis plot restait sinon en échelle linéaire.
+    if (axes->tenir && !axes->series.empty()) {
+        axes->logX = axes->logX || logX;
+        axes->logY = axes->logY || logY;
+    } else {
+        axes->logX = logX;
+        axes->logY = logY;
+    }
     std::size_t k = 0;
     std::size_t indexCouleur = axes->series.size();
     // « h = plot(x,y) » rend une poignee par courbe tracee.

@@ -31,6 +31,10 @@
 %                  transition valide, sinon l'action de séjour
 ```
 
+## `matlibre_sf_etiquette`
+
+_Pas de bloc d'aide._
+
 ## `matlibre_sf_evaluer`
 
 _Pas de bloc d'aide._
@@ -478,7 +482,9 @@ SFTRANSITION Ajoute une transition gardée.
   champs du contexte sont des variables ; l'action de condition
   s'exécute dès que la condition est vraie, avant la sortie de l'état.
   Chaque partie est facultative : 'go', '[n >= 3]', 'go[n > 0]{k = 1;}',
-  '[after(2, sec)]'. ACTION peut de même être un texte : 'fin = 1;'.
+  'go{k = 1;}', '[after(2, sec)]'. L'action de la transition s'écrit
+  après une barre, comme dans Stateflow : 'go[n > 0]/fin = 1;' ; ACTION
+  peut aussi la donner, en texte : 'fin = 1;'.
 
   Quand plusieurs transitions partent du même état, la première déclarée
   dont la garde est vraie l'emporte. C'est une règle de priorité, et il

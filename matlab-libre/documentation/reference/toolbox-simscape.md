@@ -19,7 +19,7 @@
 %
 % Résolution
 %   solveDC            - Point de fonctionnement continu
-%   solveTransient     - Réponse temporelle, par Euler implicite
+%   solveTransient     - Réponse temporelle, par la règle des trapèzes
 ```
 
 ## `addCapacitor`
@@ -198,15 +198,29 @@ SOLVEDC Point de fonctionnement continu par analyse nodale modifiée.
 ## `solveTransient`
 
 ```
-SOLVETRANSIENT Réponse temporelle par Euler implicite.
-  [T,V] = SOLVETRANSIENT(C,TFINAL,PAS) intègre le circuit ; chaque
-  condensateur est remplacé à chaque pas par une conductance C/h en
-  parallèle avec une source de courant, et chaque bobine par une
-  résistance L/h en série avec une source de tension (modèle compagnon
-  de l'intégration implicite).
+SOLVETRANSIENT Réponse temporelle d'un circuit, par la règle des trapèzes.
+  [T,V] = SOLVETRANSIENT(C,TFINAL,PAS) intègre le circuit de 0 à TFINAL
+  au pas PAS. V a une ligne par instant de T et une colonne par nœud. La
+  première ligne est l'état initial, comme l'option « uic » de SPICE :
+  condensateurs déchargés, bobines sans courant, et les tensions des
+  nœuds qui s'en déduisent.
 
-  SOURCETEMPS, facultative, est une poignée @(t) rendant un facteur
-  multiplicatif appliqué aux sources de tension.
+  Chaque pas remplace les condensateurs et les bobines par leur modèle
+  compagnon — une conductance et une source de courant —, puis résout
+  les équations nodales modifiées. La règle des trapèzes, celle de SPICE,
+  est d'ordre deux et ne dissipe rien : un circuit LC sans perte oscille
+  sans s'éteindre. Euler implicite, d'ordre un, amortit les oscillations
+  d'autant plus que le pas est grand.
+
+  [T,V] = SOLVETRANSIENT(C,TFINAL,PAS,SOURCETEMPS) module les sources de
+  tension par le facteur SOURCETEMPS(t), une poignée évaluée à la fin de
+  chaque pas.
+  [T,V] = SOLVETRANSIENT(...,'Method',M) choisit l'intégration :
+  'trapezoidal' (défaut) ou 'euler' (Euler implicite).
+
+  Comme dans SPICE, la règle des trapèzes peut faire osciller d'un pas à
+  l'autre les courants des condensateurs après une discontinuité d'une
+  source modulée ; 'euler' l'évite, au prix de la précision.
 
   Exemple :
      c = circuit('RC');
@@ -214,8 +228,9 @@ SOLVETRANSIENT Réponse temporelle par Euler implicite.
      c = addResistor(c, 1, 2, 1000);
      c = addCapacitor(c, 2, 0, 1e-6);
      [t, v] = solveTransient(c, 0.01, 1e-5);
-     abs(v(end, 2) - 5) < 0.1    % le condensateur finit par se charger
+     v(1, 2)                     % 0 : le condensateur part déchargé
+     abs(v(end, 2) - 5) < 0.01   % puis se charge
 
-  Voir aussi SOLVEDC, CIRCUIT, ADDCAPACITOR.
+  Voir aussi SOLVEDC, CIRCUIT, ADDCAPACITOR, ADDINDUCTOR.
 ```
 

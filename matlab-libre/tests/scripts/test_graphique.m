@@ -218,6 +218,26 @@ assert(strcmp(get(h1, 'LineStyle'), '-.') && strcmp(get(h1, 'Marker'), 'none'));
 assert(strcmp(get(h2, 'LineStyle'), '-') && strcmp(get(h2, 'Marker'), '.'));
 assert(strcmp(get(h3, 'LineStyle'), '-.') && strcmp(get(h3, 'Marker'), 'o'));
 assert(~isempty(strfind(matlibre_svg(), 'stroke-dasharray="8,3,2,3"')));
+% Une barre part de zero, et zero compte dans les limites, comme dans
+% MATLAB : bar([1300 700 200 900]) commencait l'axe a 200, et la barre de
+% 200 disparaissait.
+figure
+bar([1300 700 200 900]);
+limitesY = get(gca, 'YLim');
+assert(limitesY(1) == 0 && limitesY(2) >= 1300);
+figure
+bar([1 2; 3 4], 'stacked');
+limitesY = get(gca, 'YLim');
+assert(limitesY(1) == 0 && limitesY(2) >= 7);
+% Sous hold on, plot garde l'echelle logarithmique posee par semilogy.
+figure
+semilogy(1:3, [1 10 100]);
+hold on
+plot(1:3, [2 20 200], 'o');
+assert(strcmp(get(gca, 'YScale'), 'log'));
+hold off
+plot(1:3, [1 2 3]);
+assert(strcmp(get(gca, 'YScale'), 'linear'));
 % Une etiquette de graduation longue elargit la marge au lieu d'etre
 % rognee au bord de la figure.
 figure

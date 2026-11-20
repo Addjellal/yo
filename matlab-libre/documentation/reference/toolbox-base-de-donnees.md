@@ -87,10 +87,10 @@ DBLOAD Lit une table depuis un fichier CSV.
   T = DBLOAD(FICHIER) lit un fichier écrit par DBSAVE : la première
   ligne donne les noms de colonnes, les suivantes les enregistrements.
 
-  Les champs qui se convertissent en nombre reviennent en nombres, les
-  autres restent des chaînes. C'est la seule reconstruction de type
-  possible d'un format qui n'en porte pas — et elle se trompe sur un
-  identifiant tout en chiffres, qu'elle rendra numérique.
+  Le fichier suit RFC 4180 : un champ entre guillemets est du texte,
+  virgules, guillemets doublés et retours à la ligne compris ; un champ
+  nu qui se lit comme un nombre est un nombre, les autres du texte. Un
+  fichier écrit par DBSAVE revient donc avec ses types exacts.
 
   L'aller-retour DBSAVE puis DBLOAD est la vérification qui compte :
   la table relue doit se comporter comme l'originale, groupements
@@ -115,9 +115,12 @@ DBSAVE Écrit la table dans un fichier CSV.
   les noms de colonnes, puis une ligne par enregistrement, les champs
   séparés par des virgules.
 
-  Le CSV est le seul format qu'à peu près tout sait lire. Il ne porte
-  pas les types : c'est DBLOAD qui les rétablit, en reconnaissant ce qui
-  se convertit en nombre.
+  Le fichier suit RFC 4180, ce que lisent les tableurs, Python (csv) et
+  SQLite : le texte est entre guillemets, ses guillemets doublés — une
+  virgule ou un retour à la ligne dans un nom ne casse rien —, et les
+  nombres s'écrivent avec dix-sept chiffres significatifs, ce qui les
+  relit exactement. Les guillemets portent aussi le type : DBLOAD rend
+  en texte ce qui était du texte, « 007 » compris.
 
   Exemple :
      t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
@@ -199,5 +202,18 @@ DBUPDATE Met à jour une colonne pour les lignes retenues.
      t = dbUpdate(t, @(l) strcmp(l{2}, 'ventes'), 'salaire', 45000);
 
   Voir aussi DBSELECT, DBDELETE, DBINSERT.
+```
+
+## `matlibre_db_colonne`
+
+```
+MATLIBRE_DB_COLONNE Le rang d'une colonne, ou une erreur qui la nomme.
+  J = MATLIBRE_DB_COLONNE(T,NOM,FONCTION) rend le rang de la colonne NOM
+  de la table T. Une colonne inconnue est refusée en le disant : une
+  requête qui porterait sur rien ne doit pas réussir en silence.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Voir aussi DBUPDATE, DBGROUPSUM.
 ```
 

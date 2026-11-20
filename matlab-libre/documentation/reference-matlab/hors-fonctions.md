@@ -823,6 +823,58 @@ de MatLibre ne fait pas comme celle de MathWorks.
   propres à MatLibre. Les objets `medicalVolume` et `medicalImage` et la
   lecture DICOM (`dicomread`, `dicominfo`) manquent.
 
+### Virgule fixe, Stateflow, Simscape
+
+- **Virgule fixe** : `fi`, `numerictype` et `fimath` suivent
+  Fixed-Point Designer — six arrondis, saturation ou repli, pleine
+  précision des sommes et des produits —, mais les entiers stockés sont
+  des doubles : au-delà de 53 bits, les derniers se perdent. `quantizer`,
+  `quantize`, les fonctions CORDIC (`cordicsincos`, `cordicsqrt`...),
+  `fiaccel` et le Fixed-Point Tool manquent.
+- **Stateflow** : une machine se construit par des fonctions (`sfchart`,
+  `sfstate`, `sftransition`...), non dans l'éditeur graphique ; l'API
+  d'objets de MATLAB (`sfnew`, `sfroot`, `Stateflow.State`) n'existe pas.
+  Les étiquettes s'écrivent dans la syntaxe de Stateflow,
+  `evenement[condition]{action de condition}/action de transition`.
+- **Circuits** : `circuit`, `solveDC` et `solveTransient` sont propres à
+  MatLibre et ne traitent que des réseaux linéaires (résistances,
+  condensateurs, bobines, sources). L'intégration suit la règle des
+  trapèzes de SPICE, au départ de condensateurs déchargés et de bobines
+  sans courant ; pas d'analyse en fréquence, ni de composants non
+  linéaires, ni de langage Simscape (`.ssc`, `ssc_build`). Les blocs
+  Simscape des schémas Simulink sont décrits avec Simulink.
+
+### Calcul parallèle, base de données, acquisition, instruments
+
+- **Calcul parallèle** : un pool de fils sur une machine ; le corps d'un
+  `parfor` voit les fonctions locales du fichier qui le contient. Pas de
+  `gpuArray`, et `distributed` est l'identité.
+- **Base de données** : `dbTable`, `dbSelect`, `dbGroupSum`... sont des
+  tables en mémoire propres à MatLibre, sauvées en CSV (RFC 4180, nombres
+  à dix-sept chiffres). L'interface SQL de la Database Toolbox
+  (`database`, `sqlite`, `fetch`, `sqlread`, `sqlwrite`, `execute`)
+  manque.
+- **Acquisition** : la session de `daq` est simulée — chaque voie est une
+  fonction du temps — et son horloge avance d'une lecture à l'autre. Les
+  fonctions de MATLAB (`addinput`, `read`, `write`, `start`) manquent :
+  `addAnalogInput`, `readData` et `writeData` en tiennent lieu.
+- **Instruments** : `visadev`, `writeline`, `readline` et `writeread`
+  suivent MATLAB, mais l'instrument est simulé (un multimètre et une
+  alimentation SCPI). Aucune liaison réelle : VISA, GPIB, `serialport`,
+  `tcpclient` et `udpport` manquent.
+
+### Coder, Compiler
+
+- **Coder** : l'arithmétique entière du C produit se calcule en double,
+  puis s'arrondit et sature comme MATLAB ; pour `int64` et `uint64`,
+  au-delà de 2^53, le dernier chiffre peut se perdre là où MATLAB est
+  exact.
+- **Compiler** : `mcc -m` fabrique un lanceur qui appelle l'interpréteur
+  MatLibre — l'équivalent du MATLAB Runtime, qu'il faut installer — et
+  non un binaire autonome. Options reconnues : `-m`, `-o`, `-d`, `-a`,
+  `-v` ; les autres (`-W`, `-T`, `-R`...), les bibliothèques partagées et
+  `compiler.build` sont refusés ou absents.
+
 ### Calcul
 
 - **Décomposition de Schur** (`schur`, `ordschur`, `qz`) : elle manque à

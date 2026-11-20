@@ -753,9 +753,13 @@ void etendueDonnees(const Axes& a, double& xmin, double& xmax, double& ymin, dou
             // Des barres débordent de leur abscisse d'une demi-largeur.
             if (enX && s.genre == GenreTrace::Barres)
                 demi = s.largeurBarre / 2 * ecartBarres(s.x);
-            // Des barres empilées partent de leur pied, non de zéro.
+            // Une barre part de son pied — la base de la barre empilée,
+            // zéro sinon — et le pied compte dans l'étendue, comme dans
+            // MATLAB : sans lui, des barres de 200 à 1300 commençaient
+            // l'axe à 200, et la plus petite disparaissait.
             if (!enX && s.genre == GenreTrace::Barres)
-                for (double v : s.basesBarres) {
+                for (std::size_t k = 0; k < s.y.size(); ++k) {
+                    double v = k < s.basesBarres.size() ? s.basesBarres[k] : 0.0;
                     if (!std::isfinite(v) || (positives && v <= 0)) continue;
                     bas = std::min(bas, v);
                     haut = std::max(haut, v);

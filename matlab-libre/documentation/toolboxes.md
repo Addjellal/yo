@@ -16,14 +16,14 @@ existant appellera.
 | `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 141 |
 | `audio` | Audio Toolbox — sons et descripteurs. | 13 |
 | `automatique` | Control System Toolbox — systèmes asservis linéaires. | 124 |
-| `base-de-donnees` | Database Toolbox — stockage tabulaire. | 8 |
+| `base-de-donnees` | Database Toolbox — stockage tabulaire. | 9 |
 | `bioinformatique` | Bioinformatics Toolbox — séquences biologiques. | 14 |
 | `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 6 |
 | `cartographie` | Mapping Toolbox — géodésie et cartographie. | 15 |
 | `coder` | MATLAB Coder — génération de code C. | 4 |
 | `communications` | Communications Toolbox — transmissions numériques. | 148 |
 | `communications-sans-fil` | Wireless (5G / LTE / WLAN) — couche physique. | 10 |
-| `compilateur` | MATLAB Compiler — distribution d'un programme. | 3 |
+| `compilateur` | MATLAB Compiler — distribution d'un programme. | 5 |
 | `conduite-automatisee` | Automated Driving Toolbox — aide à la conduite. | 4 |
 | `dsp` | DSP System Toolbox — traitement du signal en temps réel. | 6 |
 | `econometrie` | Econometrics Toolbox — séries temporelles et économétrie. | 84 |
@@ -35,7 +35,7 @@ existant appellera.
 | `identification` | System Identification Toolbox — identification de modèles. | 107 |
 | `imagerie-medicale` | Medical Imaging Toolbox — imagerie médicale. | 5 |
 | `images` | Image Processing Toolbox — traitement d'images. | 143 |
-| `instruments` | Instrument Control Toolbox — pilotage d'instruments (simulé). | 4 |
+| `instruments` | Instrument Control Toolbox — pilotage d'instruments (simulé). | 6 |
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
@@ -54,7 +54,7 @@ existant appellera.
 | `signal` | Signal Processing Toolbox — traitement du signal. | 208 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 99 |
-| `stateflow` | Stateflow — machines à états finis. | 19 |
+| `stateflow` | Stateflow — machines à états finis. | 20 |
 | `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 298 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 70 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |

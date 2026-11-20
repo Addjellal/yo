@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-3135 fonctions ecrites dans le langage, reparties en 55 toolboxes.
+3141 fonctions ecrites dans le langage, reparties en 55 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -45,14 +45,14 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`apprentissage-profond`](reference/toolbox-apprentissage-profond.md) | 141 |
 | [`audio`](reference/toolbox-audio.md) | 13 |
 | [`automatique`](reference/toolbox-automatique.md) | 124 |
-| [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 8 |
+| [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 9 |
 | [`bioinformatique`](reference/toolbox-bioinformatique.md) | 14 |
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 6 |
 | [`cartographie`](reference/toolbox-cartographie.md) | 15 |
 | [`coder`](reference/toolbox-coder.md) | 4 |
 | [`communications`](reference/toolbox-communications.md) | 148 |
 | [`communications-sans-fil`](reference/toolbox-communications-sans-fil.md) | 10 |
-| [`compilateur`](reference/toolbox-compilateur.md) | 3 |
+| [`compilateur`](reference/toolbox-compilateur.md) | 5 |
 | [`conduite-automatisee`](reference/toolbox-conduite-automatisee.md) | 4 |
 | [`dsp`](reference/toolbox-dsp.md) | 6 |
 | [`econometrie`](reference/toolbox-econometrie.md) | 84 |
@@ -64,7 +64,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`identification`](reference/toolbox-identification.md) | 107 |
 | [`imagerie-medicale`](reference/toolbox-imagerie-medicale.md) | 5 |
 | [`images`](reference/toolbox-images.md) | 143 |
-| [`instruments`](reference/toolbox-instruments.md) | 4 |
+| [`instruments`](reference/toolbox-instruments.md) | 6 |
 | [`instruments-financiers`](reference/toolbox-instruments-financiers.md) | 82 |
 | [`interface`](reference/toolbox-interface.md) | 17 |
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
@@ -85,7 +85,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`signal`](reference/toolbox-signal.md) | 208 |
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
 | [`simulink`](reference/toolbox-simulink.md) | 99 |
-| [`stateflow`](reference/toolbox-stateflow.md) | 19 |
+| [`stateflow`](reference/toolbox-stateflow.md) | 20 |
 | [`statistiques`](reference/toolbox-statistiques.md) | 298 |
 | [`symbolique`](reference/toolbox-symbolique.md) | 70 |
 | [`types`](reference/toolbox-types.md) | 45 |
