@@ -243,6 +243,97 @@ void testSignal() {
     verifierProche(z.re[4], 5, "ifft(fft(x)) = x pour une longueur impaire");
 }
 
+// La copie à l'écriture : une copie partage les nombres, l'écriture les
+// détache, la lecture ne les détache jamais.
+void testPartage() {
+    Valeur a = Valeur::matrice(1, 1000, 1.0);
+    Valeur b = a;
+    verifier(a.re.memeBloc(b.re), "une copie partage les donnees");
+    b.re[0] = 2.0;
+    verifier(!a.re.memeBloc(b.re), "ecrire dans la copie la detache");
+    verifierProche(a.re[0], 1.0, "l'original ne voit pas l'ecriture");
+    verifierProche(b.re[0], 2.0, "la copie porte l'ecriture");
+    verifier(!a.re.partage() && !b.re.partage(), "chacun est seul apres l'ecriture");
+
+    // Lire par un acces constant ne detache pas, meme en parcourant tout.
+    Valeur c = a;
+    const Valeur& lue = c;
+    double somme = 0;
+    for (double x : lue.re) somme += x;
+    verifierProche(somme, 1000.0, "la lecture constante voit les donnees");
+    verifier(c.re.memeBloc(a.re), "lire ne detache pas");
+
+    // L'ecriture dans l'original detache l'original, pas la copie.
+    a.re[1] = 5.0;
+    verifierProche(c.re[1], 1.0, "la copie garde l'ancienne valeur");
+
+    // Une position prise sur le bloc partage reste juste apres le
+    // detachement : elle est convertie en rang avant.
+    VecteurPartage<double> v = {1, 2, 3};
+    VecteurPartage<double> w = v;
+    const VecteurPartage<double>& wc = w;
+    w.insert(wc.begin() + 1, 9.0);
+    verifier(v == std::vector<double>{1, 2, 3}, "insert : l'original intact");
+    verifier(w == std::vector<double>{1, 9, 2, 3}, "insert : a la bonne place");
+    w = v;
+    w.erase(wc.begin(), wc.begin() + 2);
+    verifier(v == std::vector<double>{1, 2, 3} && w == std::vector<double>{3},
+             "erase sur un bloc partage");
+
+    // Les modifications globales sur un bloc partage.
+    w = v;
+    w.push_back(4);
+    verifier(v.size() == 3 && w.size() == 4, "push_back detache");
+    w = v;
+    w.resize(5, 7.0);
+    verifier(v.size() == 3 && w == std::vector<double>{1, 2, 3, 7, 7}, "resize detache");
+    w = v;
+    w.resize(3);
+    verifier(w.memeBloc(v), "resize a la meme taille ne copie rien");
+    w.assign(2, 0.0);
+    verifier(v == std::vector<double>{1, 2, 3} && w == std::vector<double>{0, 0},
+             "assign detache");
+    w = v;
+    w.clear();
+    verifier(w.empty() && v.size() == 3, "clear lache le bloc partage");
+    w = v;
+    std::vector<double>& dedans = w.modifier();
+    dedans[0] = -1;
+    verifier(v[0] == 1 && w[0] == -1, "modifier rend un vecteur a soi seul");
+
+    // Le compte revient a un quand la copie disparait.
+    {
+        VecteurPartage<double> temporaire = v;
+        verifier(v.partage(), "partage tant que la copie vit");
+    }
+    verifier(!v.partage(), "seul a nouveau apres elle");
+
+    // Pas de raccourci sur l'identite : un NaN partage reste different de
+    // lui-meme, comme le veut isequal.
+    VecteurPartage<double> nan1 = {std::nan("")};
+    VecteurPartage<double> nan2 = nan1;
+    verifier(!(nan1 == nan2), "deux copies d'un NaN ne sont pas egales");
+
+    // Dans l'interpreteur : l'affectation et l'appel partagent, l'ecriture
+    // dans l'appele ne remonte pas.
+    Interpreteur it;
+    it.installerBibliotheque();
+    std::ostringstream poubelle;
+    it.definirSortie(&poubelle);
+    it.executerTexte("function y = rendre(x)\ny = x;\nend\n", "<test>");
+    it.executerTexte("a = zeros(1, 100); b = a; c = rendre(a);", "<test>");
+    verifier(it.trouverVariable("a")->re.memeBloc(it.trouverVariable("b")->re),
+             "b = a ne recopie pas");
+    verifier(it.trouverVariable("a")->re.memeBloc(it.trouverVariable("c")->re),
+             "un argument rendu tel quel ne recopie pas");
+    it.executerTexte("function x = ecrire(x)\nx(1) = 5;\nend\n", "<test>");
+    it.executerTexte("d = ecrire(a);", "<test>");
+    verifierProche(it.trouverVariable("a")->re[0], 0.0, "l'appele n'ecrit pas chez l'appelant");
+    verifierProche(it.trouverVariable("d")->re[0], 5.0, "l'appele rend son ecriture");
+    verifier(it.trouverVariable("a")->re.memeBloc(it.trouverVariable("b")->re),
+             "l'ecriture de l'appele ne detache que lui");
+}
+
 void testErreurs() {
     bool leve = false;
     try {
@@ -283,6 +374,7 @@ int main() {
         {"fonctions", testFonctions},   {"algebre", testAlgebre},
         {"texte", testTexte},           {"affichage", testAffichage},
         {"signal", testSignal},         {"erreurs", testErreurs},
+        {"partage", testPartage},
     };
     for (const auto& c : cas) {
         std::cout << "[" << c.nom << "]\n";

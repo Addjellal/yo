@@ -1046,17 +1046,18 @@ std::vector<Valeur> Interpreteur::appelerValeur(const Valeur& poignee, std::vect
     portee->anonyme = true;
     if (f.capture)
         for (const auto& kv : *f.capture) portee->variables[kv.first] = kv.second;
-    for (std::size_t k = 0; k < f.parametres.size(); ++k) {
+    // Comme pour une fonction de fichier, les arguments sont déplacés dans
+    // la portée ; « varargin » reçoit tous ceux qui suivent les paramètres.
+    const bool variadique = !f.parametres.empty() && f.parametres.back() == "varargin";
+    const std::size_t fixes = f.parametres.size() - (variadique ? 1 : 0);
+    for (std::size_t k = 0; k < fixes && k < args.size(); ++k) {
         if (f.parametres[k] == "~") continue;
-        if (k < args.size()) portee->variables[f.parametres[k]] = args[k];
+        portee->variables[f.parametres[k]] = std::move(args[k]);
     }
-    if (!f.parametres.empty() && f.parametres.back() == "varargin") {
-        Valeur reste = Valeur::celluleDims({1, 0});
+    if (variadique) {
         std::vector<Valeur> extra;
-        for (std::size_t k = f.parametres.size() - 1; k < args.size(); ++k)
-            extra.push_back(args[k]);
-        reste = Valeur::celluleLigne(extra);
-        portee->variables["varargin"] = reste;
+        for (std::size_t k = fixes; k < args.size(); ++k) extra.push_back(std::move(args[k]));
+        portee->variables["varargin"] = Valeur::celluleLigne(extra);
     }
     portee->nargin = (int)args.size();
     portee->nargout = nargout;
@@ -1131,13 +1132,18 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
     } else {
         englobanteEnAttente_.reset();
     }
+    // Les arguments passent dans la portée sans copie : une variable de
+    // l'appelant partage ses données avec le paramètre, et l'appelé ne les
+    // recopie que s'il les modifie. Ils sont déplacés, non copiés : un
+    // argument calculé pour l'appel — « f(zeros(n)) » — n'a alors pas
+    // d'autre propriétaire, et l'appelé l'écrit sur place.
     for (std::size_t k = 0; k < fixes && k < args.size(); ++k) {
         if (f->entrees[k] == "~") continue;
-        portee->variables[f->entrees[k]] = args[k];
+        portee->variables[f->entrees[k]] = std::move(args[k]);
     }
     if (f->variadiqueEntree()) {
         std::vector<Valeur> extra;
-        for (std::size_t k = fixes; k < args.size(); ++k) extra.push_back(args[k]);
+        for (std::size_t k = fixes; k < args.size(); ++k) extra.push_back(std::move(args[k]));
         portee->variables["varargin"] = Valeur::celluleLigne(extra);
     }
     portee->nargin = (int)args.size();

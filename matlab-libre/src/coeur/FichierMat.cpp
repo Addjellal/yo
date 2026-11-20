@@ -554,12 +554,12 @@ Valeur lireCorpsMatrice(Lecteur& l, std::string* nom, bool* globale,
     Valeur v;
     v.classe = classeDepuisMx(classe, logique);
     v.dims = d;
-    remplir(v.re, pr, l.inverse());
+    remplir(v.re.modifier(), pr, l.inverse());
     std::size_t attendus = nombreElements(d, l);
     v.re.resize(attendus, 0.0);
     if (complexe) {
         Element pi = lireElement(l);
-        remplir(v.im, pi, l.inverse());
+        remplir(v.im.modifier(), pi, l.inverse());
         v.im.resize(attendus, 0.0);
     }
     return v;

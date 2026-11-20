@@ -120,6 +120,8 @@ public:
     std::vector<Valeur> appeler(const std::string& nom, std::vector<Valeur> args, int nargout);
     std::vector<Valeur> appelerValeur(const Valeur& poignee, std::vector<Valeur> args,
                                       int nargout);
+    // Consomme ARGS : les valeurs passent dans la portée de l'appelé, et
+    // le vecteur ne porte plus, au retour, que des valeurs vidées.
     std::vector<Valeur> appelerUtilisateur(const std::shared_ptr<FonctionUtilisateur>& f,
                                            std::vector<Valeur>& args, int nargout);
     bool fonctionExiste(const std::string& nom) const;

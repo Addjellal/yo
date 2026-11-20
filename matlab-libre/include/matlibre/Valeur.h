@@ -10,13 +10,23 @@
 // comportement observable.
 //
 // Le rangement est celui de MATLAB : par colonnes (column-major).
+//
+// Comme dans MATLAB, une copie ne recopie pas les données : « b = a », un
+// argument passé à une fonction, une valeur rendue partagent les mêmes
+// tableaux jusqu'à ce que l'un des deux les modifie (VecteurPartage.h).
+// Qui ne fait que lire une valeur la lit donc par une référence constante :
+// un accès non constant à « re », « im », « cellules » ou « chaines » se
+// croit en écriture, et se paie une copie privée dès qu'ils sont partagés.
 #pragma once
 
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
+
+#include "matlibre/VecteurPartage.h"
 
 namespace matlibre {
 
@@ -84,10 +94,13 @@ class Valeur {
 public:
     Classe classe = Classe::Double;
     Dims dims{0, 0};
-    std::vector<double> re;
-    std::vector<double> im;                 // vide si réel
-    std::vector<Valeur> cellules;           // Cellule
-    std::vector<std::string> chaines;       // Chaine (string array)
+    // Les tableaux sont partagés entre les copies jusqu'à la première
+    // écriture ; une structure partage ses champs par « st », et ne s'en
+    // détache qu'en écrivant (detacherStructure).
+    VecteurPartage<double> re;
+    VecteurPartage<double> im;              // vide si réel
+    VecteurPartage<Valeur> cellules;        // Cellule
+    VecteurPartage<std::string> chaines;    // Chaine (string array)
     std::shared_ptr<ChampsStructure> st;    // Structure / Objet
     std::shared_ptr<Fonction> fn;           // Fonction
     std::string nomObjet;                   // Objet : nom de la classe
@@ -159,6 +172,11 @@ public:
     void detacherStructure();  // copie à l'écriture
 };
 
+// Un tableau de valeurs qui grandit — une cellule qu'on remplit, la pile
+// des portées — déplace ses éléments au lieu de les copier.
+static_assert(std::is_nothrow_move_constructible<Valeur>::value,
+              "Valeur doit se deplacer sans pouvoir lever d'exception");
+
 // Les arguments d'une fonction native : le vecteur lui-même, avec un
 // « operator[] » qui refuse au lieu de lire hors du tableau.
 //
@@ -167,18 +185,27 @@ public:
 // devait penser à vérifier son arité : « asin() » sans argument lisait
 // args[0] d'un vecteur vide et le programme tombait, là où MATLAB dit
 // « Not enough input arguments ».
+//
+// L'accès est en lecture seule : un argument partage ses données avec la
+// variable de l'appelant, et le lire par un accès non constant les
+// recopierait pour rien. La native qui transforme un argument sur place
+// le demande par « modifier » ; il se détache alors de cette variable.
 class Arguments {
 public:
     Arguments(std::vector<Valeur>& v) : v_(v) {}   // conversion voulue
-    Valeur& operator[](std::size_t k) const {
+    const Valeur& operator[](std::size_t k) const {
+        if (k >= v_.size()) manquant();
+        return v_[k];
+    }
+    Valeur& modifier(std::size_t k) const {
         if (k >= v_.size()) manquant();
         return v_[k];
     }
     std::size_t size() const { return v_.size(); }
     bool empty() const { return v_.empty(); }
-    std::vector<Valeur>::iterator begin() const { return v_.begin(); }
-    std::vector<Valeur>::iterator end() const { return v_.end(); }
-    Valeur& back() const {
+    std::vector<Valeur>::const_iterator begin() const { return v_.cbegin(); }
+    std::vector<Valeur>::const_iterator end() const { return v_.cend(); }
+    const Valeur& back() const {
         if (v_.empty()) manquant();
         return v_.back();
     }

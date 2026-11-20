@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <utility>
 
 #include "matlibre/Erreur.h"
 
@@ -294,7 +295,9 @@ std::string Valeur::classeNom() const {
 
 void Valeur::compacter() {
     if (im.empty()) return;
-    for (double v : im)
+    // Lecture par l'accès constant : parcourir « im » ne doit pas le
+    // détacher d'une copie qui le partage.
+    for (double v : std::as_const(im))
         if (v != 0.0) return;
     im.clear();
 }

@@ -1145,6 +1145,165 @@ assert(~isempty(strfind(texteAffiche, 'BusElement with properties:')) && ...
        ~isempty(strfind(texteAffiche, sprintf('              Name: ''a''\n'))), ...
        'un objet : « X with properties: », les proprietes alignees');
 
+%% ------------------------------- passage par valeur, partage a l'ecriture
+% Un argument, une affectation, une valeur rendue partagent leurs donnees
+% avec la variable d'origine, comme dans MATLAB ; la copie n'a lieu que
+% lorsqu'un des deux cotes ecrit. Ce qui doit se voir : un appele qui
+% modifie son parametre ne change jamais la variable de l'appelant, quelle
+% que soit sa classe, et une copie modifiee ne change pas l'original.
+nombres = [1 2 3 4];
+assert(isequal(changerPremier(nombres, 9), [9 2 3 4]) && isequal(nombres, [1 2 3 4]), ...
+       'un double modifie par l''appele');
+lettres = 'abc';
+assert(strcmp(changerPremier(lettres, 'X'), 'Xbc') && strcmp(lettres, 'abc'), 'un char');
+drapeaux = [true false true];
+assert(isequal(changerPremier(drapeaux, false), [false false true]) && ...
+       isequal(drapeaux, [true false true]) && islogical(drapeaux), 'un logique');
+complexes = [1+2i, 3-4i];
+assert(isequal(changerPremier(complexes, 5i), [5i, 3-4i]) && ...
+       isequal(complexes, [1+2i, 3-4i]), 'un complexe : les deux parties');
+reels = [1 2 3];
+assert(~isreal(changerPremier(reels, 1i)) && isreal(reels) && isequal(reels, [1 2 3]), ...
+       'un reel que l''appele rend complexe reste reel chez l''appelant');
+entiers = int8([1 2 3]);
+assert(isequal(changerPremier(entiers, int8(-7)), int8([-7 2 3])) && ...
+       isequal(entiers, int8([1 2 3])) && isa(entiers, 'int8'), 'un int8');
+simples = single([1.5 2.5]);
+assert(isequal(changerPremier(simples, single(0)), single([0 2.5])) && ...
+       isequal(simples, single([1.5 2.5])), 'un single');
+% L'appele qui grandit, raccourcit ou vide son parametre.
+assert(isequal(remanierParametre(nombres), [2 4 0 0 0 7]) && isequal(nombres, [1 2 3 4]), ...
+       'croissance et suppression dans l''appele');
+cellules = {[1 2 3], 'texte', {4}};
+assert(isequal(modifierCellule(cellules), {[1 99 3], 'TEXTE', {5}, 'ajout'}) && ...
+       isequal(cellules, {[1 2 3], 'texte', {4}}), ...
+       'une cellule, et les tableaux dans ses cases');
+structure = struct('a', [1 2 3], 'b', 'mot');
+modifiee = modifierStructure(structure);
+assert(isequal(modifiee.a, [1 50 3]) && strcmp(modifiee.b, 'Mot') && modifiee.c == 1);
+assert(isequal(structure.a, [1 2 3]) && strcmp(structure.b, 'mot') && ...
+       ~isfield(structure, 'c'), 'une structure, et les tableaux dans ses champs');
+structures = struct('v', {[1 2], [3 4]});
+modifiees = modifierStructures(structures);
+assert(isequal([modifiees.v], [10 2 3 4 5]) && numel(modifiees) == 3);
+assert(isequal([structures.v], [1 2 3 4]) && numel(structures) == 2, ...
+       'un tableau de structures');
+imbrique = struct('c', {{[1 2 3]}});
+imbrique2 = imbrique;
+imbrique2.c{1}(2) = 0;
+assert(isequal(imbrique.c{1}, [1 2 3]) && isequal(imbrique2.c{1}, [1 0 3]), ...
+       'un tableau dans une cellule dans une structure');
+% Le meme tableau passe deux fois : ecrire dans un parametre ne change ni
+% l'autre, ni la variable de l'appelant.
+[premier, second] = ecrireLePremierDeDeux(nombres, nombres);
+assert(isequal(premier, [7 2 3 4]) && isequal(second, [1 2 3 4]) && ...
+       isequal(nombres, [1 2 3 4]), 'deux parametres partagent sans se voir');
+% Un argument calcule pour l'appel n'a qu'un proprietaire : l'appele
+% l'ecrit, et le resultat est juste.
+assert(isequal(changerPremier(zeros(1, 3), 1), [1 0 0]));
+% varargin et fonctions anonymes passent par valeur de la meme facon.
+assert(isequal(ecrireVarargin(nombres, 2), [0 2 3 4]) && isequal(nombres, [1 2 3 4]));
+ecrireAnonyme = @(v) changerPremier(v, -1);
+assert(isequal(ecrireAnonyme(nombres), [-1 2 3 4]) && isequal(nombres, [1 2 3 4]));
+% Une fonction anonyme garde la valeur qu'elle a capturee.
+capturee = [1 2 3];
+lireCapturee = @() capturee;
+capturee(1) = 100;
+assert(isequal(lireCapturee(), [1 2 3]), 'la capture ne voit pas l''ecriture');
+% L'affectation partage aussi, et l'ecriture se separe dans les deux sens.
+aa = 1:5;
+bb = aa;
+bb(2) = 0;
+assert(isequal(aa, 1:5) && isequal(bb, [1 0 3 4 5]));
+aa(3) = -1;
+assert(isequal(bb, [1 0 3 4 5]) && isequal(aa, [1 2 -1 4 5]));
+original = zeros(1, 5);
+copie = original;
+for k = 1:5
+    copie(k) = k;
+end
+assert(all(original == 0) && isequal(copie, 1:5), 'remplir la copie laisse l''original');
+copie = original;
+copie(2) = [];
+assert(numel(original) == 5 && numel(copie) == 4);
+copie = original;
+copie(:) = 3;
+copie(8) = 1;
+assert(all(original == 0) && numel(original) == 5 && numel(copie) == 8);
+rendu = rendreTel(nombres);
+rendu(1) = -5;
+assert(nombres(1) == 1, 'une valeur rendue est une copie');
+% Ce qu'on tire d'une cellule ou d'une structure est une copie.
+boite = {zeros(1, 3)};
+tire = boite{1};
+tire(1) = 5;
+assert(boite{1}(1) == 0);
+fiche = struct('a', [1 2]);
+tire = fiche.a;
+tire(1) = 7;
+fiche2 = fiche;
+fiche2.a(2) = 50;
+assert(isequal(fiche.a, [1 2]) && isequal(fiche2.a, [1 50]));
+carte = containers.Map();
+rangee = [1 2 3];
+carte('k') = rangee;
+rangee(1) = 50;
+assert(isequal(carte('k'), [1 2 3]), 'la carte garde la valeur rangee');
+relue = carte('k');
+relue(2) = 60;
+assert(isequal(carte('k'), [1 2 3]), 'la valeur lue dans la carte est une copie');
+% Une persistante rendue puis modifiee ne change pas la persistante.
+memoire = tableauPersistant();
+memoire(1) = 999;
+memoire = tableauPersistant();
+assert(memoire(1) == 1, 'la persistante ne voit pas l''ecriture de l''appelant');
+% Une globale passee en argument, puis modifiee par l'appele a travers
+% « global » : le parametre garde la valeur recue.
+global partageGlobal
+partageGlobal = [1 2 3];
+assert(isequal(ecrireLaGlobale(partageGlobal), [1 2 3]) && ...
+       isequal(partageGlobal, [100 2 3]), 'une globale ecrite pendant l''appel');
+% evalin ecrit chez l'appelant pendant que l'appele tient son parametre.
+chezAppelant = [1 2 3];
+assert(isequal(ecrireChezLAppelantPendantLAppel(chezAppelant), [1 2 3]) && ...
+       isequal(chezAppelant, [9 2 3]), 'evalin pendant l''appel');
+% Une fonction imbriquee qui ecrit la variable de son parent, recue aussi
+% en parametre.
+assert(partageImbrique(), 'fonction imbriquee et parametre');
+% Le cout ne depend pas de la taille du tableau passe : deux mille appels
+% avec deux millions d'elements prennent le temps de deux mille appels
+% avec un seul element, non celui de deux mille copies de seize Mo. Et de
+% meme pour l'affectation, et pour une fonction native qui ne fait que
+% lire.
+petit = 0;
+gros = zeros(1, 2e6);
+debut = tic;
+for k = 1:2000
+    lu = lireUnElement(petit, 1);
+end
+tempsPetit = toc(debut);
+debut = tic;
+for k = 1:2000
+    lu = lireUnElement(gros, k);
+end
+tempsGros = toc(debut);
+assert(tempsGros < 4 * tempsPetit + 1, ...
+       sprintf('passer un grand tableau coute %.2f s, un petit %.2f s', tempsGros, tempsPetit));
+debut = tic;
+for k = 1:2000
+    alias = gros;
+    n = numel(alias) + alias(k);
+end
+assert(toc(debut) < 4 * tempsPetit + 1, 'affecter un grand tableau ne le recopie pas');
+assert(n == 2e6 && all(gros == 0));
+% Une descente recursive qui passe tout son texte a chaque appel : le
+% motif d'un analyseur. Lineaire, plus quadratique.
+texteLong = repmat('a', 1, 1e6);
+debut = tic;
+assert(compterRecursif(texteLong, 1, 0) == 100);
+assert(toc(debut) < 4 * tempsPetit + 1, 'une recursion qui passe un long texte');
+disp('passage par valeur : ok');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)
@@ -1273,4 +1432,68 @@ end
 function nettoyageInterne()
     c = onCleanup(@() noterNettoyage('interne'));   %#ok<NASGU>
     noterNettoyage('dans interne');
+end
+function x = changerPremier(x, v)
+    x(1) = v;
+end
+function x = remanierParametre(x)
+    x(1) = [];
+    x(end+1) = 0;
+    x(2:2:end) = [];
+    x(6) = 7;
+    x(3:5) = 0;
+end
+function c = modifierCellule(c)
+    c{1}(2) = 99;
+    c{2} = upper(c{2});
+    c{3}{1} = 5;
+    c{end+1} = 'ajout';
+end
+function s = modifierStructure(s)
+    s.a(2) = 50;
+    s.b(1) = 'M';
+    s.c = 1;
+end
+function t = modifierStructures(t)
+    t(1).v(1) = 10;
+    t(3).v = 5;
+end
+function [a, b] = ecrireLePremierDeDeux(a, b)
+    a(1) = 7;
+    assert(isequal(b, [1 2 3 4]), 'le second parametre ne voit pas l''ecriture');
+end
+function r = ecrireVarargin(varargin)
+    varargin{1}(1) = 0;
+    r = varargin{1};
+end
+function y = rendreTel(x)
+    y = x;
+end
+function v = tableauPersistant()
+    persistent tableau
+    if isempty(tableau)
+        tableau = [1 2 3];
+    end
+    v = tableau;
+end
+function p = ecrireLaGlobale(p)
+    global partageGlobal
+    partageGlobal(1) = 100;
+end
+function p = ecrireChezLAppelantPendantLAppel(p)
+    evalin('caller', 'chezAppelant(1) = 9;');
+end
+function y = lireUnElement(x, k)
+    y = x(k);
+end
+function n = compterRecursif(t, p, n)
+% Avance de dix mille caracteres par appel, en passant tout le texte.
+% Cent niveaux : assez pour le motif, sans approcher la limite de la pile.
+    if p > numel(t) || n >= 100
+        return;
+    end
+    if t(p) == 'a'
+        n = n + 1;
+    end
+    n = compterRecursif(t, p + 10000, n);
 end

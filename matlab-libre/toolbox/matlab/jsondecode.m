@@ -28,7 +28,8 @@ function v = jsondecode(texte)
 end
 
 function p = sauterBlancs(t, p)
-    while p <= numel(t) && any(t(p) == [' ', sprintf('\t'), sprintf('\n'), sprintf('\r')])
+% Les seuls blancs du JSON : espace, tabulation, saut de ligne, retour.
+    while p <= numel(t) && (t(p) == ' ' || t(p) == 9 || t(p) == 10 || t(p) == 13)
         p = p + 1;
     end
 end
@@ -45,13 +46,16 @@ function [v, p] = lireValeur(t, p)
         case '"'
             [v, p] = lireChaine(t, p);
         otherwise
-            if strncmp(t(p:end), 'true', 4)
+            % On ne compare que les caractères qui peuvent correspondre :
+            % « t(p:end) » recopiait tout le reste du texte à chaque
+            % valeur lue, et le décodage devenait quadratique.
+            if strncmp(t(p:min(end, p + 3)), 'true', 4)
                 v = true;
                 p = p + 4;
-            elseif strncmp(t(p:end), 'false', 5)
+            elseif strncmp(t(p:min(end, p + 4)), 'false', 5)
                 v = false;
                 p = p + 5;
-            elseif strncmp(t(p:end), 'null', 4)
+            elseif strncmp(t(p:min(end, p + 3)), 'null', 4)
                 v = [];
                 p = p + 4;
             else
@@ -164,10 +168,10 @@ function v = rassembler(elements)
         end
     end
     if toutesStructures && memesChamps(elements)
-        v = elements{1};
-        for k = 2:numel(elements)
-            v(k, 1) = elements{k};
-        end
+        % Une seule concaténation, qui range les champs par leur nom :
+        % empiler les structures une à une recopiait tout le tableau à
+        % chaque ajout.
+        v = vertcat(elements{:});
         return;
     end
     v = elements(:);

@@ -89,6 +89,18 @@ parfor i = 1:6
 end
 assert(isequal(d, (1:6) * 7));
 
+% Un grand tableau diffusé n'est pas recopié : chaque travailleur en tient
+% une copie qui partage ses données avec les autres, dans son propre fil.
+% L'appelé qui écrit dans son paramètre s'en fait une copie à lui seul ;
+% ni les autres travailleurs ni l'original ne voient son écriture.
+diffuse = 1:100000;
+vus = zeros(1, 40);
+parfor i = 1:40
+    vus(i) = ecrireDansSaCopie(diffuse, i) + sum(diffuse(1:3));
+end
+assert(isequal(vus, 8 * ones(1, 40)), 'chaque travailleur ecrit dans sa copie');
+assert(isequal(diffuse, 1:100000), 'l''original diffuse ne voit aucune ecriture');
+
 %% ------------------------------------------------- corps non parallélisable
 % Écriture indexée par autre chose que la variable de boucle : MatLibre
 % retombe sur l'exécution séquentielle et rend le même résultat.

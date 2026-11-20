@@ -237,6 +237,24 @@ catch
     jsonRefuse = true;
 end
 assert(jsonRefuse);
+% Un grand tableau se decode en un temps proportionnel a sa taille :
+% l'analyse passe tout le texte a chaque appel sans le recopier, ne compare
+% que les caracteres utiles, et empile les objets d'un seul coup. Vingt
+% mille nombres prenaient plusieurs minutes.
+grandJson = ['[' sprintf('%d,', 1:19999) '20000]'];
+debut = tic;
+grandLu = jsondecode(grandJson);
+assert(isequal(grandLu, (1:20000)') && toc(debut) < 30, 'jsondecode d''un grand tableau');
+objetsJson = ['[' strjoin(arrayfun(@(k) sprintf('{"id":%d,"v":[%d,%d]}', k, k, 2 * k), ...
+                                   1:2000, 'UniformOutput', false), ',') ']'];
+debut = tic;
+objetsLus = jsondecode(objetsJson);
+assert(isequal(size(objetsLus), [2000 1]) && isequal([objetsLus.id], 1:2000) && ...
+       isequal(objetsLus(7).v, [7; 14]) && toc(debut) < 30, ...
+       'jsondecode d''un tableau d''objets');
+% Les objets aux memes champs dans un autre ordre s'empilent par nom.
+desordre = jsondecode('[{"a":1,"b":2},{"b":3,"a":4}]');
+assert(isequal([desordre.a], [1 4]) && isequal([desordre.b], [2 3]));
 
 %% ------------------------------------------ lecture et ecriture de cases
 bac = tempdir();
