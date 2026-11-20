@@ -58,7 +58,11 @@ disp('derivation automatique : ok');
 rng(2);
 A = randn(6, 7);
 K = randn(3, 2);
-assert(max(max(abs(conv2(A, K, 'valid') - extractdata(dlconv(dlarray(A, 'SS'), K, 0))))) < 1e-12);
+% Comme les couches de MATLAB : une correlation (FILTER2), le filtre n'est
+% pas retourne comme dans CONV2.
+sortie = extractdata(dlconv(dlarray(A, 'SS'), K, 0));
+assert(max(max(abs(filter2(K, A, 'valid') - sortie))) < 1e-12);
+assert(max(max(abs(conv2(A, rot90(K, 2), 'valid') - sortie))) < 1e-12);
 X = randn(7, 6, 2, 3);
 W = randn(3, 2, 2, 4);
 B = randn(4, 1);

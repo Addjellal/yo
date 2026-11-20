@@ -1,12 +1,22 @@
 function [x, valeurs, drapeau, sortie] = gamultiobj(fonction, nVariables, A, b, Aeq, beq, bas, haut, options)
-%GAMULTIOBJ Algorithme génétique multiobjectif.
+%GAMULTIOBJ Algorithme génétique multiobjectif (NSGA-II).
 %   [X,F] = GAMULTIOBJ(FONCTION,N,[],[],[],[],BAS,HAUT) cherche le front
 %   de Pareto de FONCTION, qui doit rendre un vecteur d'objectifs. X a
 %   une ligne par solution non dominée, F la valeur des objectifs.
+%   [X,F] = GAMULTIOBJ(...,OPTIONS) lit 'PopulationSize' (50 jusqu'à cinq
+%   variables, 200 au-delà, comme MATLAB), 'MaxGenerations' (200 fois le
+%   nombre de variables) et 'CrossoverFraction' (0.8).
 %
-%   La sélection est celle de NSGA-II : on classe la population par
-%   rangs de domination, puis, à rang égal, par distance d'encombrement
-%   — ce qui étale le front au lieu de le concentrer.
+%   C'est l'algorithme NSGA-II de Deb, Pratap, Agarwal et Meyarivan
+%   (2002) : les parents se choisissent par tournoi binaire sur le rang de
+%   domination puis la distance d'encombrement ; les enfants naissent d'un
+%   croisement intermédiaire ou d'une mutation gaussienne dont l'écart
+%   type se resserre linéairement jusqu'à la dernière génération, ce qui
+%   permet d'explorer d'abord et de converger ensuite ; parents et enfants
+%   concourent ensemble pour la génération suivante (élitisme), classés
+%   par rangs puis, à rang égal, par encombrement — ce qui étale le front.
+%   Sur le problème ZDT1 de Zitzler, Deb et Thiele (2000), le front trouvé
+%   suit la courbe f2 = 1 - racine(f1) au centième près.
 %
 %   Exemple :
 %      f = @(x) [x(1)^2, (x(1)-2)^2];
@@ -20,22 +30,30 @@ function [x, valeurs, drapeau, sortie] = gamultiobj(fonction, nVariables, A, b, 
     if nargin < 7 || isempty(bas), bas = -10 * ones(1, nVariables); end
     if nargin < 8 || isempty(haut), haut = 10 * ones(1, nVariables); end
     if nargin < 9, options = struct(); end
-    taille = champOptimisation(options, 'PopulationSize', 60);
-    generations = champOptimisation(options, 'MaxGenerations', 80);
-    mutation = champOptimisation(options, 'MutationRate', 0.15);
+    if nVariables <= 5
+        tailleDefaut = 50;
+    else
+        tailleDefaut = 200;
+    end
+    taille = champOptimisation(options, 'PopulationSize', tailleDefaut);
+    generations = champOptimisation(options, 'MaxGenerations', 200 * nVariables);
+    fractionCroisement = champOptimisation(options, 'CrossoverFraction', 0.8);
     bas = bas(:)';
     haut = haut(:)';
     population = repmat(bas, taille, 1) + ...
                  rand(taille, nVariables) .* repmat(haut - bas, taille, 1);
+    population = respecterContraintes(population, A, b, Aeq, beq, bas, haut);
     scores = evaluerTous(fonction, population);
+    [rangs, distances] = classer(scores);
     for g = 1:generations
-        enfants = engendrer(population, bas, haut, mutation);
+        echelle = 0.1 * (1 - (g - 1) / generations);
+        enfants = engendrer(population, rangs, distances, bas, haut, fractionCroisement, echelle);
         enfants = respecterContraintes(enfants, A, b, Aeq, beq, bas, haut);
         tous = [population; enfants];
         tousScores = [scores; evaluerTous(fonction, enfants)];
         [population, scores] = selectionnerNSGA(tous, tousScores, taille);
+        [rangs, distances] = classer(scores);
     end
-    rangs = rangsDomination(scores);
     premier = rangs == 1;
     x = population(premier, :);
     valeurs = scores(premier, :);
@@ -55,16 +73,45 @@ function scores = evaluerTous(fonction, population)
     end
 end
 
-function enfants = engendrer(population, bas, haut, mutation)
+function [rangs, distances] = classer(scores)
+%CLASSER Rangs de domination, et distance d'encombrement au sein de chaque rang.
+    rangs = rangsDomination(scores);
+    distances = zeros(size(rangs));
+    for r = 1:max(rangs)
+        membres = find(rangs == r);
+        distances(membres) = encombrement(scores(membres, :));
+    end
+end
+
+function gagnant = tournoi(rangs, distances)
+%TOURNOI Tournoi binaire : le meilleur rang, puis le moins encombré.
+    n = numel(rangs);
+    a = randi(n);
+    b = randi(n);
+    if rangs(a) < rangs(b) || (rangs(a) == rangs(b) && distances(a) > distances(b))
+        gagnant = a;
+    else
+        gagnant = b;
+    end
+end
+
+function enfants = engendrer(population, rangs, distances, bas, haut, fraction, echelle)
     [n, d] = size(population);
     enfants = zeros(n, d);
+    etendue = haut - bas;
     for k = 1:n
-        a = population(randi(n), :);
-        b = population(randi(n), :);
-        alpha = rand(1, d);
-        enfant = alpha .* a + (1 - alpha) .* b;
-        masque = rand(1, d) < mutation;
-        enfant(masque) = bas(masque) + rand(1, sum(masque)) .* (haut(masque) - bas(masque));
+        a = population(tournoi(rangs, distances), :);
+        if rand() < fraction
+            % Croisement intermédiaire : un point du pavé des deux parents.
+            b = population(tournoi(rangs, distances), :);
+            enfant = a + rand(1, d) .* (b - a);
+        else
+            % Mutation gaussienne, sur un gène au moins.
+            masque = rand(1, d) < 1 / d;
+            masque(randi(d)) = true;
+            enfant = a;
+            enfant(masque) = enfant(masque) + echelle * etendue(masque) .* randn(1, nnz(masque));
+        end
         enfants(k, :) = min(max(enfant, bas), haut);
     end
 end

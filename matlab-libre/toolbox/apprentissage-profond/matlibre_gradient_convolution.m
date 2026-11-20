@@ -27,7 +27,6 @@ function contributions = matlibre_gradient_convolution(g, donnees)
     gradientMatrice = reshape(permute(g, [3 1 2 4]), filtres, []);
     versPoidsMatrice = contexte.patchs * gradientMatrice.';
     versPoids = reshape(versPoidsMatrice, contexte.taillePoids);
-    versPoids = versPoids(end:-1:1, end:-1:1, :, :);
     versPatchs = contexte.poidsMatrice * gradientMatrice;
     versEtendue = accumarray(contexte.indices(:), versPatchs(:), ...
                              [prod(contexte.tailleEtendue) 1]);

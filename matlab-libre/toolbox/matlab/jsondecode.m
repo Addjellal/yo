@@ -45,13 +45,15 @@ function [v, p] = lireValeur(t, p)
         case '"'
             [v, p] = lireChaine(t, p);
         otherwise
-            if strncmp(t(p:end), 'true', 4)
+            % Lire quatre ou cinq caractères, non tout le reste du texte :
+            % recopier la fin à chaque valeur rendait le décodage quadratique.
+            if motIci(t, p, 'true')
                 v = true;
                 p = p + 4;
-            elseif strncmp(t(p:end), 'false', 5)
+            elseif motIci(t, p, 'false')
                 v = false;
                 p = p + 5;
-            elseif strncmp(t(p:end), 'null', 4)
+            elseif motIci(t, p, 'null')
                 v = [];
                 p = p + 4;
             else
@@ -236,4 +238,8 @@ function [v, p] = lireNombre(t, p)
         error('MATLAB:json:BadNumber', ...
               'Nombre attendu à la position %d.', debut);
     end
+end
+
+function oui = motIci(t, p, mot)
+    oui = p + numel(mot) - 1 <= numel(t) && strcmp(t(p:p + numel(mot) - 1), mot);
 end
