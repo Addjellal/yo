@@ -185,6 +185,47 @@ svgEgal = matlibre_svg();
 % davantage d'unites : les graduations descendent sous -1.
 assert(~isempty(strfind(svgEgal, '>-3<')));
 assert(isequal(axis, [0 10 0 1]));   % les bornes des donnees, inchangees
+% Bornes fixees ensuite : elles restent, et c'est la boite qui se resserre
+% (MATLAB ajuste alors PlotBoxAspectRatio) ; « axis image » de meme serre
+% la boite sur l'image, sans bandes blanches.
+motifBoite = ['<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="([\d.]+)" ' ...
+              'fill="white" stroke="#222"'];
+figure
+imagesc(magic(5)); axis equal; xlim([0.5 5.5]); ylim([0.5 5.5]);
+boite = regexp(matlibre_svg(), motifBoite, 'tokens', 'once');
+assert(abs(str2double(boite{1}) - str2double(boite{2})) <= 1);
+figure('Position', [0 0 800 300]);
+imagesc(ones(10, 20)); axis image;
+boite = regexp(matlibre_svg(), motifBoite, 'tokens', 'once');
+assert(abs(str2double(boite{1}) / str2double(boite{2}) - 2) < 0.02);
+assert(isequal(axis, [0.5 20.5 0.5 10.5]));
+% La couleur et la taille d'un texte doivent tenir : une regle de feuille
+% de style l'emporte sur un attribut, et « text{fill:#222} » rendait tous
+% les textes gris fonce, 'Color','w' compris.
+figure
+imagesc(1); text(1, 1, 'blanc', 'Color', 'w', 'FontSize', 20); title('titre', 'FontSize', 9);
+svgTexte = matlibre_svg();
+assert(~isempty(strfind(svgTexte, 'fill="#FFFFFF">blanc')));
+assert(isempty(regexp(svgTexte, 'text\{[^}]*(fill|font-size):', 'once')));
+assert(isempty(regexp(svgTexte, '\.titre\{[^}]*font-size:', 'once')));
+% « -. » est le tiret-point, « .- » le marqueur point relie par un trait.
+figure
+h1 = plot(1:3, 'r-.');
+hold on
+h2 = plot(1:3, 'k.-');
+h3 = plot(1:3, 'b-.o');
+assert(strcmp(get(h1, 'LineStyle'), '-.') && strcmp(get(h1, 'Marker'), 'none'));
+assert(strcmp(get(h2, 'LineStyle'), '-') && strcmp(get(h2, 'Marker'), '.'));
+assert(strcmp(get(h3, 'LineStyle'), '-.') && strcmp(get(h3, 'Marker'), 'o'));
+assert(~isempty(strfind(matlibre_svg(), 'stroke-dasharray="8,3,2,3"')));
+% Une etiquette de graduation longue elargit la marge au lieu d'etre
+% rognee au bord de la figure.
+figure
+plot(1:3);
+set(gca, 'YTick', 1:3, 'YTickLabel', {'une etiquette vraiment tres longue', 'b', 'c'});
+boite = regexp(matlibre_svg(), ['<rect x="([\d.]+)" y="[\d.]+" width="[\d.]+" ' ...
+                                'height="[\d.]+" fill="white" stroke="#222"'], 'tokens', 'once');
+assert(str2double(boite{1}) > 180);
 
 % « axis square » rend la boite carree : le cadre du trace doit l'etre.
 figure
@@ -965,6 +1006,25 @@ set(poigneeLegende, 'Visible', 'off');
 assert(strcmp(get(poigneeLegende, 'Visible'), 'off'));
 poigneeBarre = colorbar;
 assert(strcmp(class(poigneeBarre), 'matlab.graphics.illustration.ColorBar'));
+% La barre se dessine (elle etait acceptee sans rien tracer, malgre sa
+% fiche) : un degrade a droite de la boite, gradue sur CLim. 'off' la
+% retire ; une autre position est refusee en le disant.
+figure
+imagesc([0 10; 20 30]);
+colorbar
+svgBarre = matlibre_svg();
+assert(~isempty(strfind(svgBarre, 'class="barreCouleurs"')));
+assert(~isempty(strfind(svgBarre, '>30</text>')) && ~isempty(strfind(svgBarre, '>0</text>')));
+colorbar('off');
+assert(isempty(strfind(matlibre_svg(), 'class="barreCouleurs"')));
+refusBarre = false;
+try
+    colorbar('southoutside');
+catch erreurBarre
+    refusBarre = strcmp(erreurBarre.identifier, 'MatLibre:colorbar:Position');
+end
+assert(refusBarre);
+close all
 
 % Les enfants d'une figure sont ses axes : sans eux, un parcours de
 % l'arbre graphique s'arretait a la figure.

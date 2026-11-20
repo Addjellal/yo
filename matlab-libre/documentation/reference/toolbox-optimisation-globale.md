@@ -117,22 +117,7 @@ _Pas de bloc d'aide._
 
 ## `gamultiobj`
 
-```
-GAMULTIOBJ Algorithme génétique multiobjectif.
-  [X,F] = GAMULTIOBJ(FONCTION,N,[],[],[],[],BAS,HAUT) cherche le front
-  de Pareto de FONCTION, qui doit rendre un vecteur d'objectifs. X a
-  une ligne par solution non dominée, F la valeur des objectifs.
-
-  La sélection est celle de NSGA-II : on classe la population par
-  rangs de domination, puis, à rang égal, par distance d'encombrement
-  — ce qui étale le front au lieu de le concentrer.
-
-  Exemple :
-     f = @(x) [x(1)^2, (x(1)-2)^2];
-     [x, v] = gamultiobj(f, 1, [], [], [], [], -2, 4);
-
-  Voir aussi GA, PARETOSEARCH, GAOPTIMSET.
-```
+_Pas de bloc d'aide._
 
 ## `gaoptimset`
 
@@ -226,10 +211,31 @@ MULTISTART Minimisation locale répétée depuis des points tirés au hasard.
 ## `paretosearch`
 
 ```
-PARETOSEARCH Front de Pareto par recherche directe.
-  Même but que GAMULTIOBJ, mais sans hasard de croisement : chaque
-  point non dominé est sondé dans les directions de coordonnée, et le
-  front s'épaissit tant qu'on trouve mieux.
+PARETOSEARCH Front de Pareto par recherche directe sur maillage.
+  [X,F] = PARETOSEARCH(FONCTION,N,[],[],[],[],BAS,HAUT) cherche le front
+  de Pareto de FONCTION, qui rend un vecteur d'objectifs, sans gradient
+  ni hasard de croisement. X a une ligne par point non dominé, F la
+  valeur des objectifs.
+  [X,F] = PARETOSEARCH(...,[],OPTIONS) lit 'ParetoSetSize' (60, comme
+  MATLAB), 'MaxIterations' (100 fois le nombre de variables) et
+  'MeshTolerance' (1e-6, rapportée à l'étendue de chaque variable).
+  [X,F,DRAPEAU,SORTIE] = PARETOSEARCH(...) rend aussi le nombre
+  d'itérations et d'évaluations.
+
+  Chaque point de l'archive non dominée porte sa propre maille, comme
+  dans une recherche par motifs : il sonde les 2N directions de
+  coordonnée ; un sondage qui entre dans l'archive y entre avec une
+  maille doublée, et un point dont aucun sondage n'a réussi resserre la
+  sienne de moitié. Le pas ne se resserre donc que là où il le faut, et
+  les points peuvent parcourir tout le domaine. L'archive est ramenée à
+  ParetoSetSize points par la distance d'encombrement, extrémités
+  gardées. Chaque itération sonde les dix points actifs les plus isolés.
+  Sur le problème ZDT1 de Zitzler, Deb et Thiele (2000), le front trouvé
+  suit la courbe f2 = 1 - racine(f1).
+
+  Seules les bornes sont prises en charge : les contraintes linéaires et
+  non linéaires sont refusées en le disant (GAMULTIOBJ prend les
+  contraintes linéaires).
 
   Exemple :
      f = @(x) [x(1)^2, (x(1)-2)^2];

@@ -69,6 +69,10 @@ AXIS  Bornes et proportions des axes.
     AXIS([xmin xmax ymin ymax]) impose les bornes.
     AXIS AUTO revient au calcul automatique.
     AXIS EQUAL donne la même échelle aux deux axes : un cercle est rond.
+    Comme dans MATLAB, l'axe qui a trop de place élargit ses bornes si
+    elles sont automatiques ; si on les a fixées (XLIM, YLIM), elles
+    restent, et c'est la boîte qui se resserre.
+    AXIS IMAGE fait de même, la boîte serrée sur les données.
     AXIS SQUARE rend la boîte des axes carrée.
     AXIS TIGHT serre les bornes sur les données.
     AXIS OFF / AXIS ON cache ou montre les axes.
@@ -76,7 +80,7 @@ AXIS  Bornes et proportions des axes.
 
     Syntaxe
        axis([xmin xmax ymin ymax])
-       axis auto | equal | square | tight | off | on
+       axis auto | equal | image | square | tight | off | on
        v = axis
 
     Exemples
@@ -241,10 +245,17 @@ CLOSE  Ferme une figure.
 
 ```
 COLORBAR  Barre de couleurs, avec son échelle.
-    COLORBAR ajoute la barre à droite des axes courants.
+    COLORBAR ajoute la barre à droite des axes courants : la palette en
+    vigueur, graduée sur les bornes de couleur (CLIM).
+    COLORBAR(AX) la met à droite des axes AX.
+    COLORBAR('off') la retire.
+    MatLibre ne la place qu'à droite ('eastoutside', la position par
+    défaut de MATLAB) : les autres positions sont refusées en le disant.
 
     Syntaxe
        colorbar
+       colorbar(ax)
+       colorbar('off')
 
     Exemples
        imagesc(peaks(30)); colorbar

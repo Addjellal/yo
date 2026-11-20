@@ -521,6 +521,26 @@ void couleurPixelImage(const std::vector<double>& palette, const Serie& s, std::
     couleurEchelle(palette, valeur, cmin, cmax, r, v, b);
 }
 
+BarreCouleurs barreCouleurs(const Figure& f, const Axes& a) {
+    BarreCouleurs barre;
+    double cmin, cmax;
+    limitesCouleur(a, cmin, cmax);
+    const std::vector<double>& palette = paletteEnVigueur(f, a);
+    const int tranches = 128;
+    for (int k = 0; k < tranches; ++k) {
+        int r, v, b;
+        couleurEchelle(palette, cmin + (cmax - cmin) * (k + 0.5) / tranches, cmin, cmax, r, v, b);
+        barre.tranches.insert(barre.tranches.end(), {r, v, b});
+    }
+    for (double t : graduations(cmin, cmax, 6)) {
+        double fraction = (t - cmin) / (cmax - cmin);
+        if (fraction < -1e-9 || fraction > 1 + 1e-9) continue;
+        barre.valeurs.push_back(t);
+        barre.fractions.push_back(fraction);
+    }
+    return barre;
+}
+
 void limitesCouleur(const Axes& a, double& cmin, double& cmax) {
     if (a.climManuelle) {
         cmin = a.cmin;
@@ -804,12 +824,29 @@ void appliquerProportions(const Axes& a, int& gauche, int& droite, int& haut, in
     if (largeur <= 0 || hauteur <= 0) return;
     double echelle = std::max((xmax - xmin) / largeur, (ymax - ymin) / hauteur);
     if (!(echelle > 0)) return;
-    double cx = (xmin + xmax) / 2, cy = (ymin + ymax) / 2;
-    double demiX = echelle * largeur / 2, demiY = echelle * hauteur / 2;
-    xmin = cx - demiX;
-    xmax = cx + demiX;
-    ymin = cy - demiY;
-    ymax = cy + demiY;
+    // L'axe qui a de la place, comme dans MATLAB : ses bornes s'élargissent
+    // si elles sont automatiques ; si on les a fixées (« axis image »,
+    // xlim, ylim), elles restent, et c'est la boîte qui se resserre.
+    if (a.limitesManuellesX) {
+        int utile = (int)std::lround((xmax - xmin) / echelle);
+        int centre = (gauche + droite) / 2;
+        gauche = centre - utile / 2;
+        droite = gauche + utile;
+    } else {
+        double cx = (xmin + xmax) / 2, demiX = echelle * largeur / 2;
+        xmin = cx - demiX;
+        xmax = cx + demiX;
+    }
+    if (a.limitesManuellesY) {
+        int utile = (int)std::lround((ymax - ymin) / echelle);
+        int centre = (haut + bas) / 2;
+        haut = centre - utile / 2;
+        bas = haut + utile;
+    } else {
+        double cy = (ymin + ymax) / 2, demiY = echelle * hauteur / 2;
+        ymin = cy - demiY;
+        ymax = cy + demiY;
+    }
 }
 
 std::string rendreSVG(const Figure& figure) {
@@ -818,8 +855,13 @@ std::string rendreSVG(const Figure& figure) {
     out << "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" << L << "\" height=\"" << H
         << "\" viewBox=\"0 0 " << L << " " << H << "\">\n";
     out << "<rect width=\"" << L << "\" height=\"" << H << "\" fill=\"white\"/>\n";
-    out << "<style>text{font-family:Helvetica,Arial,sans-serif;font-size:12px;fill:#222}"
-           ".titre{font-size:15px}.axe{stroke:#222;stroke-width:1;fill:none}"
+    // Une règle de feuille de style l'emporte sur un attribut : la couleur
+    // et la taille par défaut ne s'appliquent donc qu'aux textes qui n'en
+    // portent pas, sans quoi « text(...,'Color','w') » ou « FontSize »
+    // resteraient sans effet.
+    out << "<style>text{font-family:Helvetica,Arial,sans-serif}"
+           "text:not([font-size]){font-size:12px}text:not([fill]){fill:#222}"
+           ".titre:not([font-size]){font-size:15px}.axe{stroke:#222;stroke-width:1;fill:none}"
            ".grille{stroke:#ccc;stroke-width:0.5}</style>\n";
 
     int indiceAxe = 0;
@@ -837,8 +879,20 @@ std::string rendreSVG(const Figure& figure) {
         int droite = (int)((fx + fl) * L - std::min(30.0, 0.10 * largeurCase));
         int haut = (int)(fy * H + std::min(40.0, 0.16 * hauteurCase));
         int bas = (int)((fy + fh) * H - std::min(50.0, 0.22 * hauteurCase));
+        // Des étiquettes de graduation écrites à la main (« yticklabels »)
+        // peuvent être longues : la marge s'élargit pour qu'elles tiennent,
+        // comme MATLAB le fait, au lieu de les rogner au bord.
+        double largeurEtiquettesY = 0;
+        for (const auto& e : a.etiquettesTicksY)
+            largeurEtiquettesY = std::max(largeurEtiquettesY, largeurTexte(e, 12));
+        if (a.axesVisibles && largeurEtiquettesY > 0) {
+            int requis = (int)(fx * L + largeurEtiquettesY + 14 +
+                               (a.etiquetteY.empty() ? 0.0 : 24.0));
+            gauche = std::max(gauche, requis);
+        }
         if (droite <= gauche + 10 || bas <= haut + 10) continue;
         int hautTitre = haut;
+        const int xEtiquetteY = (int)std::min(gauche - 46.0, gauche - largeurEtiquettesY - 20);
 
         // La légende se mesure avant les échelles : placée hors de l'axe,
         // elle lui prend de la place, comme dans MATLAB.
@@ -887,6 +941,12 @@ std::string rendreSVG(const Figure& figure) {
                                                       : (haut + bas) / 2.0 - hauteurLegende / 2;
             }
             if (droite <= gauche + 10 || bas <= haut + 10) continue;
+        }
+
+        // La barre de couleurs prend sa place à droite, comme dans MATLAB.
+        if (a.barreCouleurs) {
+            droite -= LARGEUR_BARRE_COULEURS;
+            if (droite <= gauche + 10) continue;
         }
 
         // Les bornes : celles qu'on a fixées, ou celles des données,
@@ -1165,6 +1225,32 @@ std::string rendreSVG(const Figure& figure) {
         }
         out << "</g>\n";
 
+        if (a.barreCouleurs) {
+            BarreCouleurs barre = barreCouleurs(figure, a);
+            const int x0 = droite + 14, largeurBande = 14;
+            const std::size_t tranches = barre.tranches.size() / 3;
+            const double pas = (double)(bas - haut) / (double)tranches;
+            out << "<g class=\"barreCouleurs\">\n";
+            for (std::size_t k = 0; k < tranches; ++k)
+                out << "<rect x=\"" << x0 << "\" y=\"" << formater("%.2f", bas - (k + 1) * pas)
+                    << "\" width=\"" << largeurBande << "\" height=\"" << formater("%.2f", pas + 0.5)
+                    << "\" fill=\""
+                    << formater("#%02X%02X%02X", barre.tranches[3 * k], barre.tranches[3 * k + 1],
+                                barre.tranches[3 * k + 2])
+                    << "\"/>\n";
+            out << "<rect class=\"axe\" x=\"" << x0 << "\" y=\"" << haut << "\" width=\""
+                << largeurBande << "\" height=\"" << (bas - haut) << "\"/>\n";
+            for (std::size_t k = 0; k < barre.valeurs.size(); ++k) {
+                double y = bas - barre.fractions[k] * (bas - haut);
+                out << "<line class=\"axe\" x1=\"" << (x0 + largeurBande) << "\" y1=\""
+                    << formater("%.2f", y) << "\" x2=\"" << (x0 + largeurBande + 4) << "\" y2=\""
+                    << formater("%.2f", y) << "\"/>\n";
+                out << "<text x=\"" << (x0 + largeurBande + 7) << "\" y=\"" << formater("%.2f", y + 4)
+                    << "\">" << echapperXml(nombreCourt(barre.valeurs[k])) << "</text>\n";
+            }
+            out << "</g>\n";
+        }
+
         if (!a.titre.empty())
             out << "<text class=\"titre\" x=\"" << ((gauche + droite) / 2) << "\" y=\""
                 << (hautTitre - 14) << "\" text-anchor=\"middle\""
@@ -1178,8 +1264,8 @@ std::string rendreSVG(const Figure& figure) {
             out << "<text x=\"" << ((gauche + droite) / 2) << "\" y=\"" << (bas + 36)
                 << "\" text-anchor=\"middle\">" << echapperXml(a.etiquetteX) << "</text>\n";
         if (!a.etiquetteY.empty() && a.axesVisibles)
-            out << "<text x=\"" << (gauche - 46) << "\" y=\"" << ((haut + bas) / 2)
-                << "\" text-anchor=\"middle\" transform=\"rotate(-90 " << (gauche - 46) << " "
+            out << "<text x=\"" << xEtiquetteY << "\" y=\"" << ((haut + bas) / 2)
+                << "\" text-anchor=\"middle\" transform=\"rotate(-90 " << xEtiquetteY << " "
                 << ((haut + bas) / 2) << ")\">" << echapperXml(a.etiquetteY) << "</text>\n";
 
         if (!entrees.empty()) {

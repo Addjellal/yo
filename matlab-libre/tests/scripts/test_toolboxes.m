@@ -115,6 +115,12 @@ assert(isequal(classify(reseau, X).', [1 2 2 1]));
 % Text Analytics
 mots = tokenizedDocument('Le chat dort.');
 assert(numel(mots) == 3);
+% Plusieurs textes : un document par texte, comme MATLAB (rendait une
+% cellule vide).
+documents = tokenizedDocument(["Le chat dort.", "Le chien court vite."]);
+assert(isequal(size(documents), [1 2]) && numel(documents{2}) == 4);
+[effectifs, vocabulaire] = bagOfWords(documents);
+assert(isequal(sum(effectifs, 2), [3; 4]) && numel(vocabulaire) == 6);
 assert(editDistance('chat', 'chats') == 1);
 
 % Wavelet

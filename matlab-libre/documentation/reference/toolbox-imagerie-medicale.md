@@ -75,7 +75,8 @@ HAUSDORFFDIST Distance de Hausdorff entre deux ensembles de points.
 IRADONTRANSFORM Rétroprojection filtrée.
   IMAGE = IRADONTRANSFORM(S,ANGLES,TAILLE) reconstruit une image à
   partir de son sinogramme. ANGLES est la liste des angles de
-  projection, en degrés ; TAILLE le côté de l'image rendue.
+  projection, en degrés ; TAILLE le côté de l'image rendue. C'est IRADON
+  de MATLAB, avec le filtre de Ram-Lak et l'interpolation linéaire.
 
   Rétroprojeter sans filtrer étale chaque projection sur toute l'image
   et donne un résultat flou : chaque point y contribue à tout ce qui est
@@ -105,6 +106,8 @@ RADONTRANSFORM Projections de l'image pour une série d'angles.
   chaque droite de cet angle. Les angles vont de 0 à 179 degrés par
   défaut.
   RADONTRANSFORM(IMAGE,ANGLES) impose la liste des angles.
+  C'est RADON de MATLAB, dont les projections partagent chaque pixel en
+  quatre sous-pixels répartis entre les deux casiers les plus proches.
 
   C'est exactement ce que mesure un scanner : chaque détecteur relève
   l'atténuation cumulée le long d'un rayon. Reconstruire l'image à

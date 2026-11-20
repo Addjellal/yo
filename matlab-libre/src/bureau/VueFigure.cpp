@@ -135,6 +135,17 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
     double margeHaut = std::min(30.0, 0.16 * cadre.height());
     double margeBas = std::min(44.0, 0.22 * cadre.height());
     if (axes.titre.empty()) margeHaut = std::min(16.0, margeHaut);
+    // La barre de couleurs prend sa place à droite, comme dans le SVG.
+    if (axes.barreCouleurs) margeDroite += LARGEUR_BARRE_COULEURS;
+    // Des étiquettes de graduation écrites à la main peuvent être longues :
+    // la marge s'élargit pour qu'elles tiennent, comme dans le SVG.
+    double largeurEtiquettesY = 0;
+    for (const auto& e : axes.etiquettesTicksY)
+        largeurEtiquettesY =
+            std::max(largeurEtiquettesY, metrique.horizontalAdvance(QString::fromStdString(e)));
+    if (axes.axesVisibles && largeurEtiquettesY > 0)
+        margeGauche = std::max(margeGauche, largeurEtiquettesY + 14 +
+                                                (axes.etiquetteY.empty() ? 0.0 : 24.0));
     QRectF trace(cadre.left() + margeGauche, cadre.top() + margeHaut,
                  cadre.width() - margeGauche - margeDroite,
                  cadre.height() - margeHaut - margeBas);
@@ -463,6 +474,27 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
         ++rang;
     }
     peintre.restore();
+
+    if (axes.barreCouleurs) {
+        BarreCouleurs barre = barreCouleurs(figure_.figure, axes);
+        const double x0 = trace.right() + 14, largeurBande = 14;
+        const std::size_t tranches = barre.tranches.size() / 3;
+        const double pas = trace.height() / (double)tranches;
+        for (std::size_t k = 0; k < tranches; ++k)
+            peintre.fillRect(QRectF(x0, trace.bottom() - (double)(k + 1) * pas, largeurBande,
+                                    pas + 0.5),
+                             QColor(barre.tranches[3 * k], barre.tranches[3 * k + 1],
+                                    barre.tranches[3 * k + 2]));
+        peintre.setPen(QColor("#222222"));
+        peintre.setBrush(Qt::NoBrush);
+        peintre.drawRect(QRectF(x0, trace.top(), largeurBande, trace.height()));
+        for (std::size_t k = 0; k < barre.valeurs.size(); ++k) {
+            double y = trace.bottom() - barre.fractions[k] * trace.height();
+            peintre.drawLine(QPointF(x0 + largeurBande, y), QPointF(x0 + largeurBande + 4, y));
+            peintre.drawText(QPointF(x0 + largeurBande + 7, y + 4),
+                             etiquetteGraduation(barre.valeurs[k], false));
+        }
+    }
 
     // Titres et étiquettes.
     peintre.setPen(QColor("#101010"));

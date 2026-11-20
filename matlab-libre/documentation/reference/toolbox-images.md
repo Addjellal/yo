@@ -1911,6 +1911,41 @@ IND2RGB Image indexée vers image en couleurs.
   Voir aussi GRAY2RGB, RGB2GRAY, COLORMAP.
 ```
 
+## `iradon`
+
+```
+IRADON Transformée de Radon inverse, par rétroprojection filtrée.
+  I = IRADON(R,THETA) reconstruit une image à partir des projections R
+  (une colonne par angle, comme celles de RADON) prises aux angles THETA,
+  en degrés ; THETA peut aussi être l'écart entre deux angles, pris alors
+  à partir de zéro.
+  I = IRADON(R,THETA,INTERP,FILTRE,ECHELLE,TAILLE) précise, comme
+  MATLAB :
+     INTERP   'linear' (défaut) ou 'nearest' : l'interpolation de la
+              rétroprojection
+     FILTRE   'Ram-Lak' (défaut), 'Shepp-Logan', 'Cosine', 'Hamming',
+              'Hann' ou 'None'
+     ECHELLE  la part de la bande gardée, entre 0 et 1 (1 par défaut)
+     TAILLE   le côté de l'image (2*floor(size(R,1)/(2*sqrt(2))) par défaut)
+  [I,H] = IRADON(...) rend aussi la réponse en fréquence du filtre.
+
+  Chaque projection est filtrée par la rampe |f|, construite dans le
+  domaine spatial (Kak et Slaney, Principles of Computerized Tomographic
+  Imaging, chapitre 3 : h(0) = 1/4, h(n) = -1/(n pi)^2 pour n impair,
+  zéro pour n pair) et appliquée sur des projections complétées de zéros
+  jusqu'à une puissance de deux au moins double, ce qui évite le
+  repliement circulaire et le décalage du continu. Les projections
+  filtrées sont ensuite rétroprojetées et sommées, au facteur pi/(2 N)
+  près pour N angles.
+
+  Exemple :
+     P = phantom(64);
+     I = iradon(radon(P, 0:179), 0:179, 'linear', 'Ram-Lak', 1, 64);
+     sqrt(mean((I(:) - P(:)) .^ 2))  % petit
+
+  Voir aussi RADON, PHANTOM.
+```
+
 ## `lab2rgb`
 
 ```
@@ -2195,6 +2230,27 @@ PADARRAY Ajoute une bordure à un tableau.
   Voir aussi IMFILTER, IMRESIZE, IMTRANSLATE.
 ```
 
+## `phantom`
+
+```
+PHANTOM Fantôme de Shepp et Logan, ou image d'ellipses.
+  P = PHANTOM(N) rend le fantôme de tête de Shepp et Logan modifié (Toft,
+  1996) sur une grille N x N (256 par défaut), comme MATLAB : dix
+  ellipses dont les densités s'ajoutent.
+  P = PHANTOM(DEF,N) choisit le fantôme : 'Modified Shepp-Logan'
+  (défaut, contrastes relevés pour l'affichage) ou 'Shepp-Logan'
+  (l'original de 1974) ; DEF peut aussi être une matrice d'ellipses, une
+  ligne [A a b x0 y0 phi] par ellipse : densité, demi-axes, centre et
+  angle en degrés, sur le carré [-1,1] x [-1,1].
+  [P,E] = PHANTOM(...) rend aussi la matrice des ellipses.
+
+  Exemple :
+     P = phantom(128);
+     [max(P(:)) min(P(:))]           % 1 et 0
+
+  Voir aussi RADON, IRADON.
+```
+
 ## `poly2mask`
 
 ```
@@ -2227,6 +2283,32 @@ PSNR Rapport signal sur bruit de crête, en décibels.
      psnr(x, x + 0.01 * randn(32, 32)) > 30
 
   Voir aussi SSIM, IMMSE, IMNOISE.
+```
+
+## `radon`
+
+```
+RADON Transformée de Radon : les projections d'une image.
+  R = RADON(I,THETA) rend, pour chaque angle THETA (en degrés, 0:179 par
+  défaut), la projection de l'image I : la somme de ses valeurs le long
+  des droites perpendiculaires à la direction THETA, comptée dans le sens
+  trigonométrique depuis l'axe des x. R a une colonne par angle.
+  [R,XP] = RADON(...) rend aussi les abscisses radiales, en pixels,
+  comptées depuis le pixel central floor((size(I)+1)/2).
+
+  Comme MATLAB, chaque pixel est partagé en quatre sous-pixels, et chacun
+  répartit sa valeur entre les deux casiers les plus proches de sa
+  projection, au prorata de la distance. Ce partage évite le crénelage
+  d'un simple arrondi, qui fait osciller les projections d'un casier à
+  l'autre aux angles obliques. La somme de chaque projection vaut celle
+  de l'image.
+
+  Exemple :
+     P = phantom(64);
+     [R, xp] = radon(P, 0:179);
+     max(abs(sum(R) - sum(P(:))))    % ~0 : chaque projection garde la masse
+
+  Voir aussi IRADON, PHANTOM, FANBEAM.
 ```
 
 ## `rangefilt`

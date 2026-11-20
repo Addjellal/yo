@@ -646,9 +646,13 @@ DLCONV Convolution dérivable, à une ou deux dimensions.
     'DilationFactor'  1, l'écartement des coefficients du filtre
     'DataFormat'      le format, quand X n'en porte pas
 
-  Le filtre est retourné avant le produit : DLCONV calcule une
-  convolution au sens propre, comme CONV2. Pour une couche apprise, la
-  convention est sans effet ; elle compte quand on impose un filtre.
+  Comme les couches convolutives de MATLAB, chaque sortie est le produit
+  scalaire des poids et de la fenêtre d'entrée, sans retourner le filtre :
+  c'est une corrélation, celle de FILTER2, et non la convolution au sens
+  propre de CONV2 (qui retourne le filtre). C'est aussi la convention de
+  Keras, PyTorch et ONNX : des poids appris ailleurs donnent les mêmes
+  sorties. Pour une couche apprise sur place, la convention est sans
+  effet ; elle compte dès qu'on impose ou qu'on importe des poids.
 
   L'opération est dérivable par rapport à l'entrée, aux poids et au
   biais : c'est elle qui porte l'apprentissage d'un réseau convolutif.
@@ -657,6 +661,8 @@ DLCONV Convolution dérivable, à une ou deux dimensions.
      x = dlarray(reshape(1:9, 3, 3), 'SS');
      y = dlconv(x, ones(2, 2), 0);
      extractdata(y)      % les sommes de chaque carre de quatre
+     k = [1 2; 3 4];
+     isequal(extractdata(dlconv(x, k, 0)), filter2(k, reshape(1:9, 3, 3), 'valid'))   % 1
 
   Voir aussi DLARRAY, DLGRADIENT, CONVOLUTION2DLAYER, FULLYCONNECT.
 ```

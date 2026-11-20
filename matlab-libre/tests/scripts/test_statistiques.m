@@ -478,6 +478,16 @@ optionsRecherche = struct('ParetoSetSize', 20, 'MaxIterations', 25);
 assert(size(xRecherche, 1) > 5);
 assert(min(xRecherche) < 0.2 && max(xRecherche) > 1.8);
 assert(size(vRecherche, 2) == 2);
+% La forme de MATLAB a contraintes non lineaires : OPTIONS en dixieme
+% argument, et la contrainte refusee en le disant.
+[xPareto10, ~] = gamultiobj(deuxObjectifs, 1, [], [], [], [], -2, 4, [], optionsPareto);
+assert(size(xPareto10, 1) > 5);
+try
+    gamultiobj(deuxObjectifs, 1, [], [], [], [], -2, 4, @(x) deal(x - 1, []));
+    error('la contrainte non lineaire aurait du etre refusee');
+catch erreur
+    assert(strcmp(erreur.identifier, 'globaloptim:gamultiobj:NonLineaire'));
+end
 
 % surrogateopt sur une fonction lisse : il approche le minimum en cent
 % evaluations, sans jamais deriver.

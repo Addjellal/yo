@@ -105,11 +105,14 @@ void decoderStyle(const std::string& spec, Serie& s) {
             s.couleur = couleur;
             continue;
         }
-        if (c == '-' || c == ':' || c == '.') {
-            if (c == '.' && !(k + 1 < spec.size() && spec[k + 1] == '-')) {
-                s.marqueur = ".";
-                continue;
-            }
+        // Le point n'appartient au style que dans le tiret-point « -. » ;
+        // ailleurs, « .- » compris, c'est le marqueur point, comme MATLAB.
+        if (c == '.') {
+            if (k > 0 && spec[k - 1] == '-' && style == "-") style += c;
+            else s.marqueur = ".";
+            continue;
+        }
+        if (c == '-' || c == ':') {
             style += c;
             continue;
         }
@@ -2080,12 +2083,46 @@ FONCTION(fnCaxis) {
     INUTILISE
     return bornesCouleur(it, args, nargout, "caxis");
 }
+// colorbar, colorbar(ax), colorbar('off'), colorbar('eastoutside') : la
+// barre se dessine a droite de la boite, la seule position que MatLibre
+// sache tenir ; les autres sont refusees en le disant.
 FONCTION(fnColorbar) {
     INUTILISE
-    // La barre de couleurs n'est pas encore dessinee ; la poignee rendue
-    // designe l'axe courant, de sorte que « c = colorbar; » ne casse pas
-    // un programme qui la garde pour plus tard.
-    if (nargout > 0) return {poigneeTexteCourant(it, "colorbar")};
+    auto a = axesCourants(it);
+    std::size_t k = 0;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        a = axesDeLaPoignee(it, args[0]);
+        k = 1;
+    }
+    bool visible = true;
+    auto position = [](const std::string& mot) {
+        if (mot != "eastoutside" && mot != "east")
+            erreur("MatLibre:colorbar:Position",
+                   "MatLibre ne place la barre de couleurs qu'à droite des axes "
+                   "('eastoutside'), non en '" + mot + "'.");
+    };
+    for (; k < args.size(); ++k) {
+        if (!(args[k].estTexte() || args[k].estChaine()))
+            erreur("MATLAB:colorbar:InvalidInput", "colorbar : une position, 'off' ou des options.");
+        std::string mot = enMinuscules(args[k].versTexte());
+        if (mot == "off" || mot == "delete" || mot == "hide") {
+            visible = false;
+        } else if (mot == "on" || mot == "show") {
+            visible = true;
+        } else if (mot == "location") {
+            if (k + 1 >= args.size())
+                erreur("MATLAB:colorbar:InvalidInput", "colorbar : 'Location' attend une valeur.");
+            position(enMinuscules(args[++k].versTexte()));
+        } else if (mot.find("outside") != std::string::npos || mot == "north" || mot == "south" ||
+                   mot == "west" || mot == "east" || mot == "manual") {
+            position(mot);
+        } else {
+            erreur("MatLibre:colorbar:Option",
+                   "MatLibre ne connaît pas l'option '" + args[k].versTexte() + "' de colorbar.");
+        }
+    }
+    a->barreCouleurs = visible;
+    if (nargout > 0 && visible) return {poigneeTexteCourant(it, "colorbar")};
     return {};
 }
 FONCTION(fnBox) { INUTILISE return {}; }

@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **684 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **3130 fonctions de toolbox** réparties en 55 modules, écrites dans le
+- **3135 fonctions de toolbox** réparties en 55 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -295,7 +295,7 @@ totalité.
    Jacobi ajoutées au MATLAB de base —, Bessel, l'équi-ondulation de Parks
    et McClellan par échange de Remez, l'ajustement sur gabarit de
    `yulewalk` et l'ajustement sur réponse complexe d'`invfreqz`.
-   L'Image Processing Toolbox en compte 140 — filtrage avec
+   L'Image Processing Toolbox en compte 143 — filtrage avec
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
    124 : construction et conversion des modèles dans les trois

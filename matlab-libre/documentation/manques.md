@@ -16,7 +16,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | identification | 40 | 0 | 100 % |
 | images | 74 | 0 | 100 % |
 | instruments-financiers | 55 | 0 | 100 % |
-| matlab-graphique | 142 | 0 | 100 % |
+| matlab-graphique | 142 | 3 | 98 % |
 | matlab-langage | 614 | 0 | 100 % |
 | ondelettes | 112 | 0 | 100 % |
 | optimisation-globale | 15 | 0 | 100 % |
@@ -29,7 +29,11 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | symbolique | 36 | 0 | 100 % |
 | types | 100 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2407** | **0** | **100 %** |
+| **ensemble** | **2407** | **3** | **100 %** |
+
+## matlab-graphique
+
+`xtickangle`, `ytickangle`, `ztickangle`
 
 ## Ce qui manque au-delà des fonctions
 
@@ -139,6 +143,11 @@ qu'ils ne font pas encore comme MATLAB.
   (`Interpreter` vaut `'tex'` par défaut) met en indice et en exposant et
   traduit `\alpha`, `\pi`... Seules les graduations des axes
   logarithmiques écrivent leurs puissances de dix en exposant.
+- **Barre de couleurs** : `colorbar` la dessine à droite des axes, graduée
+  sur `CLim` ; les autres positions (`'southoutside'`...) sont refusées en
+  le disant, et la poignée rendue accepte `Ticks` et `Label` sans effet.
+- **Graduations inclinées** : `xtickangle`, `ytickangle` et
+  `XTickLabelRotation` manquent ; des étiquettes longues se chevauchent.
 - **Marqueurs** : les quatorze formes de MATLAB, `MarkerSize`,
   `MarkerFaceColor` et `MarkerEdgeColor` ; `scatter` dessine encore des
   disques pleins, que MATLAB laisse creux par défaut.
@@ -185,6 +194,14 @@ qu'ils ne font pas encore comme MATLAB.
   MATLAB continue d'avancer.
 - **`montage`** assemble et rend l'image assemblée ; la navigation entre
   vignettes n'existe pas.
+- **Tomographie** : `radon`, `iradon` et `phantom` suivent les
+  algorithmes de MATLAB — quatre sous-pixels par pixel pour `radon`,
+  filtre de rampe spatial de Kak et Slaney puis rétroprojection pour
+  `iradon`, avec les filtres `'Ram-Lak'`, `'Shepp-Logan'`, `'Cosine'`,
+  `'Hamming'`, `'Hann'` et `'None'`. La rétroprojection n'interpole qu'en
+  `'linear'` ou `'nearest'` : `'spline'`, `'pchip'` et `'cubic'` sont
+  refusés. La géométrie en éventail (`fanbeam`, `ifanbeam`, `fan2para`,
+  `para2fan`) manque.
 
 ### Systèmes asservis
 
@@ -264,6 +281,14 @@ qu'ils ne font pas encore comme MATLAB.
   structures dont les champs sont ceux que MatLibre lit réellement. Les
   fonctions personnalisables de MATLAB — `MutationFcn`, `CrossoverFcn`,
   `SearchFcn`, `AnnealingFcn` — sont acceptées et sans effet.
+- **Multiobjectif** : `gamultiobj` suit NSGA-II (Deb et al., 2002), là
+  où MATLAB emploie une variante élitiste contrôlée par `ParetoFraction` ;
+  sur ZDT1, le front trouvé est à un millième du vrai. Il prend les
+  contraintes linéaires et refuse, en le disant, les contraintes non
+  linéaires. `paretosearch` sonde les directions de coordonnées autour
+  de chaque point de l'archive, chacun avec sa maille, et ne prend que des
+  bornes. `ParetoFraction`, `DistanceMeasureFcn` et les fonctions de
+  tracé sont sans effet.
 
 ### Finance
 
@@ -798,6 +823,42 @@ de MatLibre ne fait pas comme celle de MathWorks.
   Vehicle Dynamics Blockset et de l'Automated Driving Toolbox
   (`drivingScenario`, `referencePathFrenet`, `lateralControllerStanley`)
   manquent.
+
+### Apprentissage profond, renforcement, analyse de texte
+
+- **Convolution** : `dlconv` et `convolution2dLayer` calculent, comme
+  MATLAB, Keras, PyTorch et ONNX, une corrélation — le filtre n'est pas
+  retourné, comme dans `filter2` et non dans `conv2` : des poids appris
+  ailleurs donnent les mêmes sorties. L'import et l'export de réseaux
+  (`importONNXNetwork`, `importKerasNetwork`, `exportONNXNetwork`)
+  manquent.
+- **Renforcement** : `gridworld`, `pasGrille`, `qlearning`, `sarsa` et
+  `greedyPolicy` sont propres à MatLibre et tabulaires : ils rendent une
+  table Q. Les agents et environnements de MATLAB (`rlQAgent`,
+  `rlDQNAgent`, `rlPPOAgent`, `rlFunctionEnv`, `train`) n'existent pas.
+- **Documents** : un document est une cellule de mots, non un objet
+  `tokenizedDocument`, et le sac de mots est le couple
+  `[C, V] = bagOfWords(...)` (effectifs, vocabulaire), non un objet.
+  `tokenizedDocument` d'un tableau de textes rend un document par texte.
+  `normalizeWords` fait la racinisation de Porter, pour l'anglais : la
+  lemmatisation (`'Style','lemma'`) et les autres langues sont refusées.
+  `tfidf` et `editDistance` suivent les formules et les options de
+  MATLAB. Pas de modèles de thèmes (`fitlda`, `fitlsa`) ni de plongements
+  de mots (`wordEmbedding`).
+
+### Maintenance prédictive, imagerie médicale
+
+- **Maintenance prédictive** : `faultFeatures`, `healthIndicator`,
+  `rulDegradation` et `rulSimilarity` sont propres à MatLibre et rendent
+  des nombres et des structures ; `rulDegradation` extrapole la droite
+  des moindres carrés. Les modèles de durée de vie de MATLAB
+  (`linearDegradationModel`, `exponentialDegradationModel`,
+  `residualSimilarityModel`, avec `fit` et `predictRUL`) et le Diagnostic
+  Feature Designer manquent.
+- **Imagerie médicale** : `radonTransform` et `iradonTransform` appellent
+  `radon` et `iradon` ; `diceIndex`, `hausdorffDist` et `windowLevel` sont
+  propres à MatLibre. Les objets `medicalVolume` et `medicalImage` et la
+  lecture DICOM (`dicomread`, `dicominfo`) manquent.
 
 ### Calcul
 

@@ -1,11 +1,15 @@
-function [x, valeurs, drapeau, sortie] = gamultiobj(fonction, nVariables, A, b, Aeq, beq, bas, haut, options)
+function [x, valeurs, drapeau, sortie] = gamultiobj(fonction, nVariables, A, b, Aeq, beq, bas, haut, ...
+                                                     varargin)
 %GAMULTIOBJ Algorithme génétique multiobjectif (NSGA-II).
 %   [X,F] = GAMULTIOBJ(FONCTION,N,[],[],[],[],BAS,HAUT) cherche le front
 %   de Pareto de FONCTION, qui doit rendre un vecteur d'objectifs. X a
 %   une ligne par solution non dominée, F la valeur des objectifs.
 %   [X,F] = GAMULTIOBJ(...,OPTIONS) lit 'PopulationSize' (50 jusqu'à cinq
 %   variables, 200 au-delà, comme MATLAB), 'MaxGenerations' (200 fois le
-%   nombre de variables) et 'CrossoverFraction' (0.8).
+%   nombre de variables) et 'CrossoverFraction' (0.8). La forme de
+%   MATLAB GAMULTIOBJ(...,BAS,HAUT,NONLCON,OPTIONS) est reconnue ; les
+%   contraintes linéaires sont prises, les contraintes non linéaires
+%   refusées en le disant.
 %
 %   C'est l'algorithme NSGA-II de Deb, Pratap, Agarwal et Meyarivan
 %   (2002) : les parents se choisissent par tournoi binaire sur le rang de
@@ -29,7 +33,24 @@ function [x, valeurs, drapeau, sortie] = gamultiobj(fonction, nVariables, A, b, 
     if nargin < 6, beq = []; end
     if nargin < 7 || isempty(bas), bas = -10 * ones(1, nVariables); end
     if nargin < 8 || isempty(haut), haut = 10 * ones(1, nVariables); end
-    if nargin < 9, options = struct(); end
+    options = struct();
+    nonlin = [];
+    if numel(varargin) == 1 && isa(varargin{1}, 'function_handle')
+        nonlin = varargin{1};
+    elseif numel(varargin) == 1
+        options = varargin{1};
+    elseif numel(varargin) == 2
+        [nonlin, options] = varargin{:};
+    elseif numel(varargin) > 2
+        error('globaloptim:gamultiobj:Arguments', 'Trop d''arguments pour GAMULTIOBJ.');
+    end
+    if ~isempty(nonlin)
+        error('globaloptim:gamultiobj:NonLineaire', ...
+              'MatLibre ne prend pas encore les contraintes non linéaires de GAMULTIOBJ.');
+    end
+    if isempty(options)
+        options = struct();
+    end
     if nVariables <= 5
         tailleDefaut = 50;
     else

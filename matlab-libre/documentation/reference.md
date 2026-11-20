@@ -33,14 +33,14 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-3130 fonctions ecrites dans le langage, reparties en 55 toolboxes.
+3135 fonctions ecrites dans le langage, reparties en 55 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
 | [`acquisition`](reference/toolbox-acquisition.md) | 5 |
 | [`aerospatial`](reference/toolbox-aerospatial.md) | 6 |
 | [`ajustement-courbes`](reference/toolbox-ajustement-courbes.md) | 96 |
-| [`analyse-de-texte`](reference/toolbox-analyse-de-texte.md) | 8 |
+| [`analyse-de-texte`](reference/toolbox-analyse-de-texte.md) | 9 |
 | [`antennes`](reference/toolbox-antennes.md) | 5 |
 | [`apprentissage-profond`](reference/toolbox-apprentissage-profond.md) | 141 |
 | [`audio`](reference/toolbox-audio.md) | 13 |
@@ -63,14 +63,14 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`gestion-risques`](reference/toolbox-gestion-risques.md) | 69 |
 | [`identification`](reference/toolbox-identification.md) | 107 |
 | [`imagerie-medicale`](reference/toolbox-imagerie-medicale.md) | 5 |
-| [`images`](reference/toolbox-images.md) | 140 |
+| [`images`](reference/toolbox-images.md) | 143 |
 | [`instruments`](reference/toolbox-instruments.md) | 4 |
 | [`instruments-financiers`](reference/toolbox-instruments-financiers.md) | 82 |
 | [`interface`](reference/toolbox-interface.md) | 17 |
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maToolbox`](reference/toolbox-maToolbox.md) | 0 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
-| [`matlab`](reference/toolbox-matlab.md) | 459 |
+| [`matlab`](reference/toolbox-matlab.md) | 460 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 134 |

@@ -13,10 +13,28 @@ function mots = tokenizedDocument(texte)
 %   comme le même mot. C'est presque toujours souhaitable, sauf quand la
 %   majuscule porte une information — un nom propre.
 %
-%   Exemple :
+%   DOCS = TOKENIZEDDOCUMENT(TEXTES), où TEXTES est un tableau de chaînes
+%   ou une cellule de textes, rend, comme MATLAB, un document par texte :
+%   une cellule de même taille dont chaque case est la cellule des mots
+%   d'un texte, celle que prend BAGOFWORDS.
+%
+%   Exemples :
 %      tokenizedDocument('Le chat, le chien !')   % {'le','chat','le','chien'}
+%      docs = tokenizedDocument(["Le chat dort.", "Le chien court."]);
+%      [c, v] = bagOfWords(docs)                  % deux lignes, une par texte
 %
 %   Voir aussi BAGOFWORDS, REMOVESTOPWORDS, NORMALIZEWORDS, SPLITSENTENCES.
+    if iscell(texte) || (isstring(texte) && ~isscalar(texte))
+        mots = cell(size(texte));
+        for k = 1:numel(texte)
+            mots{k} = tokenizedDocument(char(texte(k)));
+        end
+        return
+    end
+    if ischar(texte) && size(texte, 1) > 1
+        error('textanalytics:tokenizedDocument:Matrice', ...
+              'Un texte par ligne de caractères : passer un tableau de chaînes ou une cellule.');
+    end
     texte = lower(char(texte));
     propre = regexprep(texte, '[^a-z0-9àâçéèêëîïôûùüÿñæœ'']', ' ');
     morceaux = strsplit(strtrim(propre), ' ');

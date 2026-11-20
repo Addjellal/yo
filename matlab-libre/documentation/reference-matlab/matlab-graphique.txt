@@ -13,6 +13,7 @@ uicontrol uifigure view voronoi waterfall xlabel xlim xline xticklabels xticks
 ylabel ylim yline yticklabels yticks zlabel zlim zoom
 bubblechart exportgraphics geoplot geoscatter swarmchart
 fplot3 fimplicit3
+xtickangle ytickangle ztickangle
 sgtitle subtitle
 ishandle isgraphics gco gcbo findall ancestor
 open_system

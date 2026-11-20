@@ -931,4 +931,282 @@ assert(max(max(abs(lisse - M \ b2))) < 1e-12);
 assert(timeToCollision(50, 10) == 5 && isinf(timeToCollision(50, -1)));
 fprintf('conduite : pure pursuit de Coulter, lissage exact\n');
 
+%% ------------------------------------------------------------------- flou
+% Les deux exemples de défuzzification de la documentation de MathWorks
+% (un trapèze, puis l'union de trois trapèzes écrêtés), et le pourboire de
+% Mamdani (service, nourriture ; min, max, centroïde sur 101 points), dont
+% MathWorks imprime 7,0169 pour [2 1]. Référence : les mêmes formules en
+% NumPy.
+x = -10:0.1:10;
+mf = trapmf(x, [-10 -8 -4 7]);
+x2 = 0:0.1:20;
+mf2 = max(0.5 * trapmf(x2, [5 7 12 14]), ...
+          max(0.9 * trapmf(x2, [0 2 8 12]), 0.1 * trapmf(x2, [12 13 18 19])));
+methodes = {'centroid', 'bisector', 'mom', 'som', 'lom'};
+attendu1 = [-3.285714285714285 -3.7 -6 -8 -4];
+attendu2 = [6.771874918837492 6.3 5 2 8];
+for k = 1:5
+    assert(abs(defuzz(x, mf, methodes{k}) - attendu1(k)) < 1e-12);
+    assert(abs(defuzz(x2, mf2, methodes{k}) - attendu2(k)) < 1e-12);
+end
+fis = mamfis('Name', 'tipper');
+fis = addInput(fis, [0 10], 'Name', 'service');
+fis = addMF(fis, 'service', 'gaussmf', [1.5 0], 'Name', 'poor');
+fis = addMF(fis, 'service', 'gaussmf', [1.5 5], 'Name', 'good');
+fis = addMF(fis, 'service', 'gaussmf', [1.5 10], 'Name', 'excellent');
+fis = addInput(fis, [0 10], 'Name', 'food');
+fis = addMF(fis, 'food', 'trapmf', [-2 0 1 3], 'Name', 'rancid');
+fis = addMF(fis, 'food', 'trapmf', [7 9 10 12], 'Name', 'delicious');
+fis = addOutput(fis, [0 30], 'Name', 'tip');
+fis = addMF(fis, 'tip', 'trimf', [0 5 10], 'Name', 'cheap');
+fis = addMF(fis, 'tip', 'trimf', [10 15 20], 'Name', 'average');
+fis = addMF(fis, 'tip', 'trimf', [20 25 30], 'Name', 'generous');
+fis = addRule(fis, [1 1 1 1 2; 2 0 2 1 1; 3 2 3 1 2]);
+entrees = [2 1; 5 5; 3 8; 8 2; 9.5 9.5];
+pourboires = [7.016879143126786; 15; 18.005930962167767; 14.414563100643582; 24.782694677693076];
+assert(max(abs(evalfis(fis, entrees) - pourboires)) < 1e-10);
+assert(round(evalfis(fis, [2 1]), 4) == 7.0169);
+fprintf('flou : defuzzification et pourboire de MathWorks\n');
+
+%% ---------------------------------------------------- apprentissage profond
+% Les couches de MATLAB, comme Keras, PyTorch et ONNX, calculent une
+% corrélation : dlconv contre scipy.signal.correlate2d, sur des données
+% déterministes. softmax et entropie croisée, normalisation par lot
+% (Ioffe et Szegedy, 2015) et trois pas d'Adam (Kingma et Ba, 2015) contre
+% NumPy ; le premier pas d'Adam vaut exactement le pas d'apprentissage.
+deterministe = @(forme, a, b) reshape(sin(a * (1:prod(forme)) + b), forme);
+X = deterministe([7 6 3], 0.37, 0.1);
+W = deterministe([3 2 3 4], 0.73, 0.5);
+Y = extractdata(dlconv(dlarray(X, 'SSC'), W, [0.1 -0.2 0.3 0.05], 'DataFormat', 'SSC'));
+assert(isequal(size(Y), [5 5 4]));
+assert(max(abs(squeeze(Y(1, 1, :)).' - [0.26784873776669327 -1.5010549040202914 ...
+                                         -2.0534567878519843 -2.6024555013921939])) < 1e-13);
+assert(max(abs(squeeze(Y(5, 5, :)).' - [-1.621816398764949 -0.81709864265275267 ...
+                                         0.9851685548415805 1.818095348863779])) < 1e-13);
+assert(abs(sum(Y(:)) - 3.4779512526332539) < 1e-12);
+assert(abs(sum(Y(:) .^ 2) - 791.23086617174897) < 1e-10);
+Z = deterministe([4 5], 1.3, 0.2) * 3;
+T = zeros(4, 5);
+T(sub2ind([4 5], [1 3 2 4 3], 1:5)) = 1;
+P = extractdata(softmax(dlarray(Z, 'CB')));
+assert(max(abs(P(:, 1).' - [0.87238665806295079 0.11954731464910769 ...
+                            0.0037581110386750668 0.004307916249266317])) < 1e-15);
+assert(abs(extractdata(crossentropy(dlarray(P, 'CB'), T)) - 1.6607721234614341) < 1e-14);
+Xb = deterministe([4 3 2 5], 0.91, 0.3) * 2 + 1;
+Yb = extractdata(batchnorm(dlarray(Xb, 'SSCB'), [0.2; -0.1], [1.5; 0.7]));
+assert(max(abs(squeeze(Yb(1, 1, :, 1)).' - [2.0989684474004493 -0.55574089432854479])) < 1e-14);
+assert(max(abs(squeeze(Yb(4, 3, :, 5)).' - [-1.7230743536758177 0.32580696469252157])) < 1e-14);
+p = dlarray([1; -2; 0.5]);
+[p1, m, v] = adamupdate(p, dlarray([0.3; -0.1; 2]), [], [], 1);
+assert(max(abs(extractdata(p - p1)) - 0.001) < 1e-10);
+p = p1;
+for t = 2:3
+    [p, m, v] = adamupdate(p, dlarray([0.3; -0.1; 2] * t), m, v, t);
+end
+assert(max(abs(extractdata(p).' - [0.9970768168185361 -1.9970768169554483 ...
+                                   0.49707681676034837])) < 1e-15);
+fprintf('apprentissage profond : correlation, softmax, normalisation, Adam\n');
+
+%% ----------------------------------------------------------- renforcement
+% Grille 5 x 5 de Sutton et Barto : -1 par pas, +10 au but, trois
+% obstacles qui n'allongent pas le chemin. Le plus court chemin a donc
+% 8 pas (distance de Manhattan), et la valeur optimale d'un état à d pas
+% du but vaut -(1 - g^(d-1))/(1 - g) + 10 g^(d-1). Q-learning (Watkins)
+% et SARSA trouvent ce chemin ; les valeurs apprises le long du chemin
+% sont celles de Bellman.
+env = gridworld(5, 5, [5 5], [2 3; 3 3; 4 2]);
+g = 0.95;
+rng(3);
+Q = qlearning(env, 3000, 0.5, g, 0.1);
+politique = greedyPolicy(Q);
+s = 1;
+for pasFaits = 0:30
+    reste = 8 - pasFaits;
+    assert(abs(Q(s, politique(s)) - (-(1 - g^(reste - 1)) / (1 - g) + 10 * g^(reste - 1))) < 1e-9);
+    [s, ~, fini] = pasGrille(env, s, politique(s));
+    if fini, break; end
+end
+assert(pasFaits + 1 == 8);
+Qs = sarsa(env, 3000, 0.5, g, 0.1);
+politique = greedyPolicy(Qs);
+s = 1;
+for pasFaits = 1:30
+    [s, ~, fini] = pasGrille(env, s, politique(s));
+    if fini, break; end
+end
+assert(pasFaits == 8);
+fprintf('renforcement : Q-learning et SARSA, chemin et valeurs de Bellman\n');
+
+%% ------------------------------------------------------- analyse de texte
+% Racinisation de Porter (1980) : des mots de la liste officielle de
+% Martin Porter (voc.txt, output.txt) et ceux de l'article, contre NLTK.
+% editDistance : les exemples de la documentation de MathWorks. tfidf :
+% scikit-learn sans lissage ni normalisation pondère par ln(N/df) + 1, soit
+% le tfidf de MATLAB, ln(N/df), plus les comptes.
+mots = {'abash' 'arming' 'bezonian' 'caraways' 'commonalty' 'curs' 'displaced' 'entendre' ...
+        'finest' 'glanc' 'history' 'intricate' 'liquors' 'miscalled' 'offenseless' 'pettish' ...
+        'prophesy' 'requit' 'sedition' 'sorrows' 'surveying' 'treasons' 'untreasur' 'whirling' ...
+        'caresses' 'ponies' 'ties' 'cats' 'plastered' 'motoring' 'sing' 'hopping' 'falling' ...
+        'hissing' 'filing' 'relational' 'conditional' 'generalizations' 'oscillators' ...
+        'triplicate' 'formative' 'electriciti' 'electrical' 'hopefulness' 'goodness' 'revival' ...
+        'allowance' 'adjustable' 'irritant' 'replacement' 'adoption' 'homologous' 'communism' ...
+        'activate' 'effective' 'bowdlerize' 'agreed' 'happy' 'controlling' 'dependent'};
+racines = {'abash' 'arm' 'bezonian' 'carawai' 'commonalti' 'cur' 'displac' 'entendr' ...
+           'finest' 'glanc' 'histori' 'intric' 'liquor' 'miscal' 'offenseless' 'pettish' ...
+           'prophesi' 'requit' 'sedit' 'sorrow' 'survei' 'treason' 'untreasur' 'whirl' ...
+           'caress' 'poni' 'ti' 'cat' 'plaster' 'motor' 'sing' 'hop' 'fall' ...
+           'hiss' 'file' 'relat' 'condit' 'gener' 'oscil' ...
+           'triplic' 'form' 'electr' 'electr' 'hope' 'good' 'reviv' ...
+           'allow' 'adjust' 'irrit' 'replac' 'adopt' 'homolog' 'commun' ...
+           'activ' 'effect' 'bowdler' 'agre' 'happi' 'control' 'depend'};
+assert(isequal(normalizeWords(mots), racines));
+assert(editDistance("Text analytics", "Text analysis") == 2);
+assert(editDistance("MATALB", "MATLAB") == 2);
+assert(editDistance("MATALB", "MATLAB", 'SwapCost', 1) == 1);
+assert(editDistance("MATLAB", "MathWorks") == 8);
+assert(editDistance("MATLAB", "MathWorks", 'SubstituteCost', ...
+                    @(a, b) double(lower(a) ~= lower(b))) == 6);
+assert(editDistance('kitten', 'sitting') == 3);
+textes = ["the quick brown fox jumps over the lazy dog", "the lazy dog sleeps", ...
+          "a quick brown dog runs", "the fox runs and the fox jumps"];
+[comptes, vocabulaireSac] = bagOfWords(tokenizedDocument(textes));
+vocabulaire = {'a' 'and' 'brown' 'dog' 'fox' 'jumps' 'lazy' 'over' 'quick' 'runs' 'sleeps' 'the'};
+sklearn = reshape([0 0 2.3862943611198908 0 0 0 0 2.3862943611198908 1.6931471805599454 0 ...
+    1.6931471805599454 0 1.2876820724517808 1.2876820724517808 1.2876820724517808 0 ...
+    1.6931471805599454 0 0 3.3862943611198908 1.6931471805599454 0 0 1.6931471805599454 ...
+    1.6931471805599454 1.6931471805599454 0 0 2.3862943611198908 0 0 0 1.6931471805599454 ...
+    0 1.6931471805599454 0 0 0 1.6931471805599454 1.6931471805599454 0 2.3862943611198908 ...
+    0 0 2.5753641449035616 1.2876820724517808 0 2.5753641449035616], 4, 12);
+[presents, colonnes] = ismember(vocabulaire, vocabulaireSac);
+assert(all(presents));
+ecart = full(tfidf(comptes) + comptes);
+assert(max(max(abs(ecart(:, colonnes) - sklearn))) < 1e-14);
+fprintf('texte : Porter (liste officielle), editDistance de MathWorks, tfidf de scikit-learn\n');
+
+%% -------------------------------------------------- maintenance predictive
+% Sur un sinus échantillonné sur des périodes entières, les descripteurs
+% sont connus : efficace A/racine(2), facteur de crête racine(2), kurtosis
+% 3/2, asymétrie nulle, centroïde à la fréquence du sinus. Sur un signal
+% composé, kurtosis et asymétrie comme scipy.stats ; la durée de vie
+% restante extrapole la droite de numpy.polyfit.
+fs = 4000;
+t = (0:fs - 1).' / fs;
+d = faultFeatures(3 * sin(2 * pi * 50 * t), fs);
+assert(abs(d.rms - 3 / sqrt(2)) < 1e-12 && abs(d.facteurCrete - sqrt(2)) < 1e-12);
+assert(abs(d.kurtosis - 1.5) < 1e-12 && abs(d.asymetrie) < 1e-12 && abs(d.centroide - 50) < 1e-9);
+compose = sin(2 * pi * 50 * t) + 0.4 * sin(2 * pi * 173 * t + 0.3) ...
+          + 0.2 * sign(sin(2 * pi * 7 * t + 0.1));
+d = faultFeatures(compose, fs);
+assert(abs(d.kurtosis - 2.000865952615261) < 1e-12);
+assert(abs(d.asymetrie - 0.00081551118227692055) < 1e-14);
+assert(abs(d.rms - 0.78735240978199938) < 1e-14);
+assert(abs(rulDegradation(0.01 * (1:50).', 1) - 50) < 1e-9);
+k = (1:60).';
+assert(abs(rulDegradation(0.02 * k + 0.05 * sin(0.7 * k), 1.5) - 15.194284464481811) < 1e-9);
+fprintf('maintenance : descripteurs d''un sinus, scipy.stats, RUL de polyfit\n');
+
+%% ------------------------------------------------------ imagerie medicale
+% Fantôme de Shepp et Logan modifié (Toft) : la table de ses dix ellipses
+% donne l'image et, par la formule de Kak et Slaney (chap. 3), son
+% sinogramme exact. radon le suit à 2 % près (les pixels discrétisent
+% les bords) ; iradon, filtre de rampe, reconstruit l'image à 0,065 rms
+% près, scikit-image à 0,054. Dice et Hausdorff (scipy.spatial).
+E = [1 .69 .92 0 0 0; -.8 .6624 .874 0 -.0184 0; -.2 .11 .31 .22 0 -18;
+     -.2 .16 .41 -.22 0 18; .1 .21 .25 0 .35 0; .1 .046 .046 0 .1 0; .1 .046 .046 0 -.1 0;
+     .1 .046 .023 -.08 -.605 0; .1 .023 .023 0 -.606 0; .1 .023 .046 .06 -.605 0];
+n = 128;
+axe = ((0:n - 1) - (n - 1) / 2) / ((n - 1) / 2);
+xg = repmat(axe, n, 1);
+yg = rot90(xg);
+fantome = zeros(n);
+for e = 1:10
+    xe = xg - E(e, 4);
+    ye = yg - E(e, 5);
+    c = cosd(E(e, 6));
+    s = sind(E(e, 6));
+    dedans = (xe * c + ye * s) .^ 2 / E(e, 2)^2 + (ye * c - xe * s) .^ 2 / E(e, 3)^2 <= 1;
+    fantome(dedans) = fantome(dedans) + E(e, 1);
+end
+P = phantom(n);
+assert(max(abs(P(:) - fantome(:))) < 1e-12);
+angles = 0:179;
+centre = floor((n + 1) / 2);
+xp = (-(ceil(sqrt(2 * (n - centre)^2)) + 1):(ceil(sqrt(2 * (n - centre)^2)) + 1)).';
+echelle = (n - 1) / 2;
+decalage = (n + 1) / 2 - centre;
+exact = zeros(numel(xp), numel(angles));
+for k = 1:numel(angles)
+    th = deg2rad(angles(k));
+    for e = 1:10
+        a2 = (E(e, 2) * cos(th - deg2rad(E(e, 6))))^2 + (E(e, 3) * sin(th - deg2rad(E(e, 6))))^2;
+        s0 = (E(e, 4) * cos(th) + E(e, 5) * sin(th)) * echelle + decalage * (cos(th) - sin(th));
+        u = (xp - s0) / echelle;
+        corde = 2 * E(e, 1) * E(e, 2) * E(e, 3) * sqrt(max(a2 - u .^ 2, 0)) / a2;
+        exact(:, k) = exact(:, k) + corde * echelle;
+    end
+end
+R = radon(P, angles);
+assert(isequal(size(R), size(exact)));
+assert(sqrt(mean((R(:) - exact(:)) .^ 2)) < 0.02 * max(exact(:)));
+reconstruite = iradon(radon(P, 0:0.5:179.5), 0.5, 'linear', 'Ram-Lak', 1, n);
+assert(sqrt(mean((reconstruite(:) - P(:)) .^ 2)) < 0.065);
+a = false(10); a(3:7, 3:7) = true;
+b = false(10); b(5:9, 5:9) = true;
+assert(abs(diceIndex(a, b) - 2 * 9 / 50) < 1e-15);
+th = (0:49).' * 2 * pi / 50;
+assert(abs(hausdorffDist([2 * cos(th), sin(th)], [1.3 * cos(th + 0.1) + 0.2, 0.9 * sin(2 * th)]) ...
+           - 0.9064945851385664) < 1e-14);
+fprintf('imagerie medicale : Shepp-Logan, sinogramme exact, reconstruction\n');
+
+%% ------------------------------------------------- instruments financiers
+% Hull (Options, Futures and Other Derivatives, ex. 21.1) : put américain,
+% S = K = 50, r = 10 %, sigma = 40 %, 5 mois en 5 pas, 4,49. Un arbre de
+% Cox, Ross et Rubinstein de 2000 pas rejoint Black et Scholes ; Black
+% (1976) sur un future ; prix, durée, convexité et rendement d'une
+% obligation. Références : les mêmes formules en Python.
+[~, arbre] = binprice(50, 50, 0.1, 5/12, 1/12, 0.4, 0);
+assert(abs(arbre(1, 1) - 4.488458534726) < 1e-11 && round(arbre(1, 1), 2) == 4.49);
+[~, arbre] = binprice(100, 95, 0.05, 1, 1/2000, 0.2, 1);
+assert(abs(arbre(1, 1) - 13.346896133019) < 1e-9);
+assert(abs(blsprice(100, 95, 0.05, 1, 0.2) - 13.346464945880) < 1e-11);
+assert(abs(arbre(1, 1) - blsprice(100, 95, 0.05, 1, 0.2)) < 1e-3);
+[c, p] = blkprice(20, 20, 0.09, 4/12, 0.25);
+assert(abs(c - 1.116641456559) < 1e-11 && abs(p - 1.116641456559) < 1e-11);
+assert(abs(bondprice(0.10, 0.08, 10, 100, 2) - 87.537789657460) < 1e-10);
+[mac, modif] = bonddur(0.10, 0.08, 10, 100, 2);
+assert(abs(mac - 6.840368408939) < 1e-11 && abs(modif - 6.514636579942) < 1e-11);
+assert(abs(bondconvexity(0.10, 0.08, 10, 100, 2) - 56.485035644686) < 1e-10);
+assert(abs(bondyield(87.537789657460, 0.08, 10, 100, 2) - 0.10) < 1e-12);
+fprintf('instruments financiers : Hull, CRR, Black, obligations\n');
+
+%% --------------------------------------------------- optimisation globale
+% Rastrigin (1974) a son minimum global, nul, à l'origine, entouré d'une
+% centaine de minima locaux : ga, particleswarm et patternsearch le
+% trouvent. ZDT1 (Zitzler, Deb et Thiele, 2000) a pour front de Pareto
+% f2 = 1 - racine(f1) : gamultiobj (NSGA-II) et paretosearch le suivent.
+rastrigin = @(x) 10 * size(x, 2) + sum(x .^ 2 - 10 * cos(2 * pi * x), 2);
+bas = -5.12 * ones(1, 2);
+haut = 5.12 * ones(1, 2);
+rng(1);
+[~, f] = ga(rastrigin, 2, [], [], [], [], bas, haut);
+assert(f < 1e-2);
+rng(1);
+[~, f] = particleswarm(rastrigin, 2, bas, haut);
+assert(f < 1e-6);
+[~, f] = patternsearch(rastrigin, [0.3 -0.2], [], [], [], [], bas, haut);
+assert(f < 1e-10);
+zdt1 = @(x) [x(:, 1), (1 + 9 * mean(x(:, 2:end), 2)) ...
+             .* (1 - sqrt(x(:, 1) ./ (1 + 9 * mean(x(:, 2:end), 2))))];
+rng(1);
+[~, F] = gamultiobj(zdt1, 5, [], [], [], [], zeros(1, 5), ones(1, 5));
+ecart = abs(F(:, 2) - (1 - sqrt(F(:, 1))));
+assert(size(F, 1) >= 40 && max(ecart) < 5e-3 && median(ecart) < 5e-4);
+assert(min(F(:, 1)) < 0.01 && max(F(:, 1)) > 0.99);
+rng(1);
+[~, F] = paretosearch(zdt1, 5, [], [], [], [], zeros(1, 5), ones(1, 5));
+ecart = abs(F(:, 2) - (1 - sqrt(F(:, 1))));
+assert(size(F, 1) >= 40 && max(ecart) < 1e-6);
+assert(min(F(:, 1)) < 0.01 && max(F(:, 1)) > 0.99);
+fprintf('optimisation globale : Rastrigin, front de ZDT1\n');
+
 disp('litterature : toutes les verifications passent');

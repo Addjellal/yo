@@ -153,6 +153,8 @@ struct Axes {
     // données mises à l'échelle.
     bool climManuelle = false;
     double cmin = 0, cmax = 1;
+    // « colorbar » : la barre des couleurs, à droite de la boîte.
+    bool barreCouleurs = false;
     // La légende : sa position (« Location » de MATLAB, en minuscules), son
     // orientation, son cadre, et les courbes qu'elle nomme quand
     // « legend(h, ...) » les désigne (vide : toutes).
@@ -233,6 +235,16 @@ void limitesCouleur(const Axes& a, double& cmin, double& cmax);
 // borné à [1,m].
 void couleurEchelle(const std::vector<double>& palette, double valeur, double cmin,
                     double cmax, int& r, int& v, int& b);
+// La barre de couleurs (« colorbar ») : la place qu'elle prend à droite de
+// la boîte, la couleur de ses tranches de bas en haut (trois composantes
+// par tranche), et ses graduations avec leur hauteur en fraction de la
+// boîte. Les deux rendus — le SVG et la fenêtre — passent par là.
+const int LARGEUR_BARRE_COULEURS = 74;
+struct BarreCouleurs {
+    std::vector<int> tranches;
+    std::vector<double> valeurs, fractions;
+};
+BarreCouleurs barreCouleurs(const Figure& f, const Axes& a);
 // La couleur du pixel K d'une image, selon son mode (couleurs vraies,
 // indices directs, mise à l'échelle).
 void couleurPixelImage(const std::vector<double>& palette, const Serie& s, std::size_t k,
