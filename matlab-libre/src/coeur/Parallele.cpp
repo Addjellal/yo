@@ -310,6 +310,25 @@ Valeur elementNeutre(const std::string& op) {
     return Valeur::vide();
 }
 
+// Les fonctions locales du fichier qui lance le travail : comme sous
+// MATLAB, le corps d'un parfor ou d'un spmd peut appeler une sous-fonction
+// du script ou de la fonction qui le contient. Le travailleur, interprète
+// neuf, ne les connaîtrait pas ; on lui en donne la table. Les références
+// sont faibles ; l'hôte fait vivre leurs groupes.
+std::shared_ptr<FonctionUtilisateur> fonctionsDeLAppelant(const Interpreteur& it) {
+    const Portee& p = it.portee();
+    if (!p.fonction || p.fonction->voisines.empty()) return nullptr;
+    auto hote = std::make_shared<FonctionUtilisateur>();
+    hote->nom = p.fonction->nom;
+    hote->fichier = p.fonction->fichier;
+    hote->voisines = p.fonction->voisines;
+    // parfeval n'attend pas : l'hôte fait vivre les groupes de fonctions
+    // tant qu'un travailleur peut encore les appeler.
+    if (auto groupe = p.fonction->groupe.lock()) hote->groupesPossedes.push_back(groupe);
+    for (const auto& g : p.fonction->groupesPossedes) hote->groupesPossedes.push_back(g);
+    return hote;
+}
+
 struct ResultatTravailleur {
     std::map<std::string, std::vector<std::pair<std::size_t, Valeur>>> tranches;
     std::map<std::string, Valeur> reductions;
@@ -335,6 +354,7 @@ bool executerParforParallele(Interpreteur& it, const NoeudPtr& boucle,
 
     std::string racine = it.racineToolbox();
     std::vector<std::string> chemins = it.chemin();
+    auto hote = fonctionsDeLAppelant(it);
 
     std::vector<ResultatTravailleur> resultats((std::size_t)travailleurs);
     std::vector<std::thread> fils;
@@ -346,6 +366,7 @@ bool executerParforParallele(Interpreteur& it, const NoeudPtr& boucle,
             Interpreteur ouvrier;
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
+            if (hote) ouvrier.porteeBase().fonction = hote;
             for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
                 ouvrier.ajouterChemin(*p, true);
             std::ostringstream muet;
@@ -449,6 +470,7 @@ std::vector<std::vector<Valeur>> appliquerEnParallele(
     }
     std::string racine = it.racineToolbox();
     std::vector<std::string> chemins = it.chemin();
+    auto hote = fonctionsDeLAppelant(it);
     std::atomic<std::size_t> prochaine{0};
     std::vector<std::string> erreurs((std::size_t)travailleurs);
     std::vector<std::thread> fils;
@@ -457,6 +479,7 @@ std::vector<std::vector<Valeur>> appliquerEnParallele(
             Interpreteur ouvrier;
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
+            if (hote) ouvrier.porteeBase().fonction = hote;
             for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
                 ouvrier.ajouterChemin(*p, true);
             std::ostringstream muet;
@@ -514,6 +537,7 @@ bool executerSpmd(Interpreteur& it, const NoeudPtr& bloc) {
     for (const auto& nom : diffusees) valeursDiffusees.emplace_back(nom, it.lireVariable(nom));
     std::string racine = it.racineToolbox();
     std::vector<std::string> chemins = it.chemin();
+    auto hote = fonctionsDeLAppelant(it);
     std::vector<std::map<std::string, Valeur>> sorties((std::size_t)travailleurs);
     std::vector<std::string> erreurs((std::size_t)travailleurs);
     std::vector<std::thread> fils;
@@ -522,6 +546,7 @@ bool executerSpmd(Interpreteur& it, const NoeudPtr& bloc) {
             Interpreteur ouvrier;
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
+            if (hote) ouvrier.porteeBase().fonction = hote;
             for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
                 ouvrier.ajouterChemin(*p, true);
             std::ostringstream muet;
@@ -629,10 +654,11 @@ long long lancerTravail(Interpreteur& it, const Valeur& fonction, int nargout,
                         std::vector<Valeur> args) {
     std::string racine = it.racineToolbox();
     std::vector<std::string> chemins = it.chemin();
+    auto hote = fonctionsDeLAppelant(it);
     auto travail = std::make_shared<Travail>();
     auto promesse = std::make_shared<std::promise<std::vector<Valeur>>>();
     travail->resultat = promesse->get_future();
-    auto tache = [racine, chemins, fonction, nargout, args, promesse, travail]() {
+    auto tache = [racine, chemins, hote, fonction, nargout, args, promesse, travail]() {
         if (travail->annule) {
             promesse->set_value({});
             return;
@@ -641,6 +667,7 @@ long long lancerTravail(Interpreteur& it, const Valeur& fonction, int nargout,
             Interpreteur ouvrier;
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
+            if (hote) ouvrier.porteeBase().fonction = hote;
             for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
                 ouvrier.ajouterChemin(*p, true);
             std::ostringstream muet;

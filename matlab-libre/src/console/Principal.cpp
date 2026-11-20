@@ -229,7 +229,9 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (k < arguments.size()) {
-            // Les arguments restants sont visibles par « argv » dans le script.
+            // Les arguments restants sont visibles par « argv » dans un
+            // script ; un fichier de fonctions les reçoit en entrée, en
+            // texte, comme une application compilée par MATLAB.
             std::vector<Valeur> reste;
             for (std::size_t j = k + 1; j < arguments.size(); ++j)
                 reste.push_back(Valeur::texte(arguments[j]));
@@ -239,7 +241,7 @@ int main(int argc, char** argv) {
                                  ? fs::current_path().string()
                                  : fichier.parent_path().string(),
                              true);
-            it.executerFichier(arguments[k]);
+            it.executerFichier(arguments[k], reste);
             return 0;
         }
         return executerFluxInteractif(it);

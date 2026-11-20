@@ -1247,7 +1247,8 @@ void Interpreteur::executerTexte(const std::string& source, const std::string& o
     }
 }
 
-void Interpreteur::executerFichier(const std::string& fichier) {
+void Interpreteur::executerFichier(const std::string& fichier,
+                                   const std::vector<Valeur>& arguments) {
     suivreInterruption();
     std::string source = lireFichier(fichier);
     // mfilename doit pouvoir nommer le fichier en cours d'exécution.
@@ -1288,7 +1289,7 @@ void Interpreteur::executerFichier(const std::string& fichier) {
             throw;
         }
     } else if (!u.fonctions.empty()) {
-        std::vector<Valeur> args;
+        std::vector<Valeur> args = arguments;
         appelerUtilisateur(u.fonctions[0], args, 0);
     }
 }

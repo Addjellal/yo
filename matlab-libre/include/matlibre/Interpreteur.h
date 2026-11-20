@@ -111,7 +111,10 @@ public:
 
     // --- exécution ---
     void executerTexte(const std::string& source, const std::string& origine);
-    void executerFichier(const std::string& fichier);
+    // ARGUMENTS va à la fonction principale d'un fichier de fonctions,
+    // comme une application compilée par MATLAB reçoit sa ligne de commande.
+    void executerFichier(const std::string& fichier,
+                         const std::vector<Valeur>& arguments = {});
     void executerBloc(const NoeudPtr& b);
     void executerInstruction(const NoeudPtr& n);
 

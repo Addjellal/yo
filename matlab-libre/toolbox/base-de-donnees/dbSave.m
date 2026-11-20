@@ -4,9 +4,12 @@ function dbSave(t, nomFichier)
 %   les noms de colonnes, puis une ligne par enregistrement, les champs
 %   séparés par des virgules.
 %
-%   Le CSV est le seul format qu'à peu près tout sait lire. Il ne porte
-%   pas les types : c'est DBLOAD qui les rétablit, en reconnaissant ce qui
-%   se convertit en nombre.
+%   Le fichier suit RFC 4180, ce que lisent les tableurs, Python (csv) et
+%   SQLite : le texte est entre guillemets, ses guillemets doublés — une
+%   virgule ou un retour à la ligne dans un nom ne casse rien —, et les
+%   nombres s'écrivent avec dix-sept chiffres significatifs, ce qui les
+%   relit exactement. Les guillemets portent aussi le type : DBLOAD rend
+%   en texte ce qui était du texte, « 007 » compris.
 %
 %   Exemple :
 %      t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
@@ -17,27 +20,24 @@ function dbSave(t, nomFichier)
 %
 %   Voir aussi DBLOAD, DBTABLE.
     fid = fopen(nomFichier, 'w');
-    for k = 1:numel(t.colonnes)
-        if k > 1
-            fprintf(fid, ',');
-        end
-        fprintf(fid, '%s', t.colonnes{k});
+    if fid < 0
+        error('database:dbSave:Ouverture', 'Impossible d''écrire « %s ».', nomFichier);
     end
-    fprintf(fid, '\n');
+    fprintf(fid, '%s\n', strjoin(cellfun(@champ, t.colonnes, 'UniformOutput', false), ','));
     for i = 1:numel(t.lignes)
-        ligne = t.lignes{i};
-        for k = 1:numel(ligne)
-            if k > 1
-                fprintf(fid, ',');
-            end
-            v = ligne{k};
-            if ischar(v)
-                fprintf(fid, '%s', v);
-            else
-                fprintf(fid, '%g', v);
-            end
-        end
-        fprintf(fid, '\n');
+        fprintf(fid, '%s\n', strjoin(cellfun(@champ, t.lignes{i}, 'UniformOutput', false), ','));
     end
     fclose(fid);
+end
+
+% Un champ CSV (RFC 4180) : le texte entre guillemets, ses guillemets
+% doublés ; un nombre avec dix-sept chiffres, qui le relisent exactement.
+function texte = champ(v)
+    if ischar(v) || isstring(v)
+        texte = ['"' strrep(char(v), '"', '""') '"'];
+    elseif islogical(v)
+        texte = sprintf('%d', v);
+    else
+        texte = sprintf('%.17g', v);
+    end
 end

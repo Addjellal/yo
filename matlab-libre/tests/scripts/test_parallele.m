@@ -144,5 +144,34 @@ parfor i = 1:4
 end
 assert(isequal(grille, (1:4)' * (1:4)));
 
+%% ------------------------------------- fonctions locales dans le corps
+% Comme sous MATLAB, le corps d'un parfor appelle les fonctions locales
+% du script ou de la fonction qui le contient. Les travailleurs, qui sont
+% des interpretes neufs, ne les voyaient pas : « Unrecognized function ».
+carres = zeros(1, 6);
+parfor i = 1:6
+    carres(i) = carreLocal(i);
+end
+assert(isequal(carres, (1:6) .^ 2));
+spmd
+    v = carreLocal(labindex);
+end
+assert(v{2} == 4);
+dossierFonction = tempname();
+mkdir(dossierFonction);
+fichierFonction = fopen(fullfile(dossierFonction, 'sommeParalleleLocale.m'), 'w');
+fprintf(fichierFonction, ['function s = sommeParalleleLocale(n)\n' ...
+                          '    s = 0;\n    parfor k = 1:n\n        s = s + aide(k);\n    end\nend\n' ...
+                          'function y = aide(k)\n    y = 2 * k;\nend\n']);
+fclose(fichierFonction);
+addpath(dossierFonction);
+assert(sommeParalleleLocale(10) == 110);
+rmpath(dossierFonction);
+rmdir(dossierFonction, 's');
+
 delete(gcp('nocreate'));
 disp('parallele : toutes les verifications passent');
+
+function y = carreLocal(x)
+    y = x ^ 2;
+end

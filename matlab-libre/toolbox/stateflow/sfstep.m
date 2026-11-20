@@ -284,7 +284,7 @@ function [vrai, contexte] = garde(tr, contexte, u, machine)
         vrai = true;
         return
     end
-    [evenement, condition, actionCondition] = etiquette(char(g));
+    [evenement, condition, actionCondition] = matlibre_sf_etiquette(g);
     vrai = true;
     if ~isempty(evenement)
         % l'événement que l'entrée nomme, ou celui qui réveille le
@@ -319,28 +319,6 @@ function texte = emissions(texte, machine)
         texte = regexprep(texte, ['send\s*\(\s*' nom '\s*\)\s*;?'], emettre);
         texte = regexprep(texte, ['(^|[;,{}\n]\s*)' nom '\s*(;|,|$)'], ['$1' emettre]);
     end
-end
-
-% « e[c]{a} », « [c] », « e » ou une condition nue.
-function [evenement, condition, action] = etiquette(texte)
-    evenement = '';
-    condition = '';
-    action = '';
-    texte = strtrim(texte);
-    jetons = regexp(texte, '^(\w*)\s*\[(.*)\]\s*(\{(.*)\})?\s*$', 'tokens', 'once');
-    if ~isempty(jetons)
-        evenement = jetons{1};
-        condition = jetons{2};
-        if numel(jetons) >= 4
-            action = jetons{4};
-        end
-        return
-    end
-    if ~isempty(regexp(texte, '^[A-Za-z]\w*$', 'once'))
-        evenement = texte;   % un nom seul : un événement
-        return
-    end
-    condition = texte;
 end
 
 % Une action : une poignée — @(c) pour l'entrée et la sortie, @(c, u)

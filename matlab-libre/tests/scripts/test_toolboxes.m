@@ -343,11 +343,24 @@ session = daq();
 session = addAnalogInput(session, 'v', @(t) 2 * t);
 [donnees, temps] = readData(session, 5);
 assert(abs(donnees(3) - 2 * temps(3)) < 1e-12);
+% Deux lectures se suivent dans le temps, comme une acquisition continue
+% (la seconde rendait le meme bloc que la premiere).
+[suite, tempsSuite] = readData(session, 5);
+assert(abs(tempsSuite(1) - (temps(end) + 1 / session.frequence)) < 1e-12);
+assert(abs(suite(1) - 2 * tempsSuite(1)) < 1e-12 && session.Rate == session.frequence);
 
 % Instrument Control
 instrument = visadev('SIM::1');
 [reponse, instrument] = query(instrument, '*IDN?');
 assert(~isempty(strfind(reponse, 'MatLibre')));
+% Une poignee, comme dans MATLAB : writeline puis readline, sans reprendre
+% l'objet (la reponse etait perdue). SCPI : forme longue, file d'erreurs.
+writeline(instrument, '*IDN?');
+assert(startsWith(readline(instrument), 'MatLibre'));
+assert(~isnan(str2double(writeread(instrument, 'MEASure:VOLTage:DC?'))));
+writeline(instrument, 'FOO:BAR');
+assert(strcmp(writeread(instrument, 'SYST:ERR?'), '-113,"Undefined header"'));
+assert(strcmp(writeread(instrument, 'SYST:ERR?'), '+0,"No error"'));
 
 % Audio
 son = 0.5 * sin(2 * pi * 440 * (0:999) / 8000);

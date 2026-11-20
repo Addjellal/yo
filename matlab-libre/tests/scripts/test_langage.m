@@ -665,6 +665,10 @@ assert(isequal(strlength(prealloue), [0 0 0]));
 assert(all(ismissing(prealloue)));
 assert(isequal(size(strings(2)), [2 2]));
 assert(isequal(size(strings()), [1 1]));
+% char d'une chaine vide est un tableau de caracteres vide, non un double
+% vide : ischar(char("")) etait faux.
+assert(ischar(char("")) && isequal(size(char("")), [0 0]));
+assert(ischar(char({'', ''})) && isequal(size(char({'', ''})), [2 0]));
 disp('join et strings : ok');
 
 % DISCRETIZE en categorielle : l'ordre est celui des bornes, non

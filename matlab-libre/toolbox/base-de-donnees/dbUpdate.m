@@ -15,7 +15,7 @@ function t = dbUpdate(t, predicat, colonne, valeur)
 %      t = dbUpdate(t, @(l) strcmp(l{2}, 'ventes'), 'salaire', 45000);
 %
 %   Voir aussi DBSELECT, DBDELETE, DBINSERT.
-    j = find(strcmp(t.colonnes, colonne), 1);
+    j = matlibre_db_colonne(t, colonne, 'dbUpdate');
     for k = 1:numel(t.lignes)
         if predicat(t.lignes{k})
             ligne = t.lignes{k};

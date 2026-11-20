@@ -1160,6 +1160,14 @@ FONCTION(fnChar) {
     if (lignes.empty()) return {Valeur::texte("")};
     std::size_t largeur = 0;
     for (const auto& l : lignes) largeur = std::max(largeur, l.size());
+    // Des lignes toutes vides : char("") est un tableau de caractères vide,
+    // non un double vide qu'aurait laissé la concaténation.
+    if (largeur == 0) {
+        if (lignes.size() == 1) return {Valeur::videClasse(Classe::Caractere)};
+        Valeur v = Valeur::matrice((int)lignes.size(), 0);
+        v.classe = Classe::Caractere;
+        return {v};
+    }
     std::vector<Valeur> rangs;
     rangs.reserve(lignes.size());
     for (auto l : lignes) {

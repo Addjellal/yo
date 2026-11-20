@@ -19,8 +19,8 @@ function [cles, sommes] = dbGroupSum(t, colonneCle, colonneValeur)
 %      sum(masses)                     % le total general
 %
 %   Voir aussi DBSELECT, DBTABLE.
-    a = find(strcmp(t.colonnes, colonneCle), 1);
-    b = find(strcmp(t.colonnes, colonneValeur), 1);
+    a = matlibre_db_colonne(t, colonneCle, 'dbGroupSum');
+    b = matlibre_db_colonne(t, colonneValeur, 'dbGroupSum');
     cles = {};
     sommes = [];
     for k = 1:numel(t.lignes)

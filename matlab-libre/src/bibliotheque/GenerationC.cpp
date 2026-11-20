@@ -251,8 +251,10 @@ struct Traducteur {
         }
         aides.insert("saturer");
         std::ostringstream o;
+        // Les bornes en entier exact : le flux, avec ses six chiffres par
+        // défaut, écrivait 2.14748e+09 pour intmax('int32').
         o << "(" << cible.nomC() << ")matlibre_saturer(" << valeur << ", "
-          << cible.minimum() << ", " << cible.maximum() << ")";
+          << formater("%.17g", cible.minimum()) << ", " << formater("%.17g", cible.maximum()) << ")";
         return o.str();
     }
 
@@ -470,6 +472,11 @@ struct Traducteur {
             if (puissance) {
                 aides.insert("pow");
                 code = "pow((double)(" + a.code + "), (double)(" + b.code + "))";
+            } else if (t.entier() && !comparaison && cop != "&&" && cop != "||") {
+                // Un calcul entier se fait comme MATLAB : en double, puis
+                // arrondi et saturé. En C, 7/2 tronquerait à 3 (MATLAB : 4)
+                // et int32 * int32 déborderait avant la saturation.
+                code = "((double)(" + a.code + ") " + cop + " (double)(" + b.code + "))";
             } else {
                 code = "((" + a.code + ") " + cop + " (" + b.code + "))";
             }
@@ -486,6 +493,8 @@ struct Traducteur {
         if (puissance) {
             aides.insert("pow");
             valeur = "pow((double)" + ea + ", (double)" + eb + ")";
+        } else if (t.entier() && !comparaison && cop != "&&" && cop != "||") {
+            valeur = "((double)" + ea + " " + cop + " (double)" + eb + ")";
         } else {
             valeur = "(" + ea + " " + cop + " " + eb + ")";
         }
