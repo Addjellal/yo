@@ -1,8 +1,12 @@
 # MatLibre — clone libre du langage MATLAB.
 #
-# Aucune dépendance obligatoire : un compilateur C++17 suffit. LAPACK, BLAS
-# et FFTW sont utilisés s'ils sont présents, uniquement pour accélérer les
-# gros calculs ; les mêmes algorithmes sont écrits dans src/coeur.
+# Aucune dépendance obligatoire : un compilateur C++17 suffit, et Qt6 pour
+# le bureau, s'il est la. L'algebre lineaire, la FFT, les matrices creuses
+# et les images sont ecrites dans src/ : aucune bibliotheque de calcul
+# n'est cherchee ni liee. (Les options MATLIBRE_AVEC_LAPACK, _FFTW,
+# _SUITESPARSE et _OPENCV liaient ces bibliotheques sans qu'aucune ligne
+# du code ne s'en serve : elles n'acceleraient rien et ajoutaient des
+# dependances que le paquet .deb ne declarait pas.)
 cmake_minimum_required(VERSION 3.16)
 project(MatLibre VERSION 0.1.0 LANGUAGES CXX)
 
@@ -41,15 +45,6 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "^[A-Za-z][A-Za-z0-9_]*$" AND NOT CMAKE_BUILD_TY
     "    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release")
 endif()
 
-# Les bibliotheques ci-dessous sont des ACCELERATEURS, pas des dependances :
-# MatLibre a ses propres algorithmes pour tout ce qu'elles font, et les
-# resultats sont les memes. On note celles qui manquent pour les resumer en
-# une ligne a la fin, au lieu de quatre lignes qui ressemblent a des pannes.
-set(MATLIBRE_INTERNES)
-set(MATLIBRE_TROUVEES)
-
-option(MATLIBRE_AVEC_LAPACK "Utiliser LAPACK/BLAS si disponible" ON)
-option(MATLIBRE_AVEC_FFTW   "Utiliser FFTW si disponible"        ON)
 option(MATLIBRE_TESTS       "Construire les tests"               ON)
 
 if(MSVC)
@@ -86,30 +81,6 @@ file(GLOB_RECURSE MATLIBRE_SOURCES CONFIGURE_DEPENDS
 add_library(matlibre_coeur STATIC ${MATLIBRE_SOURCES})
 target_include_directories(matlibre_coeur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-if(MATLIBRE_AVEC_LAPACK)
-  find_package(LAPACK QUIET)
-  if(LAPACK_FOUND)
-    target_link_libraries(matlibre_coeur PUBLIC ${LAPACK_LIBRARIES})
-    target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_LAPACK=1)
-    list(APPEND MATLIBRE_TROUVEES "LAPACK/BLAS")
-  else()
-    list(APPEND MATLIBRE_INTERNES "LAPACK/BLAS")
-  endif()
-endif()
-
-if(MATLIBRE_AVEC_FFTW)
-  find_library(FFTW3_LIB fftw3)
-  find_path(FFTW3_INC fftw3.h)
-  if(FFTW3_LIB AND FFTW3_INC)
-    target_link_libraries(matlibre_coeur PUBLIC ${FFTW3_LIB})
-    target_include_directories(matlibre_coeur PUBLIC ${FFTW3_INC})
-    target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_FFTW=1)
-    list(APPEND MATLIBRE_TROUVEES "FFTW")
-  else()
-    list(APPEND MATLIBRE_INTERNES "FFTW")
-  endif()
-endif()
-
 find_package(Threads QUIET)
 if(Threads_FOUND)
   target_link_libraries(matlibre_coeur PUBLIC Threads::Threads)
@@ -125,48 +96,6 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/toolbox/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/matlibre)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/documentation/
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
-
-# --- dépendances optionnelles supplémentaires --------------------------------
-option(MATLIBRE_AVEC_SUITESPARSE "Utiliser SuiteSparse (UMFPACK/CHOLMOD) si disponible" ON)
-option(MATLIBRE_AVEC_OPENCV      "Utiliser OpenCV si disponible"                        ON)
-
-if(MATLIBRE_AVEC_SUITESPARSE)
-  find_library(UMFPACK_LIB umfpack)
-  find_path(UMFPACK_INC umfpack.h PATH_SUFFIXES suitesparse)
-  if(UMFPACK_LIB AND UMFPACK_INC)
-    target_link_libraries(matlibre_coeur PUBLIC ${UMFPACK_LIB})
-    target_include_directories(matlibre_coeur PUBLIC ${UMFPACK_INC})
-    target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_SUITESPARSE=1)
-    list(APPEND MATLIBRE_TROUVEES "SuiteSparse")
-  else()
-    list(APPEND MATLIBRE_INTERNES "SuiteSparse")
-  endif()
-endif()
-
-if(MATLIBRE_AVEC_OPENCV)
-  find_package(OpenCV QUIET COMPONENTS core imgproc imgcodecs)
-  if(OpenCV_FOUND)
-    target_link_libraries(matlibre_coeur PUBLIC ${OpenCV_LIBS})
-    target_include_directories(matlibre_coeur PUBLIC ${OpenCV_INCLUDE_DIRS})
-    target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_OPENCV=1)
-    list(APPEND MATLIBRE_TROUVEES "OpenCV")
-  else()
-    list(APPEND MATLIBRE_INTERNES "OpenCV")
-  endif()
-endif()
-
-# --- resume des accelerateurs -------------------------------------------------
-if(MATLIBRE_TROUVEES)
-  list(JOIN MATLIBRE_TROUVEES ", " MATLIBRE_TEXTE_TROUVEES)
-  message(STATUS "MatLibre : acceleree par ${MATLIBRE_TEXTE_TROUVEES}")
-endif()
-if(MATLIBRE_INTERNES)
-  list(JOIN MATLIBRE_INTERNES ", " MATLIBRE_TEXTE_INTERNES)
-  message(STATUS
-    "MatLibre : ${MATLIBRE_TEXTE_INTERNES} absente(s) — les algorithmes internes "
-    "prennent le relais, rien ne manque a l'execution. Ces bibliotheques ne font "
-    "qu'accelerer les gros calculs.")
-endif()
 
 # --- bureau natif (facultatif : le reste se compile et se teste sans Qt) ------
 #

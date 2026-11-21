@@ -7,9 +7,10 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
 
-Rien n'est obligatoire hors un compilateur C++17. Si LAPACK, BLAS ou FFTW
-sont présents, ils sont détectés et liés ; sinon les algorithmes internes
-prennent le relais, sans que rien ne manque.
+Rien n'est obligatoire hors un compilateur C++17 (et Qt6 pour le bureau).
+Aucune bibliothèque de calcul n'est cherchée : l'algèbre linéaire, la
+FFT, les matrices creuses sont écrites dans `src/coeur` et
+`src/bibliotheque`.
 
 Le `Makefile` de la racine enveloppe ces deux commandes :
 

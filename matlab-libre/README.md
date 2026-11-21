@@ -75,8 +75,8 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
   installer, et les fichiers vont dans les deux sens avec MATLAB.
 - **Un rendu graphique** en SVG, écrit à la main : courbes, barres,
   nuages, tiges, escaliers, images, sous-graphes, légendes.
-- **Aucune dépendance obligatoire.** LAPACK, BLAS et FFTW sont utilisés
-  s'ils sont là, uniquement pour aller plus vite.
+- **Aucune dépendance obligatoire.** Un compilateur C++17 suffit ;
+  l'algèbre linéaire et la FFT sont écrites ici, sans LAPACK ni FFTW.
 
 ## Ce que ce n'est pas
 

@@ -127,8 +127,10 @@ Jacobi (matrices symétriques) ou Hessenberg + QR à décalage de Wilkinson
 (cas général), exponentielle de matrice par mise à l'échelle et
 approximant de Padé.
 
-Si LAPACK et BLAS sont trouvés à la compilation, ils sont liés et
-serviront aux grandes matrices ; sans eux, rien ne manque.
+Rien n'est délégué à LAPACK ni à BLAS : c'est ce qui rend `eig` et `svd`
+lents sur les grandes matrices denses (0,27 s et 0,44 s pour 300×300, où
+MATLAB met quelques millisecondes). Les brancher, en dépendance
+facultative, est une proposition de `audit-reprise.md`.
 
 ## Fourier
 

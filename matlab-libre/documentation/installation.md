@@ -1,9 +1,9 @@
 # Installer MatLibre
 
 Un compilateur C++17 et CMake suffisent. Aucune bibliothèque n'est
-obligatoire : LAPACK, BLAS, FFTW, SuiteSparse et OpenCV sont utilisés
-s'ils sont présents, uniquement pour aller plus vite ou lire plus de
-formats d'image.
+obligatoire : Qt6 (Widgets), s'il est présent, ajoute l'application de
+bureau ; tout le reste — algèbre linéaire, FFT, matrices creuses — est
+écrit dans le dépôt.
 
 ## Compiler
 
@@ -85,20 +85,14 @@ cd build && cpack
 
 | Bibliothèque | Ce qu'elle apporte | Option CMake |
 | --- | --- | --- |
-| LAPACK / BLAS | algèbre linéaire dense plus rapide | `MATLIBRE_AVEC_LAPACK` |
-| FFTW | transformées de Fourier plus rapides | `MATLIBRE_AVEC_FFTW` |
-| SuiteSparse | grands systèmes creux | `MATLIBRE_AVEC_SUITESPARSE` |
-| OpenCV | lecture et écriture d'images élargies | `MATLIBRE_AVEC_OPENCV` |
+| Qt6 Widgets | l'application de bureau `matlibre-bureau` | `MATLIBRE_BUREAU` |
 
-Chacune est cherchée automatiquement ; la configuration dit ce qu'elle a
-trouvé. Pour s'en passer explicitement :
-
-```bash
-cmake -S . -B build -DMATLIBRE_AVEC_LAPACK=OFF -DMATLIBRE_AVEC_FFTW=OFF
-```
-
-Les algorithmes internes donnent les mêmes résultats — les tests passent
-dans les deux cas.
+Aucune bibliothèque de calcul n'est cherchée. Les options
+`MATLIBRE_AVEC_LAPACK`, `MATLIBRE_AVEC_FFTW`, `MATLIBRE_AVEC_SUITESPARSE`
+et `MATLIBRE_AVEC_OPENCV` ont été retirées le 21 novembre 2026 : elles
+liaient ces bibliothèques sans qu'aucune ligne du code ne s'en serve, et
+le paquet `.deb` héritait de dépendances qu'il ne déclarait pas. Brancher
+LAPACK pour de bon est une proposition de `audit-reprise.md`.
 
 ## Gérer les toolboxes
 
@@ -117,5 +111,8 @@ chemin de recherche.
 
 ## Intégration continue
 
-`.github/workflows/construire.yml` compile et teste sur Ubuntu, macOS et
-Windows, et fabrique les archives.
+Il n'y en a pas qui tourne. `.github/workflows/construire.yml` est rangé
+dans `matlab-libre/`, or GitHub ne lit que le `.github/workflows` de la
+racine du dépôt : ce fichier n'a jamais été exécuté. Le remplacer par un
+ensemble à la racine — construction et tests rapides à chaque poussée,
+batterie complète chaque nuit — est une proposition de `audit-reprise.md`.

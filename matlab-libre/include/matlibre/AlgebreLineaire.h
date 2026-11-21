@@ -2,9 +2,9 @@
 //
 // Tout est écrit ici, sans dépendance externe : LU avec pivot partiel, QR de
 // Householder, Cholesky, SVD de Jacobi unilatérale, valeurs propres par
-// Hessenberg + QR à décalage. Si LAPACK et BLAS sont trouvés à la
-// compilation (option MATLIBRE_AVEC_LAPACK), les mêmes fonctions y
-// délèguent les cas denses volumineux.
+// Hessenberg + QR à décalage. Aucune ne délègue à LAPACK : c'est ce qui
+// rend eig et svd lents sur les grandes matrices denses (voir
+// documentation/audit-reprise.md).
 #pragma once
 
 #include <complex>
