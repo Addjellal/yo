@@ -170,20 +170,54 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 
 ## 5. L'audit de reprise
 
-Avant d'ajouter quoi que ce soit, une session qui reprend fait le point,
-et le rend écrit dans `documentation/audit-reprise.md` (date, commit,
-constats chiffrés, ce qui a été corrigé, ce qui est proposé).
+Avant d'ajouter quoi que ce soit, une session qui reprend fait le point
+sur tout ce qui peut profiter à l'application, et le rend écrit dans
+`documentation/audit-reprise.md`. Chaque constat y porte : ce qui a été
+vu, la preuve (commande, mesure, capture, scénario qui le déclenche), la
+gravité, et ce qui a été fait — corrigé, avec le commit, ou proposé, avec
+un coût estimé.
+
+### Outils d'analyse disponibles dans le conteneur
+
+ASan, UBSan et TSan (`-fsanitize=address,undefined`, `-fsanitize=thread`
+avec gcc), `valgrind` (memcheck, callgrind pour le profil), `clang-tidy`,
+`clang-format`, `gcov`, Xvfb et ImageMagick (`import`), Playwright et
+Chromium (`outils/capturer.js`). Absents : `cppcheck`, `lcov`, `perf`,
+la chaîne MinGW (la construction pour Windows ne s'éprouve donc pas ici).
+Le CMake n'a pas encore d'option pour les assainisseurs ni pour la
+couverture : les ajouter (`-DMATLIBRE_ASSAINIR=ON`,
+`-DMATLIBRE_COUVERTURE=ON`) est en soi une amélioration.
+
+### Les douze volets
 
 1. **Construire** et vérifier qu'aucun avertissement nouveau n'apparaît
    (ceux de `Base.cpp`, `Mat.cpp`, `Math.cpp`, `Statistiques.cpp` sont
-   connus).
+   connus), puis la même chose avec `-Wall -Wextra -Wshadow
+   -Wconversion` pour mesurer la dette, sans tout corriger.
 2. **La batterie complète** (49 tests) et le bureau (`ctest -R bureau`).
    Un test rouge est le premier travail : en trouver la cause — défaut
    réel, ou test qui ne tenait qu'au hasard — avant toute autre chose.
-3. **Le banc** (`outils/banc.m`) : comparer aux références ; une mesure
+3. **La santé de la mémoire et des fils** : construire avec ASan et
+   UBSan et repasser la batterie (au moins le cœur, les graphiques,
+   Simulink et le bureau) ; TSan sur `test_parallele.m` et `parfor` ;
+   `valgrind` sur quelques scripts longs pour les fuites. Toute lecture
+   hors bornes, tout comportement indéfini, toute course est un défaut à
+   corriger.
+4. **La robustesse** : `outils/eprouverNatives.sh` (chaque native appelée
+   avec des arguments absurdes : une erreur MATLAB est juste, un plantage
+   jamais) ; un fuzzeur maison de l'analyseur et de l'interpréteur
+   (fichiers `.m` tronqués, mutés, imbriqués à l'excès, très longs) ;
+   les cas limites (vide, NaN, Inf, complexe, entiers, tailles énormes,
+   chaînes Unicode) ; des fichiers abîmés en lecture (`.mat`, `.csv`,
+   `.json`, `.slx`, images, audio) ; l'application de bureau devant un
+   calcul qui ne finit pas, une figure de dix millions de points, un
+   fichier qui disparaît.
+5. **Le banc** (`outils/banc.m`) : comparer aux références ; une mesure
    plus lente d'un facteur 1,5 se regarde, d'un facteur 3 se cherche
-   (régression, ou machine différente : le dire). Le banc du 21 novembre
-   2026 montre déjà où MatLibre est lent face à MATLAB :
+   (régression, ou machine différente : le dire). Puis profiler les
+   points chauds (`valgrind --tool=callgrind`) et dire ce qui les
+   accélérerait. Le banc du 21 novembre 2026 montre déjà où MatLibre est
+   lent face à MATLAB :
    - l'algèbre linéaire dense est écrite à la main, sans LAPACK : `eig`
      d'une matrice symétrique 300×300 prend 0,27 s, `svd` 0,44 s, quand
      MATLAB y met quelques millisecondes ;
@@ -191,7 +225,9 @@ constats chiffrés, ce qui a été corrigé, ce qui est proposé).
    - un `parfor` coûte 0,23 s de démarrage, même vide (section 6) ;
    - une boucle scalaire tourne à 0,4 µs le tour : c'est un interpréteur
      à parcours d'arbre, sans compilation à la volée.
-4. **Les conflits** :
+   La durée de la batterie elle-même (`test_simulink` : 25 minutes) freine
+   chaque correction : la raccourcir sans rien perdre est un gain.
+6. **Les conflits** :
    - avec la branche par défaut : `git fetch origin main` puis
      `git rev-list --left-right --count origin/main...HEAD` et
      `git merge-tree --write-tree origin/main HEAD` (le 21 novembre :
@@ -204,52 +240,91 @@ constats chiffrés, ce qui a été corrigé, ce qui est proposé).
      en `ode1` au pas de 0,01, quand `new_system('m')` part, comme
      Simulink, en `VariableStepAuto` — d'où un intégrateur faux de 5e-3
      sur un sinus, là où ode45 donne 3e-10. À trancher.
-5. **Le logiciel** : relire le code des grands ajouts récents (`Toile`,
+7. **La fidélité à MATLAB sur du vrai code** : faire tourner des
+   programmes MATLAB réels — les exemples de la documentation publique
+   de MathWorks, des projets libres sous licence permissive — et relever
+   ce qui échoue ou diffère ; confronter les résultats numériques à des
+   références indépendantes (NumPy, SciPy, statsmodels) ; relire des
+   fichiers produits par MATLAB et Simulink (`.mat` v5 et v7, `.slx`).
+   MatLibre est sous licence MIT : rien ne se copie d'un code GPL (les
+   tests d'Octave, par exemple) ni de MathWorks — on s'en sert comme
+   référence de comportement, on n'en reprend pas une ligne.
+8. **Le logiciel** : relire le code des grands ajouts récents (`Toile`,
    `Dessin.cpp`, `Espace.cpp`, `Tex.cpp`, `Tampon.h`, `Aleatoire.cpp`)
    en cherchant les défauts réels, avec le scénario qui les déclenche ;
-   passer `outils/eprouverNatives.sh` ; vérifier la couverture
+   `clang-tidy` sur ces fichiers ; mesurer la couverture des tests
+   (`gcov`) pour trouver le code que rien n'exerce ; repérer les fichiers
+   devenus trop gros (`TracesGraphiques.cpp` dépasse trois mille lignes)
+   et le code mort ; vérifier la couverture fonctionnelle
    (`outils/manques.m`, `outils/audit.m`).
-6. **Le design** :
+9. **Le design** :
    - les figures : rendre en PNG un corpus varié (tracés plans, barres,
      images, contours, légendes, sous-figures, 3D, TeX) et le regarder
      face à ce que MATLAB montre (couleurs, polices, marges, graduations,
      vues 3D) ; comparer la fenêtre (`outils/vueFigure.sh`) au SVG ;
    - l'application de bureau : capturer la fenêtre principale, l'éditeur,
      la console, l'aide, l'éditeur Simulink, et juger lisibilité,
-     cohérence visuelle, encombrement, contrastes, tailles de police.
-7. **L'ergonomie pour l'utilisateur** : se mettre à la place de trois
-   personnes — l'utilisateur de MATLAB qui change d'outil, l'étudiant qui
-   découvre, l'ingénieur qui lance des scripts en ligne de commande — et
-   parcourir ce qu'elles font, en notant chaque friction :
-   - **premier contact** : installer, lancer la console et le bureau,
-     trouver de l'aide (`help`, `doc`, le navigateur d'aide, la
-     recherche), comprendre ce qui manque par rapport à MATLAB ;
-   - **le travail courant** : écrire un script dans l'éditeur, l'exécuter,
-     lire une erreur et aller à la ligne fautive, déboguer (points
-     d'arrêt, pas à pas, espace de travail), tracer et retoucher une
-     figure, l'exporter, bâtir et simuler un modèle Simulink ;
-   - **les messages** : une erreur dit-elle quoi, où, et comment s'en
-     sortir ? MATLAB propose « Did you mean: plot? » pour une faute de
-     frappe (`plt(1:3)`) ; MatLibre ne le fait pas. Les messages de
-     MATLAB sont en anglais, ceux propres à MatLibre en français : le
-     mélange se voit, et se discute ;
-   - **la ligne de commande** : options, codes de retour, sortie lisible
-     dans un terminal et dans un journal, historique et complétion de la
-     console ;
-   - **la rapidité ressentie** : démarrage de la console (0,2 à 0,26 s le
-     21 novembre), premier tracé, première simulation, ouverture du
-     bureau, réactivité pendant un long calcul ;
-   - **l'accessibilité** : clavier seul, contrastes, agrandissement,
-     écrans à haute densité.
-   Un défaut est déjà trouvé : `matlibre -q` (et `--quiet`), annoncé par
-   `matlibre --help`, n'est pas lu — l'option est prise pour un nom de
-   script (« Unable to open file '-q' »), dans
-   `src/console/Principal.cpp`. À corriger en premier.
-8. **Rendre compte** : corriger tout de suite ce qui est un défaut avéré
-   (test rouge, résultat faux, plantage, conflit, régression du banc),
-   chacun dans son commit ; pour le reste — améliorations du logiciel, du
-   design et de l'ergonomie —, une liste classée par intérêt et par coût,
-   à soumettre à l'utilisateur avant de s'y mettre.
+     cohérence visuelle, encombrement, contrastes, tailles de police,
+     thème sombre, écrans à haute densité.
+10. **L'ergonomie pour l'utilisateur** : se mettre à la place de trois
+    personnes — l'utilisateur de MATLAB qui change d'outil, l'étudiant
+    qui découvre, l'ingénieur qui lance des scripts en ligne de
+    commande — et parcourir ce qu'elles font, en notant chaque friction :
+    - **premier contact** : installer, lancer la console et le bureau,
+      trouver de l'aide (`help`, `doc`, le navigateur d'aide, la
+      recherche), comprendre ce qui manque par rapport à MATLAB ;
+    - **le travail courant** : écrire un script dans l'éditeur,
+      l'exécuter, lire une erreur et aller à la ligne fautive, déboguer
+      (points d'arrêt, pas à pas, espace de travail), tracer et
+      retoucher une figure, l'exporter, bâtir et simuler un modèle
+      Simulink, ne rien perdre si l'application se ferme ;
+    - **les messages** : une erreur dit-elle quoi, où, et comment s'en
+      sortir ? MATLAB propose « Did you mean: plot? » pour une faute de
+      frappe (`plt(1:3)`) ; MatLibre ne le fait pas. Les messages de
+      MATLAB sont en anglais, ceux propres à MatLibre en français : le
+      mélange se voit, et se discute ;
+    - **la ligne de commande** : options, codes de retour, sortie lisible
+      dans un terminal et dans un journal, historique et complétion de
+      la console ;
+    - **la rapidité ressentie** : démarrage de la console (0,2 à 0,26 s
+      le 21 novembre), premier tracé, première simulation, ouverture du
+      bureau, réactivité pendant un long calcul, possibilité de
+      l'interrompre ;
+    - **l'accessibilité** : clavier seul, contrastes, agrandissement,
+      lecteur d'écran.
+    Un défaut est déjà trouvé : `matlibre -q` (et `--quiet`), annoncé
+    par `matlibre --help`, n'est pas lu — l'option est prise pour un nom
+    de script (« Unable to open file '-q' »), dans
+    `src/console/Principal.cpp`. À corriger en premier.
+11. **La documentation** : le README et les comptes qu'il annonce sont-ils
+    justes ? Manque-t-il un guide de démarrage pour qui vient de MATLAB,
+    un guide de migration (ce qui diffère, ce qui manque), des tutoriels
+    par domaine ? Les fiches d'aide ont-elles des exemples utiles, et
+    pas seulement exécutables ? Le vocabulaire français est-il le même
+    d'une fiche à l'autre ?
+12. **La distribution et la maintenance** : construire depuis zéro en
+    suivant `installation.md`, avec et sans Qt ; regarder ce que donnent
+    l'installation et la désinstallation ; le dépôt n'a pas
+    d'intégration continue (pas de `.github/workflows`) — proposer
+    l'ensemble qui construit et passe les tests rapides à chaque
+    poussée, et la batterie complète chaque nuit ; un journal des
+    versions, un guide de contribution ; ce qui touche au système, au
+    réseau et aux fichiers (`system`, `webread`, l'écriture de fichiers)
+    se fait-il sans surprise et sans danger pour l'utilisateur ?
+
+### Rendre compte
+
+Corriger tout de suite ce qui est un défaut avéré — test rouge, résultat
+faux, plantage, lecture hors bornes, course, conflit, régression du
+banc, option ou commande qui ne fait pas ce qu'elle annonce —, chacun
+dans son commit, la batterie repassée avant de pousser. Pour le reste —
+améliorations du logiciel, de la performance, du design, de
+l'ergonomie, de la documentation, de la distribution —, un tableau
+classé par intérêt pour l'utilisateur, par coût et par risque, à
+soumettre avant de s'y mettre. Ce qui ajoute une dépendance (LAPACK,
+SQLite, HDF5), change un comportement que l'utilisateur voit, ou
+remanie un gros fichier se décide avec l'utilisateur. À la fin, mettre
+à jour cette fiche et `etat.md`.
 
 ## 6. Ce qui reste, par ordre d'intérêt
 
@@ -307,32 +382,57 @@ Coller ce message :
 > d'abord `matlab-libre/documentation/reprise.md` en entier, puis
 > `etat.md` et `architecture.md`.
 >
-> Avant d'ajouter quoi que ce soit, fais l'audit de reprise décrit à la
-> section 5 de `reprise.md` :
-> 1. Construis (`cmake -S . -B build -DCMAKE_BUILD_TYPE=Release` puis
->    `cmake --build build -j4`) et passe la batterie complète (`cd build
->    && ctest -j2 --timeout 7000`, une demi-heure) et le bureau.
-> 2. Fais le benchmark du projet avec `outils/banc.m` et compare aux
->    références ; dis où MatLibre est lent, et pourquoi.
-> 3. Vérifie que tout fonctionne : tests, exemples d'aide, fonctions
->    natives éprouvées (`outils/eprouverNatives.sh`), couverture.
-> 4. Cherche les conflits : avec la branche `main`, entre noms de
->    fichiers et fonctions natives, et entre comportements qui devraient
->    s'accorder (la section 5 en donne un exemple à trancher).
-> 5. Examine le logiciel (relecture du code récent, robustesse,
->    performance) et le design (figures rendues en PNG face à MATLAB,
->    captures de l'application de bureau : lisibilité, cohérence
->    visuelle).
-> 6. Examine l'ergonomie pour l'utilisateur, en te mettant à la place
->    d'un utilisateur de MATLAB, d'un étudiant et d'un ingénieur en ligne
->    de commande : premier contact, aide, écriture et exécution d'un
->    script, erreurs et débogage, figures, Simulink, ligne de commande,
->    rapidité ressentie, accessibilité. Note chaque friction (la
->    section 5 en donne déjà une, l'option `-q`).
+> Ta mission : faire un audit complet de tout ce qui peut profiter à
+> l'application, corriger ce qui est cassé, et me proposer le reste. Suis
+> les douze volets de la section 5 de `reprise.md` :
+>
+> 1. **Construction** : `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release`
+>    puis `cmake --build build -j4` ; aucun avertissement nouveau, et la
+>    dette mesurée avec des avertissements plus stricts.
+> 2. **Tests** : la batterie complète (`cd build && ctest -j2 --timeout
+>    7000`, une demi-heure) et le bureau ; un test rouge passe avant tout.
+> 3. **Mémoire et fils** : la batterie sous ASan et UBSan, `parfor` sous
+>    TSan, `valgrind` pour les fuites.
+> 4. **Robustesse** : `outils/eprouverNatives.sh`, un fuzzeur de
+>    l'analyseur et de l'interpréteur, les cas limites, des fichiers
+>    abîmés, l'application de bureau mise à l'épreuve.
+> 5. **Performance** : le benchmark avec `outils/banc.m` comparé aux
+>    références, un profil des points chauds, et la durée de la batterie
+>    elle-même ; dis où MatLibre est lent, pourquoi, et ce qui
+>    l'accélérerait.
+> 6. **Conflits** : avec la branche `main`, entre noms de fichiers et
+>    fonctions natives, et entre comportements qui devraient s'accorder
+>    (la section 5 en donne un exemple à trancher).
+> 7. **Fidélité à MATLAB** : du vrai code MATLAB (exemples publics,
+>    projets libres sous licence permissive), des résultats confrontés à
+>    des références indépendantes, des fichiers `.mat` et `.slx` réels.
+>    Rien ne se copie de code GPL ni de MathWorks.
+> 8. **Logiciel** : relecture du code récent, `clang-tidy`, couverture des
+>    tests, code mort, fichiers trop gros, architecture.
+> 9. **Design** : les figures rendues en PNG face à MATLAB, et les
+>    captures de l'application de bureau (lisibilité, cohérence visuelle,
+>    contrastes, thème, haute densité).
+> 10. **Ergonomie pour l'utilisateur** : à la place d'un utilisateur de
+>     MATLAB, d'un étudiant et d'un ingénieur en ligne de commande —
+>     premier contact, aide, scripts, erreurs et débogage, figures,
+>     Simulink, ligne de commande, rapidité ressentie, accessibilité.
+>     Note chaque friction (la section 5 en donne déjà une, l'option
+>     `-q`).
+> 11. **Documentation** : justesse du README, guide de démarrage et de
+>     migration depuis MATLAB, qualité des exemples, vocabulaire.
+> 12. **Distribution et maintenance** : construction depuis zéro,
+>     installation, intégration continue (il n'y en a pas), journal des
+>     versions, guide de contribution, sûreté de ce qui touche au système,
+>     au réseau et aux fichiers.
 >
 > Corrige directement les défauts avérés — test rouge, résultat faux,
-> plantage, conflit, régression du banc, option ou commande qui ne fait
-> pas ce qu'elle annonce —, un commit par correction. Écris le rapport
-> dans `documentation/audit-reprise.md`, puis propose-moi, classées par
-> intérêt et par coût, les améliorations et corrections restantes —
-> logicielles, de design et d'ergonomie — avant de les entreprendre.
+> plantage, lecture hors bornes, course, conflit, régression du banc,
+> option ou commande qui ne fait pas ce qu'elle annonce —, un commit par
+> correction, la batterie repassée avant de pousser. Écris le rapport
+> dans `documentation/audit-reprise.md`, chaque constat avec sa preuve.
+> Puis propose-moi, dans un tableau classé par intérêt pour
+> l'utilisateur, par coût et par risque, toutes les améliorations et
+> corrections restantes — logiciel, performance, design, ergonomie,
+> documentation, distribution. Demande-moi avant d'ajouter une
+> dépendance, de changer un comportement visible ou de remanier un gros
+> fichier. À la fin, mets à jour `reprise.md` et `etat.md`.
