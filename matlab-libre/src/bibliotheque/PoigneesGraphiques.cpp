@@ -215,6 +215,8 @@ bool ecrireAxes(Interpreteur& it, const Valeur& p, const std::string& nom,
     if (memeNom(nom, "XTick")) { a->ticksX = versVecteur(v); return true; }
     if (memeNom(nom, "YTick")) { a->ticksY = versVecteur(v); return true; }
     if (memeNom(nom, "XTickLabel")) { a->etiquettesTicksX = versTextes(v); return true; }
+    if (memeNom(nom, "XTickLabelRotation")) { a->angleTicksX = v.scal(); return true; }
+    if (memeNom(nom, "YTickLabelRotation")) { a->angleTicksY = v.scal(); return true; }
     if (memeNom(nom, "YTickLabel")) { a->etiquettesTicksY = versTextes(v); return true; }
     if (memeNom(nom, "XLim")) {
         auto b = versVecteur(v);
@@ -265,6 +267,7 @@ bool ecrireTexte(Interpreteur& it, const Valeur& p, const std::string& nom,
         std::string texte = v.versTexte();
         if (cible == "xlabel") a->etiquetteX = texte;
         else if (cible == "ylabel") a->etiquetteY = texte;
+        else if (cible == "colorbarlabel") a->etiquetteBarre = texte;
         else a->titre = texte;
         return true;
     }
@@ -289,9 +292,10 @@ bool lireTexte(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
     auto a = axesDe(it, p);
     std::string cible = p.champ("Cible", 0).versTexte();
     if (memeNom(nom, "String")) {
-        sortie = Valeur::texte(cible == "xlabel"   ? a->etiquetteX
-                               : cible == "ylabel" ? a->etiquetteY
-                                                   : a->titre);
+        sortie = Valeur::texte(cible == "xlabel"          ? a->etiquetteX
+                               : cible == "ylabel"        ? a->etiquetteY
+                               : cible == "colorbarlabel" ? a->etiquetteBarre
+                                                          : a->titre);
         return true;
     }
     if (memeNom(nom, "FontSize")) {
@@ -456,8 +460,20 @@ bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur&
                     palette[3 * (std::size_t)i + (std::size_t)j];
         return true;
     }
-    if (memeNom(nom, "XTick")) { sortie = depuisVecteur(a->ticksX); return true; }
-    if (memeNom(nom, "YTick")) { sortie = depuisVecteur(a->ticksY); return true; }
+    if (memeNom(nom, "XTick") || memeNom(nom, "YTick")) {
+        // Les graduations montrées, même choisies d'office, comme MATLAB.
+        double xmin, xmax, ymin, ymax;
+        limitesAxe(*a, xmin, xmax, ymin, ymax);
+        sortie = depuisVecteur(memeNom(nom, "XTick")
+                                   ? graduationsEffectives(*a, 'x', xmin, xmax, a->logX)
+                                   : graduationsEffectives(*a, 'y', ymin, ymax, a->logY));
+        return true;
+    }
+    if (memeNom(nom, "XTickLabelRotation") || memeNom(nom, "YTickLabelRotation")) {
+        sortie = Valeur::scalaire(memeNom(nom, "XTickLabelRotation") ? a->angleTicksX
+                                                                      : a->angleTicksY);
+        return true;
+    }
     if (memeNom(nom, "XLim") || memeNom(nom, "YLim")) {
         double xmin, xmax, ymin, ymax;
         limitesAxe(*a, xmin, xmax, ymin, ymax);
@@ -691,19 +707,46 @@ bool ecrireLegende(Interpreteur& it, const Valeur& p, const std::string& nom,
            "Unrecognized property '" + nom + "' for class 'Legend'.");
 }
 
-// La barre de couleurs n'est pas encore dessinee : ses proprietes se
-// posent et se relisent sans effet sur le trace, ce qui suffit a ce
-// qu'un programme qui la regle ne s'arrete pas.
+// La barre de couleurs : sa position, son etiquette, ses graduations et
+// leurs textes se lisent et s'ecrivent, et le trace les suit.
 bool lireBarre(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
     // La poignee designe bien un axe existant : le verifier ici fait que
     // lire une propriete d'une barre supprimee echoue comme il se doit.
-    axesDe(it, p);
+    auto a = axesDe(it, p);
     if (memeNom(nom, "Visible")) {
-        sortie = Valeur::texte("on");
+        sortie = marche(a->barreCouleurs);
         return true;
     }
-    if (memeNom(nom, "Location") || memeNom(nom, "Label")) {
-        sortie = Valeur::texte("");
+    if (memeNom(nom, "Location")) {
+        sortie = Valeur::texte(a->positionBarre);
+        return true;
+    }
+    // L'etiquette est un texte, comme dans MATLAB : « cb.Label.String = 'T' »
+    // lit la poignee, puis ecrit sa chaine.
+    if (memeNom(nom, "Label")) {
+        sortie = poigneeTexte((int)p.champ("NumeroFigure", 0).scal(),
+                              (int)p.champ("NumeroAxe", 0).scal(), "colorbarlabel");
+        return true;
+    }
+    if (memeNom(nom, "Ticks")) {
+        sortie = depuisVecteur(barreCouleurs(*figureDe(it, p), *a).valeurs);
+        return true;
+    }
+    if (memeNom(nom, "TickLabels")) {
+        BarreCouleurs barre = barreCouleurs(*figureDe(it, p), *a);
+        sortie = Valeur::celluleDims({(int)barre.textes.size(), 1});
+        for (std::size_t k = 0; k < barre.textes.size(); ++k)
+            sortie.cellules[k] = Valeur::texte(barre.textes[k]);
+        return true;
+    }
+    if (memeNom(nom, "Limits")) {
+        double bas, haut;
+        limitesCouleur(*a, bas, haut);
+        sortie = Valeur::ligne({bas, haut});
+        return true;
+    }
+    if (memeNom(nom, "Type")) {
+        sortie = Valeur::texte("colorbar");
         return true;
     }
     return false;
@@ -711,12 +754,39 @@ bool lireBarre(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
 
 bool ecrireBarre(Interpreteur& it, const Valeur& p, const std::string& nom,
                  const Valeur& v) {
-    (void)it; (void)p; (void)v;
-    if (memeNom(nom, "Visible") ||
-        memeNom(nom, "Location") || memeNom(nom, "Label") ||
-        memeNom(nom, "FontSize") || memeNom(nom, "Ticks") ||
-        memeNom(nom, "TickLabels"))
+    auto a = axesDe(it, p);
+    if (memeNom(nom, "Visible")) {
+        a->barreCouleurs = vraiDe(v);
         return true;
+    }
+    if (memeNom(nom, "Location")) {
+        std::string ou = v.versTexte();
+        for (auto& c : ou) c = (char)std::tolower((unsigned char)c);
+        static const char* permises[] = {"east",         "west",        "north",
+                                         "south",        "eastoutside", "westoutside",
+                                         "northoutside", "southoutside"};
+        for (const char* permise : permises)
+            if (ou == permise) {
+                a->positionBarre = ou;
+                return true;
+            }
+        erreur("MATLAB:colorbar:InvalidLocation",
+               "Invalid location '" + v.versTexte() + "' for a colorbar.");
+    }
+    if (memeNom(nom, "Label")) {
+        // « cb.Label = 'T' », ou la poignee relue apres « cb.Label.String ».
+        if (v.estTexte() || v.estChaine()) a->etiquetteBarre = v.versTexte();
+        return true;
+    }
+    if (memeNom(nom, "Ticks")) {
+        a->ticksBarre = versVecteur(v);
+        return true;
+    }
+    if (memeNom(nom, "TickLabels")) {
+        a->etiquettesTicksBarre = versTextes(v);
+        return true;
+    }
+    if (memeNom(nom, "FontSize")) return true;
     erreur("MATLAB:hg:InvalidProperty",
            "Unrecognized property '" + nom + "' for class 'ColorBar'.");
 }

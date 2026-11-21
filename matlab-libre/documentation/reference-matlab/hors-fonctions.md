@@ -113,14 +113,15 @@ qu'ils ne font pas encore comme MATLAB.
   (`Interpreter` vaut `'tex'` par défaut) met en indice et en exposant et
   traduit `\alpha`, `\pi`... Seules les graduations des axes
   logarithmiques écrivent leurs puissances de dix en exposant.
-- **Barre de couleurs** : `colorbar` la dessine à droite des axes, graduée
-  sur `CLim` ; les autres positions (`'southoutside'`...) sont refusées en
-  le disant, et la poignée rendue accepte `Ticks` et `Label` sans effet.
+- **Barre de couleurs** : ses huit positions, son étiquette
+  (`cb.Label.String`), ses graduations et leurs textes suivent MATLAB ;
+  `Direction`, `Limits` en écriture et la police (`FontSize`) ne sont pas
+  pris en compte.
 - **Graduations inclinées** : `xtickangle`, `ytickangle` et
-  `XTickLabelRotation` manquent ; des étiquettes longues se chevauchent.
-- **Marqueurs** : les quatorze formes de MATLAB, `MarkerSize`,
-  `MarkerFaceColor` et `MarkerEdgeColor` ; `scatter` dessine encore des
-  disques pleins, que MATLAB laisse creux par défaut.
+  `XTickLabelRotation` inclinent les étiquettes ; MATLAB les incline aussi
+  de lui-même quand elles se chevauchent, ce que MatLibre ne fait pas.
+- **Couleurs des lignes** : `get(h,'Color')` rend un code `'#FF0000'`, là
+  où MATLAB rend le triplet `[1 0 0]` ; les deux s'écrivent.
 
 - **`bar`** lit les données, la largeur, `'grouped'` et `'stacked'`,
   `FaceColor`, `EdgeColor`, `BarWidth`, `FaceAlpha` et `DisplayName` ;

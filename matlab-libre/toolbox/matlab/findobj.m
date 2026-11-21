@@ -6,7 +6,7 @@ function h = findobj(varargin)
 %   que les textes.
 %
 %   H = FINDOBJ('Nom',VALEUR) ne garde que les objets dont la propriété
-%   nommée vaut VALEUR — par exemple FINDOBJ('Color','#D95319') ou
+%   nommée vaut VALEUR — par exemple FINDOBJ('Color','#FF0000') ou
 %   FINDOBJ('LineWidth',2).
 %
 %   H = FINDOBJ(AX,...) cherche dans l'axe AX plutôt que dans l'axe
@@ -18,7 +18,7 @@ function h = findobj(varargin)
 %
 %   Exemples :
 %      plot(1:10, 'r'); hold on; plot((1:10).^2, 'b'); hold off
-%      rouges = findobj('Color', '#D95319');
+%      rouges = findobj('Color', '#FF0000');
 %      set(rouges, 'LineWidth', 3);
 %
 %      textes = findobj('Type', 'text');

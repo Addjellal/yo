@@ -398,20 +398,32 @@ STAIRS  Trace en escalier.
 
 ### scatter
 SCATTER  Nuage de points.
-    SCATTER(X,Y) place un marqueur à chaque couple (X,Y).
-    SCATTER(X,Y,TAILLE) règle la surface des marqueurs.
-    SCATTER(X,Y,TAILLE,COULEUR) donne leur couleur.
+    SCATTER(X,Y) place un cercle creux à chaque couple (X,Y), comme
+    MATLAB.
+    SCATTER(X,Y,SZ) règle l'aire des marqueurs, en points carrés (36 par
+    défaut) : un nombre pour tous, ou un par point.
+    SCATTER(X,Y,SZ,C) donne leur couleur : un nom ou un triplet pour
+    tous, une valeur par point que la palette met à l'échelle (CLIM), ou
+    une ligne RVB par point.
+    SCATTER(..., 'filled') remplit les marqueurs de leur couleur, sans
+    bord ; SCATTER(..., MARQUEUR) choisit la forme ('d', 's', '^'...).
+    SCATTER(AX, ...) trace dans les axes AX. Les paires MarkerEdgeColor,
+    MarkerFaceColor, LineWidth, DisplayName, SizeData et CData sont lues.
 
     Syntaxe
        scatter(x,y)
-       scatter(x,y,taille)
-       scatter(x,y,taille,couleur)
+       scatter(x,y,sz)
+       scatter(x,y,sz,c)
+       scatter(...,'filled')
+       scatter(...,marqueur)
+       h = scatter(...)
 
     Exemples
 
        scatter(randn(1,200), randn(1,200));
        x = rand(1,50);  y = rand(1,50);
        scatter(x, y, 36, 'r');
+       scatter(x, y, 200 * y, x, 'filled'); colorbar
 
     Voir aussi PLOT, PLOT3, BAR.
 
@@ -675,18 +687,28 @@ IMAGESC  Affiche une matrice en étalant ses valeurs sur toute la palette.
 COLORBAR  Barre de couleurs, avec son échelle.
     COLORBAR ajoute la barre à droite des axes courants : la palette en
     vigueur, graduée sur les bornes de couleur (CLIM).
-    COLORBAR(AX) la met à droite des axes AX.
+    COLORBAR(AX) la met sur les axes AX.
+    COLORBAR(POSITION) la place hors de la boîte — 'eastoutside' (le
+    défaut), 'westoutside', 'northoutside', 'southoutside' — ou dedans,
+    le long d'un bord — 'east', 'west', 'north', 'south'.
+    COLORBAR(..., 'Ticks', T, 'TickLabels', C) impose les graduations et
+    leurs textes.
     COLORBAR('off') la retire.
-    MatLibre ne la place qu'à droite ('eastoutside', la position par
-    défaut de MATLAB) : les autres positions sont refusées en le disant.
+    CB = COLORBAR rend la poignée : CB.Label.String nomme la barre,
+    CB.Location, CB.Ticks et CB.TickLabels se lisent et s'écrivent.
 
     Syntaxe
        colorbar
        colorbar(ax)
+       colorbar(position)
+       colorbar(..., 'Ticks', t, 'TickLabels', c)
        colorbar('off')
+       cb = colorbar(...)
 
     Exemples
        imagesc(peaks(30)); colorbar
+       cb = colorbar('southoutside');
+       cb.Label.String = 'altitude (m)';
 
     Voir aussi COLORMAP, IMAGESC, SURF, CONTOUR.
 

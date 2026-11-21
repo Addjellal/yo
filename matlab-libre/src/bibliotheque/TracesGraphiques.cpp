@@ -30,12 +30,14 @@ const char* palette(std::size_t k) {
 
 std::string couleurDeLettre(char c) {
     switch (c) {
-        case 'r': return "#D95319";
-        case 'g': return "#77AC30";
-        case 'b': return "#0072BD";
-        case 'c': return "#4DBEEE";
-        case 'm': return "#7E2F8E";
-        case 'y': return "#EDB120";
+        // Les lettres de MATLAB sont des couleurs pures : 'r' vaut [1 0 0],
+        // et non le rouge orangé de la palette par défaut.
+        case 'r': return "#FF0000";
+        case 'g': return "#00FF00";
+        case 'b': return "#0000FF";
+        case 'c': return "#00FFFF";
+        case 'm': return "#FF00FF";
+        case 'y': return "#FFFF00";
         case 'k': return "#000000";
         case 'w': return "#FFFFFF";
         default: return "";
@@ -54,12 +56,12 @@ std::string couleurDepuisValeur(const Valeur& v) {
         if (t[0] == '#') return t;
         std::string bas = t;
         for (auto& c : bas) c = (char)std::tolower((unsigned char)c);
-        if (bas == "red") return "#D95319";
-        if (bas == "green") return "#77AC30";
-        if (bas == "blue") return "#0072BD";
-        if (bas == "cyan") return "#4DBEEE";
-        if (bas == "magenta") return "#7E2F8E";
-        if (bas == "yellow") return "#EDB120";
+        if (bas == "red") return "#FF0000";
+        if (bas == "green") return "#00FF00";
+        if (bas == "blue") return "#0000FF";
+        if (bas == "cyan") return "#00FFFF";
+        if (bas == "magenta") return "#FF00FF";
+        if (bas == "yellow") return "#FFFF00";
         if (bas == "black") return "#000000";
         if (bas == "white") return "#FFFFFF";
         if (bas == "none") return "none";
@@ -406,6 +408,9 @@ FONCTION(fnBar) {
             double y = matrice ? Y.re[(std::size_t)i + (std::size_t)c * Y.nlignes()]
                                : Y.re[(std::size_t)i];
             s.x.push_back(positions[(std::size_t)i] + decalage);
+            // La position du groupe, sans le décalage de la barre : c'est
+            // l'XData de MATLAB, et là que tombent les graduations.
+            s.xVraies.push_back(positions[(std::size_t)i]);
             if (empile) {
                 double& haut = y >= 0 ? hautPositif[(std::size_t)i] : hautNegatif[(std::size_t)i];
                 s.basesBarres.push_back(haut);
@@ -423,7 +428,6 @@ FONCTION(fnBar) {
         return {poigneeLigne(numeroFigure, axes->identifiant, identifiants[0])};
     return {poigneeLignes(numeroFigure, axes->identifiant, identifiants)};
 }
-FONCTION(fnScatter) { INUTILISE return tracer(it, args, GenreTrace::Points, false, false, nargout); }
 FONCTION(fnStairs) { INUTILISE return tracer(it, args, GenreTrace::Escalier, false, false, nargout); }
 FONCTION(fnStem) { INUTILISE return tracer(it, args, GenreTrace::Tige, false, false, nargout); }
 // Une courbe de l'espace. Le rendu est plan : on projette, mais on garde
@@ -1796,7 +1800,13 @@ FONCTION(fnYline) { return droiteConstante(it, args, nargout, 'y'); }
 std::vector<Valeur> graduationsAxe(Interpreteur& it, Arguments args, char axe) {
     auto a = axesCourants(it);
     std::vector<double>& cible = axe == 'x' ? a->ticksX : a->ticksY;
-    if (args.empty()) return {Valeur::ligne(cible)};
+    if (args.empty()) {
+        // Les graduations montrées, même choisies d'office, comme MATLAB.
+        double xmin, xmax, ymin, ymax;
+        limitesAxe(*a, xmin, xmax, ymin, ymax);
+        return {Valeur::ligne(axe == 'x' ? graduationsEffectives(*a, 'x', xmin, xmax, a->logX)
+                                         : graduationsEffectives(*a, 'y', ymin, ymax, a->logY))};
+    }
     if (args[0].estTexte() || args[0].estChaine()) {
         // « xticks('auto') » rend le choix automatique.
         std::string mode = args[0].versTexte();
@@ -2090,9 +2100,10 @@ FONCTION(fnCaxis) {
     INUTILISE
     return bornesCouleur(it, args, nargout, "caxis");
 }
-// colorbar, colorbar(ax), colorbar('off'), colorbar('eastoutside') : la
-// barre se dessine a droite de la boite, la seule position que MatLibre
-// sache tenir ; les autres sont refusees en le disant.
+// colorbar, colorbar(ax), colorbar('off'), colorbar(position) et les
+// paires Location, Ticks, TickLabels. Les huit positions de MATLAB : hors
+// de la boîte (« eastoutside », le défaut, « westoutside »,
+// « northoutside », « southoutside ») ou dedans (« east »…).
 FONCTION(fnColorbar) {
     INUTILISE
     auto a = axesCourants(it);
@@ -2102,11 +2113,17 @@ FONCTION(fnColorbar) {
         k = 1;
     }
     bool visible = true;
-    auto position = [](const std::string& mot) {
-        if (mot != "eastoutside" && mot != "east")
-            erreur("MatLibre:colorbar:Position",
-                   "MatLibre ne place la barre de couleurs qu'à droite des axes "
-                   "('eastoutside'), non en '" + mot + "'.");
+    auto position = [&](const std::string& mot) {
+        static const char* permises[] = {"east",         "west",        "north",
+                                         "south",        "eastoutside", "westoutside",
+                                         "northoutside", "southoutside"};
+        for (const char* p : permises)
+            if (mot == p) {
+                a->positionBarre = mot;
+                return;
+            }
+        erreur("MATLAB:colorbar:InvalidLocation",
+               "Invalid location '" + mot + "' for a colorbar.");
     };
     for (; k < args.size(); ++k) {
         if (!(args[k].estTexte() || args[k].estChaine()))
@@ -2116,22 +2133,169 @@ FONCTION(fnColorbar) {
             visible = false;
         } else if (mot == "on" || mot == "show") {
             visible = true;
-        } else if (mot == "location") {
+        } else if (mot == "location" || mot == "ticks" || mot == "ticklabels" ||
+                   mot == "fontsize") {
             if (k + 1 >= args.size())
-                erreur("MATLAB:colorbar:InvalidInput", "colorbar : 'Location' attend une valeur.");
-            position(enMinuscules(args[++k].versTexte()));
-        } else if (mot.find("outside") != std::string::npos || mot == "north" || mot == "south" ||
-                   mot == "west" || mot == "east" || mot == "manual") {
-            position(mot);
+                erreur("MATLAB:colorbar:InvalidInput",
+                       "colorbar : '" + args[k].versTexte() + "' attend une valeur.");
+            const Valeur& v = args[++k];
+            if (mot == "location") {
+                position(enMinuscules(v.versTexte()));
+            } else if (mot == "ticks") {
+                exigerNumerique(v, "colorbar");
+                a->ticksBarre = valeursDe(v);
+            } else if (mot == "ticklabels") {
+                a->etiquettesTicksBarre.clear();
+                if (v.classe == Classe::Cellule)
+                    for (const auto& c : v.cellules)
+                        a->etiquettesTicksBarre.push_back(c.versTexte());
+                else if (v.estChaine())
+                    for (const auto& c : v.chaines) a->etiquettesTicksBarre.push_back(c);
+                else
+                    a->etiquettesTicksBarre.push_back(v.versTexte());
+            }
         } else {
-            erreur("MatLibre:colorbar:Option",
-                   "MatLibre ne connaît pas l'option '" + args[k].versTexte() + "' de colorbar.");
+            position(mot);
         }
     }
     a->barreCouleurs = visible;
     if (nargout > 0 && visible) return {poigneeTexteCourant(it, "colorbar")};
     return {};
 }
+// scatter(x,y), scatter(x,y,sz), scatter(x,y,sz,c), scatter(...,'filled'),
+// scatter(...,marqueur), scatter(ax,...) et les paires MarkerEdgeColor,
+// MarkerFaceColor, LineWidth, DisplayName, SizeData, CData. SZ est l'aire
+// des marqueurs en points carrés (36 par défaut : un marqueur de taille
+// 6), un nombre ou un par point ; C une couleur, un triplet, une valeur
+// par point que la palette met à l'échelle, ou une ligne RVB par point.
+// Les marqueurs sont creux, comme dans MATLAB, sauf sous 'filled'. Le
+// tracé générique de plot lisait SZ comme une seconde courbe.
+FONCTION(fnScatter) {
+    INUTILISE
+    std::size_t k = 0;
+    std::shared_ptr<Axes> cible;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        cible = axesDeLaPoignee(it, args[0]);
+        k = 1;
+    }
+    std::vector<const Valeur*> nombres;
+    while (k < args.size() && nombres.size() < 4 && !args[k].estTexte() && !args[k].estChaine())
+        nombres.push_back(&args[k++]);
+    if (nombres.size() < 2)
+        erreur("MATLAB:scatter:NotEnoughInputs", "scatter attend au moins X et Y.");
+    for (const Valeur* v : nombres) exigerNumerique(*v, "scatter");
+    Serie s;
+    s.genre = GenreTrace::Points;
+    s.couleur.clear();
+    s.marqueur = "o";
+    s.style = "none";
+    s.x = valeursDe(*nombres[0]);
+    s.y = valeursDe(*nombres[1]);
+    if (s.x.size() != s.y.size())
+        erreur("MATLAB:scatter:InvalidXYData",
+               "X et Y doivent avoir le même nombre d'éléments.");
+    const std::size_t n = s.x.size();
+    auto lireAires = [&](const Valeur& v) {
+        if (v.estVide()) return;
+        std::vector<double> aires = valeursDe(v);
+        if (aires.size() != 1 && aires.size() != n)
+            erreur("MATLAB:scatter:InvalidSizeData",
+                   "La taille des marqueurs est un nombre, ou un par point.");
+        for (double a : aires)
+            if (!(a > 0))
+                erreur("MATLAB:scatter:InvalidSizeData",
+                       "La taille des marqueurs doit être positive.");
+        s.airesPoints = aires;
+    };
+    auto lireCouleurs = [&](const Valeur& c) {
+        if (c.estVide()) return;
+        if (c.estTexte() || c.estChaine()) {
+            std::string couleur = couleurDepuisValeur(c);
+            if (couleur.empty() || couleur == "none")
+                erreur("MATLAB:scatter:InvalidCData", "Couleur inconnue : " + c.versTexte() + ".");
+            s.couleur = couleur;
+            return;
+        }
+        // Un triplet : une seule couleur. Ambigu pour trois points, il est
+        // lu comme couleur s'il tient dans [0,1], comme dans MATLAB.
+        bool triplet = c.nlignes() == 1 && c.ncolonnes() == 3;
+        if (triplet && n == 3)
+            for (std::size_t i = 0; i < 3; ++i)
+                if (c.re[i] < 0 || c.re[i] > 1) triplet = false;
+        if (triplet) {
+            s.couleur = couleurDepuisValeur(c);
+            return;
+        }
+        if (c.ncolonnes() == 3 && (std::size_t)c.nlignes() == n && n != 1) {
+            for (std::size_t i = 0; i < n; ++i) {
+                Valeur ligne = Valeur::ligne({c.re[i], c.re[i + n], c.re[i + 2 * n]});
+                s.couleursPoints.push_back(couleurDepuisValeur(ligne));
+            }
+            return;
+        }
+        if (c.nelem() == n) {
+            s.valeursCouleurPoints = valeursDe(c);
+            return;
+        }
+        erreur("MATLAB:scatter:InvalidCData",
+               "La couleur est un nom, un triplet RVB, une valeur par point ou une ligne RVB "
+               "par point.");
+    };
+    if (nombres.size() >= 3) lireAires(*nombres[2]);
+    if (nombres.size() >= 4) lireCouleurs(*nombres[3]);
+    while (k < args.size()) {
+        if (!args[k].estTexte() && !args[k].estChaine())
+            erreur("MATLAB:scatter:InvalidArgument", "Argument de scatter inattendu.");
+        std::string mot = args[k].versTexte();
+        std::string bas = enMinuscules(mot);
+        if (bas == "filled") {
+            s.pointsRemplis = true;
+            ++k;
+            continue;
+        }
+        bool paire = bas == "markeredgecolor" || bas == "markerfacecolor" || bas == "linewidth" ||
+                     bas == "displayname" || bas == "sizedata" || bas == "cdata" ||
+                     bas == "marker" || bas == "markerfacealpha" || bas == "markeredgealpha";
+        if (!paire && estSpecificationStyle(mot)) {
+            Serie style;
+            style.couleur.clear();
+            decoderStyle(mot, style);
+            if (!style.marqueur.empty()) s.marqueur = style.marqueur;
+            if (!style.couleur.empty()) s.couleur = style.couleur;
+            ++k;
+            continue;
+        }
+        if (k + 1 >= args.size())
+            erreur("MATLAB:scatter:InvalidArgument", "L'option " + mot + " attend une valeur.");
+        const Valeur& v = args[k + 1];
+        if (bas == "markeredgecolor") s.couleurBordMarqueur = couleurMarqueurDepuis(v);
+        else if (bas == "markerfacecolor") s.couleurFaceMarqueur = couleurMarqueurDepuis(v);
+        else if (bas == "linewidth") s.epaisseur = v.scal();
+        else if (bas == "displayname") s.etiquette = v.versTexte();
+        else if (bas == "sizedata") lireAires(v);
+        else if (bas == "cdata") lireCouleurs(v);
+        else if (bas == "marker") s.marqueur = v.versTexte();
+        else if (bas == "markerfacealpha" || bas == "markeredgealpha") s.opacite = v.scal();
+        else
+            erreur("MatLibre:scatter:Option",
+                   "MatLibre ne connaît pas l'option '" + mot + "' de scatter.");
+        k += 2;
+    }
+    // MarkerFaceColor 'flat' : la couleur du point, comme 'filled'.
+    if (s.couleurFaceMarqueur == "flat") s.pointsRemplis = true;
+    if (s.airesPoints.empty()) s.tailleMarqueur = 6;
+    if (cible) {
+        auto f = figureCourante(it);
+        for (std::size_t i = 0; i < f->axes.size(); ++i)
+            if (f->axes[i] == cible) f->axeCourant = (int)i;
+    }
+    nouveauTrace(it);
+    auto axes = axesCourants(it);
+    int identifiant = ajouterSerie(it, s);
+    if (nargout <= 0) return {};
+    return {poigneeLigne(figureCourante(it)->numero, axes->identifiant, identifiant)};
+}
+
 FONCTION(fnBox) { INUTILISE return {}; }
 FONCTION(fnShading) { INUTILISE return {}; }
 

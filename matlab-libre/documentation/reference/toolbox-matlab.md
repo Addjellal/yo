@@ -1879,7 +1879,7 @@ FINDOBJ Cherche des objets graphiques par leurs propriétés.
   que les textes.
 
   H = FINDOBJ('Nom',VALEUR) ne garde que les objets dont la propriété
-  nommée vaut VALEUR — par exemple FINDOBJ('Color','#D95319') ou
+  nommée vaut VALEUR — par exemple FINDOBJ('Color','#FF0000') ou
   FINDOBJ('LineWidth',2).
 
   H = FINDOBJ(AX,...) cherche dans l'axe AX plutôt que dans l'axe
@@ -1891,7 +1891,7 @@ FINDOBJ Cherche des objets graphiques par leurs propriétés.
 
   Exemples :
      plot(1:10, 'r'); hold on; plot((1:10).^2, 'b'); hold off
-     rouges = findobj('Color', '#D95319');
+     rouges = findobj('Color', '#FF0000');
      set(rouges, 'LineWidth', 3);
 
      textes = findobj('Type', 'text');
@@ -9829,6 +9829,44 @@ XMLWRITE Écrit un document XML.
      ~isempty(strfind(t, '<b>2</b>'))
 
   Voir aussi XMLREAD, WRITESTRUCT, READSTRUCT.
+```
+
+## `xtickangle`
+
+```
+XTICKANGLE Incline les étiquettes de graduation des abscisses.
+  XTICKANGLE(ANGLE) incline les étiquettes de l'axe courant de ANGLE
+  degrés, dans le sens trigonométrique : 45 les fait monter vers la
+  droite, chacune se terminant sur sa graduation, 90 les écrit de bas en
+  haut. La marge du bas s'agrandit pour qu'elles tiennent.
+  XTICKANGLE(AX, ANGLE) agit sur l'axe AX.
+  A = XTICKANGLE rend l'inclinaison de l'axe courant.
+
+  Exemple :
+     bar([3 5 2 4]);
+     xticklabels({'janvier', 'fevrier', 'mars', 'avril'});
+     xtickangle(45);
+     assert(xtickangle == 45);
+
+  Voir aussi ytickangle, xticklabels, xticks.
+```
+
+## `ytickangle`
+
+```
+YTICKANGLE Incline les étiquettes de graduation des ordonnées.
+  YTICKANGLE(ANGLE) incline les étiquettes de l'axe courant de ANGLE
+  degrés, dans le sens trigonométrique, chacune se terminant sur sa
+  graduation.
+  YTICKANGLE(AX, ANGLE) agit sur l'axe AX.
+  A = YTICKANGLE rend l'inclinaison de l'axe courant.
+
+  Exemple :
+     plot(1:4);
+     ytickangle(30);
+     assert(ytickangle == 30);
+
+  Voir aussi xtickangle, yticklabels, yticks.
 ```
 
 ## `yyyymmdd`

@@ -98,6 +98,15 @@ struct Serie {
     // la précédente.
     double largeurBarre = 0.8;
     std::vector<double> basesBarres;
+    // Un nuage de points (« scatter ») : l'aire de chaque marqueur en
+    // points carrés (vide : celle de tailleMarqueur), la couleur de chaque
+    // point — une valeur que la palette met à l'échelle par CLim, ou une
+    // couleur propre —, et « 'filled' », qui remplit les marqueurs de leur
+    // couleur au lieu de les laisser creux.
+    std::vector<double> airesPoints;
+    std::vector<double> valeursCouleurPoints;
+    std::vector<std::string> couleursPoints;
+    bool pointsRemplis = false;
 };
 
 struct Axes {
@@ -153,8 +162,18 @@ struct Axes {
     // données mises à l'échelle.
     bool climManuelle = false;
     double cmin = 0, cmax = 1;
-    // « colorbar » : la barre des couleurs, à droite de la boîte.
+    // « colorbar » : la barre des couleurs, sa position (« Location » de
+    // MATLAB, en minuscules : « eastoutside » par défaut, « southoutside »,
+    // « east » dans la boîte…), son étiquette (« cb.Label.String »), ses
+    // graduations et leurs textes, s'ils sont imposés.
     bool barreCouleurs = false;
+    std::string positionBarre = "eastoutside";
+    std::string etiquetteBarre;
+    std::vector<double> ticksBarre;
+    std::vector<std::string> etiquettesTicksBarre;
+    // L'inclinaison des étiquettes de graduation, en degrés dans le sens
+    // trigonométrique : « xtickangle(45) », « XTickLabelRotation ».
+    double angleTicksX = 0, angleTicksY = 0;
     // La légende : sa position (« Location » de MATLAB, en minuscules), son
     // orientation, son cadre, et les courbes qu'elle nomme quand
     // « legend(h, ...) » les désigne (vide : toutes).
@@ -201,6 +220,15 @@ void couleurCarte(double t, int& r, int& v, int& b);
 // pas de place. Rend faux si aucune donnée ne peut être portée.
 bool bornesLog(double& bas, double& haut);
 
+// Les graduations d'un axe (« x » ou « y ») telles que le tracé les
+// montre entre BAS et HAUT : celles qu'on a imposées ; sinon, sous des
+// barres, une par barre tant qu'elles sont peu nombreuses — c'est ce que
+// fait MATLAB, et ce qui met « xticklabels » sous les bonnes barres — ;
+// sinon des graduations rondes. « xticks » et « get(ax,'XTick') » rendent
+// les mêmes.
+std::vector<double> graduationsEffectives(const Axes& a, char axe, double bas, double haut,
+                                          bool log);
+
 // Applique « axis equal » et « axis square » : ajuste la boite en pixels
 // et les bornes pour tenir les proportions demandees. Les deux rendus —
 // le SVG et le bureau — passent par la, pour donner la meme image.
@@ -235,14 +263,16 @@ void limitesCouleur(const Axes& a, double& cmin, double& cmax);
 // borné à [1,m].
 void couleurEchelle(const std::vector<double>& palette, double valeur, double cmin,
                     double cmax, int& r, int& v, int& b);
-// La barre de couleurs (« colorbar ») : la place qu'elle prend à droite de
-// la boîte, la couleur de ses tranches de bas en haut (trois composantes
-// par tranche), et ses graduations avec leur hauteur en fraction de la
-// boîte. Les deux rendus — le SVG et la fenêtre — passent par là.
+// La barre de couleurs (« colorbar ») : la couleur de ses tranches, du
+// bas vers le haut (trois composantes par tranche), et ses graduations
+// avec leur place en fraction de la longueur de la barre — celles qu'on a
+// imposées (« cb.Ticks »), sinon des graduations rondes sur CLim — et
+// leurs textes.
 const int LARGEUR_BARRE_COULEURS = 74;
 struct BarreCouleurs {
     std::vector<int> tranches;
     std::vector<double> valeurs, fractions;
+    std::vector<std::string> textes;
 };
 BarreCouleurs barreCouleurs(const Figure& f, const Axes& a);
 // La couleur du pixel K d'une image, selon son mode (couleurs vraies,

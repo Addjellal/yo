@@ -169,6 +169,32 @@ std::vector<double> graduationsAxe(double bas, double haut, int cible, bool log)
     return valeurs;
 }
 
+std::vector<double> graduationsEffectives(const Axes& a, char axe, double bas, double haut,
+                                          bool log) {
+    const std::vector<double>& imposees = axe == 'x' ? a.ticksX : a.ticksY;
+    if (!imposees.empty()) return imposees;
+    if (axe == 'x' && !log) {
+        std::vector<double> positions;
+        bool barres = false;
+        for (const auto& s : a.series) {
+            if (s.genre != GenreTrace::Barres) continue;
+            barres = true;
+            for (double v : s.xVraies.empty() ? s.x : s.xVraies)
+                if (std::isfinite(v)) positions.push_back(v);
+        }
+        std::sort(positions.begin(), positions.end());
+        positions.erase(std::unique(positions.begin(), positions.end()), positions.end());
+        if (barres && !positions.empty() && positions.size() <= 15) {
+            std::vector<double> dedans;
+            const double marge = 1e-9 * (std::fabs(bas) + std::fabs(haut) + 1);
+            for (double v : positions)
+                if (v >= bas - marge && v <= haut + marge) dedans.push_back(v);
+            if (!dedans.empty()) return dedans;
+        }
+    }
+    return graduationsAxe(bas, haut, 6, log);
+}
+
 bool bornesLog(double& bas, double& haut) {
     if (haut <= 0) return false;
     if (bas <= 0) bas = haut / 1000.0;
@@ -410,11 +436,16 @@ BarreCouleurs barreCouleurs(const Figure& f, const Axes& a) {
         couleurEchelle(palette, cmin + (cmax - cmin) * (k + 0.5) / tranches, cmin, cmax, r, v, b);
         barre.tranches.insert(barre.tranches.end(), {r, v, b});
     }
-    for (double t : graduations(cmin, cmax, 6)) {
+    std::vector<double> valeurs = a.ticksBarre.empty() ? graduations(cmin, cmax, 6) : a.ticksBarre;
+    for (std::size_t k = 0; k < valeurs.size(); ++k) {
+        double t = valeurs[k];
         double fraction = (t - cmin) / (cmax - cmin);
         if (fraction < -1e-9 || fraction > 1 + 1e-9) continue;
         barre.valeurs.push_back(t);
         barre.fractions.push_back(fraction);
+        // « cb.TickLabels » : le texte de même rang que la graduation.
+        barre.textes.push_back(k < a.etiquettesTicksBarre.size() ? a.etiquettesTicksBarre[k]
+                                                                  : nombreCourt(t));
     }
     return barre;
 }
@@ -440,6 +471,7 @@ void limitesCouleur(const Axes& a, double& cmin, double& cmax) {
             prendre(s.cBas);
             prendre(s.cHaut);
         }
+        for (double x : s.valeursCouleurPoints) prendre(x);
     }
     if (!std::isfinite(cmin)) {
         cmin = 0;

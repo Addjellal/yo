@@ -149,6 +149,128 @@ void couleursMarqueur(const Serie& s, const std::string& couleur, std::string& b
 
 std::string rvb(int r, int v, int b) { return formater("rgb(%d,%d,%d)", r, v, b); }
 
+const double PI = 3.14159265358979323846;
+
+// La couleur du point K d'un nuage : la sienne, celle que la palette donne
+// à sa valeur, ou celle de la série.
+std::string couleurPoint(const std::vector<double>& palette, double cmin, double cmax,
+                         const Serie& s, std::size_t k) {
+    if (!s.couleursPoints.empty())
+        return s.couleursPoints[std::min(k, s.couleursPoints.size() - 1)];
+    if (!s.valeursCouleurPoints.empty()) {
+        int r, v, b;
+        const std::size_t rang = std::min(k, s.valeursCouleurPoints.size() - 1);
+        couleurEchelle(palette, s.valeursCouleurPoints[rang], cmin, cmax, r, v, b);
+        return formater("#%02X%02X%02X", r, v, b);
+    }
+    return s.couleur;
+}
+
+// Le bord et la face d'un marqueur de nuage : la couleur du point
+// (« flat » dans MATLAB) sauf couleur imposée ; la face est vide, sauf
+// sous « 'filled' » ou MarkerFaceColor.
+void couleursPoint(const Serie& s, const std::string& couleur, std::string& bord,
+                   std::string& face) {
+    // Sous « 'filled' », MATLAB ôte le bord (MarkerEdgeColor 'none') :
+    // le point est une tache de sa couleur.
+    const std::string& b = s.couleurBordMarqueur;
+    if (b.empty() && s.pointsRemplis) bord = "none";
+    else bord = b.empty() || b == "auto" || b == "flat" ? couleur : b;
+    const std::string& f = s.couleurFaceMarqueur;
+    if (f == "auto" || f == "flat") face = couleur;
+    else if (!f.empty() && f != "none") face = f;
+    else face = s.pointsRemplis ? couleur : std::string("none");
+}
+
+// La barre de couleurs, du côté que dit sa position. Dehors, elle occupe
+// la place que dessinerAxe lui a réservée ; dedans, elle se pose à huit
+// pixels du bord de la boîte. Ses graduations et leurs textes sont du côté
+// opposé à la boîte quand elle est dehors, du côté du centre quand elle
+// est dedans ; son étiquette au-delà.
+void dessinerBarre(Toile& toile, const Axes& a, const BarreCouleurs& barre, int gauche,
+                   int droite, int haut, int bas, double bordCase, double descenteX,
+                   double largeurTextes) {
+    const std::string& ou = a.positionBarre;
+    const bool verticale = ou.compare(0, 5, "north") != 0 && ou.compare(0, 5, "south") != 0;
+    const bool dehors = ou.size() > 7 && ou.compare(ou.size() - 7, 7, "outside") == 0;
+    const bool ouest = ou.compare(0, 4, "west") == 0;
+    const bool nord = ou.compare(0, 5, "north") == 0;
+    const double bande = 14;
+    const std::size_t tranches = barre.tranches.size() / 3;
+    if (tranches == 0) return;
+    auto teinte = [&](std::size_t k) {
+        return formater("#%02X%02X%02X", barre.tranches[3 * k], barre.tranches[3 * k + 1],
+                        barre.tranches[3 * k + 2]);
+    };
+    const double etiquette = a.etiquetteBarre.empty() ? 0.0 : 22.0;
+    toile.groupe("barreCouleurs");
+    StyleTexte st;
+    StyleTexte stEtiquette;
+    stEtiquette.ancre = 'c';
+    if (verticale) {
+        const double y0 = dehors ? haut : haut + 8, y1 = dehors ? bas : bas - 8;
+        // Les textes à droite de la bande : dehors à l'est, dedans à l'ouest.
+        const bool textesADroite = dehors ? !ouest : ouest;
+        double x0;
+        if (dehors) x0 = ouest ? bordCase + 4 + etiquette + largeurTextes + 7 : droite + 14;
+        else x0 = ouest ? gauche + 8 : droite - 8 - bande;
+        const double pas = (y1 - y0) / (double)tranches;
+        for (std::size_t k = 0; k < tranches; ++k)
+            toile.rectangle(x0, y1 - (double)(k + 1) * pas, bande, pas + 0.5, teinte(k), 1.0,
+                            nullptr);
+        Trait cadre = traitAxe();
+        toile.rectangle(x0, y0, bande, y1 - y0, "none", 1.0, &cadre);
+        st.ancre = textesADroite ? 'l' : 'r';
+        for (std::size_t k = 0; k < barre.valeurs.size(); ++k) {
+            double y = y1 - barre.fractions[k] * (y1 - y0);
+            if (textesADroite) {
+                toile.ligne(x0 + bande, y, x0 + bande + 4, y, traitAxe());
+                toile.texte(x0 + bande + 7, y + 4, simple(barre.textes[k]), st);
+            } else {
+                toile.ligne(x0, y, x0 - 4, y, traitAxe());
+                toile.texte(x0 - 7, y + 4, simple(barre.textes[k]), st);
+            }
+        }
+        if (!a.etiquetteBarre.empty()) {
+            // Écrite de bas en haut, comme l'étiquette des ordonnées.
+            stEtiquette.angle = 90;
+            double x = textesADroite ? x0 + bande + 7 + largeurTextes + 16
+                                     : x0 - 7 - largeurTextes - 4;
+            toile.texte(x, (y0 + y1) / 2, morceauxTexte(a.etiquetteBarre), stEtiquette);
+        }
+    } else {
+        const double xg = dehors ? gauche : gauche + 8, xd = dehors ? droite : droite - 8;
+        // Les textes sous la bande : dehors au sud, dedans au nord.
+        const bool textesDessous = dehors ? !nord : nord;
+        double y0;
+        if (dehors)
+            y0 = nord ? haut - 8 - bande
+                      : bas + 28 + descenteX + (a.etiquetteX.empty() ? 0.0 : 22.0);
+        else
+            y0 = nord ? haut + 8 : bas - 8 - bande;
+        const double pas = (xd - xg) / (double)tranches;
+        for (std::size_t k = 0; k < tranches; ++k)
+            toile.rectangle(xg + (double)k * pas, y0, pas + 0.5, bande, teinte(k), 1.0, nullptr);
+        Trait cadre = traitAxe();
+        toile.rectangle(xg, y0, xd - xg, bande, "none", 1.0, &cadre);
+        st.ancre = 'c';
+        for (std::size_t k = 0; k < barre.valeurs.size(); ++k) {
+            double x = xg + barre.fractions[k] * (xd - xg);
+            if (textesDessous) {
+                toile.ligne(x, y0 + bande, x, y0 + bande + 4, traitAxe());
+                toile.texte(x, y0 + bande + 16, simple(barre.textes[k]), st);
+            } else {
+                toile.ligne(x, y0, x, y0 - 4, traitAxe());
+                toile.texte(x, y0 - 7, simple(barre.textes[k]), st);
+            }
+        }
+        if (!a.etiquetteBarre.empty())
+            toile.texte((xg + xd) / 2, textesDessous ? y0 + bande + 34 : y0 - 25,
+                        morceauxTexte(a.etiquetteBarre), stEtiquette);
+    }
+    toile.finGroupe();
+}
+
 // Le dessin d'un axe : ses graduations, ses séries, sa barre de couleurs,
 // ses titres et sa légende.
 void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H,
@@ -175,9 +297,26 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
                            (a.etiquetteY.empty() ? 0.0 : 24.0));
         gauche = std::max(gauche, requis);
     }
+    // Des étiquettes d'abscisses inclinées (« xtickangle ») descendent plus
+    // bas qu'une ligne de texte : la marge s'agrandit d'autant, et
+    // l'étiquette de l'axe descend avec elle.
+    double descenteX = 0;
+    if (a.axesVisibles && a.angleTicksX != 0) {
+        double x0, x1, y0, y1;
+        limitesAxe(a, x0, x1, y0, y1);
+        std::vector<double> t = graduationsEffectives(a, 'x', x0, x1, a.logX);
+        double plusLarge = 0;
+        for (std::size_t k = 0; k < t.size(); ++k)
+            plusLarge = std::max(plusLarge, toile.largeur(simple(k < a.etiquettesTicksX.size()
+                                                                     ? a.etiquettesTicksX[k]
+                                                                     : nombreCourt(t[k])),
+                                                          12));
+        double angle = std::fabs(a.angleTicksX) * PI / 180;
+        descenteX = std::max(0.0, plusLarge * std::sin(angle) + 12 * std::cos(angle) - 12);
+        bas -= (int)std::ceil(descenteX);
+    }
     if (droite <= gauche + 10 || bas <= haut + 10) return;
     int hautTitre = haut;
-    const int xEtiquetteY = (int)std::min(gauche - 46.0, gauche - largeurEtiquettesY - 20);
 
     // La légende se mesure avant les échelles : placée hors de l'axe, elle
     // lui prend de la place, comme dans MATLAB.
@@ -209,7 +348,7 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
             xLegende = (gauche + droite) / 2.0 - largeurLegende / 2;
         } else if (ou == "southoutside") {
             bas -= (int)std::ceil(hauteurLegende + 10);
-            yLegende = bas + 46;
+            yLegende = bas + 46 + descenteX;
             xLegende = (gauche + droite) / 2.0 - largeurLegende / 2;
         } else if (ou == "westoutside" || ou == "northwestoutside" ||
                    ou == "southwestoutside") {
@@ -228,10 +367,34 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
         if (droite <= gauche + 10 || bas <= haut + 10) return;
     }
 
-    // La barre de couleurs prend sa place à droite, comme dans MATLAB.
+    // La barre de couleurs prend sa place hors de la boîte — à droite par
+    // défaut, ou du côté que dit sa position —, ou se pose dedans
+    // (« east », « south »…) sans rien lui prendre.
+    BarreCouleurs barre;
+    const std::string& ouBarre = a.positionBarre;
+    const bool barreVerticale = ouBarre.compare(0, 5, "north") != 0 &&
+                                ouBarre.compare(0, 5, "south") != 0;
+    const bool barreDehors = ouBarre.size() > 7 &&
+                             ouBarre.compare(ouBarre.size() - 7, 7, "outside") == 0;
+    const bool barreOuest = ouBarre.compare(0, 4, "west") == 0;
+    const bool barreNord = ouBarre.compare(0, 5, "north") == 0;
+    double largeurTextesBarre = 0;
+    const double placeEtiquetteBarre = a.etiquetteBarre.empty() ? 0.0 : 22.0;
     if (a.barreCouleurs) {
-        droite -= LARGEUR_BARRE_COULEURS;
-        if (droite <= gauche + 10) return;
+        barre = barreCouleurs(figure, a);
+        for (const auto& t : barre.textes)
+            largeurTextesBarre = std::max(largeurTextesBarre, toile.largeur(simple(t), 12));
+        if (barreDehors && barreVerticale) {
+            int place = (int)std::ceil(std::max((double)LARGEUR_BARRE_COULEURS,
+                                                35 + largeurTextesBarre + 8 + placeEtiquetteBarre));
+            if (barreOuest) gauche += place;
+            else droite -= place;
+        } else if (barreDehors) {
+            int place = (int)std::ceil(40 + placeEtiquetteBarre);
+            if (barreNord) haut += place;
+            else bas -= place;
+        }
+        if (droite <= gauche + 10 || bas <= haut + 10) return;
     }
 
     // Les bornes : celles qu'on a fixées, ou celles des données, arrondies
@@ -265,12 +428,19 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
 
     // Les graduations imposées par « ax.XTick = [...] » l'emportent sur
     // celles qu'on choisirait.
-    auto tx = a.axesVisibles ? (a.ticksX.empty() ? graduationsAxe(xmin, xmax, 6, logX) : a.ticksX)
+    auto tx = a.axesVisibles ? graduationsEffectives(a, 'x', xmin, xmax, logX)
                              : std::vector<double>{};
-    auto ty = a.axesVisibles ? (a.ticksY.empty() ? graduationsAxe(ymin, ymax, 6, logY) : a.ticksY)
+    auto ty = a.axesVisibles ? graduationsEffectives(a, 'y', ymin, ymax, logY)
                              : std::vector<double>{};
+    // Une étiquette inclinée se termine sur sa graduation, comme dans
+    // MATLAB : ancrée par sa fin pour un angle positif, par son début pour
+    // un angle négatif, et décalée d'une demi-hauteur de texte pour que la
+    // ligne passe par la graduation.
     StyleTexte styleGraduationX;
-    styleGraduationX.ancre = 'c';
+    styleGraduationX.ancre = a.angleTicksX > 0 ? 'r' : a.angleTicksX < 0 ? 'l' : 'c';
+    styleGraduationX.angle = a.angleTicksX;
+    const double sinX = std::sin(a.angleTicksX * PI / 180);
+    const double cosX = std::cos(a.angleTicksX * PI / 180);
     std::size_t rangTick = 0;
     for (double v : tx) {
         double px = ex.versPixel(v);
@@ -282,10 +452,14 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
                                          ? simple(a.etiquettesTicksX[rangTick])
                                          : etiquetteGraduation(v, logX);
         ++rangTick;
-        toile.texte(px, bas + 16, texte, styleGraduationX);
+        if (a.angleTicksX == 0) toile.texte(px, bas + 16, texte, styleGraduationX);
+        else toile.texte(px + 4 * sinX, bas + 8 + 4 * cosX, texte, styleGraduationX);
     }
     StyleTexte styleGraduationY;
     styleGraduationY.ancre = 'r';
+    styleGraduationY.angle = a.angleTicksY;
+    const double sinY = std::sin(a.angleTicksY * PI / 180);
+    const double cosY = std::cos(a.angleTicksY * PI / 180);
     rangTick = 0;
     for (double v : ty) {
         double py = ey.versPixel(v);
@@ -296,7 +470,7 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
                                          ? simple(a.etiquettesTicksY[rangTick])
                                          : etiquetteGraduation(v, logY);
         ++rangTick;
-        toile.texte(gauche - 8, py + 4, texte, styleGraduationY);
+        toile.texte(gauche - 8 + 4 * sinY, py + 4 * cosY, texte, styleGraduationY);
     }
 
     toile.decouper(gauche, haut, droite - gauche, bas - haut);
@@ -428,8 +602,31 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
             continue;
         }
         if (s.genre == GenreTrace::Points) {
-            for (std::size_t k = 0; k < n; ++k)
-                toile.cercle(ex.versPixel(s.x[k]), ey.versPixel(s.y[k]), 3, s.couleur, nullptr);
+            // Un nuage : chaque point a son aire et sa couleur, creux par
+            // défaut comme dans MATLAB, plein sous « 'filled' ».
+            const std::string marqueur = s.marqueur.empty() ? "o" : s.marqueur;
+            FormeMarqueur commune = formeMarqueur(marqueur, s.tailleMarqueur);
+            if (s.airesPoints.size() == 1)
+                commune = formeMarqueur(marqueur, std::sqrt(std::max(s.airesPoints[0], 0.0)));
+            for (std::size_t k = 0; k < n; ++k) {
+                if (!std::isfinite(s.x[k]) || !std::isfinite(s.y[k])) continue;
+                std::string couleur = couleurPoint(palette, cmin, cmax, s, k);
+                std::string bord, face;
+                couleursPoint(s, couleur, bord, face);
+                // Un « + » ou un « x » n'a que son trait : il le garde.
+                if (bord == "none" && commune.genre == FormeMarqueur::Traits) bord = couleur;
+                if (s.airesPoints.size() > 1)
+                    dessinerMarqueur(toile,
+                                     formeMarqueur(marqueur, std::sqrt(std::max(
+                                                                 k < s.airesPoints.size()
+                                                                     ? s.airesPoints[k]
+                                                                     : 0.0,
+                                                                 0.0))),
+                                     ex.versPixel(s.x[k]), ey.versPixel(s.y[k]), bord, face);
+                else
+                    dessinerMarqueur(toile, commune, ex.versPixel(s.x[k]), ey.versPixel(s.y[k]),
+                                     bord, face);
+            }
             continue;
         }
         if (s.genre == GenreTrace::Tige) {
@@ -484,27 +681,9 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
     }
     toile.finDecoupe();
 
-    if (a.barreCouleurs) {
-        BarreCouleurs barre = barreCouleurs(figure, a);
-        const int x0 = droite + 14, largeurBande = 14;
-        const std::size_t tranches = barre.tranches.size() / 3;
-        const double pas = (double)(bas - haut) / (double)tranches;
-        toile.groupe("barreCouleurs");
-        for (std::size_t k = 0; k < tranches; ++k)
-            toile.rectangle(x0, bas - (double)(k + 1) * pas, largeurBande, pas + 0.5,
-                            formater("#%02X%02X%02X", barre.tranches[3 * k],
-                                     barre.tranches[3 * k + 1], barre.tranches[3 * k + 2]),
-                            1.0, nullptr);
-        Trait cadre = traitAxe();
-        toile.rectangle(x0, haut, largeurBande, bas - haut, "none", 1.0, &cadre);
-        StyleTexte st;
-        for (std::size_t k = 0; k < barre.valeurs.size(); ++k) {
-            double y = bas - barre.fractions[k] * (bas - haut);
-            toile.ligne(x0 + largeurBande, y, x0 + largeurBande + 4, y, traitAxe());
-            toile.texte(x0 + largeurBande + 7, y + 4, simple(nombreCourt(barre.valeurs[k])), st);
-        }
-        toile.finGroupe();
-    }
+    if (a.barreCouleurs)
+        dessinerBarre(toile, a, barre, gauche, droite, haut, bas, fx * L, descenteX,
+                      largeurTextesBarre);
 
     if (!a.titre.empty()) {
         StyleTexte st;
@@ -521,12 +700,15 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
     if (!a.etiquetteX.empty() && a.axesVisibles) {
         StyleTexte st;
         st.ancre = 'c';
-        toile.texte((gauche + droite) / 2, bas + 36, morceauxTexte(a.etiquetteX), st);
+        toile.texte((gauche + droite) / 2, bas + 36 + descenteX, morceauxTexte(a.etiquetteX), st);
     }
     if (!a.etiquetteY.empty() && a.axesVisibles) {
         StyleTexte st;
         st.ancre = 'c';
         st.angle = 90;
+        // À côté de la boîte telle qu'elle est finalement placée : une
+        // légende ou une barre de couleurs à l'ouest l'ont décalée.
+        const double xEtiquetteY = std::min(gauche - 46.0, gauche - largeurEtiquettesY - 20);
         toile.texte(xEtiquetteY, (haut + bas) / 2, morceauxTexte(a.etiquetteY), st);
     }
 
@@ -589,7 +771,13 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
             Trait bord = trait(s.couleurBord.empty() ? couleur : s.couleurBord, 1);
             toile.rectangle(xe + 8, milieu - 5, 20, 10, couleur, s.opacite, &bord);
         } else if (s.genre == GenreTrace::Points) {
-            toile.cercle(xe + 18, milieu, 3, couleur, nullptr);
+            std::string bord, face;
+            couleursPoint(s, couleurPoint(palette, cmin, cmax, s, 0), bord, face);
+            double aire = s.airesPoints.empty() ? s.tailleMarqueur * s.tailleMarqueur
+                                                : std::min(s.airesPoints[0], 144.0);
+            dessinerMarqueur(toile, formeMarqueur(s.marqueur.empty() ? "o" : s.marqueur,
+                                                  std::sqrt(std::max(aire, 1.0))),
+                             xe + 18, milieu, bord, face);
         } else {
             if (s.style != "none")
                 toile.ligne(xe + 6, milieu, xe + 30, milieu,

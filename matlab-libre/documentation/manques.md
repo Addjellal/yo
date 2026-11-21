@@ -16,7 +16,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | identification | 40 | 0 | 100 % |
 | images | 74 | 0 | 100 % |
 | instruments-financiers | 55 | 0 | 100 % |
-| matlab-graphique | 142 | 3 | 98 % |
+| matlab-graphique | 144 | 1 | 99 % |
 | matlab-langage | 614 | 0 | 100 % |
 | ondelettes | 112 | 0 | 100 % |
 | optimisation-globale | 15 | 0 | 100 % |
@@ -29,11 +29,11 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | symbolique | 36 | 0 | 100 % |
 | types | 100 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2407** | **3** | **100 %** |
+| **ensemble** | **2409** | **1** | **100 %** |
 
 ## matlab-graphique
 
-`xtickangle`, `ytickangle`, `ztickangle`
+`ztickangle`
 
 ## Ce qui manque au-delà des fonctions
 
@@ -150,14 +150,15 @@ qu'ils ne font pas encore comme MATLAB.
   (`Interpreter` vaut `'tex'` par défaut) met en indice et en exposant et
   traduit `\alpha`, `\pi`... Seules les graduations des axes
   logarithmiques écrivent leurs puissances de dix en exposant.
-- **Barre de couleurs** : `colorbar` la dessine à droite des axes, graduée
-  sur `CLim` ; les autres positions (`'southoutside'`...) sont refusées en
-  le disant, et la poignée rendue accepte `Ticks` et `Label` sans effet.
+- **Barre de couleurs** : ses huit positions, son étiquette
+  (`cb.Label.String`), ses graduations et leurs textes suivent MATLAB ;
+  `Direction`, `Limits` en écriture et la police (`FontSize`) ne sont pas
+  pris en compte.
 - **Graduations inclinées** : `xtickangle`, `ytickangle` et
-  `XTickLabelRotation` manquent ; des étiquettes longues se chevauchent.
-- **Marqueurs** : les quatorze formes de MATLAB, `MarkerSize`,
-  `MarkerFaceColor` et `MarkerEdgeColor` ; `scatter` dessine encore des
-  disques pleins, que MATLAB laisse creux par défaut.
+  `XTickLabelRotation` inclinent les étiquettes ; MATLAB les incline aussi
+  de lui-même quand elles se chevauchent, ce que MatLibre ne fait pas.
+- **Couleurs des lignes** : `get(h,'Color')` rend un code `'#FF0000'`, là
+  où MATLAB rend le triplet `[1 0 0]` ; les deux s'écrivent.
 
 - **`bar`** lit les données, la largeur, `'grouped'` et `'stacked'`,
   `FaceColor`, `EdgeColor`, `BarWidth`, `FaceAlpha` et `DisplayName` ;

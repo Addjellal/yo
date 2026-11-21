@@ -406,7 +406,8 @@ assert(numel(xticklabels()) == 3);
 svgEtiquettes = matlibre_svg();
 assert(~isempty(strfind(svgEtiquettes, 'milieu')));
 xticks('auto');
-assert(isempty(xticks()));
+% Les graduations choisies d'office se relisent, comme dans MATLAB.
+assert(~isempty(xticks()) && ~isequal(xticks(), [1 5 10]));
 yticks([0 5 10]);
 assert(isequal(yticks(), [0 5 10]));
 
@@ -687,7 +688,7 @@ plot(1:10, 'r');
 hold('on');
 plot((1:10) .^ 2, 'b');
 hold('off');
-rouges = findobj('Color', '#D95319');
+rouges = findobj('Color', '#FF0000');
 assert(numel(rouges) == 1);
 set(rouges, 'LineWidth', 3);
 assert(get(rouges(1), 'LineWidth') == 3);
@@ -1028,7 +1029,7 @@ poigneeBarre = colorbar;
 assert(strcmp(class(poigneeBarre), 'matlab.graphics.illustration.ColorBar'));
 % La barre se dessine (elle etait acceptee sans rien tracer, malgre sa
 % fiche) : un degrade a droite de la boite, gradue sur CLim. 'off' la
-% retire ; une autre position est refusee en le disant.
+% retire. Les autres positions sont verifiees plus loin.
 figure
 imagesc([0 10; 20 30]);
 colorbar
@@ -1037,13 +1038,6 @@ assert(~isempty(strfind(svgBarre, 'class="barreCouleurs"')));
 assert(~isempty(strfind(svgBarre, '>30</text>')) && ~isempty(strfind(svgBarre, '>0</text>')));
 colorbar('off');
 assert(isempty(strfind(matlibre_svg(), 'class="barreCouleurs"')));
-refusBarre = false;
-try
-    colorbar('southoutside');
-catch erreurBarre
-    refusBarre = strcmp(erreurBarre.identifier, 'MatLibre:colorbar:Position');
-end
-assert(refusBarre);
 close all
 
 % Les enfants d'une figure sont ses axes : sans eux, un parcours de
@@ -1308,6 +1302,79 @@ print(fichierBarres);
 texteBarres = fileread(fichierBarres);
 delete(fichierBarres);
 assert(contains(texteBarres, '#33B333') && contains(texteBarres, 'stroke="none"'));
+close all;
+
+%% ------------------------------------------- nuages, barres, graduations
+% scatter : des cercles creux par défaut, comme MATLAB ; SZ est une aire
+% par point, et non une seconde courbe ; C met chaque point à l'échelle
+% de la palette, et CLim s'étend sur ses valeurs.
+figure;
+h = scatter(1:5, [2 4 3 5 1], [10 20 40 80 160], [1 2 3 4 5]);
+assert(numel(get(gca, 'Children')) == 1, 'la taille n''est pas une seconde courbe');
+assert(isequal(get(h, 'XData'), 1:5));
+assert(isequal(clim, [1 5]));
+dessinNuage = matlibre_svg();
+assert(numel(strfind(dessinNuage, '<circle')) == 5);
+assert(numel(strfind(dessinNuage, 'fill="none"')) >= 5, 'des marqueurs creux');
+rayons = cellfun(@str2double, regexp(dessinNuage, '<circle[^>]* r="([\d.]+)"', 'tokens'));
+assert(issorted(rayons) && rayons(end) / rayons(1) > 3.5, 'l''aire suit SZ');
+% 'filled' remplit, et ôte le bord ; une couleur nommée vaut pour tous.
+figure;
+scatter([1 2 3], [3 1 2], 'filled', 'MarkerFaceColor', 'r');
+dessinPlein = matlibre_svg();
+assert(numel(strfind(dessinPlein, 'fill="#FF0000" stroke="none"')) == 3);
+refusTaille = false;
+try
+    scatter(1:3, 1:3, [1 2]);
+catch err
+    refusTaille = strcmp(err.identifier, 'MATLAB:scatter:InvalidSizeData');
+end
+assert(refusTaille, 'une taille par point, ou une seule');
+% Les lettres sont des couleurs pures, comme dans MATLAB.
+figure;
+h = plot(1:3, 'g');
+assert(strcmp(get(h, 'Color'), '#00FF00'));
+% bar : une graduation par barre, si bien que xticklabels nomme les
+% bonnes barres ; xticks rend les graduations montrées.
+figure;
+bar([3 5 2 4]);
+assert(isequal(xticks, 1:4));
+assert(isequal(get(gca, 'XTick'), 1:4));
+xticklabels({'janvier', 'fevrier', 'mars', 'avril'});
+% Les étiquettes inclinées : xtickangle, et la propriété de l'axe.
+xtickangle(45);
+assert(xtickangle == 45 && get(gca, 'XTickLabelRotation') == 45);
+dessinIncline = matlibre_svg();
+assert(~isempty(strfind(dessinIncline, 'rotate(-45')), 'les etiquettes sont inclinees');
+assert(~isempty(regexp(dessinIncline, 'text-anchor="end"[^>]*rotate\(-45[^>]*>janvier<', ...
+                       'once')), 'et se terminent sur leur graduation');
+set(gca, 'YTickLabelRotation', 30);
+assert(ytickangle == 30);
+% La barre de couleurs : ses huit positions, son étiquette, ses
+% graduations nommées.
+figure;
+imagesc(magic(4));
+cb = colorbar('southoutside');
+assert(strcmp(get(cb, 'Location'), 'southoutside'));
+cb.Label.String = 'altitude';
+assert(strcmp(cb.Label.String, 'altitude'));
+cb.Ticks = [4 8 12];
+cb.TickLabels = {'bas', 'milieu', 'haut'};
+assert(isequal(cb.Ticks, [4 8 12]));
+dessinBarre = matlibre_svg();
+assert(~isempty(strfind(dessinBarre, '>altitude<')) && ~isempty(strfind(dessinBarre, '>milieu<')));
+for position = {'north', 'south', 'east', 'west', 'northoutside', 'westoutside'}
+    colorbar(position{1});
+    assert(strcmp(get(colorbar, 'Location'), position{1}));
+    assert(~isempty(strfind(matlibre_svg(), 'class="barreCouleurs"')));
+end
+refusPosition = false;
+try
+    colorbar('ailleurs');
+catch err
+    refusPosition = strcmp(err.identifier, 'MATLAB:colorbar:InvalidLocation');
+end
+assert(refusPosition);
 close all;
 
 disp('graphique : toutes les verifications passent');

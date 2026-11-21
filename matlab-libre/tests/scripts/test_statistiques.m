@@ -775,7 +775,7 @@ assert(strcmp(get(poigneeCourbe, 'Type'), 'line'));
 assert(isequal(get(poigneeCourbe, 'XData'), [1 2 3]));
 set(poigneeCourbe, 'LineWidth', 3, 'Color', 'r');
 assert(get(poigneeCourbe, 'LineWidth') == 3);
-assert(strcmp(get(poigneeCourbe, 'Color'), '#D95319'));
+assert(strcmp(get(poigneeCourbe, 'Color'), '#FF0000'));
 poigneeCourbe.LineStyle = '--';
 assert(strcmp(poigneeCourbe.LineStyle, '--'));
 poigneeCourbe.YData = [9 8 7];
