@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <mutex>
 #include <memory>
 #include <sstream>
 
@@ -283,6 +284,16 @@ namespace {
     std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
+// La table des fichiers ouverts est commune au processus, donc aux fils
+// d'un parfor, qui ouvraient, écrivaient et fermaient leurs fichiers dans
+// la même std::map sans verrou — une course, qui pouvait corrompre la
+// table. Tout accès passe désormais par ce verrou, et un flux se prend
+// par un shared_ptr : fermé par un autre fil, il reste valide le temps de
+// la lecture en cours.
+std::mutex& verrouFichiers() {
+    static std::mutex verrou;
+    return verrou;
+}
 std::map<int, std::shared_ptr<std::fstream>>& fichiers() {
     static std::map<int, std::shared_ptr<std::fstream>> table;
     return table;
@@ -290,6 +301,11 @@ std::map<int, std::shared_ptr<std::fstream>>& fichiers() {
 std::map<int, std::string>& nomsFichiers() {
     static std::map<int, std::string> table;
     return table;
+}
+std::shared_ptr<std::fstream> chercherFlux(int fid) {
+    std::lock_guard<std::mutex> garde(verrouFichiers());
+    auto f = fichiers().find(fid);
+    return f == fichiers().end() ? nullptr : f->second;
 }
 
 FONCTION(fnDisp) {
@@ -370,10 +386,9 @@ FONCTION(fnFprintf) {
     if (fid == 1) it.sortie() << texte << std::flush;
     else if (fid == 2) it.erreurSortie() << texte << std::flush;
     else {
-        auto f = fichiers().find(fid);
-        if (f == fichiers().end())
-            erreur("MATLAB:badfid", formater("Invalid file identifier %d.", fid));
-        *f->second << texte;
+        auto f = chercherFlux(fid);
+        if (!f) erreur("MATLAB:badfid", formater("Invalid file identifier %d.", fid));
+        *f << texte;
     }
     if (nargout > 0) return {Valeur::scalaire((double)texte.size())};
     return {};
@@ -900,10 +915,14 @@ FONCTION(fnFopen) {
         if (nargout >= 2) return {Valeur::scalaire(-1), Valeur::texte("No such file or directory")};
         return {Valeur::scalaire(-1)};
     }
-    static int prochain = 3;
-    int fid = prochain++;
-    fichiers()[fid] = f;
-    nomsFichiers()[fid] = nom;
+    int fid;
+    {
+        std::lock_guard<std::mutex> garde(verrouFichiers());
+        static int prochain = 3;
+        fid = prochain++;
+        fichiers()[fid] = f;
+        nomsFichiers()[fid] = nom;
+    }
     if (nargout >= 2) return {Valeur::scalaire(fid), Valeur::texte("")};
     return {Valeur::scalaire(fid)};
 }
@@ -911,6 +930,7 @@ FONCTION(fnFopen) {
 FONCTION(fnFclose) {
     INUTILISE
     exigerArguments(args, 1, 1, "fclose");
+    std::lock_guard<std::mutex> garde(verrouFichiers());
     if (args[0].estTexte() && args[0].versTexte() == "all") {
         fichiers().clear();
         return {Valeur::scalaire(0)};
@@ -923,18 +943,17 @@ FONCTION(fnFclose) {
     return {Valeur::scalaire(0)};
 }
 
-std::fstream& fluxDe(int fid) {
-    auto f = fichiers().find(fid);
-    if (f == fichiers().end())
-        erreur("MATLAB:badfid", formater("Invalid file identifier %d.", fid));
-    return *f->second;
+std::shared_ptr<std::fstream> fluxDe(int fid) {
+    auto f = chercherFlux(fid);
+    if (!f) erreur("MATLAB:badfid", formater("Invalid file identifier %d.", fid));
+    return f;
 }
 
 FONCTION(fnFgetl) {
     INUTILISE
     exigerArguments(args, 1, 1, "fgetl");
     std::string ligne;
-    if (!std::getline(fluxDe((int)args[0].scal()), ligne)) return {Valeur::scalaire(-1)};
+    if (!std::getline(*fluxDe((int)args[0].scal()), ligne)) return {Valeur::scalaire(-1)};
     if (!ligne.empty() && ligne.back() == '\r') ligne.pop_back();
     return {Valeur::texte(ligne)};
 }
@@ -943,20 +962,21 @@ FONCTION(fnFgets) {
     INUTILISE
     exigerArguments(args, 1, 2, "fgets");
     std::string ligne;
-    if (!std::getline(fluxDe((int)args[0].scal()), ligne)) return {Valeur::scalaire(-1)};
+    if (!std::getline(*fluxDe((int)args[0].scal()), ligne)) return {Valeur::scalaire(-1)};
     return {Valeur::texte(ligne + "\n")};
 }
 
 FONCTION(fnFeof) {
     INUTILISE
     exigerArguments(args, 1, 1, "feof");
-    return {Valeur::booleen(fluxDe((int)args[0].scal()).eof())};
+    return {Valeur::booleen(fluxDe((int)args[0].scal())->eof())};
 }
 
 FONCTION(fnFrewind) {
     INUTILISE
     exigerArguments(args, 1, 1, "frewind");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     f.clear();
     f.seekg(0);
     // Un fichier ouvert en ecriture a lui aussi un curseur a ramener :
@@ -972,7 +992,8 @@ FONCTION(fnFrewind) {
 FONCTION(fnFtell) {
     INUTILISE
     exigerArguments(args, 1, 1, "ftell");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     std::ios::iostate etat = f.rdstate();
     f.clear();
     std::streampos position = f.tellg();
@@ -989,7 +1010,8 @@ FONCTION(fnFtell) {
 FONCTION(fnFseek) {
     INUTILISE
     exigerArguments(args, 2, 3, "fseek");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     std::streamoff decalage = (std::streamoff)args[1].scal();
     std::ios::seekdir depuis = std::ios::beg;
     if (args.size() > 2) {
@@ -1026,7 +1048,8 @@ FONCTION(fnFseek) {
 FONCTION(fnFerror) {
     INUTILISE
     exigerArguments(args, 1, 2, "ferror");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     bool effacer = args.size() > 1 && args[1].versTexte() == "clear";
     std::string message;
     double numero = 0;
@@ -1159,7 +1182,8 @@ static void encoderElement(std::ostream& f, double x, const PrecisionES& p) {
 FONCTION(fnFread) {
     INUTILISE
     exigerArguments(args, 1, 3, "fread");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     std::size_t combien = (std::size_t)-1;
     std::size_t rangType = 0;
     if (args.size() > 1) {
@@ -1189,7 +1213,8 @@ FONCTION(fnFread) {
 // second appel poursuit la lecture.
 FONCTION(fnFscanf) {
     exigerArguments(args, 2, 3, "fscanf");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     std::string reste((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     f.clear();
     std::vector<Valeur> passees;
@@ -1217,7 +1242,8 @@ FONCTION(fnFscanf) {
 FONCTION(fnFwrite) {
     INUTILISE
     exigerArguments(args, 2, 3, "fwrite");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     const Valeur& v = args[1];
     PrecisionES p;
     if (args.size() > 2) p = lirePrecision(args[2].versTexte(), "fwrite");
