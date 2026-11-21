@@ -2,7 +2,9 @@
 
 Ce document dit ce qui est fait, comment on le sait, et ce qui reste. Il
 est écrit à la main ; `documentation/audit.md`, lui, est produit par
-`outils/audit.m` et donne les chiffres bruts.
+`outils/audit.m` et donne les chiffres bruts. Pour reprendre le travail
+d'une session à l'autre — règles du dépôt, commandes, derniers ajouts,
+la suite —, voir `documentation/reprise.md`.
 
 ## 1. Ce que MatLibre est aujourd'hui
 

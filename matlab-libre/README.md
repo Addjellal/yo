@@ -185,6 +185,7 @@ propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
 | [`couverture.md`](documentation/couverture.md) | ce qui manque, dit franchement |
 | [`manques.md`](documentation/manques.md) | l'inventaire compare a MATLAB, fonction par fonction — genere |
 | [`etat.md`](documentation/etat.md) | l'état des lieux : ce qui est fait, comment on le sait, ce qui reste |
+| [`reprise.md`](documentation/reprise.md) | reprendre le travail d'une session à l'autre : règles, commandes, derniers ajouts, la suite |
 | [`audit.md`](documentation/audit.md) | aide, exemples et couverture des tests, boîte par boîte — généré |
 
 ## Tests
