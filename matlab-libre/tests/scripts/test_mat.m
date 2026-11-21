@@ -217,6 +217,28 @@ catch e
 end
 assert(dimensionsFolles);
 
+%% -------- une etiquette courte trop longue ne fait pas lire hors du fichier
+% La forme courte d'un element loge au plus quatre octets dans son
+% etiquette. Une longueur plus grande, lue d'un fichier abime, faisait
+% lire au-dela de ces quatre octets — hors du tampon (AddressSanitizer).
+% Un scalaire « a » dont le nom est en forme courte, d'une longueur
+% annoncee de 64 octets.
+nomCourt = [1 0 64 0, double('a'), 0 0 0];
+corpsCourt = [motLong(6), motLong(8), motLong(6), motLong(0), ...
+              motLong(5), motLong(8), motLong(1), motLong(1), ...
+              nomCourt, motLong(9), motLong(8), reel(7)];
+octets = [entete, motLong(14), motLong(numel(corpsCourt)), corpsCourt];
+fid = fopen('court.mat', 'w');
+fwrite(fid, octets, 'uint8');
+fclose(fid);
+courtRefuse = false;
+try
+    load('court.mat');
+catch e
+    courtRefuse = strcmp(e.identifier, 'MATLAB:load:fichierAbime');
+end
+assert(courtRefuse, 'une forme courte de 64 octets est refusee');
+
 %% -------------------------------------------------- le niveau 7.3 se nomme
 % Un fichier « -v7.3 » est un HDF5 : la signature suit les cinq cent douze
 % octets que la norme reserve. Le message doit le dire et donner la
