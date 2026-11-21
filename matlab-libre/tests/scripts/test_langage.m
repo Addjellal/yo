@@ -665,6 +665,25 @@ assert(isequal(strlength(prealloue), [0 0 0]));
 assert(all(ismissing(prealloue)));
 assert(isequal(size(strings(2)), [2 2]));
 assert(isequal(size(strings()), [1 1]));
+% dir comme MATLAB : « . » et « .. » en tete d'un dossier (l'idiome
+% d(3:end) en depend), plusieurs etoiles, « ** » recursif (il rendait une
+% liste vide), et les champs date et datenum.
+racineDir = tempname();
+mkdir(fullfile(racineDir, 'sous', 'profond'));
+for nomDir = {'a_1_x.csv', 'a_2_y.csv', 'b.txt', 'sous/c_3_z.csv', 'sous/profond/d_4_w.csv'}
+    f = fopen(fullfile(racineDir, nomDir{1}), 'w'); fprintf(f, '1'); fclose(f);
+end
+listeDir = dir(racineDir);
+assert(isequal({listeDir(1:2).name}, {'.', '..'}) && numel(listeDir) == 6);
+assert(all(isfield(listeDir, {'name', 'folder', 'date', 'bytes', 'isdir', 'datenum'})));
+assert(abs(listeDir(3).datenum - now) < 1);
+etoiles = dir(fullfile(racineDir, 'a_*_*.csv'));
+assert(isequal({etoiles.name}, {'a_1_x.csv', 'a_2_y.csv'}));
+recursif = dir(fullfile(racineDir, '**', '*.csv'));
+assert(isequal({recursif.name}, {'a_1_x.csv', 'a_2_y.csv', 'c_3_z.csv', 'd_4_w.csv'}));
+assert(endsWith(recursif(4).folder, fullfile('sous', 'profond')));
+assert(numel(dir(fullfile(racineDir, '*.m'))) == 0);
+rmdir(racineDir, 's');
 % char d'une chaine vide est un tableau de caracteres vide, non un double
 % vide : ischar(char("")) etait faux.
 assert(ischar(char("")) && isequal(size(char("")), [0 0]));

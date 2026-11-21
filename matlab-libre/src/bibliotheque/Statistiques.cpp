@@ -625,8 +625,8 @@ FONCTION(fnNormrnd) {
     Dims d = dimsDepuisArguments(args, 2, args.size());
     if (args.size() <= 2) d = Dims{1, 1};
     Valeur r = Valeur::matriceDims(d);
-    std::normal_distribution<double> loi(mu, sigma);
-    for (auto& x : r.re) x = loi(it.generateur);
+    // Comme MATLAB : mu + sigma .* randn.
+    for (auto& x : r.re) x = mu + sigma * it.generateur.normale();
     return {r};
 }
 
@@ -637,8 +637,8 @@ FONCTION(fnUnifrnd) {
     Dims d = dimsDepuisArguments(args, 2, args.size());
     if (args.size() <= 2) d = Dims{1, 1};
     Valeur r = Valeur::matriceDims(d);
-    std::uniform_real_distribution<double> loi(a, b);
-    for (auto& x : r.re) x = loi(it.generateur);
+    // Comme MATLAB : a + (b - a) .* rand.
+    for (auto& x : r.re) x = a + (b - a) * it.generateur.uniforme();
     return {r};
 }
 

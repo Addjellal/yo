@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "matlibre/Aleatoire.h"
 #include "matlibre/Arbre.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Deboguage.h"
@@ -259,7 +260,9 @@ public:
     // c'est le seul écart, et « format short » le rétablit.
     Format format = Format::Long;
     bool formatCompact = false;
-    std::mt19937_64 generateur{5489u};
+    // Le générateur de rand, randn, randi et randperm : celui de MATLAB,
+    // si bien que rng(0) donne les mêmes nombres (voir Aleatoire.h).
+    GenerateurMatlab generateur{0};
     std::string dernierIdentifiant;
     std::string dernierMessage;
     // Le dernier avertissement émis, message et identifiant : ce que

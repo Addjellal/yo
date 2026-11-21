@@ -148,14 +148,13 @@ FONCTION(fnSprand) {
     int m = (int)args[0].scal();
     int n = (int)args[1].scal();
     double densite = args[2].scal();
-    std::uniform_real_distribution<double> loi(0.0, 1.0);
     std::vector<double> lignes, colonnes, valeurs;
     for (int j = 0; j < n; ++j)
         for (int i = 0; i < m; ++i)
-            if (loi(it.generateur) < densite) {
+            if (it.generateur.uniforme() < densite) {
                 lignes.push_back(i + 1);
                 colonnes.push_back(j + 1);
-                valeurs.push_back(loi(it.generateur));
+                valeurs.push_back(it.generateur.uniforme());
             }
     return {creuxDepuisTriplets(Valeur::colonne(lignes), Valeur::colonne(colonnes),
                                 Valeur::colonne(valeurs), m, n)};
@@ -167,15 +166,13 @@ FONCTION(fnSprandn) {
     int m = (int)args[0].scal();
     int n = (int)args[1].scal();
     double densite = args[2].scal();
-    std::uniform_real_distribution<double> uniforme(0.0, 1.0);
-    std::normal_distribution<double> normale(0.0, 1.0);
     std::vector<double> lignes, colonnes, valeurs;
     for (int j = 0; j < n; ++j)
         for (int i = 0; i < m; ++i)
-            if (uniforme(it.generateur) < densite) {
+            if (it.generateur.uniforme() < densite) {
                 lignes.push_back(i + 1);
                 colonnes.push_back(j + 1);
-                valeurs.push_back(normale(it.generateur));
+                valeurs.push_back(it.generateur.normale());
             }
     return {creuxDepuisTriplets(Valeur::colonne(lignes), Valeur::colonne(colonnes),
                                 Valeur::colonne(valeurs), m, n)};

@@ -69,8 +69,17 @@ void chargerToolboxes(Interpreteur& it, const std::string& racine) {
     it.definirRacineToolbox(racine);
     std::error_code ec;
     std::vector<std::string> dossiers;
-    for (const auto& e : fs::directory_iterator(racine, ec))
-        if (e.is_directory()) dossiers.push_back(e.path().string());
+    for (const auto& e : fs::directory_iterator(racine, ec)) {
+        if (!e.is_directory()) continue;
+        dossiers.push_back(e.path().string());
+        // « homonymes » : les fonctions dont le nom ne diffère d'une autre
+        // du module que par la casse — addmf et addMF. Sous Windows et
+        // macOS, deux tels fichiers ne peuvent pas partager un dossier :
+        // l'un écraserait l'autre. MATLAB range de même ses boîtes sur
+        // plusieurs dossiers du chemin.
+        fs::path homonymes = e.path() / "homonymes";
+        if (fs::is_directory(homonymes, ec)) dossiers.push_back(homonymes.string());
+    }
     std::sort(dossiers.begin(), dossiers.end());
     // Ajoutés en tête, du dernier au premier : l'ordre final est
     // alphabétique, et la racine passe devant.

@@ -1,6 +1,8 @@
 // Systeme.cpp — environnement, fichiers, chemin de recherche, aide.
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <ctime>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -58,45 +60,134 @@ FONCTION(fnCd) {
     return {};
 }
 
+// Un motif de dir : « * » vaut n'importe quelle suite de caractères, y
+// compris vide, autant de fois qu'il apparaît.
+bool correspondMotif(const std::string& nom, const std::string& motif) {
+    std::size_t n = 0, m = 0, etoile = std::string::npos, reprise = 0;
+    while (n < nom.size()) {
+        if (m < motif.size() && motif[m] == '*') {
+            etoile = m++;
+            reprise = n;
+        } else if (m < motif.size() && motif[m] == nom[n]) {
+            ++m;
+            ++n;
+        } else if (etoile != std::string::npos) {
+            m = etoile + 1;
+            n = ++reprise;
+        } else {
+            return false;
+        }
+    }
+    while (m < motif.size() && motif[m] == '*') ++m;
+    return m == motif.size();
+}
+
+// Une entrée de dir, avec les champs de MATLAB : name, folder, date,
+// bytes, isdir, datenum (l'heure locale de la dernière écriture).
+Valeur entreeDir(const std::string& nom, const fs::path& dossier, const fs::path& chemin) {
+    std::error_code ec;
+    bool repertoire = fs::is_directory(chemin, ec);
+    Valeur s = Valeur::structureVide();
+    s.poserChamp("name", Valeur::texte(nom));
+    s.poserChamp("folder", Valeur::texte(fs::absolute(dossier, ec).lexically_normal().string()));
+    double jours = 0;
+    std::string date;
+    auto ecriture = fs::last_write_time(chemin, ec);
+    if (!ec) {
+        auto systeme = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+            ecriture - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+        std::time_t t = std::chrono::system_clock::to_time_t(systeme);
+        std::tm local{};
+#ifdef _WIN32
+        localtime_s(&local, &t);
+#else
+        localtime_r(&t, &local);
+#endif
+        static const char* mois[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        date = formater("%02d-%s-%04d %02d:%02d:%02d", local.tm_mday, mois[local.tm_mon],
+                        local.tm_year + 1900, local.tm_hour, local.tm_min, local.tm_sec);
+        // datenum : 719529 est le 1er janvier 1970, et l'heure locale compte.
+        std::tm utc{};
+#ifdef _WIN32
+        gmtime_s(&utc, &t);
+#else
+        gmtime_r(&t, &utc);
+#endif
+        utc.tm_isdst = local.tm_isdst;
+        double decalage = std::difftime(std::mktime(&local), std::mktime(&utc));
+        jours = 719529.0 + ((double)t + decalage) / 86400.0;
+    }
+    s.poserChamp("date", Valeur::texte(date));
+    std::error_code e2;
+    double octets = (!repertoire && fs::is_regular_file(chemin, e2)) ? (double)fs::file_size(chemin, e2)
+                                                                       : 0.0;
+    s.poserChamp("bytes", Valeur::scalaire(octets));
+    s.poserChamp("isdir", Valeur::booleen(repertoire));
+    s.poserChamp("datenum", Valeur::scalaire(jours));
+    return s;
+}
+
+// Les entrées d'un dossier qui répondent au filtre, « . » et « .. »
+// compris quand il les admet — un dossier nu, « * » —, comme MATLAB.
+void listerDossier(const fs::path& dossier, const std::string& filtre,
+                   std::vector<Valeur>& entrees) {
+    std::error_code ec;
+    std::vector<Valeur> ici;
+    for (const char* point : {".", ".."})
+        if (filtre.empty() || correspondMotif(point, filtre))
+            ici.push_back(entreeDir(point, dossier, dossier / point));
+    for (const auto& e : fs::directory_iterator(dossier, ec)) {
+        std::string nom = e.path().filename().string();
+        if (!filtre.empty() && !correspondMotif(nom, filtre)) continue;
+        ici.push_back(entreeDir(nom, dossier, e.path()));
+    }
+    std::sort(ici.begin(), ici.end(), [](const Valeur& a, const Valeur& b) {
+        return a.champ("name").versTexte() < b.champ("name").versTexte();
+    });
+    entrees.insert(entrees.end(), ici.begin(), ici.end());
+}
+
+// « dossier/ ** /filtre » : le dossier, puis chacun de ses sous-dossiers,
+// à toute profondeur, dans l'ordre alphabétique.
+void listerRecursif(const fs::path& dossier, const std::string& filtre,
+                    std::vector<Valeur>& entrees) {
+    listerDossier(dossier, filtre, entrees);
+    std::error_code ec;
+    std::vector<fs::path> sous;
+    for (const auto& e : fs::directory_iterator(dossier, ec))
+        if (e.is_directory(ec) && !e.is_symlink(ec)) sous.push_back(e.path());
+    std::sort(sous.begin(), sous.end());
+    for (const auto& d : sous) listerRecursif(d, filtre, entrees);
+}
+
 FONCTION(fnDir) {
     INUTILISE
     std::string motif = args.empty() ? "." : args[0].versTexte();
-    fs::path base = motif;
-    std::string filtre;
-    std::error_code ec;
-    if (!fs::is_directory(base, ec)) {
-        filtre = base.filename().string();
-        base = base.parent_path();
-        if (base.empty()) base = ".";
-    }
-    auto correspond = [&](const std::string& nom) {
-        if (filtre.empty()) return true;
-        // Motif simple avec « * ».
-        std::size_t etoile = filtre.find('*');
-        if (etoile == std::string::npos) return nom == filtre;
-        std::string avant = filtre.substr(0, etoile);
-        std::string apres = filtre.substr(etoile + 1);
-        return nom.size() >= avant.size() + apres.size() &&
-               nom.compare(0, avant.size(), avant) == 0 &&
-               nom.compare(nom.size() - apres.size(), apres.size(), apres) == 0;
-    };
     std::vector<Valeur> entrees;
-    for (const auto& e : fs::directory_iterator(base, ec)) {
-        std::string nom = e.path().filename().string();
-        if (!correspond(nom)) continue;
-        Valeur s = Valeur::structureVide();
-        s.poserChamp("name", Valeur::texte(nom));
-        s.poserChamp("folder", Valeur::texte(e.path().parent_path().string()));
-        s.poserChamp("isdir", Valeur::booleen(e.is_directory()));
-        std::error_code e2;
-        s.poserChamp("bytes",
-                     Valeur::scalaire(e.is_regular_file() ? (double)fs::file_size(e.path(), e2)
-                                                          : 0.0));
-        entrees.push_back(s);
+    std::error_code ec;
+    // « ** » : la recherche récursive de MATLAB, « dossier/ ** /*.m ».
+    std::size_t double_etoile = motif.find("**");
+    if (double_etoile != std::string::npos) {
+        std::string avant = motif.substr(0, double_etoile);
+        std::string apres = motif.substr(double_etoile + 2);
+        while (!apres.empty() && (apres[0] == '/' || apres[0] == '\\')) apres.erase(0, 1);
+        if (apres.find('/') != std::string::npos || apres.find('\\') != std::string::npos ||
+            apres.find("**") != std::string::npos)
+            erreur("MatLibre:dir:Motif",
+                   "MatLibre ne prend « ** » que suivi d'un nom de fichier : dossier/ ** /*.m.");
+        fs::path base = avant.empty() ? fs::path(".") : fs::path(avant);
+        if (fs::is_directory(base, ec)) listerRecursif(base, apres, entrees);
+    } else {
+        fs::path base = motif;
+        std::string filtre;
+        if (!fs::is_directory(base, ec)) {
+            filtre = base.filename().string();
+            base = base.parent_path();
+            if (base.empty()) base = ".";
+        }
+        if (fs::is_directory(base, ec)) listerDossier(base, filtre, entrees);
     }
-    std::sort(entrees.begin(), entrees.end(), [](const Valeur& a, const Valeur& b) {
-        return a.champ("name").versTexte() < b.champ("name").versTexte();
-    });
     if (nargout == 0 && !entrees.empty()) {
         for (const auto& e : entrees) it.sortie() << e.champ("name").versTexte() << "\n";
         return {};
@@ -111,8 +202,11 @@ FONCTION(fnLs) {
     auto r = fnDir(it, a, 1);
     if (r.empty() || !r[0].estStructure()) return {Valeur::texte("")};
     std::string s;
-    for (std::size_t k = 0; k < r[0].nelem(); ++k)
-        s += r[0].champ("name", k).versTexte() + "\n";
+    for (std::size_t k = 0; k < r[0].nelem(); ++k) {
+        std::string nom = r[0].champ("name", k).versTexte();
+        if (nom == "." || nom == "..") continue;   // le ls d'Unix ne les montre pas
+        s += nom + "\n";
+    }
     if (nargout == 0) {
         it.sortie() << s;
         return {};

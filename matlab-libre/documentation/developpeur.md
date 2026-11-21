@@ -115,6 +115,12 @@ Un fichier `.m` dans le dossier de la toolbox, portant le nom de la
 fonction, avec son bloc d'aide juste après la ligne `function`. Rien à
 recompiler. Ajoutez la ligne correspondante au `Contents.m`.
 
+Deux noms qui ne diffèrent que par la casse — `addmf`, la fonction
+historique, à côté de `addMF` — ne peuvent pas partager un dossier :
+sous Windows et macOS, l'un écraserait l'autre au clonage du dépôt. Le
+second va dans le sous-dossier `homonymes/` du module, que le chargeur
+met lui aussi au chemin. `test_aide` refuse toute collision de casse.
+
 ## Ajouter une toolbox
 
 Un dossier sous `toolbox/`, un `Contents.m` qui nomme la toolbox

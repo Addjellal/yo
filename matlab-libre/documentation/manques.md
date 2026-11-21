@@ -87,6 +87,13 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
   attributs entre parenthèses (`properties (Access = private)`) sont
   analysés et ignorés : rien n'est privé.
 - **Interfaces externes** : MEX, appel de Java, de Python, de C++.
+- **Générateur aléatoire** : `rand`, `randi`, `randperm` et `randn`
+  suivent le générateur `'twister'` de MATLAB — MT19937, doubles sur
+  53 bits, ziggurat à 256 bandes —, si bien que `rng(0)` rend les mêmes
+  nombres que MATLAB. Le rare rejet de `randn` (un tirage sur cent),
+  dont MATLAB ne publie pas le détail, suit Marsaglia et Tsang et peut en
+  différer. Les autres générateurs (`'philox'`, `'threefry'`,
+  `'combRecursive'`...) sont refusés en le disant.
 - **`functions(f)`** ne rend pas le champ `workspace` d'une fonction
   anonyme. La capture elle-même suit MATLAB : seules les variables que le
   corps cite sont retenues, à leur valeur du moment, et lues sans copie
