@@ -78,6 +78,10 @@ struct Serie {
     // Hors de la légende : les niveaux d'un contour après le premier —
     // MATLAB n'y met qu'un objet par appel à « contour ».
     bool horsLegende = false;
+    // Des barres d'histogramme : l'axe se gradue normalement, non d'une
+    // graduation par barre comme sous BAR — les bords des classes, écrits
+    // en pleine précision, se chevauchaient.
+    bool histogramme = false;
     // Couleur tirée de la palette : un niveau de contour, un polygone
     // « fill » de couleur numérique. VALEURCOULEUR passe par CLim comme un
     // pixel d'image ; CBAS et CHAUT élargissent la CLim automatique (la

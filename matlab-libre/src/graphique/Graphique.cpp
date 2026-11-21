@@ -177,7 +177,7 @@ std::vector<double> graduationsEffectives(const Axes& a, char axe, double bas, d
         std::vector<double> positions;
         bool barres = false;
         for (const auto& s : a.series) {
-            if (s.genre != GenreTrace::Barres) continue;
+            if (s.genre != GenreTrace::Barres || s.histogramme) continue;
             barres = true;
             for (double v : s.xVraies.empty() ? s.x : s.xVraies)
                 if (std::isfinite(v)) positions.push_back(v);

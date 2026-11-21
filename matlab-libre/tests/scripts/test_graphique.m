@@ -1539,4 +1539,17 @@ end
 assert(refusCote);
 close all;
 
+%% ------------------- l'histogramme garde des graduations ordinaires
+% Trace comme des barres, il heritait d'une graduation par barre : les
+% bords des classes, ecrits en pleine precision, se chevauchaient
+% (« -2.43202-1.82571… »). BAR, lui, garde une graduation par barre.
+figure;
+histogram(linspace(-2.43, 2.42, 500));
+graduations = xticks();
+assert(all(graduations == round(graduations)), 'des graduations rondes');
+figure;
+bar([3 5 2]);
+assert(isequal(xticks(), [1 2 3]), 'une graduation par barre sous BAR');
+close all;
+
 disp('graphique : toutes les verifications passent');

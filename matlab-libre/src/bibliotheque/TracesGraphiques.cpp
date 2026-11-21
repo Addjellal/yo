@@ -634,6 +634,7 @@ FONCTION(fnHistogramme) {
     nouveauTrace(it);
     Serie s;
     s.genre = GenreTrace::Barres;
+    s.histogramme = true;
     s.x = centres;
     s.y = valeursDe(comptes[0]);
     s.couleur = palette(axesCourants(it)->series.size());
