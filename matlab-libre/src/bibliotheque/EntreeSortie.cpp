@@ -191,7 +191,17 @@ std::string formatMatlab(const std::string& formatBrut, const std::vector<Valeur
                         sortie += formater(("%" + drapeaux + largeur + "s").c_str(),
                                            t.c_str());
                     } else if (e.nombre != std::floor(e.nombre)) {
-                        sortie += formater((spec + "g").c_str(), e.nombre);
+                        // Une valeur non entière passe en « %e », comme dans
+                        // MATLAB : sprintf('%d', 3.5) vaut '3.500000e+00'.
+                        // Le « %g » d'avant rendait '3.5', qu'un programme
+                        // relisant la sortie prenait pour un entier mal écrit.
+                        sortie += formater((spec + "e").c_str(), e.nombre);
+                    } else if (std::fabs(e.nombre) >= 9.2e18) {
+                        // Au-delà de 2^63, la conversion en long long déborde
+                        // (comportement indéfini) : 1e20 s'écrivait
+                        // -9223372036854775808. L'entier s'écrit en entier.
+                        sortie += formater(("%" + drapeaux + largeur + ".0f").c_str(),
+                                           e.nombre);
                     } else {
                         sortie += formater((spec + "lld").c_str(), (long long)e.nombre);
                     }

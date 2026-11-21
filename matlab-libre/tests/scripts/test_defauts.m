@@ -739,6 +739,16 @@ assert(strcmp(num2str(0.001234567), '0.0012346'));
 assert(strcmp(num2str(3.14159, 4), '3.142'), 'une precision donnee l''emporte');
 assert(strcmp(num2str(42), '42') && strcmp(num2str(0.1), '0.1'));
 
+%% ----------- SPRINTF('%d') d'une valeur non entiere ou tres grande
+% MATLAB passe en %e quand la valeur n'est pas entiere : '3.500000e+00',
+% non '3.5'. Et un entier au-dela de 2^63 debordait la conversion en
+% long long : 1e20 s'ecrivait -9223372036854775808.
+assert(strcmp(sprintf('%d', 3.5), '3.500000e+00'), sprintf('%d', 3.5));
+assert(strcmp(sprintf('%i', -0.25), '-2.500000e-01'));
+assert(strcmp(sprintf('%d', 42), '42'));
+assert(strcmp(sprintf('%d', 1e20), '100000000000000000000'), sprintf('%d', 1e20));
+assert(strcmp(sprintf('%d', -1e20), '-100000000000000000000'));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)
