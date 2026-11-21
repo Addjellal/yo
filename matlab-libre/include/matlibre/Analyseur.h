@@ -27,8 +27,10 @@ private:
     // La profondeur de la descente récursive. Au-delà de PROFONDEUR_MAX
     // emboîtements — parenthèses, crochets, blocs, opérateurs unaires —,
     // l'analyse s'arrête sur une erreur de syntaxe : dix mille parenthèses
-    // faisaient déborder la pile et tomber le programme.
-    static constexpr int PROFONDEUR_MAX = 1000;
+    // faisaient déborder la pile et tomber le programme. 256 laisse de la
+    // marge sous la pile d'un mégaoctet du fil principal de Windows, et
+    // sous AddressSanitizer, dont les cadres sont bien plus gros.
+    static constexpr int PROFONDEUR_MAX = 256;
     int profondeur_ = 0;
     struct Descente {
         Analyseur& a;

@@ -900,7 +900,7 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
 Analyseur::Descente::Descente(Analyseur& analyseur) : a(analyseur) {
     if (++a.profondeur_ > PROFONDEUR_MAX) {
         --a.profondeur_;
-        a.erreurSyntaxe("Nesting is too deep (more than 1000 levels).");
+        a.erreurSyntaxe("Nesting is too deep (more than 256 levels).");
     }
 }
 
