@@ -279,6 +279,22 @@ Valeur operationUnaire(const std::string& op, const Valeur& v) {
         erreur("MATLAB:UndefinedFunction",
                formater("Undefined unary operator '%s' for input arguments of type '%s'.",
                         op.c_str(), v.classeNom().c_str()));
+    // Un tableau creux porte ses nombres dans « creux », non dans « re » :
+    // « -sparse([1 0 2]) » rendait la matrice telle quelle, alors que
+    // « 0 - s » et « uminus(s) » la niaient.
+    if (v.estCreux()) {
+        if (op == "+") return v;
+        if (op == "-") {
+            Valeur r = v;
+            r.creux = std::make_shared<DonneesCreuses>(*v.creux);
+            for (auto& x : r.creux->valeur) x = -x;
+            for (auto& x : r.creux->imaginaire) x = -x;
+            return r;
+        }
+        // « ~ » : un logique plein, comme le rend déjà une comparaison sur un
+        // creux — MatLibre ne range pas de logique en creux.
+        return operationUnaire(op, assurerDense(v));
+    }
     if (op == "+") return v;
     if (op == "-") {
         Valeur a = preparer(v);
