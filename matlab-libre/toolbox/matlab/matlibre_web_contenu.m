@@ -2,7 +2,8 @@ function c = matlibre_web_contenu(texte, url, typeVoulu)
 %MATLIBRE_WEB_CONTENU Interprétation du corps d'une réponse web.
 %   C = MATLIBRE_WEB_CONTENU(TEXTE,URL) rend le contenu décodé : un
 %   document JSON devient structure ou cellule, un fichier délimité
-%   devient une matrice, le reste reste du texte.
+%   (.csv, .tsv) fait de nombres devient une matrice, le reste — un .txt
+%   compris — reste du texte.
 %
 %   C = MATLIBRE_WEB_CONTENU(TEXTE,URL,TYPE) impose l'interprétation :
 %   'auto' devine, 'json' décode, 'text' et 'raw' rendent le texte tel
@@ -40,7 +41,11 @@ function c = matlibre_web_contenu(texte, url, typeVoulu)
             % Ce n'était pas du JSON : le texte reste du texte.
         end
     end
-    if strcmp(typeVoulu, 'auto') && any(strcmpi(ext, {'.csv', '.tsv', '.txt'}))
+    % Un .txt est du texte (text/plain, que MATLAB rend en caractères) : lu
+    % par READMATRIX, un texte qui n'était pas fait de nombres devenait []
+    % sans rien dire. Un fichier délimité dont rien ne se lit en nombres
+    % reste du texte, pour la même raison.
+    if strcmp(typeVoulu, 'auto') && any(strcmpi(ext, {'.csv', '.tsv'}))
         f = [tempname() ext];
         fid = fopen(f, 'w');
         if fid >= 0
@@ -49,7 +54,9 @@ function c = matlibre_web_contenu(texte, url, typeVoulu)
             try
                 c = readmatrix(f);
                 delete(f);
-                return;
+                if ~isempty(c) && ~all(isnan(c(:)))
+                    return;
+                end
             catch
                 delete(f);
             end

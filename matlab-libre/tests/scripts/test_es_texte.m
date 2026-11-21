@@ -219,6 +219,18 @@ if isunix && system('command -v curl > /dev/null 2>&1') == 0
     fclose(fid);
     lu = webread(['file://' nomBizarre]);
     assert(isstruct(lu) && lu.a == 1, 'un $ et une apostrophe passent tels quels');
+    % Un .txt est du texte : il devenait [] en passant par READMATRIX.
+    nomTexte = fullfile(dossierWeb, 'note.txt');
+    fid = fopen(nomTexte, 'w');
+    fprintf(fid, 'bonjour le monde\n');
+    fclose(fid);
+    lu = webread(['file://' nomTexte]);
+    assert(ischar(lu) && strcmp(strtrim(lu), 'bonjour le monde'), 'un .txt reste du texte');
+    nomCsv = fullfile(dossierWeb, 'mesures.csv');
+    fid = fopen(nomCsv, 'w');
+    fprintf(fid, '1,2\n3,4\n');
+    fclose(fid);
+    assert(isequal(webread(['file://' nomCsv]), [1 2; 3 4]), 'un .csv de nombres se lit');
     rmdir(dossierWeb, 's');
 end
 refuseImpair = false;
