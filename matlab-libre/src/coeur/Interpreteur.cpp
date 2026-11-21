@@ -1933,6 +1933,10 @@ Valeur Interpreteur::evaluer(const NoeudPtr& n) {
             if (v) return *v;
             break;
         }
+        // Les opérandes ne s'évaluent qu'une fois. Quand l'un d'eux était
+        // un objet, on retombait sur evaluerMulti, qui les évaluait de
+        // nouveau : « f() + objet » appelait f deux fois — deux tirages au
+        // hasard, deux affichages, un objet handle modifié deux fois.
         case TypeN::OpBinaire: {
             const std::string& op = n->texte;
             if (op != "&&" && op != "||") {
@@ -1940,14 +1944,22 @@ Valeur Interpreteur::evaluer(const NoeudPtr& n) {
                 Valeur b = evaluer(n->enfants[1]);
                 if (a.classe != Classe::Objet && b.classe != Classe::Objet)
                     return operationBinaire(op, a, b);
-                break;
+                auto r = appliquerBinaire(op, a, b);
+                if (r.empty())
+                    erreur("MATLAB:emptyOutput",
+                           "Too many output arguments: the expression produced no value.");
+                return r[0];
             }
             break;
         }
         case TypeN::OpUnaire: {
             Valeur a = evaluer(n->enfants[0]);
             if (a.classe != Classe::Objet) return operationUnaire(n->texte, a);
-            break;
+            auto r = appliquerUnaire(n->texte, a);
+            if (r.empty())
+                erreur("MATLAB:emptyOutput",
+                       "Too many output arguments: the expression produced no value.");
+            return r[0];
         }
         case TypeN::OpPostfixe: {
             Valeur a = evaluer(n->enfants[0]);
@@ -1970,6 +1982,38 @@ Valeur Interpreteur::evaluer(const NoeudPtr& n) {
                "Too many output arguments: the expression produced no value.");
     }
     return r[0];
+}
+
+// Un opérateur appliqué à des opérandes déjà évalués : la méthode de la
+// classe s'il y en a une (plus, minus, mtimes...), le calcul sur les
+// valeurs d'une énumération, ou l'opération ordinaire.
+std::vector<Valeur> Interpreteur::appliquerBinaire(const std::string& op, const Valeur& a,
+                                                   const Valeur& b) {
+    if (a.classe == Classe::Objet || b.classe == Classe::Objet) {
+        std::string methode = nomMethodeOperateur(op);
+        const Valeur& obj = a.classe == Classe::Objet ? a : b;
+        auto def = classeDefinie(obj.nomObjet);
+        if (def && def->methodes.count(methode)) {
+            std::vector<Valeur> args = {a, b};
+            return appelerUtilisateur(def->methodes[methode], args, 1);
+        }
+        if (estEnumeration(a) || estEnumeration(b)) return {operationEnumeration(op, a, b)};
+    }
+    return {operationBinaire(op, a, b)};
+}
+
+std::vector<Valeur> Interpreteur::appliquerUnaire(const std::string& op, const Valeur& a) {
+    if (a.classe == Classe::Objet) {
+        std::string methode = op == "-" ? "uminus" : (op == "+" ? "uplus" : "not");
+        auto def = classeDefinie(a.nomObjet);
+        if (def && def->methodes.count(methode)) {
+            std::vector<Valeur> args = {a};
+            return appelerUtilisateur(def->methodes[methode], args, 1);
+        }
+        if (estEnumeration(a))
+            return {operationUnaire(op, valeursEnumeration(a, methode.c_str()))};
+    }
+    return {operationUnaire(op, a)};
 }
 
 std::vector<Valeur> Interpreteur::evaluerIndices(const std::vector<NoeudPtr>& args,
@@ -2502,33 +2546,11 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
             }
             Valeur a = evaluer(n->enfants[0]);
             Valeur b = evaluer(n->enfants[1]);
-            if (a.classe == Classe::Objet || b.classe == Classe::Objet) {
-                std::string methode = nomMethodeOperateur(op);
-                const Valeur& obj = a.classe == Classe::Objet ? a : b;
-                auto def = classeDefinie(obj.nomObjet);
-                if (def && def->methodes.count(methode)) {
-                    std::vector<Valeur> args = {a, b};
-                    return appelerUtilisateur(def->methodes[methode], args, 1);
-                }
-                if (estEnumeration(a) || estEnumeration(b))
-                    return {operationEnumeration(op, a, b)};
-            }
-            return {operationBinaire(op, a, b)};
+            return appliquerBinaire(op, a, b);
         }
         case TypeN::OpUnaire: {
             Valeur a = evaluer(n->enfants[0]);
-            if (a.classe == Classe::Objet) {
-                std::string methode = n->texte == "-" ? "uminus"
-                                                      : (n->texte == "+" ? "uplus" : "not");
-                auto def = classeDefinie(a.nomObjet);
-                if (def && def->methodes.count(methode)) {
-                    std::vector<Valeur> args = {a};
-                    return appelerUtilisateur(def->methodes[methode], args, 1);
-                }
-                if (estEnumeration(a))
-                    return {operationUnaire(n->texte, valeursEnumeration(a, methode.c_str()))};
-            }
-            return {operationUnaire(n->texte, a)};
+            return appliquerUnaire(n->texte, a);
         }
         case TypeN::OpPostfixe: {
             Valeur a = evaluer(n->enfants[0]);

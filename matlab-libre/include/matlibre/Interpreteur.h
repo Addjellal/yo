@@ -121,6 +121,9 @@ public:
     // Le corps d'executerInstruction : celle-ci n'y ajoute que la
     // conversion d'un manque de mémoire en erreur MATLAB.
     void executerInstructionBrute(const NoeudPtr& n);
+    // Un opérateur sur des opérandes déjà évalués, objets compris.
+    std::vector<Valeur> appliquerBinaire(const std::string& op, const Valeur& a, const Valeur& b);
+    std::vector<Valeur> appliquerUnaire(const std::string& op, const Valeur& a);
 
     // --- évaluation ---
     Valeur evaluer(const NoeudPtr& n);
