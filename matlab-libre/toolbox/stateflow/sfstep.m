@@ -328,7 +328,11 @@ function contexte = agir(a, contexte, u, avecEntree, machine)
         return
     end
     if isa(a, 'function_handle')
-        if avecEntree
+        % Une action reçoit l'entrée si elle la déclare : @(c) ou @(c, u).
+        % Un argument de trop est refusé, comme dans MATLAB, et l'action
+        % à un seul paramètre d'un état « pendant » le recevait.
+        n = nargin(a);
+        if avecEntree && (n < 0 || n >= 2)
             contexte = a(contexte, u);
         else
             contexte = a(contexte);
