@@ -117,6 +117,20 @@ static void exigerTailleNumerique(const Valeur& v) {
         erreur("MATLAB:invalidSizeInput", "Size inputs must be numeric.");
 }
 
+// Une taille demandée à zeros, ones, rand... « (int)1e10 » est un
+// comportement indéfini qui vaut INT_MIN sur x86, ramené ensuite à zéro :
+// zeros(1e10) rendait un tableau vide sans rien dire, ones(2^31, 1) un
+// 0×1, zeros(NaN) aussi. Une taille non représentable est refusée ; une
+// taille négative vaut zéro, comme dans MATLAB.
+static int tailleDemandee(double x) {
+    if (std::isnan(x)) erreur("MATLAB:NonIntegerInput", "Size inputs must be integers.");
+    if (x <= 0) return 0;
+    if (x > 2147483647.0)
+        erreur("MATLAB:array:SizeLimitExceeded",
+               "Requested array exceeds the maximum possible variable size.");
+    return (int)x;
+}
+
 Dims dimsDepuisArguments(const std::vector<Valeur>& args, std::size_t debut, std::size_t fin) {
     Dims d;
     if (debut >= fin) return Dims{1, 1};
@@ -124,16 +138,16 @@ Dims dimsDepuisArguments(const std::vector<Valeur>& args, std::size_t debut, std
     if (fin - debut == 1) {
         const Valeur& v = args[debut];
         if (v.nelem() == 1) {
-            int n = (int)v.scal();
-            return Dims{std::max(0, n), std::max(0, n)};
+            int n = tailleDemandee(v.scal());
+            return Dims{n, n};
         }
         for (std::size_t k = 0; k < v.nelem() && k < v.re.size(); ++k)
-            d.push_back(std::max(0, (int)v.re[k]));
+            d.push_back(tailleDemandee(v.re[k]));
         if (d.size() < 2) d.push_back(d.empty() ? 0 : d[0]);
         rognerDimsFinales(d);
         return d;
     }
-    for (std::size_t k = debut; k < fin; ++k) d.push_back(std::max(0, (int)args[k].scal()));
+    for (std::size_t k = debut; k < fin; ++k) d.push_back(tailleDemandee(args[k].scal()));
     while (d.size() < 2) d.push_back(1);
     rognerDimsFinales(d);
     return d;

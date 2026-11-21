@@ -779,6 +779,30 @@ catch e
 end
 assert(verifierRefus(@() ones(1e6, 1e6)));
 
+%% ---------- une taille non representable est refusee, non ramenee a zero
+% « (int)1e10 » valait INT_MIN, ramene a zero : zeros(1e10) rendait un
+% tableau vide sans rien dire, ones(2^31, 1) un 0x1, zeros(NaN) aussi.
+try
+    zeros(1e10);
+    assert(false, 'zeros(1e10) doit echouer');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:array:SizeLimitExceeded'), e.identifier);
+end
+assert(verifierRefus(@() ones(2^31, 1)) && verifierRefus(@() zeros(NaN)));
+assert(verifierRefus(@() rand([2 1e10])));
+assert(isequal(size(zeros(-3)), [0 0]), 'une taille negative vaut zero');
+
+%% ---------- un tableau trop grand est une erreur, non une fin brutale
+% std::bad_alloc n'etait attrape par aucun try/catch : « 1:1e18 » et
+% « ones(1e6, 1e6) » arretaient la session (« Erreur interne »).
+try
+    trop = 1:1e18; %#ok<NASGU>
+    assert(false, '1:1e18 doit echouer');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:nomem'), e.identifier);
+end
+assert(verifierRefus(@() ones(1e6, 1e6)));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)
