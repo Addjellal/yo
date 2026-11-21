@@ -264,6 +264,21 @@ Valeur transposer(const Valeur& a, bool conjuguee) {
 }
 
 Valeur operationUnaire(const std::string& op, const Valeur& v) {
+    // Une cellule, une structure, une poignée, un texte « string » ou un
+    // objet qui n'a pas sa méthode ne portent pas de nombres : « -{1} »
+    // rendait la cellule telle quelle, « -objet » l'objet, « ~struct() »
+    // un logique, « -"abc" » des codes de caractères. MATLAB refuse.
+    if (v.classe == Classe::Objet) {
+        const char* methode = op == "-" ? "uminus" : (op == "+" ? "uplus" : "not");
+        erreur("MATLAB:UndefinedFunction",
+               formater("Undefined function '%s' for input arguments of type '%s'.", methode,
+                        v.classeNom().c_str()));
+    }
+    if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+        v.classe == Classe::Fonction || v.classe == Classe::Chaine)
+        erreur("MATLAB:UndefinedFunction",
+               formater("Undefined unary operator '%s' for input arguments of type '%s'.",
+                        op.c_str(), v.classeNom().c_str()));
     if (op == "+") return v;
     if (op == "-") {
         Valeur a = preparer(v);
