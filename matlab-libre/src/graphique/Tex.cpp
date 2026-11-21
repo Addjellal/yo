@@ -9,7 +9,9 @@
 //
 // Le texte est coupé en morceaux de même allure (Toile.h) ; la toile les
 // écrit à la suite, chacun à sa hauteur et à sa taille.
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -79,6 +81,9 @@ std::string couleurTex(const std::string& nom, bool rvb) {
             p = fin;
             while (*p == ',' || *p == ' ') ++p;
         }
+        // Bornées à [0, 1] : 2 donnait 510, écrit « 1FE » sur trois chiffres
+        // puis tronqué par snprintf — \color[rgb]{2,0,0} sortait en vert.
+        for (double& x : c) x = std::isfinite(x) ? std::min(1.0, std::max(0.0, x)) : 0.0;
         char tampon[8];
         int r = (int)(c[0] * 255 + 0.5), v = (int)(c[1] * 255 + 0.5), b = (int)(c[2] * 255 + 0.5);
         std::snprintf(tampon, sizeof tampon, "#%02X%02X%02X", r, v, b);

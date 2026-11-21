@@ -1552,4 +1552,14 @@ bar([3 5 2]);
 assert(isequal(xticks(), [1 2 3]), 'une graduation par barre sous BAR');
 close all;
 
+%% ------------------- une couleur TeX hors de [0, 1] est bornee
+% \color[rgb]{2,0,0} s'ecrivait « #1FE000 », un vert : 2 * 255 sur trois
+% chiffres hexadecimaux, tronque.
+figure;
+title('\color[rgb]{2,0,0}rouge \color[rgb]{-1,0.5,0}vert');
+svgCouleur = matlibre_svg();
+assert(~isempty(strfind(svgCouleur, 'fill="#FF0000">rouge')), 'le rouge borne');
+assert(~isempty(strfind(svgCouleur, 'fill="#008000">vert')), 'le vert borne');
+close all;
+
 disp('graphique : toutes les verifications passent');
