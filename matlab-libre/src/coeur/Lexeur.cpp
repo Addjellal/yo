@@ -105,6 +105,11 @@ std::vector<Jeton> Lexeur::analyser() {
                     }
                 }
                 blanc = true;
+                // Un « %{ » jamais refermé fait du reste du texte un
+                // commentaire, comme dans MATLAB. Sans cette sortie, on
+                // repassait ici sans fin : le drapeau restait levé et il
+                // n'y avait plus rien à lire.
+                if (i_ >= src_.size()) break;
                 continue;
             }
             if (actuel() == '.' && suivant() == '.' && suivant(2) == '.') {

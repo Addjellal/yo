@@ -749,6 +749,13 @@ assert(strcmp(sprintf('%d', 42), '42'));
 assert(strcmp(sprintf('%d', 1e20), '100000000000000000000'), sprintf('%d', 1e20));
 assert(strcmp(sprintf('%d', -1e20), '-100000000000000000000'));
 
+%% ------------ un commentaire de bloc jamais referme ne bloque pas
+% « %{ » sans « %} » faisait tourner le lexeur sans fin : le reste du
+% texte est un commentaire, comme dans MATLAB.
+eval(sprintf('valeurAvant = 2;\n%%{\nvaleurApres = 1;'));
+assert(valeurAvant == 2 && ~exist('valeurApres', 'var'));
+clear valeurAvant
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)
