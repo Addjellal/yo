@@ -377,6 +377,21 @@ if(MATLIBRE_TESTS)
     target_link_libraries(matlibre_tests PRIVATE matlibre_coeur)
     add_test(NAME unitaires COMMAND matlibre_tests)
   endif()
+  # La ligne de commande : les options se lisent dans n'importe quel ordre
+  # jusqu'au script, « -q » n'est pas pris pour un nom de fichier, et une
+  # option inconnue est refusee (code 2) au lieu d'etre ouverte comme un
+  # script.
+  add_test(NAME console_options
+           COMMAND matlibre -q --path ${CMAKE_CURRENT_SOURCE_DIR}/toolbox -e "disp(6*7)")
+  set_tests_properties(console_options PROPERTIES PASS_REGULAR_EXPRESSION "42")
+  add_test(NAME console_option_inconnue COMMAND matlibre --option-inconnue)
+  set_tests_properties(console_option_inconnue PROPERTIES WILL_FAIL TRUE)
+  if(UNIX)
+    add_test(NAME console_silencieuse
+             COMMAND sh -c "echo 'disp(6*7)' | '$<TARGET_FILE:matlibre>' -q")
+    set_tests_properties(console_silencieuse PROPERTIES
+      PASS_REGULAR_EXPRESSION "42" FAIL_REGULAR_EXPRESSION "MatLibre")
+  endif()
   file(GLOB MATLIBRE_TESTS_M CONFIGURE_DEPENDS
        ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/test_*.m)
   foreach(fichier ${MATLIBRE_TESTS_M})

@@ -119,15 +119,16 @@ void armerCtrlC(Interpreteur& it) {
 #endif
 }
 
-int executerFluxInteractif(Interpreteur& it) {
+int executerFluxInteractif(Interpreteur& it, bool silencieux) {
     it.modeInteractif = true;
     std::string tampon;
     std::string ligne;
-    std::cout << "MatLibre " << MATLIBRE_VERSION
-              << " — clone libre du langage MATLAB.\n"
-                 "« help nom » pour l'aide, « doc nom » pour la documentation "
-                 "complete.\n"
-                 "« exit » pour quitter.\n\n";
+    if (!silencieux)
+        std::cout << "MatLibre " << MATLIBRE_VERSION
+                  << " — clone libre du langage MATLAB.\n"
+                     "« help nom » pour l'aide, « doc nom » pour la documentation "
+                     "complete.\n"
+                     "« exit » pour quitter.\n\n";
     for (;;) {
         std::cout << (tampon.empty() ? ">> " : "... ") << std::flush;
         if (!std::getline(std::cin, ligne)) break;
@@ -182,6 +183,30 @@ int main(int argc, char** argv) {
     static char tamponSortie[1 << 16];
     std::setvbuf(stdout, tamponSortie, _IOFBF, sizeof tamponSortie);
     std::vector<std::string> arguments(argv + 1, argv + argc);
+    // Les options se lisent jusqu'au nom du script, dans n'importe quel
+    // ordre ; ce qui suit le script est a lui (« argv »). « -- » clot les
+    // options, pour un script dont le nom commence par un tiret. L'aide et
+    // la version se reconnaissent avant de charger la bibliotheque : elles
+    // n'ont pas a attendre son demarrage.
+    for (const std::string& a : arguments) {
+        if (a == "--version" || a == "-v") {
+            std::cout << "MatLibre " << MATLIBRE_VERSION << "\n";
+            return 0;
+        }
+        if (a == "--help" || a == "-h") {
+            std::cout << "Usage : matlibre [options] [script.m [arguments]]\n"
+                      << "  -e, --eval EXPR    evalue EXPR puis quitte\n"
+                      << "  -q, --quiet        pas de banniere\n"
+                      << "  --path DOSSIER     ajoute DOSSIER au chemin de recherche\n"
+                      << "  --test DOSSIER     execute les fichiers de test du dossier\n"
+                      << "  -v, --version      affiche la version\n"
+                      << "  --                 fin des options (script dont le nom "
+                         "commence par -)\n";
+            return 0;
+        }
+        if (a == "--" || a == "-e" || a == "--eval" || a == "--test") break;
+        if (a.empty() || a[0] != '-') break;
+    }
     Interpreteur it;
     it.installerBibliotheque();
     chargerToolboxes(it, racineToolboxes(argv[0]));
@@ -193,40 +218,47 @@ int main(int argc, char** argv) {
     it.armerInterruption();
 
     try {
-        if (arguments.empty()) return executerFluxInteractif(it);
-        if (arguments[0] == "--version" || arguments[0] == "-v") {
-            std::cout << "MatLibre " << MATLIBRE_VERSION << "\n";
-            return 0;
-        }
-        if (arguments[0] == "--help" || arguments[0] == "-h") {
-            std::cout << "Usage : matlibre [options] [script.m [arguments]]\n"
-                      << "  -e, --eval EXPR    evalue EXPR puis quitte\n"
-                      << "  -q, --quiet        pas de banniere\n"
-                      << "  --path DOSSIER     ajoute DOSSIER au chemin de recherche\n"
-                      << "  --test DOSSIER     execute les fichiers de test du dossier\n"
-                      << "  -v, --version      affiche la version\n";
-            return 0;
-        }
+        bool silencieux = false;
         std::size_t k = 0;
-        while (k < arguments.size() && arguments[k].rfind("--path", 0) == 0) {
-            if (k + 1 >= arguments.size()) break;
-            it.ajouterChemin(arguments[k + 1], true);
-            k += 2;
-        }
-        if (k < arguments.size() && (arguments[k] == "-e" || arguments[k] == "--eval")) {
-            if (k + 1 >= arguments.size()) {
-                std::cerr << "matlibre: option -e sans expression\n";
+        for (; k < arguments.size(); ++k) {
+            const std::string& a = arguments[k];
+            if (a == "-q" || a == "--quiet") {
+                silencieux = true;
+            } else if (a == "--path" || a.rfind("--path=", 0) == 0) {
+                std::string dossier;
+                if (a == "--path") {
+                    if (k + 1 >= arguments.size()) {
+                        std::cerr << "matlibre: option --path sans dossier\n";
+                        return 2;
+                    }
+                    dossier = arguments[++k];
+                } else {
+                    dossier = a.substr(7);
+                }
+                it.ajouterChemin(dossier, true);
+            } else if (a == "-e" || a == "--eval") {
+                if (k + 1 >= arguments.size()) {
+                    std::cerr << "matlibre: option -e sans expression\n";
+                    return 2;
+                }
+                it.executerTexte(arguments[k + 1], "<eval>");
+                return 0;
+            } else if (a == "--test") {
+                std::string dossier = (k + 1 < arguments.size()) ? arguments[k + 1] : "tests";
+                std::vector<Valeur> v = {Valeur::texte(dossier)};
+                auto r = it.appeler("runtests", v, 1);
+                if (!r.empty() && !r[0].vrai()) return 1;
+                return 0;
+            } else if (a == "--") {
+                ++k;
+                break;
+            } else if (a.size() > 1 && a[0] == '-') {
+                std::cerr << "matlibre: option inconnue « " << a
+                          << " » ; « matlibre --help » les liste\n";
                 return 2;
+            } else {
+                break;
             }
-            it.executerTexte(arguments[k + 1], "<eval>");
-            return 0;
-        }
-        if (k < arguments.size() && arguments[k] == "--test") {
-            std::string dossier = (k + 1 < arguments.size()) ? arguments[k + 1] : "tests";
-            std::vector<Valeur> a = {Valeur::texte(dossier)};
-            auto r = it.appeler("runtests", a, 1);
-            if (!r.empty() && !r[0].vrai()) return 1;
-            return 0;
         }
         if (k < arguments.size()) {
             // Les arguments restants sont visibles par « argv » dans un
@@ -244,7 +276,7 @@ int main(int argc, char** argv) {
             it.executerFichier(arguments[k], reste);
             return 0;
         }
-        return executerFluxInteractif(it);
+        return executerFluxInteractif(it, silencieux);
     } catch (const DemandeSortie& s) {
         return s.code;
     } catch (const InterruptionUtilisateur&) {
