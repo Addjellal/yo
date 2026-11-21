@@ -351,6 +351,7 @@ NoeudPtr Analyseur::instructionCommande() {
 }
 
 NoeudPtr Analyseur::instruction() {
+    Descente garde(*this);
     const Jeton& t = jeton();
     if (t.genre == Genre::MotCle) {
         if (t.texte == "if") return instructionSi();
@@ -896,7 +897,17 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
 
 // -------------------------------------------------------- expressions
 
-NoeudPtr Analyseur::expression() { return ouCourt(); }
+Analyseur::Descente::Descente(Analyseur& analyseur) : a(analyseur) {
+    if (++a.profondeur_ > PROFONDEUR_MAX) {
+        --a.profondeur_;
+        a.erreurSyntaxe("Nesting is too deep (more than 1000 levels).");
+    }
+}
+
+NoeudPtr Analyseur::expression() {
+    Descente garde(*this);
+    return ouCourt();
+}
 
 static NoeudPtr binaire(const std::string& op, NoeudPtr a, NoeudPtr b) {
     auto n = Noeud::creer(TypeN::OpBinaire);
@@ -1004,6 +1015,7 @@ NoeudPtr Analyseur::multiplicatif() {
 NoeudPtr Analyseur::unaire() {
     if (jeton().estOp("-") || jeton().estOp("+") || jeton().estOp("~") ||
         jeton().estOp("++") || jeton().estOp("--")) {
+        Descente garde(*this);
         std::string op = jeton().texte;
         avancer();
         auto n = Noeud::creer(TypeN::OpUnaire);

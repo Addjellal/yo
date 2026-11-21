@@ -24,6 +24,17 @@ public:
     NoeudPtr analyserBloc();        // une suite d'instructions (eval, REPL)
 
 private:
+    // La profondeur de la descente récursive. Au-delà de PROFONDEUR_MAX
+    // emboîtements — parenthèses, crochets, blocs, opérateurs unaires —,
+    // l'analyse s'arrête sur une erreur de syntaxe : dix mille parenthèses
+    // faisaient déborder la pile et tomber le programme.
+    static constexpr int PROFONDEUR_MAX = 1000;
+    int profondeur_ = 0;
+    struct Descente {
+        Analyseur& a;
+        explicit Descente(Analyseur& analyseur);
+        ~Descente() { --a.profondeur_; }
+    };
     std::vector<Jeton> j_;
     std::size_t i_ = 0;
     std::string origine_;

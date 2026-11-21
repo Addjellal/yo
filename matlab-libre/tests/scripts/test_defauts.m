@@ -756,6 +756,18 @@ eval(sprintf('valeurAvant = 2;\n%%{\nvaleurApres = 1;'));
 assert(valeurAvant == 2 && ~exist('valeurApres', 'var'));
 clear valeurAvant
 
+%% ------- un emboitement demesure est refuse, il ne fait plus tomber
+% Dix mille parentheses faisaient deborder la pile de l'analyseur, et
+% le programme tombait (erreur de segmentation). Au-dela de mille
+% niveaux, c'est une erreur de syntaxe ; en deca, rien ne change.
+assert(eval([repmat('(', 1, 900) '1' repmat(')', 1, 900)]) == 1);
+try
+    eval([repmat('(', 1, 20000) '1' repmat(')', 1, 20000)]);
+    assert(false, 'vingt mille parentheses doivent etre refusees');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:parseError'), e.identifier);
+end
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)

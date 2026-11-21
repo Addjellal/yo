@@ -54,6 +54,36 @@ struct Noeud {
         n->type = t;
         return n;
     }
+
+    Noeud() = default;
+    Noeud(const Noeud&) = default;
+    Noeud(Noeud&&) = default;
+    Noeud& operator=(const Noeud&) = default;
+    Noeud& operator=(Noeud&&) = default;
+    // La destruction est itérative : une somme de cent mille termes est un
+    // arbre de cent mille niveaux, et le destructeur récursif d'avant
+    // faisait déborder la pile. Les enfants dont ce nœud est le seul
+    // propriétaire passent dans une pile de travail, et chacun meurt après
+    // avoir donné les siens.
+    ~Noeud() {
+        std::vector<NoeudPtr> pile;
+        auto prendre = [&pile](Noeud& n) {
+            auto vider = [&pile](std::vector<NoeudPtr>& v) {
+                for (auto& e : v)
+                    if (e && e.use_count() == 1) pile.push_back(std::move(e));
+            };
+            vider(n.enfants);
+            vider(n.cibles);
+            for (auto& r : n.rangees) vider(r);
+            for (auto& a : n.acces) vider(a.args);
+        };
+        prendre(*this);
+        while (!pile.empty()) {
+            NoeudPtr n = std::move(pile.back());
+            pile.pop_back();
+            prendre(*n);
+        }
+    }
 };
 
 struct FonctionUtilisateur {
