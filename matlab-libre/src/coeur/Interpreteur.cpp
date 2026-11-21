@@ -1067,6 +1067,12 @@ std::vector<Valeur> Interpreteur::appelerValeur(const Valeur& poignee, std::vect
     portee->englobante = f.porteeEnglobante;
     portee->anonyme = true;
     portee->capture = f.capture;
+    // Un argument de trop est refusé, comme dans MATLAB et comme pour une
+    // fonction écrite dans un fichier : « f = @(x) x; f(1,2) » rendait 1,
+    // l'argument en trop passant sans rien dire.
+    if (args.size() > f.parametres.size() &&
+        (f.parametres.empty() || f.parametres.back() != "varargin"))
+        erreur("MATLAB:TooManyInputs", "Too many input arguments.");
     for (std::size_t k = 0; k < f.parametres.size(); ++k) {
         if (f.parametres[k] == "~") continue;
         if (k < args.size()) portee->variables[f.parametres[k]] = args[k];

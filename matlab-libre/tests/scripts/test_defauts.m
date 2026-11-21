@@ -172,13 +172,11 @@ for poignee = {@(x) x^3 - 2*x + 1, @(a,b) (a + b) * (a - b), @(x) -x^2 + 3, ...
                @(a,b,c) a - (b - c), @(x) 1 / (1 + exp(-x))}
     refaite = str2func(func2str(poignee{1}));
     for essai = [0.3 1 2.5]
-        try
-            attendu = poignee{1}(essai, essai + 1, essai + 2);
-            obtenu = refaite(essai, essai + 1, essai + 2);
-        catch
-            attendu = poignee{1}(essai);
-            obtenu = refaite(essai);
-        end
+        % Autant d'arguments que la poignee en declare : un de plus est
+        % refuse, comme dans MATLAB.
+        valeurs = num2cell(essai + (0:nargin(poignee{1}) - 1));
+        attendu = poignee{1}(valeurs{:});
+        obtenu = refaite(valeurs{:});
         assert(abs(attendu - obtenu) < 1e-12);
     end
 end
@@ -711,6 +709,24 @@ if isunix
            'la sortie de chaque commande, erreurs comprises, est rendue');
 end
 clear codeSys sortieSys
+
+%% ---------------- une fonction anonyme refuse un argument de trop
+% « f = @(x) x; f(1,2) » rendait 1 : l'argument en trop passait sans
+% rien dire, la ou MATLAB leve « Too many input arguments ».
+identite = @(x) x;
+constante = @() 3;
+try
+    identite(1, 2);
+    assert(false, 'un argument de trop doit etre refuse');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:TooManyInputs'), e.identifier);
+end
+assert(verifierRefus(@() constante(1)));
+compte = @(x, varargin) numel(varargin);
+assert(compte(1, 2, 3) == 2, 'varargin recoit le reste');
+ignore = @(x, ~) x;
+assert(ignore(1, 2) == 1, 'un ~ compte pour un argument');
+clear identite constante compte ignore
 
 disp('defauts : toutes les verifications passent');
 
