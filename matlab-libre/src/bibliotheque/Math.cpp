@@ -1,5 +1,6 @@
 // Math.cpp — fonctions mathématiques élémentaires, élément par élément.
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <complex>
 
@@ -61,10 +62,20 @@ bool negatif(double x) { return x < 0; }
 bool horsUn(double x) { return x < -1 || x > 1; }
 bool sousUn(double x) { return x < 1; }
 
+// Le nom que voit l'utilisateur est celui de MATLAB : « fnGammaLn »
+// devient « gammaln ». Le nom C++ passait tel quel dans le message
+// (« Not enough input arguments to 'fnSin' »).
+std::string nomMatlab(const char* nomFn) {
+    std::string nom(nomFn + 2);
+    for (char& c : nom) c = (char)std::tolower((unsigned char)c);
+    return nom;
+}
+
 #define ELEMENTAIRE(nomFn, expr)                                     \
     FONCTION(nomFn) {                                                \
         INUTILISE                                                    \
-        exigerArguments(args, 1, 1, #nomFn);                         \
+        static const std::string nomVu = nomMatlab(#nomFn);          \
+        exigerArguments(args, 1, 1, nomVu.c_str());                  \
         return {appliquerReel(numerique(args[0]),                    \
                               [](double x) { return (double)(expr); })}; \
     }
