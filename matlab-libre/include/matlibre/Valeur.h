@@ -12,6 +12,7 @@
 // Le rangement est celui de MATLAB : par colonnes (column-major).
 #pragma once
 
+#include "matlibre/Tampon.h"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -84,8 +85,9 @@ class Valeur {
 public:
     Classe classe = Classe::Double;
     Dims dims{0, 0};
-    std::vector<double> re;
-    std::vector<double> im;                 // vide si réel
+    // Partagés entre copies jusqu'à la première écriture (voir Tampon.h).
+    TamponDouble re;
+    TamponDouble im;                        // vide si réel
     std::vector<Valeur> cellules;           // Cellule
     std::vector<std::string> chaines;       // Chaine (string array)
     std::shared_ptr<ChampsStructure> st;    // Structure / Objet

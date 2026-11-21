@@ -684,6 +684,23 @@ assert(isequal({recursif.name}, {'a_1_x.csv', 'a_2_y.csv', 'c_3_z.csv', 'd_4_w.c
 assert(endsWith(recursif(4).folder, fullfile('sous', 'profond')));
 assert(numel(dir(fullfile(racineDir, '*.m'))) == 0);
 rmdir(racineDir, 's');
+% Copie sur ecriture : b = a, un argument, une cellule ou un champ ne
+% recopient rien tant qu'on n'ecrit pas, et seul ce qu'on modifie se
+% detache. La semantique par valeur reste entiere.
+tableauCow = 1:5; copieCow = tableauCow; copieCow(2) = 0;
+assert(isequal(tableauCow, 1:5) && copieCow(2) == 0);
+complexeCow = [1 2 3] + 1i; autreCow = complexeCow; autreCow(2) = 5;
+assert(imag(complexeCow(2)) == 1 && imag(autreCow(2)) == 0);
+celluleCow = {tableauCow}; celluleCow{1}(1) = 9; assert(tableauCow(1) == 1);
+structureCow.f = tableauCow; structureCow.f(1) = 9; assert(tableauCow(1) == 1);
+grandCow = zeros(2e6, 1);
+tic;
+for k = 1:200
+    lireCow = numel(grandCow(1:2)); %#ok<NASGU>
+    lireCow = premierCow(grandCow); %#ok<NASGU>
+end
+assert(toc < 0.5, 'passer un grand tableau a une fonction ne doit pas le recopier');
+clear grandCow
 % char d'une chaine vide est un tableau de caracteres vide, non un double
 % vide : ischar(char("")) etait faux.
 assert(ischar(char("")) && isequal(size(char("")), [0 0]));
@@ -1399,4 +1416,8 @@ function y = nomValeurLocal(x, varargin)
             y = y * varargin{k + 1};
         end
     end
+end
+
+function y = premierCow(x)
+    y = x(1);
 end

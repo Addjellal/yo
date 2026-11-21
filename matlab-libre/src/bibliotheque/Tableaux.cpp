@@ -331,7 +331,7 @@ FONCTION(fnCummin) {
 
 std::vector<Valeur> trier(std::vector<Valeur>& args, int nargout) {
     exigerArguments(args, 1, 3, "sort");
-    Valeur v = args[0];
+    const Valeur& v = args[0];
     bool descendant = false;
     int dim = -1;
     for (std::size_t k = 1; k < args.size(); ++k) {
@@ -383,12 +383,15 @@ std::vector<Valeur> trier(std::vector<Valeur>& args, int nargout) {
         for (std::size_t b = 0; b < interne; ++b) {
             std::vector<std::size_t> ordre(taille);
             std::iota(ordre.begin(), ordre.end(), 0);
-            auto cle = [&](std::size_t i) {
+            // Les clés, calculées une fois : le comparateur ne fait plus
+            // que lire un tableau.
+            std::vector<double> cles(taille);
+            for (std::size_t i = 0; i < taille; ++i) {
                 std::size_t p = a * interne * taille + b + i * interne;
-                return complexe ? std::hypot(v.re[p], v.im[p]) : v.re[p];
-            };
+                cles[i] = complexe ? std::hypot(v.re[p], v.im[p]) : v.re[p];
+            }
             std::stable_sort(ordre.begin(), ordre.end(), [&](std::size_t x, std::size_t y) {
-                double cx = cle(x), cy = cle(y);
+                double cx = cles[x], cy = cles[y];
                 if (std::isnan(cx)) return false;
                 if (std::isnan(cy)) return true;
                 return descendant ? cx > cy : cx < cy;

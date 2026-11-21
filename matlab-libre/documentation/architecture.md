@@ -88,6 +88,22 @@ les classes :
 Les tableaux ne sont copiés qu'une fois par affectation indexée : la copie
 de travail est ensuite déplacée de proche en proche.
 
+Les doubles d'une valeur (`re`, `im`) vivent dans un `TamponDouble`
+(`Tampon.h`), partagé entre copies jusqu'à la première écriture, comme
+dans MATLAB : `b = a`, passer `a` à une fonction ou le ranger dans une
+cellule ne recopie rien, et seul celui des deux qu'on modifie se
+détache. Les accès en lecture partagent ; tout accès qui peut écrire
+(l'opérateur `[]` non const, `data()`, `begin()`, `resize`...) détache
+d'abord un tampon partagé. Deux cents appels d'une fonction sur un
+tableau de seize mégaoctets passent ainsi de trois secondes à une
+milliseconde.
+
+Une fonction native qui ne fait que lire son argument le prend donc par
+référence const (`const Valeur& v = args[0]`) : lu par une copie non
+const, `v.re[k]` détache le tampon au premier accès — une recopie
+entière — puis teste à chaque accès qu'il est bien à soi. `sort`
+gagnait ainsi un quart de son temps.
+
 ## Fonctions et portées
 
 Une portée est une table de noms. La pile de portées sert aussi à
