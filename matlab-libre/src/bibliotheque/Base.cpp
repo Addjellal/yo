@@ -299,7 +299,10 @@ static void restaurerGenerateur(GenerateurMatlab& g, const Valeur& etat) {
 // rng(S), S = rng : comme MATLAB, avec son générateur 'twister' — les
 // autres (philox, threefry, combRecursive...) sont refusés en le disant.
 FONCTION(fnRng) {
-    static double dernierGerme = 0.0;
+    // Propre au fil : le générateur appartient à chaque interpréteur, la
+    // graine qu'on en rapporte aussi — sinon les travailleurs d'un parfor
+    // l'écrivaient ensemble, sans verrou.
+    static thread_local double dernierGerme = 0.0;
     auto rendreEtat = [&]() {
         Valeur s;
         s.classe = Classe::Structure;

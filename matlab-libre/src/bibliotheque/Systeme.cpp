@@ -775,6 +775,10 @@ FONCTION(fnMexext) {
 std::map<std::string, std::string>& fichesAide(Interpreteur& it) {
     static std::map<std::string, std::string> fiches;
     static bool chargees = false;
+    // Chargées une fois, sous verrou : deux fils d'un parfor qui
+    // demandaient de l'aide ensemble remplissaient la même table.
+    static std::mutex verrou;
+    std::lock_guard<std::mutex> garde(verrou);
     if (chargees) return fiches;
     chargees = true;
     std::string racine = it.racineToolbox();
