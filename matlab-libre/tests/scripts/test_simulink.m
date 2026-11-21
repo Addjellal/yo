@@ -10348,7 +10348,13 @@ for kT = 1:numel(catalogue78)
     end
 end
 stats78 = [0 0];   % reprises justes, modèles refusés
-for n = 1:40
+% Un modèle tiré au hasard sur quatre environ se simule (les autres sont
+% refusés à bon droit : paramètre complexe, type incompatible…) : on tire
+% jusqu'à douze reprises, plutôt qu'un nombre fixe de modèles qui
+% dépendrait de la graine.
+n = 0;
+while stats78(1) < 12 && n < 150
+    n = n + 1;
     types78 = [sources78(randi(numel(sources78))), ...
                blocs78(randi(numel(blocs78), 1, randi([2 5])))];
     nom78 = sprintf('reprise78_%d', n);
