@@ -1,11 +1,11 @@
 # MatLibre
 
 Un interpréteur libre du langage MATLAB, écrit de zéro en C++17, avec
-53 toolboxes écrites dans le langage lui-même.
+54 modules de toolbox écrits dans le langage lui-même.
 
 ```bash
 make            # compile — aucune dépendance obligatoire
-make test       # 57 verifications C++ + 47 suites en langage MATLAB
+make test       # 78 verifications C++, le bureau, 47 suites en langage MATLAB
 ./build/bin/matlibre
 ```
 
@@ -24,13 +24,14 @@ Continuous-time transfer function.
 >> A \ [1; 2]
 ans =
 
-    0.0909
-    0.6364
+   0.090909090909091
+   0.636363636363636
 
+>> format short
 >> [V, D] = eig(A); diag(D)'
 ans =
 
-    2.3820    4.6180
+   2.3820   4.6180
 
 >> G = tf(1, [1 2 1]); step(G); print('reponse.svg');
 ```
@@ -82,10 +83,10 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
 MATLAB, ce sont plusieurs milliers de fonctions et un environnement
 graphique complet. Ce dépôt en couvre une part utile, pas la totalité :
-pas d'éditeur de schéma Simulink (les modèles se décrivent en appelant
-`add_block` et `add_line` — par valeur, ou comme dans MATLAB par le nom
-du modèle et le chemin du bloc —, mais la simulation est réelle), pas d'App
-Designer, génération de code C restreinte aux scalaires et aux matrices de
+l'éditeur de schéma Simulink du bureau pose, câble, règle et simule, mais
+n'a pas d'annotations, et la bibliothèque qu'il propose au clic
+compte quarante blocs (les deux cent cinquante-cinq types se posent par
+`add_block`) ; pas d'App Designer, génération de code C restreinte aux scalaires et aux matrices de
 taille fixe, pas d'objets ni de poignées de fonction dans les fichiers
 MAT. La liste complète des écarts est dans
 [`documentation/couverture.md`](documentation/couverture.md) — elle vaut
@@ -194,8 +195,8 @@ propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
 make test
 ```
 
-57 vérifications C++ sur le lexeur, l'analyseur, l'indexation, l'algèbre
-et les messages d'erreur ; 47 suites en langage MATLAB dont une qui
+78 vérifications C++ sur le lexeur, l'analyseur, l'indexation, l'algèbre
+et les messages d'erreur ; le bureau, éprouvé hors écran ; 47 suites en langage MATLAB dont une qui
 contrôle **un résultat exact par toolbox** : `blsprice(100,100,0.05,1,0.2)`
 doit rendre 10,4506 ; `butter(2,0.2)` les coefficients de la référence ;
 `atmosisa(0)` 288,15 K et 101 325 Pa ; l'encodeur convolutif suivi du
