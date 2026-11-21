@@ -216,13 +216,40 @@ constats chiffrés, ce qui a été corrigé, ce qui est proposé).
      vues 3D) ; comparer la fenêtre (`outils/vueFigure.sh`) au SVG ;
    - l'application de bureau : capturer la fenêtre principale, l'éditeur,
      la console, l'aide, l'éditeur Simulink, et juger lisibilité,
-     cohérence, encombrement, raccourcis, messages, à la manière d'un
-     utilisateur de MATLAB qui la découvre.
-7. **Rendre compte** : corriger tout de suite ce qui est un défaut avéré
+     cohérence visuelle, encombrement, contrastes, tailles de police.
+7. **L'ergonomie pour l'utilisateur** : se mettre à la place de trois
+   personnes — l'utilisateur de MATLAB qui change d'outil, l'étudiant qui
+   découvre, l'ingénieur qui lance des scripts en ligne de commande — et
+   parcourir ce qu'elles font, en notant chaque friction :
+   - **premier contact** : installer, lancer la console et le bureau,
+     trouver de l'aide (`help`, `doc`, le navigateur d'aide, la
+     recherche), comprendre ce qui manque par rapport à MATLAB ;
+   - **le travail courant** : écrire un script dans l'éditeur, l'exécuter,
+     lire une erreur et aller à la ligne fautive, déboguer (points
+     d'arrêt, pas à pas, espace de travail), tracer et retoucher une
+     figure, l'exporter, bâtir et simuler un modèle Simulink ;
+   - **les messages** : une erreur dit-elle quoi, où, et comment s'en
+     sortir ? MATLAB propose « Did you mean: plot? » pour une faute de
+     frappe (`plt(1:3)`) ; MatLibre ne le fait pas. Les messages de
+     MATLAB sont en anglais, ceux propres à MatLibre en français : le
+     mélange se voit, et se discute ;
+   - **la ligne de commande** : options, codes de retour, sortie lisible
+     dans un terminal et dans un journal, historique et complétion de la
+     console ;
+   - **la rapidité ressentie** : démarrage de la console (0,2 à 0,26 s le
+     21 novembre), premier tracé, première simulation, ouverture du
+     bureau, réactivité pendant un long calcul ;
+   - **l'accessibilité** : clavier seul, contrastes, agrandissement,
+     écrans à haute densité.
+   Un défaut est déjà trouvé : `matlibre -q` (et `--quiet`), annoncé par
+   `matlibre --help`, n'est pas lu — l'option est prise pour un nom de
+   script (« Unable to open file '-q' »), dans
+   `src/console/Principal.cpp`. À corriger en premier.
+8. **Rendre compte** : corriger tout de suite ce qui est un défaut avéré
    (test rouge, résultat faux, plantage, conflit, régression du banc),
-   chacun dans son commit ; pour le reste — améliorations du logiciel et
-   du design —, une liste classée par intérêt et par coût, à soumettre à
-   l'utilisateur avant de s'y mettre.
+   chacun dans son commit ; pour le reste — améliorations du logiciel, du
+   design et de l'ergonomie —, une liste classée par intérêt et par coût,
+   à soumettre à l'utilisateur avant de s'y mettre.
 
 ## 6. Ce qui reste, par ordre d'intérêt
 
@@ -294,12 +321,18 @@ Coller ce message :
 >    s'accorder (la section 5 en donne un exemple à trancher).
 > 5. Examine le logiciel (relecture du code récent, robustesse,
 >    performance) et le design (figures rendues en PNG face à MATLAB,
->    captures de l'application de bureau : lisibilité, cohérence,
->    ergonomie).
+>    captures de l'application de bureau : lisibilité, cohérence
+>    visuelle).
+> 6. Examine l'ergonomie pour l'utilisateur, en te mettant à la place
+>    d'un utilisateur de MATLAB, d'un étudiant et d'un ingénieur en ligne
+>    de commande : premier contact, aide, écriture et exécution d'un
+>    script, erreurs et débogage, figures, Simulink, ligne de commande,
+>    rapidité ressentie, accessibilité. Note chaque friction (la
+>    section 5 en donne déjà une, l'option `-q`).
 >
 > Corrige directement les défauts avérés — test rouge, résultat faux,
-> plantage, conflit, régression du banc —, un commit par correction.
-> Écris le rapport dans `documentation/audit-reprise.md`, puis
-> propose-moi, classées par intérêt et par coût, les améliorations et
-> corrections restantes, autant logicielles que de design, avant de les
-> entreprendre.
+> plantage, conflit, régression du banc, option ou commande qui ne fait
+> pas ce qu'elle annonce —, un commit par correction. Écris le rapport
+> dans `documentation/audit-reprise.md`, puis propose-moi, classées par
+> intérêt et par coût, les améliorations et corrections restantes —
+> logicielles, de design et d'ergonomie — avant de les entreprendre.
