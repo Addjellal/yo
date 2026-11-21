@@ -28,6 +28,9 @@
 #include <QAction>
 #include <QToolBar>
 #include <QListWidget>
+#include <QMessageBox>
+#include <QPointer>
+#include <QAbstractButton>
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -2916,6 +2919,43 @@ end
             verifier(simulink->cheminOuvert().isEmpty(), "et l'on remonte");
             envoyer(fenetre, QStringLiteral("clear modeleEmboite"));
             verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est net");
+        }
+    }
+
+    // Un onglet modifie ne se ferme pas sans qu'on l'ait dit : la croix
+    // de l'onglet le supprimait, et le travail avec. « Annuler » le garde,
+    // « Ne pas enregistrer » le ferme.
+    {
+        fenetre.ouvrirNouveauScript();
+        QTabWidget* onglets = nullptr;
+        for (auto* t : fenetre.findChildren<QTabWidget*>())
+            if (qobject_cast<Editeur*>(t->currentWidget())) onglets = t;
+        verifier(onglets != nullptr, "les onglets de l'editeur se trouvent");
+        if (onglets) {
+            QPointer<Editeur> editeur = qobject_cast<Editeur*>(onglets->currentWidget());
+            editeur->insertPlainText(QStringLiteral("x = 1;"));
+            verifier(editeur->document()->isModified(), "l'editeur est modifie");
+            // Repond a la boite de dialogue des qu'elle paraît.
+            auto repondre = [](QMessageBox::StandardButton bouton) {
+                auto* minuteur = new QTimer;
+                minuteur->setInterval(10);
+                QObject::connect(minuteur, &QTimer::timeout, [minuteur, bouton] {
+                    auto* boite = qobject_cast<QMessageBox*>(QApplication::activeModalWidget());
+                    if (!boite || !boite->button(bouton)) return;
+                    minuteur->stop();
+                    minuteur->deleteLater();
+                    boite->button(bouton)->click();
+                });
+                minuteur->start();
+            };
+            const int avant = onglets->count();
+            repondre(QMessageBox::Cancel);
+            emit onglets->tabCloseRequested(onglets->indexOf(editeur));
+            verifier(!editeur.isNull() && onglets->count() == avant,
+                     "« Annuler » garde l'onglet modifie");
+            repondre(QMessageBox::Discard);
+            emit onglets->tabCloseRequested(onglets->indexOf(editeur));
+            verifier(editeur.isNull(), "« Ne pas enregistrer » ferme l'onglet");
         }
     }
 

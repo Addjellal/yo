@@ -67,6 +67,12 @@ public:
     // Ouvre un onglet d'editeur vide, comme le bouton « Nouveau script ».
     void ouvrirNouveauScript();
 
+    // Vrai si l'onglet INDEX peut être fermé sans rien perdre : il n'est
+    // pas modifié, ou l'utilisateur l'a enregistré, ou il a choisi de
+    // l'abandonner. Faux s'il a annulé, ou si l'enregistrement n'a pas
+    // abouti — on ne ferme alors rien.
+    bool peutFermerOnglet(int index);
+
 protected:
     void closeEvent(QCloseEvent* evenement) override;
 

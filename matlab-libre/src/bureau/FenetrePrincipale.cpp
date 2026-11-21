@@ -184,6 +184,9 @@ void FenetrePrincipale::construirePanneaux() {
     onglets_->setDocumentMode(true);
     onglets_->setMovable(true);
     connect(onglets_, &QTabWidget::tabCloseRequested, this, [this](int index) {
+        // Un onglet modifié ne se ferme pas sans qu'on l'ait dit : la
+        // croix le supprimait, et le travail avec.
+        if (!peutFermerOnglet(index)) return;
         QWidget* w = onglets_->widget(index);
         onglets_->removeTab(index);
         delete w;
@@ -735,6 +738,8 @@ void FenetrePrincipale::enregistrer() {
         etat_->setText(QStringLiteral("enregistré : %1").arg(editeur->fichier()));
         rafraichirListeFichiers();
         QMetaObject::invokeMethod(moteur_, "reindexer", Qt::QueuedConnection);
+    } else {
+        etat_->setText(QStringLiteral("impossible d'écrire %1").arg(editeur->fichier()));
     }
 }
 
@@ -751,6 +756,8 @@ void FenetrePrincipale::enregistrerSous() {
         etat_->setText(QStringLiteral("enregistré : %1").arg(chemin));
         rafraichirListeFichiers();
         QMetaObject::invokeMethod(moteur_, "reindexer", Qt::QueuedConnection);
+    } else {
+        etat_->setText(QStringLiteral("impossible d'écrire %1").arg(chemin));
     }
 }
 
@@ -1607,18 +1614,34 @@ void FenetrePrincipale::closeEvent(QCloseEvent* evenement) {
     reglages.setValue(QStringLiteral("fenetre/geometrie"), saveGeometry());
     reglages.setValue(QStringLiteral("fenetre/etat"), saveState());
     for (int k = 0; k < onglets_->count(); ++k) {
-        auto* e = qobject_cast<Editeur*>(onglets_->widget(k));
-        if (!e || !e->document()->isModified()) continue;
-        auto reponse = QMessageBox::question(
-            this, QStringLiteral("MatLibre"),
-            QStringLiteral("« %1 » a été modifié. Enregistrer avant de quitter ?")
-                .arg(onglets_->tabText(k)),
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-        if (reponse == QMessageBox::Cancel) { evenement->ignore(); return; }
-        if (reponse == QMessageBox::Save) {
-            onglets_->setCurrentIndex(k);
-            enregistrer();
+        if (!peutFermerOnglet(k)) {
+            evenement->ignore();
+            return;
         }
     }
     evenement->accept();
+}
+
+// « Enregistrer » ne suffisait pas à dire que c'était fait : un script
+// sans nom ouvre « Enregistrer sous », que l'on peut annuler, et
+// l'écriture peut échouer. On relit donc l'état du document après coup —
+// la fenêtre se fermait sinon sur un travail qui n'était nulle part.
+bool FenetrePrincipale::peutFermerOnglet(int index) {
+    auto* e = qobject_cast<Editeur*>(onglets_->widget(index));
+    if (!e || !e->document()->isModified()) return true;
+    auto reponse = QMessageBox::question(
+        this, QStringLiteral("MatLibre"),
+        QStringLiteral("« %1 » a été modifié. Enregistrer les modifications ?")
+            .arg(onglets_->tabText(index)),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    if (reponse == QMessageBox::Discard) return true;
+    if (reponse != QMessageBox::Save) return false;
+    onglets_->setCurrentIndex(index);
+    enregistrer();
+    if (e->document()->isModified()) {
+        etat_->setText(QStringLiteral("« %1 » n'a pas été enregistré")
+                           .arg(onglets_->tabText(index)));
+        return false;
+    }
+    return true;
 }

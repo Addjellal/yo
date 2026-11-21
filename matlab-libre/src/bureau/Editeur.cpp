@@ -371,6 +371,12 @@ bool Editeur::enregistrerFichier(const QString& chemin) {
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
     QTextStream flux(&f);
     flux << toPlainText();
+    flux.flush();
+    // Un disque plein, un support retiré : l'écriture peut échouer après
+    // l'ouverture. Le document resterait sinon marqué enregistré.
+    if (flux.status() != QTextStream::Ok || f.error() != QFileDevice::NoError) return false;
+    f.close();
+    if (f.error() != QFileDevice::NoError) return false;
     fichier_ = chemin;
     document()->setModified(false);
     return true;
