@@ -52,7 +52,7 @@ function matlibre_web_curl(url, fichierSortie, reglages, methode, fichierCorps, 
         morceaux{end+1} = ['-H ' citer(['Content-Type: ' char(typeMedia)])];
     end
     if ~isempty(methode)
-        morceaux{end+1} = ['-X ' upper(char(methode))];
+        morceaux{end+1} = ['-X ' citer(upper(char(methode)))];
     end
     if ~isempty(fichierCorps)
         morceaux{end+1} = ['--data-binary @' citer(fichierCorps)];
@@ -67,5 +67,16 @@ function matlibre_web_curl(url, fichierSortie, reglages, methode, fichierCorps, 
 end
 
 function t = citer(t)
-    t = ['"' strrep(t, '"', '\"') '"'];
+% Un argument de la commande, pour le shell. Sous POSIX, entre
+% apostrophes : rien n'y est interprété, ni « $ », ni « ` », ni « \ » —
+% entre guillemets doubles, « webread('http://h/$(commande)') » lançait
+% la commande, et un mot de passe contenant « $ » était amputé. Une
+% apostrophe s'y écrit '\''. Sous Windows, cmd.exe ne connaît que les
+% guillemets doubles.
+    t = char(t);
+    if ispc
+        t = ['"' strrep(t, '"', '\"') '"'];
+    else
+        t = ['''' strrep(t, '''', '''\''''') ''''];
+    end
 end
