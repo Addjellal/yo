@@ -353,15 +353,11 @@ CONTOUR  Lignes de niveau.
 
 ```
 CONTOUR3  Lignes de niveau, dans l'espace.
-    CONTOUR3(Z) trace les lignes de niveau de Z en les plaçant, dans
-    MATLAB, à la hauteur de leur niveau.
+    CONTOUR3(Z) trace les lignes de niveau de Z, chacune posée à la hauteur
+    de son niveau et de sa couleur, vues en perspective.
     CONTOUR3(X,Y,Z), CONTOUR3(...,N) et CONTOUR3(...,NIVEAUX) suivent la
     même règle que CONTOUR.
     C = CONTOUR3(...) rend la matrice des contours.
-
-    Le rendu de MatLibre est plan, comme pour PLOT3 et SURF : les courbes
-    sont dessinées à plat. Ce qu'elles valent se lit toujours ; ce qui
-    manque est la perspective.
 
     Syntaxe
        contour3(Z)
@@ -371,10 +367,10 @@ CONTOUR3  Lignes de niveau, dans l'espace.
        [C,h] = contour3(___)
 
     Exemples
-       [X, Y] = meshgrid(-3:0.1:3);
-       contour3(X, Y, X.^2 - Y.^2, 15);
+       [X, Y] = meshgrid(-2:0.1:2);
+       contour3(X, Y, X .* exp(-X.^2 - Y.^2), 20);
 
-    Voir aussi CONTOUR, CONTOURF, CONTOURC, SURFC, MESHC.
+    Voir aussi CONTOUR, SURFC, MESHC, CONTOURC.
 ```
 
 ## `contourc`
@@ -516,6 +512,31 @@ FILL  Polygone rempli.
        close
 
     Voir aussi AREA, PLOT, PATCH, AXIS.
+```
+
+## `fill3`
+
+```
+FILL3  Polygones remplis de l'espace.
+    FILL3(X,Y,Z,C) trace le polygone de sommets (X,Y,Z) rempli de la
+    couleur C ; des matrices donnent un polygone par colonne. C est une
+    couleur, un triplet, une valeur (mise à l'échelle par CLIM), une
+    valeur ou un triplet par polygone, ou une valeur par sommet (le
+    polygone prend leur moyenne). Les polygones sont peints du plus
+    lointain au plus proche ; un axe neuf passe en VIEW(3).
+    Les paires FaceColor, EdgeColor, FaceAlpha, LineWidth, LineStyle et
+    DisplayName sont lues. H = FILL3(...) rend la poignée de l'objet.
+
+    Syntaxe
+       fill3(x,y,z,c)
+       fill3(X,Y,Z,C)
+       fill3(...,nom,valeur)
+       h = fill3(...)
+
+    Exemples
+       fill3([0 1 1 0], [0 0 1 1], [0 0 1 1], 'r');
+
+    Voir aussi FILL, PATCH, SURF, VIEW.
 ```
 
 ## `gca`
@@ -736,6 +757,8 @@ LEGEND  Légende des courbes.
     été tracées.
     LEGEND({ETIQ1,ETIQ2,...}) accepte une cellule.
     LEGEND('off') retire la légende.
+    LEGEND(...,'Interpreter',I) choisit l'interprète des étiquettes :
+    'tex' (le défaut, comme TITLE l'explique), 'none' ou 'latex'.
 
     Syntaxe
        legend(etiq1,...,etiqN)
@@ -796,10 +819,35 @@ LOGLOG  Trace avec les deux axes en échelle logarithmique.
     Voir aussi SEMILOGX, SEMILOGY, PLOT.
 ```
 
+## `matlibre_cote_axe`
+
+```
+matlibre_cote_axe  Poignee d'un cote d'un axe a deux ordonnees.
+```
+
 ## `matlibre_figures_ouvertes`
 
 ```
 matlibre_figures_ouvertes  Numeros des figures ouvertes.
+```
+
+## `matlibre_patch`
+
+```
+MATLIBRE_PATCH  Faces d'un patch, sans effacer le tracé.
+    Fonction interne : elle n'existe pas dans MATLAB. PATCH l'appelle
+    avec les faces rangées en colonnes, MATLIBRE_PATCH(X,Y,Z,C,...), Z
+    pouvant être vide. Elle lit X, Y, Z, C et les paires comme FILL3, mais
+    ajoute les faces à l'axe sans effacer ni changer la vue, comme le
+    PATCH de bas niveau de MATLAB.
+
+    Syntaxe
+       h = matlibre_patch(X,Y,Z,C,...)
+
+    Exemples
+       matlibre_patch([0 1 1], [0 0 1], [], 'r');
+
+    Voir aussi PATCH, FILL3.
 ```
 
 ## `matlibre_svg`
@@ -811,19 +859,27 @@ matlibre_svg  Rend la figure courante en SVG (texte).
 ## `mesh`
 
 ```
-MESH  Surface en fil de fer.
-    MESH(Z) trace Z sur une grille régulière.
-    MESH(X,Y,Z) trace Z aux points (X,Y).
+MESH  Maillage d'une surface, en perspective.
+    MESH(Z) trace les arêtes de la grille de Z, aux nœuds (J, I).
+    MESH(X,Y,Z) les place aux points (X,Y) : des vecteurs (colonnes et
+    lignes de la grille) ou des matrices de la forme de Z.
+    MESH(...,C) colore les arêtes par C au lieu de Z.
+    Les faces sont blanches et cachent ce qui est derrière elles ; les
+    arêtes prennent leur couleur dans la palette (CLIM). Les paires
+    FaceColor, EdgeColor, FaceAlpha, LineStyle, LineWidth et DisplayName
+    sont lues ; un axe neuf passe en VIEW(3).
 
     Syntaxe
        mesh(Z)
        mesh(X,Y,Z)
+       mesh(X,Y,Z,C)
+       h = mesh(...)
 
     Exemples
        [X, Y] = meshgrid(-3:0.2:3);
        mesh(X, Y, peaks(X, Y));
 
-    Voir aussi SURF, CONTOUR, MESHGRID, PLOT3.
+    Voir aussi SURF, MESHC, MESHZ, SHADING, VIEW, PLOT3.
 ```
 
 ## `pcolor`
@@ -881,18 +937,29 @@ PLOT  Trace des courbes en deux dimensions.
 
 ```
 PLOT3  Courbe en trois dimensions.
-    PLOT3(X,Y,Z) trace la courbe passant par les points (X,Y,Z).
-    PLOT3(X,Y,Z,STYLE) impose couleur, trait et marqueur.
+    PLOT3(X,Y,Z) trace la courbe passant par les points (X,Y,Z), vue en
+    perspective : un axe neuf prend la vue par défaut de MATLAB (azimut
+    -37,5, élévation 30, VIEW(3)) et sa grille. Des matrices de même forme
+    tracent une courbe par colonne.
+    PLOT3(X,Y,Z,STYLE) impose couleur, trait et marqueur ; plusieurs
+    triplets se suivent. Les paires LineWidth, Color, DisplayName,
+    LineStyle, Marker, MarkerSize, MarkerFaceColor et MarkerEdgeColor
+    sont lues.
+    H = PLOT3(...) rend les poignées : XData, YData et ZData sont les
+    coordonnées données.
 
     Syntaxe
        plot3(x,y,z)
        plot3(x,y,z,style)
+       plot3(X,Y,Z)
+       h = plot3(...)
 
     Exemples
        t = linspace(0, 10*pi, 500);
-       plot3(cos(t), sin(t), t); grid on
+       plot3(cos(t), sin(t), t);
+       xlabel('x'); ylabel('y'); zlabel('t');
 
-    Voir aussi PLOT, MESH, SURF, ZLABEL.
+    Voir aussi PLOT, VIEW, MESH, SURF, SCATTER3, ZLABEL.
 ```
 
 ## `print`
@@ -976,6 +1043,27 @@ SCATTER  Nuage de points.
     Voir aussi PLOT, PLOT3, BAR.
 ```
 
+## `scatter3`
+
+```
+SCATTER3  Nuage de points de l'espace.
+    SCATTER3(X,Y,Z) place un cercle creux en chaque point (X,Y,Z), vu en
+    perspective ; un axe neuf passe en VIEW(3).
+    SCATTER3(X,Y,Z,SZ,C), 'filled', le marqueur et les paires suivent la
+    même règle que SCATTER.
+
+    Syntaxe
+       scatter3(x,y,z)
+       scatter3(x,y,z,sz,c)
+       scatter3(...,'filled')
+       h = scatter3(...)
+
+    Exemples
+       scatter3(randn(1,100), randn(1,100), randn(1,100), 30, 'filled');
+
+    Voir aussi SCATTER, PLOT3, VIEW.
+```
+
 ## `semilogx`
 
 ```
@@ -1037,13 +1125,17 @@ SET  Écrit une propriété d'un objet graphique.
 ## `shading`
 
 ```
-SHADING  Rendu des facettes d'une surface.
-    SHADING FLAT donne une couleur unie à chaque facette.
-    SHADING INTERP interpole la couleur à l'intérieur des facettes.
-    SHADING FACETED garde les arêtes noires (défaut).
+SHADING  Rendu des mailles d'une surface.
+    SHADING FACETED : une couleur par maille, bordée de noir (le défaut).
+    SHADING FLAT : une couleur par maille, sans bord.
+    SHADING INTERP : les couleurs des sommets fondues sur la maille (sa
+    moyenne, dans MatLibre), sans bord.
+    Sur un maillage (MESH), le réglage porte sur les arêtes.
+    SHADING(AX,...) agit sur l'axe AX.
 
     Syntaxe
-       shading flat | interp | faceted
+       shading faceted | flat | interp
+       shading(ax, ...)
 
     Exemples
        surf(peaks(40)); shading interp
@@ -1125,35 +1217,53 @@ SUBPLOT  Découpe la figure en une grille d'axes.
 ## `surf`
 
 ```
-SURF  Surface pleine, colorée par la hauteur.
-    SURF(Z) trace Z sur une grille régulière.
-    SURF(X,Y,Z) trace Z aux points (X,Y).
+SURF  Surface pleine, en perspective.
+    SURF(Z) trace la surface de Z sur la grille des nœuds (J, I).
+    SURF(X,Y,Z) la place aux points (X,Y) : des vecteurs (colonnes et
+    lignes de la grille) ou des matrices de la forme de Z.
+    SURF(...,C) colore les sommets par C au lieu de Z.
+    Chaque maille prend la couleur de son premier sommet dans la palette
+    (CLIM), bordée de noir ; SHADING règle le rendu. Les mailles sont
+    peintes de la plus lointaine à la plus proche. Les paires FaceColor
+    ('flat', 'interp', 'none' ou une couleur), EdgeColor, FaceAlpha,
+    LineStyle, LineWidth et DisplayName sont lues ; un axe neuf passe en
+    VIEW(3), avec sa grille. H = SURF(...) rend la poignée : XData, YData,
+    ZData et CData en matrices.
 
     Syntaxe
        surf(Z)
        surf(X,Y,Z)
+       surf(X,Y,Z,C)
+       surf(...,nom,valeur)
+       h = surf(...)
 
     Exemples
        [X, Y] = meshgrid(-2:0.1:2);
        surf(X, Y, X.^2 - Y.^2); shading interp
+       surf(peaks(30), 'EdgeColor', 'none'); view(45, 25); colorbar
 
-    Voir aussi MESH, CONTOUR, SHADING, COLORMAP, COLORBAR.
+    Voir aussi MESH, SURFC, SHADING, VIEW, COLORMAP, COLORBAR.
 ```
 
 ## `text`
 
 ```
 TEXT  Écrit du texte dans les axes.
-    TEXT(X,Y,TEXTE) place le texte au point (X,Y).
-    TEXT(...,'Nom',Valeur) règle 'FontSize', 'Color', 'HorizontalAlignment'.
+    TEXT(X,Y,TEXTE) place le texte au point (X,Y) ; TEXT(X,Y,Z,TEXTE) au
+    point de l'espace (X,Y,Z), que la perspective projette.
+    TEXT(...,'Nom',Valeur) règle 'FontSize', 'Color',
+    'HorizontalAlignment' et 'Interpreter'. Le texte passe par
+    l'interprète TeX, comme TITLE l'explique.
 
     Syntaxe
        text(x,y,texte)
+       text(x,y,z,texte)
        text(x,y,texte,'Nom',Valeur)
 
     Exemples
        plot(1:10);
        text(5, 5, 'ici', 'FontSize', 14, 'Color', 'r');
+       text(2, 8, '\leftarrow y = x^2 au voisinage');
 
     Voir aussi TITLE, XLABEL, LEGEND.
 ```
@@ -1162,17 +1272,28 @@ TEXT  Écrit du texte dans les axes.
 
 ```
 TITLE  Titre des axes.
-    TITLE(TEXTE) écrit un titre au-dessus des axes courants.
-    TITLE(TEXTE,'Nom',Valeur) règle 'FontSize', 'Color', 'FontWeight'.
+    TITLE(TEXTE) écrit un titre au-dessus des axes courants, en gras.
+    TITLE(AX,TEXTE) le pose sur les axes AX.
+    TITLE(TEXTE,'Nom',Valeur) règle 'FontSize' et 'Interpreter' ; 'Color'
+    et 'FontWeight' sont acceptés sans effet.
+    Comme dans MATLAB, le texte passe par l'interprète TeX : « x^2 » met
+    le 2 en exposant, « Z_L » le L en indice, « x_{max} » tout un groupe,
+    « \alpha », « \pi », « \leq », « \infty »... écrivent leur symbole,
+    « \bf » et « \it » passent en gras et en italique, « \color{red} »
+    colore la suite, « \_ » écrit un souligné. 'Interpreter','none' écrit
+    le texte tel quel ; 'latex' le lit comme du TeX, sans les dollars.
 
     Syntaxe
        title(texte)
+       title(ax,texte)
        title(texte,'Nom',Valeur)
 
     Exemples
        plot(1:10); title('Ma courbe');
        title(sprintf('n = %d', 10));
        title('Grand', 'FontSize', 16);
+       title('Réponse en \omega, gain K_p^2');
+       title('nom_de_fichier.m', 'Interpreter', 'none');
 
     Voir aussi XLABEL, YLABEL, ZLABEL, LEGEND, TEXT.
 ```
@@ -1181,35 +1302,39 @@ TITLE  Titre des axes.
 
 ```
 VIEW  Point de vue d'un tracé tridimensionnel.
-    VIEW(AZ,EL) pose l'azimut et l'élévation ; VIEW(2) demande la vue de
-    dessus, VIEW(3) la vue standard. VIEW sans argument rend l'angle
-    courant.
-
-    Le rendu de MatLibre est plan : la fonction est acceptée pour que les
-    scripts tridimensionnels passent, et rend la vue de dessus, mais elle
-    ne change pas l'image.
+    VIEW(AZ,EL) ou VIEW([AZ EL]) pose l'azimut — la rotation autour de
+    l'axe des z, comptée depuis l'axe des y négatifs — et l'élévation, en
+    degrés. VIEW(2) demande la vue de dessus (0, 90), celle d'un tracé
+    plan ; VIEW(3) la vue par défaut de MATLAB (-37,5, 30). VIEW([X Y Z])
+    regarde depuis la direction donnée. [AZ,EL] = VIEW rend la vue.
+    La projection est orthographique, celle de VIEWMTX ; la boîte est
+    étirée pour remplir l'axe, sauf sous AXIS EQUAL.
 
     Syntaxe
        view(az,el)
+       view([az el])
        view(2)
+       view(3)
        [az,el] = view
 
     Exemples
        figure
-       plot(1:10);
+       surf(peaks(20));
+       view(45, 25);
+       [az, el] = view                 % 45 et 25
        view(2);
-       angles = view;
-       angles(2)                       % 90 : la vue de dessus
        close
 
-    Voir aussi ZLIM, SURF, MESH, AXIS.
+    Voir aussi ZLIM, SURF, MESH, PLOT3, AXIS.
 ```
 
 ## `xlabel`
 
 ```
 XLABEL  Étiquette de l'axe des abscisses.
-    XLABEL(TEXTE) nomme l'axe des x des axes courants.
+    XLABEL(TEXTE) nomme l'axe des x des axes courants ; XLABEL(AX,TEXTE)
+    celui des axes AX. Le texte passe par l'interprète TeX, comme TITLE
+    l'explique ; 'Interpreter','none' l'écrit tel quel.
 
     Syntaxe
        xlabel(texte)
@@ -1220,6 +1345,7 @@ XLABEL  Étiquette de l'axe des abscisses.
        t = 0:0.01:1;
        y = sin(2*pi*5*t);
        plot(t, y); xlabel('temps (s)'); ylabel('amplitude');
+       xlabel('\omega (rad/s)');
 
     Voir aussi YLABEL, ZLABEL, TITLE, LEGEND.
 ```
@@ -1335,7 +1461,9 @@ XTICKS  Graduations de l'axe des abscisses.
 
 ```
 YLABEL  Étiquette de l'axe des ordonnées.
-    YLABEL(TEXTE) nomme l'axe des y des axes courants.
+    YLABEL(TEXTE) nomme l'axe des y des axes courants ; YLABEL(AX,TEXTE)
+    celui des axes AX. Le texte passe par l'interprète TeX, comme TITLE
+    l'explique.
 
     Syntaxe
        ylabel(texte)
@@ -1441,14 +1569,47 @@ YTICKS  Graduations de l'axe des ordonnées.
     Voir aussi XTICKS, YTICKLABELS, YLIM, GRID.
 ```
 
+## `yyaxis`
+
+```
+YYAXIS  Second axe des ordonnées, à droite.
+    YYAXIS LEFT et YYAXIS RIGHT choisissent le côté actif de l'axe
+    courant : les tracés qui suivent s'y rangent, et YLIM, YLABEL, YTICKS
+    et YTICKLABELS le visent. Le premier appel range à gauche ce qui est
+    déjà tracé. Chaque côté a ses bornes, ses graduations, son étiquette
+    et sa couleur — la première de MATLAB à gauche, la deuxième à droite
+    —, que prennent ses courbes et son axe. Un tracé sans HOLD ON ne
+    remplace que les courbes de son côté.
+    YYAXIS(AX,...) agit sur l'axe AX ; CLA revient à un seul axe.
+
+    Syntaxe
+       yyaxis left
+       yyaxis right
+       yyaxis(ax, ...)
+
+    Exemples
+       figure
+       x = 0:0.1:10;
+       yyaxis left;  plot(x, sin(x));  ylabel('sinus');
+       yyaxis right; plot(x, 1000 * exp(-x)); ylabel('exponentielle');
+       ylim                              % [0 1000], celles de droite
+       close
+
+    Voir aussi PLOTYY, YLIM, YLABEL, HOLD.
+```
+
 ## `zlabel`
 
 ```
 ZLABEL  Étiquette de l'axe des cotes.
-    ZLABEL(TEXTE) nomme l'axe des z des axes courants.
+    ZLABEL(TEXTE) nomme l'axe des z des axes courants, le long de l'arête
+    verticale de la boîte. Le texte passe par l'interprète TeX, comme
+    TITLE l'explique.
 
     Syntaxe
        zlabel(texte)
+       zlabel(ax,texte)
+       zlabel(texte,'Nom',Valeur)
 
     Exemples
 
@@ -1463,24 +1624,69 @@ ZLABEL  Étiquette de l'axe des cotes.
 
 ```
 ZLIM  Bornes de l'axe des cotes.
-    ZLIM(V) pose les bornes de l'axe des z ; ZLIM sans argument les rend.
-
-    Le rendu de MatLibre est plan : les surfaces sont dessinées par leurs
-    niveaux, sans perspective. La fonction est acceptée pour que les
-    scripts tridimensionnels passent sans être réécrits, mais elle ne
-    change pas l'image.
+    ZLIM([BAS HAUT]) pose les bornes de l'axe des z ; ZLIM sans argument
+    les rend : celles qu'on a posées, ou l'étendue des z des tracés de
+    l'espace, arrondie aux graduations. ZLIM('auto') revient au choix
+    automatique, ZLIM('manual') fige les bornes du moment.
+    ZLIM(AX,...) agit sur l'axe AX.
 
     Syntaxe
-       zlim(v)
+       zlim([bas haut])
+       zlim('auto')
        v = zlim
 
     Exemples
        figure
-       plot(1:10);
-       zlim([0 1]);
-       numel(zlim)                     % 2
+       surf(peaks(20));
+       zlim([-10 10]);
+       zlim                            % [-10 10]
        close
 
     Voir aussi XLIM, YLIM, AXIS, VIEW.
+```
+
+## `zticklabels`
+
+```
+ZTICKLABELS  Textes des graduations de l'axe des z.
+    ZTICKLABELS(C) écrit les textes de la cellule C sous les graduations
+    de l'axe des z, dans l'ordre ; ZTICKLABELS les rend ;
+    ZTICKLABELS('auto') rend les nombres.
+
+    Syntaxe
+       zticklabels(c)
+       c = zticklabels
+
+    Exemples
+       figure
+       surf(peaks(20));
+       zticks([-5 0 5]);
+       zticklabels({'bas', 'zero', 'haut'});
+       close
+
+    Voir aussi ZTICKS, XTICKLABELS, YTICKLABELS.
+```
+
+## `zticks`
+
+```
+ZTICKS  Graduations de l'axe des z.
+    ZTICKS(V) pose les graduations de l'axe des z ; ZTICKS rend celles
+    que montre le tracé, même choisies d'office ; ZTICKS('auto') revient
+    au choix automatique.
+
+    Syntaxe
+       zticks(v)
+       zticks('auto')
+       v = zticks
+
+    Exemples
+       figure
+       surf(peaks(20));
+       zticks([-5 0 5]);
+       zticks                          % [-5 0 5]
+       close
+
+    Voir aussi XTICKS, YTICKS, ZTICKLABELS, ZLIM.
 ```
 

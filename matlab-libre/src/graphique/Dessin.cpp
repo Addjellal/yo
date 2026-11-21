@@ -4,6 +4,7 @@
 
 #include "matlibre/Erreur.h"
 #include "matlibre/Toile.h"
+#include "Commun.h"
 
 namespace matlibre {
 
@@ -25,13 +26,6 @@ double largeurHelvetica(const std::string& texte, double taille, bool gras) {
     return milliemes / 1000.0 * taille * (gras ? 1.08 : 1.0);
 }
 
-std::vector<Morceau> morceauxTexte(const std::string& texte, bool tex) {
-    (void)tex;
-    Morceau m;
-    m.texte = texte;
-    return {m};
-}
-
 namespace {
 
 struct Echelle {
@@ -46,6 +40,10 @@ struct Echelle {
         return pixelsMin + (a - lo) / (hi - lo) * (pixelsMax - pixelsMin);
     }
 };
+
+}  // namespace
+
+namespace dessin {
 
 Trait traitAxe() {
     Trait t;
@@ -62,7 +60,7 @@ Trait traitGrille() {
     return t;
 }
 
-Trait trait(const std::string& couleur, double epaisseur, const std::string& motif = "-") {
+Trait trait(const std::string& couleur, double epaisseur, const std::string& motif) {
     Trait t;
     t.couleur = couleur;
     t.epaisseur = epaisseur;
@@ -149,6 +147,7 @@ void couleursMarqueur(const Serie& s, const std::string& couleur, std::string& b
 
 std::string rvb(int r, int v, int b) { return formater("rgb(%d,%d,%d)", r, v, b); }
 
+extern const double PI;
 const double PI = 3.14159265358979323846;
 
 // La couleur du point K d'un nuage : la sienne, celle que la palette donne
@@ -181,6 +180,12 @@ void couleursPoint(const Serie& s, const std::string& couleur, std::string& bord
     else if (!f.empty() && f != "none") face = f;
     else face = s.pointsRemplis ? couleur : std::string("none");
 }
+
+}  // namespace dessin
+
+using namespace dessin;
+
+namespace {
 
 // La barre de couleurs, du côté que dit sa position. Dehors, elle occupe
 // la place que dessinerAxe lui a réservée ; dedans, elle se pose à huit
@@ -236,7 +241,9 @@ void dessinerBarre(Toile& toile, const Axes& a, const BarreCouleurs& barre, int 
             stEtiquette.angle = 90;
             double x = textesADroite ? x0 + bande + 7 + largeurTextes + 16
                                      : x0 - 7 - largeurTextes - 4;
-            toile.texte(x, (y0 + y1) / 2, morceauxTexte(a.etiquetteBarre), stEtiquette);
+            toile.texte(x, (y0 + y1) / 2,
+                        morceauxInterpretes(a.etiquetteBarre, interpreteDe(a, "colorbarlabel")),
+                        stEtiquette);
         }
     } else {
         const double xg = dehors ? gauche : gauche + 8, xd = dehors ? droite : droite - 8;
@@ -266,7 +273,8 @@ void dessinerBarre(Toile& toile, const Axes& a, const BarreCouleurs& barre, int 
         }
         if (!a.etiquetteBarre.empty())
             toile.texte((xg + xd) / 2, textesDessous ? y0 + bande + 34 : y0 - 25,
-                        morceauxTexte(a.etiquetteBarre), stEtiquette);
+                        morceauxInterpretes(a.etiquetteBarre, interpreteDe(a, "colorbarlabel")),
+                        stEtiquette);
     }
     toile.finGroupe();
 }
@@ -291,7 +299,9 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
     // comme MATLAB le fait, au lieu de les rogner au bord.
     double largeurEtiquettesY = 0;
     for (const auto& e : a.etiquettesTicksY)
-        largeurEtiquettesY = std::max(largeurEtiquettesY, toile.largeur(simple(e), 12));
+        largeurEtiquettesY =
+            std::max(largeurEtiquettesY,
+                     toile.largeur(morceauxInterpretes(e, interpreteDe(a, "ticks")), 12));
     if (a.axesVisibles && largeurEtiquettesY > 0) {
         int requis = (int)(fx * L + largeurEtiquettesY + 14 +
                            (a.etiquetteY.empty() ? 0.0 : 24.0));
@@ -307,10 +317,12 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
         std::vector<double> t = graduationsEffectives(a, 'x', x0, x1, a.logX);
         double plusLarge = 0;
         for (std::size_t k = 0; k < t.size(); ++k)
-            plusLarge = std::max(plusLarge, toile.largeur(simple(k < a.etiquettesTicksX.size()
-                                                                     ? a.etiquettesTicksX[k]
-                                                                     : nombreCourt(t[k])),
-                                                          12));
+            plusLarge = std::max(
+                plusLarge, toile.largeur(morceauxInterpretes(k < a.etiquettesTicksX.size()
+                                                                 ? a.etiquettesTicksX[k]
+                                                                 : nombreCourt(t[k]),
+                                                             interpreteDe(a, "ticks")),
+                                         12));
         double angle = std::fabs(a.angleTicksX) * PI / 180;
         descenteX = std::max(0.0, plusLarge * std::sin(angle) + 12 * std::cos(angle) - 12);
         bas -= (int)std::ceil(descenteX);
@@ -326,7 +338,10 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
     double largeurLegende = 0, hauteurLegende = 0;
     std::vector<double> largeursEntrees;
     for (const auto& e : entrees) {
-        double l = 36 + toile.largeur(morceauxTexte(e.texte), policeLegende) + 10;
+        double l = 36 +
+                   toile.largeur(morceauxInterpretes(e.texte, interpreteDe(a, "legend")),
+                                 policeLegende) +
+                   10;
         largeursEntrees.push_back(l);
         if (a.legendeHorizontale) largeurLegende += l;
         else largeurLegende = std::max(largeurLegende, l);
@@ -397,289 +412,425 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
         if (droite <= gauche + 10 || bas <= haut + 10) return;
     }
 
-    // Les bornes : celles qu'on a fixées, ou celles des données, arrondies
-    // aux graduations comme le fait MATLAB.
-    double xmin, xmax, ymin, ymax;
-    limitesAxe(a, xmin, xmax, ymin, ymax);
-    // Un axe logarithmique ne porte ni le zéro ni les négatifs : faute de
-    // valeur positive, il redevient linéaire.
-    bool logX = a.logX, logY = a.logY;
-    if (logX && !(xmin > 0 && xmax > xmin) && !bornesLog(xmin, xmax)) logX = false;
-    if (logY && !(ymin > 0 && ymax > ymin) && !bornesLog(ymin, ymax)) {
-        logY = false;
-        ymin = 0;
-        ymax = 1;
-    }
-    appliquerProportions(a, gauche, droite, haut, bas, xmin, xmax, ymin, ymax);
-
-    // Un axe inversé n'échange pas ses bornes mais les pixels où elles
-    // tombent : tout le reste du tracé suit sans le savoir.
-    Echelle ex{xmin, xmax, (double)(a.xInverse ? droite : gauche),
-               (double)(a.xInverse ? gauche : droite), logX};
-    Echelle ey{ymin, ymax, (double)(a.yInverse ? haut : bas), (double)(a.yInverse ? bas : haut),
-               logY};
-
-    // « axis off » : le cadre, les graduations et leurs nombres
-    // disparaissent ; les courbes, elles, restent.
-    if (a.axesVisibles) {
-        Trait cadre = trait("#222", 1);
-        toile.rectangle(gauche, haut, droite - gauche, bas - haut, "white", 1.0, &cadre);
+    // « yyaxis » : le second axe des ordonnées prend sa place à droite —
+    // ses graduations, puis son étiquette.
+    double yminDroite = 0, ymaxDroite = 1, largeurDroite = 0;
+    std::vector<double> tyDroite;
+    const bool deuxOrdonnees = a.deuxOrdonnees && !vueEspace(a);
+    if (deuxOrdonnees) {
+        limitesAxeDroite(a, yminDroite, ymaxDroite);
+        if (a.axesVisibles) {
+            tyDroite = a.ticksYDroite.empty()
+                           ? graduationsAxe(yminDroite, ymaxDroite, 6, a.logYDroite)
+                           : a.ticksYDroite;
+            for (std::size_t k = 0; k < tyDroite.size(); ++k)
+                largeurDroite = std::max(
+                    largeurDroite,
+                    toile.largeur(k < a.etiquettesTicksYDroite.size()
+                                      ? morceauxInterpretes(a.etiquettesTicksYDroite[k],
+                                                            interpreteDe(a, "ticks"))
+                                      : etiquetteGraduation(tyDroite[k], a.logYDroite),
+                                  12));
+            droite -= (int)std::ceil(largeurDroite + (a.etiquetteYDroite.empty() ? 0 : 26.0));
+        }
+        if (droite <= gauche + 10) return;
     }
 
-    // Les graduations imposées par « ax.XTick = [...] » l'emportent sur
-    // celles qu'on choisirait.
-    auto tx = a.axesVisibles ? graduationsEffectives(a, 'x', xmin, xmax, logX)
-                             : std::vector<double>{};
-    auto ty = a.axesVisibles ? graduationsEffectives(a, 'y', ymin, ymax, logY)
-                             : std::vector<double>{};
-    // Une étiquette inclinée se termine sur sa graduation, comme dans
-    // MATLAB : ancrée par sa fin pour un angle positif, par son début pour
-    // un angle négatif, et décalée d'une demi-hauteur de texte pour que la
-    // ligne passe par la graduation.
-    StyleTexte styleGraduationX;
-    styleGraduationX.ancre = a.angleTicksX > 0 ? 'r' : a.angleTicksX < 0 ? 'l' : 'c';
-    styleGraduationX.angle = a.angleTicksX;
-    const double sinX = std::sin(a.angleTicksX * PI / 180);
-    const double cosX = std::cos(a.angleTicksX * PI / 180);
-    std::size_t rangTick = 0;
-    for (double v : tx) {
-        double px = ex.versPixel(v);
-        if (px < gauche - 1 || px > droite + 1) continue;
-        if (a.grille) toile.ligne(px, haut, px, bas, traitGrille());
-        toile.ligne(px, bas, px, bas - 4, traitAxe());
-        // « xticklabels({'a','b'}) » l'emporte sur les nombres.
-        std::vector<Morceau> texte = rangTick < a.etiquettesTicksX.size()
-                                         ? simple(a.etiquettesTicksX[rangTick])
-                                         : etiquetteGraduation(v, logX);
-        ++rangTick;
-        if (a.angleTicksX == 0) toile.texte(px, bas + 16, texte, styleGraduationX);
-        else toile.texte(px + 4 * sinX, bas + 8 + 4 * cosX, texte, styleGraduationX);
-    }
-    StyleTexte styleGraduationY;
-    styleGraduationY.ancre = 'r';
-    styleGraduationY.angle = a.angleTicksY;
-    const double sinY = std::sin(a.angleTicksY * PI / 180);
-    const double cosY = std::cos(a.angleTicksY * PI / 180);
-    rangTick = 0;
-    for (double v : ty) {
-        double py = ey.versPixel(v);
-        if (py < haut - 1 || py > bas + 1) continue;
-        if (a.grille) toile.ligne(gauche, py, droite, py, traitGrille());
-        toile.ligne(gauche, py, gauche + 4, py, traitAxe());
-        std::vector<Morceau> texte = rangTick < a.etiquettesTicksY.size()
-                                         ? simple(a.etiquettesTicksY[rangTick])
-                                         : etiquetteGraduation(v, logY);
-        ++rangTick;
-        toile.texte(gauche - 8 + 4 * sinY, py + 4 * cosY, texte, styleGraduationY);
-    }
-
-    toile.decouper(gauche, haut, droite - gauche, bas - haut);
+    // En perspective, l'espace a son propre dessin (Espace.cpp) ; la vue de
+    // dessus est le tracé plan.
     const std::vector<double>& palette = paletteEnVigueur(figure, a);
     double cmin, cmax;
     limitesCouleur(a, cmin, cmax);
-    for (const auto& serie : a.series) {
-        // Une série indexée — un niveau de contour, un polygone de couleur
-        // numérique — prend sa couleur dans la palette. Elle est courte : on
-        // la copie pour lui poser cette couleur, et l'on ne copie pas les
-        // autres, qui peuvent porter un million de points.
-        Serie copieIndexee;
-        const Serie* source = &serie;
-        if (serie.couleurIndexee) {
-            copieIndexee = serie;
-            copieIndexee.couleur = couleurDeSerie(figure, a, serie);
-            source = &copieIndexee;
+    const bool espace = vueEspace(a);
+    Echelle ex, ey;
+    if (espace) {
+        dessinerEspace(figure, a, toile, gauche, droite, haut, bas);
+    } else {
+        // Les bornes : celles qu'on a fixées, ou celles des données, arrondies
+        // aux graduations comme le fait MATLAB.
+        double xmin, xmax, ymin, ymax;
+        limitesAxe(a, xmin, xmax, ymin, ymax);
+        // Un axe logarithmique ne porte ni le zéro ni les négatifs : faute de
+        // valeur positive, il redevient linéaire.
+        bool logX = a.logX, logY = a.logY;
+        if (logX && !(xmin > 0 && xmax > xmin) && !bornesLog(xmin, xmax)) logX = false;
+        if (logY && !(ymin > 0 && ymax > ymin) && !bornesLog(ymin, ymax)) {
+            logY = false;
+            ymin = 0;
+            ymax = 1;
         }
-        const Serie& s = *source;
-        std::size_t n = std::min(s.x.size(), s.y.size());
-        if (s.genre == GenreTrace::Constante) {
-            if (s.x.empty()) continue;
-            double px = s.axeConstante == 'x' ? ex.versPixel(s.x[0]) : gauche;
-            double py = s.axeConstante == 'y' ? ey.versPixel(s.x[0]) : haut;
-            Trait t = trait(s.couleur, s.epaisseur, s.style);
-            if (s.axeConstante == 'x') toile.ligne(px, haut, px, bas, t);
-            else toile.ligne(gauche, py, droite, py, t);
-            if (!s.legendeConstante.empty()) {
-                StyleTexte st;
-                st.couleur = s.couleur;
-                st.ancre = s.axeConstante == 'x' ? 'l' : 'r';
-                toile.texte(s.axeConstante == 'x' ? px + 4 : droite - 4,
-                            s.axeConstante == 'x' ? haut + 14 : py - 4,
-                            morceauxTexte(s.legendeConstante), st);
+        appliquerProportions(a, gauche, droite, haut, bas, xmin, xmax, ymin, ymax);
+
+        // Un axe inversé n'échange pas ses bornes mais les pixels où elles
+        // tombent : tout le reste du tracé suit sans le savoir.
+        ex = Echelle{xmin, xmax, (double)(a.xInverse ? droite : gauche),
+                     (double)(a.xInverse ? gauche : droite), logX};
+        ey = Echelle{ymin, ymax, (double)(a.yInverse ? haut : bas),
+                     (double)(a.yInverse ? bas : haut), logY};
+        const Echelle eyGauche = ey;
+        const Echelle eyDroite{yminDroite, ymaxDroite, (double)(a.yInverse ? haut : bas),
+                               (double)(a.yInverse ? bas : haut), a.logYDroite};
+
+        // « axis off » : le cadre, les graduations et leurs nombres
+        // disparaissent ; les courbes, elles, restent.
+        if (a.axesVisibles) {
+            Trait cadre = trait("#222", 1);
+            toile.rectangle(gauche, haut, droite - gauche, bas - haut, "white", 1.0, &cadre);
+        }
+
+        // Les graduations imposées par « ax.XTick = [...] » l'emportent sur
+        // celles qu'on choisirait.
+        auto tx = a.axesVisibles ? graduationsEffectives(a, 'x', xmin, xmax, logX)
+                                 : std::vector<double>{};
+        auto ty = a.axesVisibles ? graduationsEffectives(a, 'y', ymin, ymax, logY)
+                                 : std::vector<double>{};
+        // Une étiquette inclinée se termine sur sa graduation, comme dans
+        // MATLAB : ancrée par sa fin pour un angle positif, par son début pour
+        // un angle négatif, et décalée d'une demi-hauteur de texte pour que la
+        // ligne passe par la graduation.
+        StyleTexte styleGraduationX;
+        styleGraduationX.ancre = a.angleTicksX > 0 ? 'r' : a.angleTicksX < 0 ? 'l' : 'c';
+        styleGraduationX.angle = a.angleTicksX;
+        const double sinX = std::sin(a.angleTicksX * PI / 180);
+        const double cosX = std::cos(a.angleTicksX * PI / 180);
+        std::size_t rangTick = 0;
+        for (double v : tx) {
+            double px = ex.versPixel(v);
+            if (px < gauche - 1 || px > droite + 1) continue;
+            if (a.grille) toile.ligne(px, haut, px, bas, traitGrille());
+            toile.ligne(px, bas, px, bas - 4, traitAxe());
+            // « xticklabels({'a','b'}) » l'emporte sur les nombres.
+            std::vector<Morceau> texte = rangTick < a.etiquettesTicksX.size()
+                                             ? morceauxInterpretes(a.etiquettesTicksX[rangTick],
+                                                                   interpreteDe(a, "ticks"))
+                                             : etiquetteGraduation(v, logX);
+            ++rangTick;
+            if (a.angleTicksX == 0) toile.texte(px, bas + 16, texte, styleGraduationX);
+            else toile.texte(px + 4 * sinX, bas + 8 + 4 * cosX, texte, styleGraduationX);
+        }
+        StyleTexte styleGraduationY;
+        styleGraduationY.ancre = 'r';
+        styleGraduationY.angle = a.angleTicksY;
+        // Sous « yyaxis », chaque axe des ordonnées prend la couleur de son
+        // côté, comme dans MATLAB.
+        if (deuxOrdonnees) styleGraduationY.couleur = couleurCote(0);
+        const double sinY = std::sin(a.angleTicksY * PI / 180);
+        const double cosY = std::cos(a.angleTicksY * PI / 180);
+        rangTick = 0;
+        for (double v : ty) {
+            double py = ey.versPixel(v);
+            if (py < haut - 1 || py > bas + 1) continue;
+            if (a.grille) toile.ligne(gauche, py, droite, py, traitGrille());
+            toile.ligne(gauche, py, gauche + 4, py, traitAxe());
+            std::vector<Morceau> texte = rangTick < a.etiquettesTicksY.size()
+                                             ? morceauxInterpretes(a.etiquettesTicksY[rangTick],
+                                                                   interpreteDe(a, "ticks"))
+                                             : etiquetteGraduation(v, logY);
+            ++rangTick;
+            toile.texte(gauche - 8 + 4 * sinY, py + 4 * cosY, texte, styleGraduationY);
+        }
+        if (deuxOrdonnees) {
+            StyleTexte styleDroite;
+            styleDroite.couleur = couleurCote(1);
+            Trait traitDroite = trait(couleurCote(1), 1);
+            for (std::size_t k = 0; k < tyDroite.size(); ++k) {
+                double py = eyDroite.versPixel(tyDroite[k]);
+                if (py < haut - 1 || py > bas + 1) continue;
+                toile.ligne(droite, py, droite - 4, py, traitDroite);
+                toile.texte(droite + 8, py + 4,
+                            k < a.etiquettesTicksYDroite.size()
+                                ? morceauxInterpretes(a.etiquettesTicksYDroite[k],
+                                                      interpreteDe(a, "ticks"))
+                                : etiquetteGraduation(tyDroite[k], a.logYDroite),
+                            styleDroite);
             }
-            continue;
-        }
-        if (s.genre == GenreTrace::Texte) {
-            if (s.x.empty() || s.y.empty()) continue;
-            StyleTexte st;
-            st.taille = s.taillePoliceTexte > 0 ? s.taillePoliceTexte : 11.0;
-            st.tailleExplicite = true;
-            st.ancre = s.alignement;
-            st.couleur = s.couleur;
-            toile.texte(ex.versPixel(s.x[0]), ey.versPixel(s.y[0]),
-                        morceauxTexte(s.legendeConstante), st);
-            continue;
-        }
-        if (s.genre == GenreTrace::Aire || s.genre == GenreTrace::Polygone) {
-            if (n < 2) continue;
-            std::vector<double> px, py;
-            for (std::size_t k = 0; k < n; ++k) {
-                px.push_back(ex.versPixel(s.x[k]));
-                py.push_back(ey.versPixel(s.y[k]));
+            if (a.axesVisibles) {
+                toile.ligne(gauche, haut, gauche, bas, trait(couleurCote(0), 1));
+                toile.ligne(droite, haut, droite, bas, traitDroite);
             }
-            if (s.genre == GenreTrace::Aire) {
-                // On referme sur la ligne des zéros : c'est la surface sous
-                // la courbe.
-                double zero = ey.versPixel(std::max(ymin, std::min(ymax, 0.0)));
-                px.push_back(ex.versPixel(s.x[n - 1]));
-                py.push_back(zero);
-                px.push_back(ex.versPixel(s.x[0]));
-                py.push_back(zero);
-            }
-            // Comme dans MATLAB, le bord d'un « fill » ou d'une « area » est
-            // noir tant qu'EdgeColor ne dit pas autre chose.
-            Trait bord = trait(s.couleurBord.empty() ? std::string("#000000") : s.couleurBord,
-                               s.epaisseur == 1.5 ? 0.5 : s.epaisseur);
-            toile.polygone(px, py, s.couleur, s.opacite, &bord);
-            continue;
         }
-        if (s.genre == GenreTrace::Image) {
-            int lImage = s.hauteurImage, cImage = s.largeurImage;
-            if (lImage <= 0 || cImage <= 0) continue;
-            // L'image occupe l'étendue que la série déclare, et non toute la
-            // boîte : « imagesc(x,y,Z) » se pose au bon endroit, et un axe
-            // inversé la retourne comme le reste.
-            double x0 = s.x.size() > 1 ? s.x[0] : 0.5;
-            double x1 = s.x.size() > 1 ? s.x[1] : cImage + 0.5;
-            double y0 = s.y.size() > 1 ? s.y[0] : 0.5;
-            double y1 = s.y.size() > 1 ? s.y[1] : lImage + 0.5;
-            // Les pixels voisins d'une même couleur, sur une ligne, ne font
-            // qu'un rectangle : le fichier reste léger.
-            for (int i = 0; i < lImage; ++i) {
-                int j = 0;
-                while (j < cImage) {
-                    int r, vert, b;
-                    couleurPixelImage(palette, s,
-                                      (std::size_t)i + (std::size_t)j * (std::size_t)lImage,
-                                      cmin, cmax, r, vert, b);
-                    int jFin = j + 1;
-                    while (jFin < cImage) {
-                        int r2, v2, b2;
-                        std::size_t suivant =
-                            (std::size_t)i + (std::size_t)jFin * (std::size_t)lImage;
-                        couleurPixelImage(palette, s, suivant, cmin, cmax, r2, v2, b2);
-                        if (r2 != r || v2 != vert || b2 != b) break;
-                        ++jFin;
-                    }
-                    double gx0 = ex.versPixel(x0 + (x1 - x0) * j / cImage);
-                    double gx1 = ex.versPixel(x0 + (x1 - x0) * jFin / cImage);
-                    double gy0 = ey.versPixel(y0 + (y1 - y0) * i / lImage);
-                    double gy1 = ey.versPixel(y0 + (y1 - y0) * (i + 1) / lImage);
-                    toile.rectangle(std::min(gx0, gx1), std::min(gy0, gy1),
-                                    std::fabs(gx1 - gx0) + 0.5, std::fabs(gy1 - gy0) + 0.5,
-                                    rvb(r, vert, b), 1.0, nullptr);
-                    j = jFin;
+
+        toile.decouper(gauche, haut, droite - gauche, bas - haut);
+        for (const auto& serie : a.series) {
+            // Une série indexée — un niveau de contour, un polygone de couleur
+            // numérique — prend sa couleur dans la palette. Elle est courte : on
+            // la copie pour lui poser cette couleur, et l'on ne copie pas les
+            // autres, qui peuvent porter un million de points.
+            Serie copieIndexee;
+            const Serie* source = &serie;
+            if (serie.couleurIndexee) {
+                copieIndexee = serie;
+                copieIndexee.couleur = couleurDeSerie(figure, a, serie);
+                source = &copieIndexee;
+            }
+            const Serie& s = *source;
+            // Une série de droite se lit sur l'échelle de droite.
+            const Echelle& ey = deuxOrdonnees && s.cote == 1 ? eyDroite : eyGauche;
+            std::size_t n = std::min(s.x.size(), s.y.size());
+            if (s.genre == GenreTrace::Constante) {
+                if (s.x.empty()) continue;
+                double px = s.axeConstante == 'x' ? ex.versPixel(s.x[0]) : gauche;
+                double py = s.axeConstante == 'y' ? ey.versPixel(s.x[0]) : haut;
+                Trait t = trait(s.couleur, s.epaisseur, s.style);
+                if (s.axeConstante == 'x') toile.ligne(px, haut, px, bas, t);
+                else toile.ligne(gauche, py, droite, py, t);
+                if (!s.legendeConstante.empty()) {
+                    StyleTexte st;
+                    st.couleur = s.couleur;
+                    st.ancre = s.axeConstante == 'x' ? 'l' : 'r';
+                    toile.texte(s.axeConstante == 'x' ? px + 4 : droite - 4,
+                                s.axeConstante == 'x' ? haut + 14 : py - 4,
+                                morceauxInterpretes(s.legendeConstante, s.interprete), st);
                 }
-            }
-            continue;
-        }
-        if (s.genre == GenreTrace::Barres) {
-            // La largeur : BarWidth fois le plus petit écart entre deux
-            // abscisses, en unités de données ; le pied : la base de la barre
-            // empilée, sinon zéro, ramené dans le cadre.
-            double demi = s.largeurBarre / 2 * ecartBarres(s.x);
-            Trait bord = trait(s.couleurBord.empty() ? std::string("#000000") : s.couleurBord,
-                               s.epaisseur);
-            for (std::size_t k = 0; k < n; ++k) {
-                double pied = k < s.basesBarres.size() ? s.basesBarres[k] : 0.0;
-                pied = std::min(std::max(pied, ymin), ymax);
-                double g = ex.versPixel(s.x[k] - demi);
-                double d = ex.versPixel(s.x[k] + demi);
-                double py = ey.versPixel(std::min(std::max(s.y[k], ymin), ymax));
-                double base = ey.versPixel(pied);
-                toile.rectangle(std::min(g, d), std::min(py, base), std::fabs(d - g),
-                                std::fabs(base - py), s.couleur, s.opacite, &bord);
-            }
-            continue;
-        }
-        if (s.genre == GenreTrace::Points) {
-            // Un nuage : chaque point a son aire et sa couleur, creux par
-            // défaut comme dans MATLAB, plein sous « 'filled' ».
-            const std::string marqueur = s.marqueur.empty() ? "o" : s.marqueur;
-            FormeMarqueur commune = formeMarqueur(marqueur, s.tailleMarqueur);
-            if (s.airesPoints.size() == 1)
-                commune = formeMarqueur(marqueur, std::sqrt(std::max(s.airesPoints[0], 0.0)));
-            for (std::size_t k = 0; k < n; ++k) {
-                if (!std::isfinite(s.x[k]) || !std::isfinite(s.y[k])) continue;
-                std::string couleur = couleurPoint(palette, cmin, cmax, s, k);
-                std::string bord, face;
-                couleursPoint(s, couleur, bord, face);
-                // Un « + » ou un « x » n'a que son trait : il le garde.
-                if (bord == "none" && commune.genre == FormeMarqueur::Traits) bord = couleur;
-                if (s.airesPoints.size() > 1)
-                    dessinerMarqueur(toile,
-                                     formeMarqueur(marqueur, std::sqrt(std::max(
-                                                                 k < s.airesPoints.size()
-                                                                     ? s.airesPoints[k]
-                                                                     : 0.0,
-                                                                 0.0))),
-                                     ex.versPixel(s.x[k]), ey.versPixel(s.y[k]), bord, face);
-                else
-                    dessinerMarqueur(toile, commune, ex.versPixel(s.x[k]), ey.versPixel(s.y[k]),
-                                     bord, face);
-            }
-            continue;
-        }
-        if (s.genre == GenreTrace::Tige) {
-            double base = ey.versPixel(0);
-            Trait t = trait(s.couleur, 1);
-            for (std::size_t k = 0; k < n; ++k) {
-                double px = ex.versPixel(s.x[k]), py = ey.versPixel(s.y[k]);
-                toile.ligne(px, base, px, py, t);
-                toile.cercle(px, py, 3, "none", &t);
-            }
-            continue;
-        }
-        // Les points qu'aucun pixel ne distingue sont retirés : le dessin est
-        // le même, le fichier tient.
-        std::vector<std::size_t> visibles =
-            indicesVisibles(s.x, s.y, ex.min, ex.max, (int)(ex.pixelsMax - ex.pixelsMin), ex.log);
-        std::vector<double> px, py;
-        std::size_t precedent = 0;
-        bool premier = true;
-        for (std::size_t k : visibles) {
-            if (k >= n) continue;
-            if (!std::isfinite(s.x[k]) || !std::isfinite(s.y[k])) {
-                if (!premier) {
-                    px.push_back(NAN);
-                    py.push_back(NAN);
-                }
-                premier = true;
                 continue;
             }
-            double x = ex.versPixel(s.x[k]), y = ey.versPixel(s.y[k]);
-            if (s.genre == GenreTrace::Escalier && !premier) {
+            if (s.genre == GenreTrace::Texte) {
+                if (s.x.empty() || s.y.empty()) continue;
+                StyleTexte st;
+                st.taille = s.taillePoliceTexte > 0 ? s.taillePoliceTexte : 11.0;
+                st.tailleExplicite = true;
+                st.ancre = s.alignement;
+                st.couleur = s.couleur;
+                toile.texte(ex.versPixel(s.x[0]), ey.versPixel(s.y[0]),
+                            morceauxInterpretes(s.legendeConstante, s.interprete), st);
+                continue;
+            }
+            if (s.genre == GenreTrace::Surface) {
+                // Une surface vue de dessus : ses mailles, à plat.
+                const int m = s.lignesGrille, c = s.colonnesGrille;
+                if (m < 2 || c < 2 || n < (std::size_t)m * (std::size_t)c) continue;
+                auto valeur = [&](std::size_t k) {
+                    return k < s.valeursCouleurPoints.size() ? s.valeursCouleurPoints[k]
+                           : k < s.z.size()                  ? s.z[k]
+                                                             : 0.0;
+                };
+                for (int j = 0; j + 1 < c; ++j)
+                    for (int i = 0; i + 1 < m; ++i) {
+                        std::size_t k00 = (std::size_t)i + (std::size_t)j * (std::size_t)m;
+                        std::size_t k10 = k00 + 1, k01 = k00 + (std::size_t)m, k11 = k01 + 1;
+                        std::vector<double> px, py;
+                        for (std::size_t k : {k00, k10, k11, k01}) {
+                            px.push_back(ex.versPixel(s.x[k]));
+                            py.push_back(ey.versPixel(s.y[k]));
+                        }
+                        double v = s.modeFaces == "interp"
+                                       ? (valeur(k00) + valeur(k10) + valeur(k11) + valeur(k01)) / 4
+                                       : valeur(k00);
+                        int r, vert, b;
+                        couleurEchelle(palette, v, cmin, cmax, r, vert, b);
+                        std::string maille = formater("#%02X%02X%02X", r, vert, b);
+                        auto mode = [&](const std::string& m2) {
+                            return m2 == "flat" || m2 == "interp" ? maille : m2;
+                        };
+                        Trait bord = trait(mode(s.modeAretes), s.epaisseur);
+                        std::string fond = mode(s.modeFaces);
+                        toile.polygone(px, py, fond, s.opacite,
+                                       bord.couleur == "none" || s.style == "none" ? nullptr
+                                                                                   : &bord);
+                    }
+                continue;
+            }
+            if (s.genre == GenreTrace::Polygone &&
+                (!s.couleursPoints.empty() || !s.valeursCouleurPoints.empty() ||
+                 std::any_of(s.x.begin(), s.x.end(), [](double v) { return std::isnan(v); }))) {
+                // Plusieurs faces, séparées par des NaN, une couleur par face.
+                std::size_t debut = 0, rang = 0;
+                while (debut < n) {
+                    std::size_t fin = debut;
+                    while (fin < n && std::isfinite(s.x[fin]) && std::isfinite(s.y[fin])) ++fin;
+                    if (fin - debut >= 2) {
+                        std::vector<double> px, py;
+                        for (std::size_t k = debut; k < fin; ++k) {
+                            px.push_back(ex.versPixel(s.x[k]));
+                            py.push_back(ey.versPixel(s.y[k]));
+                        }
+                        std::string couleurFace = s.couleur;
+                        if (!s.couleursPoints.empty()) {
+                            couleurFace =
+                                s.couleursPoints[std::min(rang, s.couleursPoints.size() - 1)];
+                        } else if (!s.valeursCouleurPoints.empty()) {
+                            int r, vert, b;
+                            couleurEchelle(palette,
+                                           s.valeursCouleurPoints[std::min(
+                                               rang, s.valeursCouleurPoints.size() - 1)],
+                                           cmin, cmax, r, vert, b);
+                            couleurFace = formater("#%02X%02X%02X", r, vert, b);
+                        }
+                        auto mode = [&](const std::string& m2) {
+                            return m2 == "flat" || m2 == "interp" ? couleurFace : m2;
+                        };
+                        Trait bord = trait(mode(s.modeAretes), s.epaisseur == 1.5 ? 0.5
+                                                                                   : s.epaisseur);
+                        toile.polygone(px, py, mode(s.modeFaces), s.opacite, &bord);
+                    }
+                    ++rang;
+                    debut = fin + 1;
+                }
+                continue;
+            }
+            if (s.genre == GenreTrace::Aire || s.genre == GenreTrace::Polygone) {
+                if (n < 2) continue;
+                std::vector<double> px, py;
+                for (std::size_t k = 0; k < n; ++k) {
+                    px.push_back(ex.versPixel(s.x[k]));
+                    py.push_back(ey.versPixel(s.y[k]));
+                }
+                if (s.genre == GenreTrace::Aire) {
+                    // On referme sur la ligne des zéros : c'est la surface sous
+                    // la courbe.
+                    double zero = ey.versPixel(std::max(ymin, std::min(ymax, 0.0)));
+                    px.push_back(ex.versPixel(s.x[n - 1]));
+                    py.push_back(zero);
+                    px.push_back(ex.versPixel(s.x[0]));
+                    py.push_back(zero);
+                }
+                // Comme dans MATLAB, le bord d'un « fill » ou d'une « area » est
+                // noir tant qu'EdgeColor ne dit pas autre chose.
+                Trait bord = trait(s.couleurBord.empty() ? std::string("#000000") : s.couleurBord,
+                                   s.epaisseur == 1.5 ? 0.5 : s.epaisseur);
+                toile.polygone(px, py, s.couleur, s.opacite, &bord);
+                continue;
+            }
+            if (s.genre == GenreTrace::Image) {
+                int lImage = s.hauteurImage, cImage = s.largeurImage;
+                if (lImage <= 0 || cImage <= 0) continue;
+                // L'image occupe l'étendue que la série déclare, et non toute la
+                // boîte : « imagesc(x,y,Z) » se pose au bon endroit, et un axe
+                // inversé la retourne comme le reste.
+                double x0 = s.x.size() > 1 ? s.x[0] : 0.5;
+                double x1 = s.x.size() > 1 ? s.x[1] : cImage + 0.5;
+                double y0 = s.y.size() > 1 ? s.y[0] : 0.5;
+                double y1 = s.y.size() > 1 ? s.y[1] : lImage + 0.5;
+                // Les pixels voisins d'une même couleur, sur une ligne, ne font
+                // qu'un rectangle : le fichier reste léger.
+                for (int i = 0; i < lImage; ++i) {
+                    int j = 0;
+                    while (j < cImage) {
+                        int r, vert, b;
+                        couleurPixelImage(palette, s,
+                                          (std::size_t)i + (std::size_t)j * (std::size_t)lImage,
+                                          cmin, cmax, r, vert, b);
+                        int jFin = j + 1;
+                        while (jFin < cImage) {
+                            int r2, v2, b2;
+                            std::size_t suivant =
+                                (std::size_t)i + (std::size_t)jFin * (std::size_t)lImage;
+                            couleurPixelImage(palette, s, suivant, cmin, cmax, r2, v2, b2);
+                            if (r2 != r || v2 != vert || b2 != b) break;
+                            ++jFin;
+                        }
+                        double gx0 = ex.versPixel(x0 + (x1 - x0) * j / cImage);
+                        double gx1 = ex.versPixel(x0 + (x1 - x0) * jFin / cImage);
+                        double gy0 = ey.versPixel(y0 + (y1 - y0) * i / lImage);
+                        double gy1 = ey.versPixel(y0 + (y1 - y0) * (i + 1) / lImage);
+                        toile.rectangle(std::min(gx0, gx1), std::min(gy0, gy1),
+                                        std::fabs(gx1 - gx0) + 0.5, std::fabs(gy1 - gy0) + 0.5,
+                                        rvb(r, vert, b), 1.0, nullptr);
+                        j = jFin;
+                    }
+                }
+                continue;
+            }
+            if (s.genre == GenreTrace::Barres) {
+                // La largeur : BarWidth fois le plus petit écart entre deux
+                // abscisses, en unités de données ; le pied : la base de la barre
+                // empilée, sinon zéro, ramené dans le cadre.
+                double demi = s.largeurBarre / 2 * ecartBarres(s.x);
+                Trait bord = trait(s.couleurBord.empty() ? std::string("#000000") : s.couleurBord,
+                                   s.epaisseur);
+                for (std::size_t k = 0; k < n; ++k) {
+                    double pied = k < s.basesBarres.size() ? s.basesBarres[k] : 0.0;
+                    pied = std::min(std::max(pied, ymin), ymax);
+                    double g = ex.versPixel(s.x[k] - demi);
+                    double d = ex.versPixel(s.x[k] + demi);
+                    double py = ey.versPixel(std::min(std::max(s.y[k], ymin), ymax));
+                    double base = ey.versPixel(pied);
+                    toile.rectangle(std::min(g, d), std::min(py, base), std::fabs(d - g),
+                                    std::fabs(base - py), s.couleur, s.opacite, &bord);
+                }
+                continue;
+            }
+            if (s.genre == GenreTrace::Points) {
+                // Un nuage : chaque point a son aire et sa couleur, creux par
+                // défaut comme dans MATLAB, plein sous « 'filled' ».
+                const std::string marqueur = s.marqueur.empty() ? "o" : s.marqueur;
+                FormeMarqueur commune = formeMarqueur(marqueur, s.tailleMarqueur);
+                if (s.airesPoints.size() == 1)
+                    commune = formeMarqueur(marqueur, std::sqrt(std::max(s.airesPoints[0], 0.0)));
+                for (std::size_t k = 0; k < n; ++k) {
+                    if (!std::isfinite(s.x[k]) || !std::isfinite(s.y[k])) continue;
+                    std::string couleur = couleurPoint(palette, cmin, cmax, s, k);
+                    std::string bord, face;
+                    couleursPoint(s, couleur, bord, face);
+                    // Un « + » ou un « x » n'a que son trait : il le garde.
+                    if (bord == "none" && commune.genre == FormeMarqueur::Traits) bord = couleur;
+                    if (s.airesPoints.size() > 1)
+                        dessinerMarqueur(toile,
+                                         formeMarqueur(marqueur, std::sqrt(std::max(
+                                                                     k < s.airesPoints.size()
+                                                                         ? s.airesPoints[k]
+                                                                         : 0.0,
+                                                                     0.0))),
+                                         ex.versPixel(s.x[k]), ey.versPixel(s.y[k]), bord, face);
+                    else
+                        dessinerMarqueur(toile, commune, ex.versPixel(s.x[k]), ey.versPixel(s.y[k]),
+                                         bord, face);
+                }
+                continue;
+            }
+            if (s.genre == GenreTrace::Tige) {
+                double base = ey.versPixel(0);
+                Trait t = trait(s.couleur, 1);
+                for (std::size_t k = 0; k < n; ++k) {
+                    double px = ex.versPixel(s.x[k]), py = ey.versPixel(s.y[k]);
+                    toile.ligne(px, base, px, py, t);
+                    toile.cercle(px, py, 3, "none", &t);
+                }
+                continue;
+            }
+            // Les points qu'aucun pixel ne distingue sont retirés : le dessin est
+            // le même, le fichier tient.
+            std::vector<std::size_t> visibles =
+                indicesVisibles(s.x, s.y, ex.min, ex.max, (int)(ex.pixelsMax - ex.pixelsMin),
+                                ex.log);
+            std::vector<double> px, py;
+            std::size_t precedent = 0;
+            bool premier = true;
+            for (std::size_t k : visibles) {
+                if (k >= n) continue;
+                if (!std::isfinite(s.x[k]) || !std::isfinite(s.y[k])) {
+                    if (!premier) {
+                        px.push_back(NAN);
+                        py.push_back(NAN);
+                    }
+                    premier = true;
+                    continue;
+                }
+                double x = ex.versPixel(s.x[k]), y = ey.versPixel(s.y[k]);
+                if (s.genre == GenreTrace::Escalier && !premier) {
+                    px.push_back(x);
+                    py.push_back(ey.versPixel(s.y[precedent]));
+                }
                 px.push_back(x);
-                py.push_back(ey.versPixel(s.y[precedent]));
+                py.push_back(y);
+                premier = false;
+                precedent = k;
             }
-            px.push_back(x);
-            py.push_back(y);
-            premier = false;
-            precedent = k;
-        }
-        if (s.style != "none" && !px.empty())
-            toile.polyligne(px, py, trait(s.couleur, s.epaisseur, s.style));
-        if (!s.marqueur.empty() && s.marqueur != "none") {
-            FormeMarqueur forme = formeMarqueur(s.marqueur, s.tailleMarqueur);
-            std::string bord, face;
-            couleursMarqueur(s, s.couleur, bord, face);
-            for (std::size_t k = 0; k < n; ++k) {
-                if (!std::isfinite(s.x[k]) || !std::isfinite(s.y[k])) continue;
-                dessinerMarqueur(toile, forme, ex.versPixel(s.x[k]), ey.versPixel(s.y[k]), bord,
-                                 face);
+            if (s.style != "none" && !px.empty())
+                toile.polyligne(px, py, trait(s.couleur, s.epaisseur, s.style));
+            if (!s.marqueur.empty() && s.marqueur != "none") {
+                FormeMarqueur forme = formeMarqueur(s.marqueur, s.tailleMarqueur);
+                std::string bord, face;
+                couleursMarqueur(s, s.couleur, bord, face);
+                for (std::size_t k = 0; k < n; ++k) {
+                    if (!std::isfinite(s.x[k]) || !std::isfinite(s.y[k])) continue;
+                    dessinerMarqueur(toile, forme, ex.versPixel(s.x[k]), ey.versPixel(s.y[k]), bord,
+                                     face);
+                }
             }
         }
+        toile.finDecoupe();
     }
-    toile.finDecoupe();
 
     if (a.barreCouleurs)
         dessinerBarre(toile, a, barre, gauche, droite, haut, bas, fx * L, descenteX,
@@ -693,23 +844,35 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
         st.gras = true;
         st.taille = a.taillePoliceTitre > 0 ? a.taillePoliceTitre : 15;
         st.tailleExplicite = a.taillePoliceTitre > 0;
-        toile.texte((gauche + droite) / 2, hautTitre - 14, morceauxTexte(a.titre), st);
+        toile.texte((gauche + droite) / 2, hautTitre - 14,
+                    morceauxInterpretes(a.titre, interpreteDe(a, "title")), st);
     }
     // MATLAB garde le titre sous « axis off », mais pas les étiquettes des
     // axes : elles nomment ce qui n'est plus dessiné.
-    if (!a.etiquetteX.empty() && a.axesVisibles) {
+    if (!a.etiquetteX.empty() && a.axesVisibles && !espace) {
         StyleTexte st;
         st.ancre = 'c';
-        toile.texte((gauche + droite) / 2, bas + 36 + descenteX, morceauxTexte(a.etiquetteX), st);
+        toile.texte((gauche + droite) / 2, bas + 36 + descenteX,
+                    morceauxInterpretes(a.etiquetteX, interpreteDe(a, "xlabel")), st);
     }
-    if (!a.etiquetteY.empty() && a.axesVisibles) {
+    if (deuxOrdonnees && !a.etiquetteYDroite.empty() && a.axesVisibles) {
+        StyleTexte st;
+        st.ancre = 'c';
+        st.angle = 90;
+        st.couleur = couleurCote(1);
+        toile.texte(droite + 8 + largeurDroite + 20, (haut + bas) / 2,
+                    morceauxInterpretes(a.etiquetteYDroite, interpreteDe(a, "ylabeldroite")), st);
+    }
+    if (!a.etiquetteY.empty() && a.axesVisibles && !espace) {
         StyleTexte st;
         st.ancre = 'c';
         st.angle = 90;
         // À côté de la boîte telle qu'elle est finalement placée : une
         // légende ou une barre de couleurs à l'ouest l'ont décalée.
         const double xEtiquetteY = std::min(gauche - 46.0, gauche - largeurEtiquettesY - 20);
-        toile.texte(xEtiquetteY, (haut + bas) / 2, morceauxTexte(a.etiquetteY), st);
+        if (deuxOrdonnees) st.couleur = couleurCote(0);
+        toile.texte(xEtiquetteY, (haut + bas) / 2,
+                    morceauxInterpretes(a.etiquetteY, interpreteDe(a, "ylabel")), st);
     }
 
     if (entrees.empty()) return;
@@ -727,7 +890,7 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
                   : (haut + bas) / 2.0 - hauteurLegende / 2;
     };
     if (!dehors) {
-        if (ou == "best") {
+        if (ou == "best" && !espace) {
             const char* choix[] = {"northeast", "northwest", "southeast", "southwest",
                                    "north",     "south",     "east",      "west"};
             std::size_t meilleur = (std::size_t)-1;
@@ -754,7 +917,7 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
                 }
             }
         } else {
-            placer(ou, xLegende, yLegende);
+            placer(ou == "best" ? std::string("northeast") : ou, xLegende, yLegende);
         }
     }
     if (a.boiteLegende) {
@@ -790,7 +953,9 @@ void dessinerAxe(const Figure& figure, const Axes& a, Toile& toile, int L, int H
                                  bord, face);
             }
         }
-        toile.texte(xe + 36, milieu + 4, morceauxTexte(entrees[k].texte), StyleTexte());
+        toile.texte(xe + 36, milieu + 4,
+                    morceauxInterpretes(entrees[k].texte, interpreteDe(a, "legend")),
+                    StyleTexte());
         if (a.legendeHorizontale) xe += largeursEntrees[k];
         else ye += ligneLegende;
     }

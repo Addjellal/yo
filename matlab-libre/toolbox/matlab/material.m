@@ -3,7 +3,7 @@ function material(mode)
 %   MATERIAL SHINY, MATERIAL DULL, MATERIAL METAL et MATERIAL DEFAULT
 %   règlent, dans MATLAB, la façon dont une surface renvoie la lumière.
 %
-%   Le rendu de MatLibre est plan et ne calcule pas d'éclairage :
+%   MatLibre ne calcule pas d'éclairage :
 %   l'appel est accepté et ne change rien à l'image.
 %
 %   Exemple :

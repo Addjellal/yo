@@ -130,10 +130,51 @@ std::vector<double> valeursDe(const Valeur& v) {
     return x;
 }
 
+std::shared_ptr<Axes> axesDeLaPoignee(Interpreteur& it, const Valeur& p, std::size_t e = 0) {
+    if (p.classe != Classe::Objet || !p.aChamp("NumeroFigure") || !p.aChamp("NumeroAxe"))
+        return nullptr;
+    int numero = (int)p.champ("NumeroFigure", e).scal();
+    auto trouve = it.figures.find(numero);
+    if (trouve == it.figures.end() || !trouve->second)
+        erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
+    int identifiant = (int)p.champ("NumeroAxe", e).scal();
+    for (const auto& a : trouve->second->axes)
+        if (a && a->identifiant == identifiant) return a;
+    erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
+}
+
+bool estPoigneeAxes(const Valeur& p) {
+    return p.classe == Classe::Objet && p.nomObjet == "matlab.graphics.axis.Axes";
+}
+
+bool estPoigneeFigure(const Valeur& p) {
+    return p.classe == Classe::Objet && p.nomObjet == "matlab.ui.Figure";
+}
+
+std::string enMinuscules(std::string t) {
+    for (auto& c : t) c = (char)std::tolower((unsigned char)c);
+    return t;
+}
+
+// Le côté des ordonnées que vise un tracé : celui de la poignée qui le
+// nomme (« plotyy » rend une poignée par côté), sinon le côté actif de
+// « yyaxis », sinon la gauche.
+int coteVise(const Axes& a, const Valeur* poignee) {
+    if (poignee && poignee->aChamp("Cote")) return (int)poignee->champ("Cote", 0).scal();
+    return a.deuxOrdonnees ? a.coteActif : 0;
+}
+
 int ajouterSerie(Interpreteur& it, Serie s) {
     auto a = axesCourants(it);
-    if (!a->tenir && a->series.empty()) { /* premier tracé */ }
     if (s.couleur.empty()) s.couleur = palette(a->series.size());
+    // Sous « yyaxis », la série va du côté actif, et en prend la couleur
+    // tant qu'aucune ne lui a été imposée : une couleur de la palette par
+    // défaut est celle que le tracé a choisie d'office.
+    if (a->deuxOrdonnees) {
+        s.cote = a->coteActif;
+        for (std::size_t k = 0; k < 7; ++k)
+            if (s.couleur == palette(k)) s.couleur = couleurCote(s.cote);
+    }
     s.identifiant = ++a->prochaineSerie;
     int identifiant = s.identifiant;
     a->series.push_back(std::move(s));
@@ -142,10 +183,48 @@ int ajouterSerie(Interpreteur& it, Serie s) {
 
 void nouveauTrace(Interpreteur& it) {
     auto a = axesCourants(it);
+    if (!a->tenir && a->deuxOrdonnees) {
+        // Sous « yyaxis », un tracé ne remplace que ceux de son côté.
+        std::vector<Serie> gardees;
+        for (auto& s : a->series)
+            if (s.cote != a->coteActif) gardees.push_back(std::move(s));
+        a->series = std::move(gardees);
+        return;
+    }
     if (!a->tenir) {
         a->series.clear();
         a->legendeVisible = false;
         a->legende.clear();
+        // Un tracé plan qui remplace un tracé de l'espace revient à la vue
+        // de dessus, et sans la grille que l'espace avait posée.
+        if (vueEspace(*a)) {
+            a->azimut = 0;
+            a->elevation = 90;
+            a->grille = false;
+        }
+        a->limitesManuellesZ = false;
+    }
+}
+
+// Un tracé de l'espace (« plot3 », « surf »…) sur un axe neuf prend la vue
+// par défaut de MATLAB — azimut -37,5, élévation 30 — et sa grille, comme
+// le font view(3) et grid on dans surf.m. Sous « hold on », l'axe garde
+// sa vue.
+void passerEnEspace(Interpreteur& it) {
+    auto a = axesCourants(it);
+    bool seul = true;
+    for (const auto& s : a->series)
+        if (!serieEspace(s)) seul = false;
+    if (a->tenir && !a->series.empty() && !seul) return;
+    if (a->tenir && vueEspace(*a)) return;
+    a->azimut = -37.5;
+    a->elevation = 30;
+    a->grille = true;
+    // L'axe neuf a ses sens ordinaires : une image avant lui avait pu
+    // retourner les ordonnées.
+    if (!a->tenir) {
+        a->xInverse = false;
+        a->yInverse = false;
     }
 }
 
@@ -168,7 +247,11 @@ std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTra
     auto axes = axesCourants(it);
     // Sous « hold on », un plot garde l'échelle de l'axe, comme dans
     // MATLAB : semilogy puis plot restait sinon en échelle linéaire.
-    if (axes->tenir && !axes->series.empty()) {
+    if (axes->deuxOrdonnees && axes->coteActif == 1) {
+        // L'échelle logarithmique d'un tracé de droite est celle de droite.
+        axes->logX = axes->logX || logX;
+        axes->logYDroite = logY || (axes->tenir && axes->logYDroite);
+    } else if (axes->tenir && !axes->series.empty()) {
         axes->logX = axes->logX || logX;
         axes->logY = axes->logY || logY;
     } else {
@@ -430,21 +513,14 @@ FONCTION(fnBar) {
 }
 FONCTION(fnStairs) { INUTILISE return tracer(it, args, GenreTrace::Escalier, false, false, nargout); }
 FONCTION(fnStem) { INUTILISE return tracer(it, args, GenreTrace::Tige, false, false, nargout); }
-// Une courbe de l'espace. Le rendu est plan : on projette, mais on garde
-// les trois coordonnees d'origine dans la serie, si bien que « XData »,
-// « YData » et « ZData » rendent ce qu'on a donne.
-//
-// La projection est celle de la vue par defaut de MATLAB — azimut -37,5
-// degres, elevation 30 —, celle qui montre les trois axes a la fois sans
-// qu'aucun se cache derriere un autre.
+// plot3(X,Y,Z), plot3(X,Y,Z,style), plusieurs triplets, et les paires
+// LineWidth, Color, DisplayName, LineStyle, Marker, MarkerSize,
+// MarkerFaceColor, MarkerEdgeColor. Des matrices tracent une courbe par
+// colonne, comme plot. Les coordonnées sont gardées telles quelles : le
+// dessin les projette selon la vue de l'axe.
 FONCTION(fnPlot3) {
     INUTILISE
     exigerArguments(args, 3, 0, "plot3");
-    const double azimut = -37.5 * 3.14159265358979323846 / 180.0;
-    const double elevation = 30.0 * 3.14159265358979323846 / 180.0;
-    const double sinA = std::sin(azimut), cosA = std::cos(azimut);
-    const double sinE = std::sin(elevation), cosE = std::cos(elevation);
-
     nouveauTrace(it);
     auto axes = axesCourants(it);
     std::size_t indexCouleur = axes->series.size();
@@ -452,48 +528,65 @@ FONCTION(fnPlot3) {
     std::size_t k = 0;
     while (k + 2 < args.size() && args[k].estNumerique() && args[k + 1].estNumerique() &&
            args[k + 2].estNumerique()) {
-        Serie s;
-        s.genre = GenreTrace::Ligne;
-        s.couleur.clear();
-        s.xVraies = valeursDe(args[k]);
-        s.yVraies = valeursDe(args[k + 1]);
-        s.z = valeursDe(args[k + 2]);
+        const Valeur& X = args[k];
+        const Valeur& Y = args[k + 1];
+        const Valeur& Z = args[k + 2];
         k += 3;
-        std::size_t n = std::min(s.xVraies.size(), std::min(s.yVraies.size(), s.z.size()));
-        s.xVraies.resize(n);
-        s.yVraies.resize(n);
-        s.z.resize(n);
-        s.x.resize(n);
-        s.y.resize(n);
-        for (std::size_t i = 0; i < n; ++i) {
-            double x = s.xVraies[i], y = s.yVraies[i], z = s.z[i];
-            s.x[i] = -x * sinA + y * cosA;
-            s.y[i] = -x * cosA * sinE - y * sinA * sinE + z * cosE;
-        }
-        if (k < args.size() && (args[k].estTexte() || args[k].estChaine())) {
-            std::string spec = args[k].versTexte();
-            if (estSpecificationStyle(spec)) {
-                decoderStyle(spec, s);
-                ++k;
-            }
+        Serie modele;
+        modele.genre = GenreTrace::Ligne;
+        modele.couleur.clear();
+        if (k < args.size() && (args[k].estTexte() || args[k].estChaine()) &&
+            estSpecificationStyle(args[k].versTexte())) {
+            decoderStyle(args[k].versTexte(), modele);
+            ++k;
         }
         while (k + 1 < args.size() && (args[k].estTexte() || args[k].estChaine())) {
-            std::string nom = args[k].versTexte();
-            for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
-            if (nom == "linewidth") s.epaisseur = args[k + 1].scal();
+            std::string nom = enMinuscules(args[k].versTexte());
+            const Valeur& v = args[k + 1];
+            if (nom == "linewidth") modele.epaisseur = v.scal();
             else if (nom == "color") {
-                std::string couleur = couleurDepuisValeur(args[k + 1]);
-                if (!couleur.empty()) s.couleur = couleur;
-            } else if (nom == "displayname") s.etiquette = args[k + 1].versTexte();
-            else if (nom == "linestyle") s.style = args[k + 1].versTexte();
-            else if (nom == "marker") s.marqueur = args[k + 1].versTexte();
+                std::string couleur = couleurDepuisValeur(v);
+                if (!couleur.empty()) modele.couleur = couleur;
+            } else if (nom == "displayname") modele.etiquette = v.versTexte();
+            else if (nom == "linestyle") modele.style = v.versTexte();
+            else if (nom == "marker") modele.marqueur = v.versTexte();
+            else if (nom == "markersize") modele.tailleMarqueur = v.scal();
+            else if (nom == "markerfacecolor")
+                modele.couleurFaceMarqueur = couleurMarqueurDepuis(v);
+            else if (nom == "markeredgecolor")
+                modele.couleurBordMarqueur = couleurMarqueurDepuis(v);
             k += 2;
         }
-        if (s.couleur.empty()) s.couleur = palette(indexCouleur++);
-        identifiants.push_back(ajouterSerie(it, s));
+        // Une courbe par colonne quand les trois sont des matrices de même
+        // forme ; sinon une seule, sur tous les éléments.
+        bool colonnes = X.nlignes() > 1 && X.ncolonnes() > 1 && X.dims == Y.dims &&
+                        X.dims == Z.dims;
+        int nb = colonnes ? X.ncolonnes() : 1;
+        std::size_t hauteur = colonnes ? (std::size_t)X.nlignes() : 0;
+        for (int c = 0; c < nb; ++c) {
+            Serie s = modele;
+            if (colonnes) {
+                for (std::size_t i = 0; i < hauteur; ++i) {
+                    std::size_t rang = i + (std::size_t)c * hauteur;
+                    s.x.push_back(X.re[rang]);
+                    s.y.push_back(Y.re[rang]);
+                    s.z.push_back(Z.re[rang]);
+                }
+            } else {
+                s.x = valeursDe(X);
+                s.y = valeursDe(Y);
+                s.z = valeursDe(Z);
+                if (s.x.size() != s.y.size() || s.x.size() != s.z.size())
+                    erreur("MATLAB:plot3:XYZLengthMismatch",
+                           "Vectors must be the same length.");
+            }
+            if (s.couleur.empty()) s.couleur = palette(indexCouleur++);
+            identifiants.push_back(ajouterSerie(it, s));
+        }
     }
     if (identifiants.empty())
         erreur("MATLAB:plot3:Arguments", "PLOT3 attend au moins X, Y et Z.");
+    passerEnEspace(it);
     if (nargout <= 0) return {};
     int numeroFigure = figureCourante(it)->numero;
     if (identifiants.size() == 1)
@@ -711,42 +804,140 @@ FONCTION(fnPcolor) {
     return traceImage(it, donnees, nargout, false, false);
 }
 
-FONCTION(surfDonnees) {
-    INUTILISE
-    exigerArguments(args, 1, 4, "surf");
-    // « surf(X,Y,Z) » : on garde l'etendue de X et de Y, faute de quoi
-    // l'image serait graduee en indices de maille.
-    std::vector<Valeur> a;
-    if (args.size() >= 3 && args[0].nelem() >= 2 && args[1].nelem() >= 2 &&
-        !args[0].estTexte() && !args[1].estTexte() && !args[0].estChaine() &&
-        !args[1].estChaine()) {
-        exigerNumerique(args[0], "surf");
-        exigerNumerique(args[1], "surf");
-        const Valeur& X = args[0];
-        const Valeur& Y = args[1];
-        std::vector<double> bordsX, bordsY;
-        if (X.nlignes() > 1 && X.ncolonnes() > 1) {
-            bordsX = {X.re[0], X.re[(std::size_t)(X.ncolonnes() - 1) * X.nlignes()]};
-        } else {
-            bordsX = {X.re.front(), X.re.back()};
-        }
-        if (Y.nlignes() > 1 && Y.ncolonnes() > 1) {
-            bordsY = {Y.re[0], Y.re[(std::size_t)Y.nlignes() - 1]};
-        } else {
-            bordsY = {Y.re.front(), Y.re.back()};
-        }
-        a = {Valeur::ligne(bordsX), Valeur::ligne(bordsY), args[2]};
-    } else {
-        a = {args[args.size() - 1]};
+// surf(Z), surf(Z,C), surf(X,Y,Z), surf(X,Y,Z,C), surf(ax,...) et les
+// paires FaceColor, EdgeColor, FaceAlpha, LineStyle, LineWidth,
+// DisplayName ; mesh de même. X et Y sont des vecteurs (colonnes et
+// lignes de la grille) ou des matrices de la forme de Z ; C donne la
+// couleur de chaque sommet, Z par défaut. surf remplit les mailles de la
+// couleur de leur premier sommet, bordées de noir ; mesh les laisse
+// blanches et colore les arêtes.
+std::vector<Valeur> surface(Interpreteur& it, Arguments args, int nargout, bool maillage) {
+    const char* nom = maillage ? "mesh" : "surf";
+    std::size_t k = 0;
+    std::shared_ptr<Axes> cible;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        cible = axesDeLaPoignee(it, args[0]);
+        k = 1;
     }
-    return traceImage(it, a, nargout, false, false);
+    std::vector<const Valeur*> nombres;
+    while (k < args.size() && nombres.size() < 4 && !args[k].estTexte() && !args[k].estChaine())
+        nombres.push_back(&args[k++]);
+    if (nombres.empty()) erreur("MATLAB:narginchk:notEnoughInputs", "Not enough input arguments.");
+    for (const Valeur* v : nombres) exigerNumerique(*v, nom);
+    const Valeur* Z = nullptr;
+    const Valeur* X = nullptr;
+    const Valeur* Y = nullptr;
+    const Valeur* C = nullptr;
+    if (nombres.size() <= 2) {
+        Z = nombres[0];
+        if (nombres.size() == 2) C = nombres[1];
+    } else {
+        X = nombres[0];
+        Y = nombres[1];
+        Z = nombres[2];
+        if (nombres.size() == 4) C = nombres[3];
+    }
+    const int m = Z->nlignes(), n = Z->ncolonnes();
+    if (m < 2 || n < 2)
+        erreur("MATLAB:" + std::string(nom) + ":NonMatrixData",
+               "Z must be a matrix, not a scalar or vector.");
+    Serie s;
+    s.genre = GenreTrace::Surface;
+    s.lignesGrille = m;
+    s.colonnesGrille = n;
+    s.epaisseur = 0.5;
+    s.couleur = "#000000";
+    s.modeFaces = maillage ? "#FFFFFF" : "flat";
+    s.modeAretes = maillage ? "flat" : "#000000";
+    const std::size_t total = (std::size_t)m * (std::size_t)n;
+    s.x.resize(total);
+    s.y.resize(total);
+    s.z.assign(Z->re.begin(), Z->re.begin() + (std::ptrdiff_t)total);
+    auto coordonnee = [&](const Valeur* V, bool enX, std::vector<double>& sortie) {
+        if (!V) {
+            for (int j = 0; j < n; ++j)
+                for (int i = 0; i < m; ++i)
+                    sortie[(std::size_t)i + (std::size_t)j * (std::size_t)m] = enX ? j + 1 : i + 1;
+            return;
+        }
+        if (V->nlignes() == m && V->ncolonnes() == n) {
+            sortie.assign(V->re.begin(), V->re.begin() + (std::ptrdiff_t)total);
+            return;
+        }
+        std::size_t attendu = enX ? (std::size_t)n : (std::size_t)m;
+        if (V->nelem() != attendu)
+            erreur("MATLAB:" + std::string(nom) + ":InvalidDimensions",
+                   std::string("Data dimensions must agree : ") + (enX ? "X" : "Y") +
+                       " doit avoir autant d'éléments que Z a de " +
+                       (enX ? "colonnes." : "lignes."));
+        for (int j = 0; j < n; ++j)
+            for (int i = 0; i < m; ++i)
+                sortie[(std::size_t)i + (std::size_t)j * (std::size_t)m] =
+                    V->re[enX ? (std::size_t)j : (std::size_t)i];
+    };
+    coordonnee(X, true, s.x);
+    coordonnee(Y, false, s.y);
+    if (C) {
+        if (C->nlignes() != m || C->ncolonnes() != n)
+            erreur("MATLAB:" + std::string(nom) + ":InvalidCData",
+                   "C doit avoir la forme de Z.");
+        s.valeursCouleurPoints.assign(C->re.begin(), C->re.begin() + (std::ptrdiff_t)total);
+    } else {
+        s.valeursCouleurPoints = s.z;
+    }
+    while (k < args.size()) {
+        if (!args[k].estTexte() && !args[k].estChaine())
+            erreur("MATLAB:" + std::string(nom) + ":InvalidArgument",
+                   std::string("Argument de ") + nom + " inattendu.");
+        std::string propriete = enMinuscules(args[k].versTexte());
+        if (k + 1 >= args.size())
+            erreur("MATLAB:" + std::string(nom) + ":InvalidArgument",
+                   "L'option " + args[k].versTexte() + " attend une valeur.");
+        const Valeur& v = args[k + 1];
+        auto mode = [&](const Valeur& valeur) {
+            if (valeur.estTexte() || valeur.estChaine()) {
+                std::string t = enMinuscules(valeur.versTexte());
+                if (t == "flat" || t == "interp" || t == "none") return t;
+                if (t == "texturemap") return std::string("interp");
+            }
+            std::string couleur = couleurDepuisValeur(valeur);
+            if (couleur.empty())
+                erreur("MATLAB:" + std::string(nom) + ":InvalidColor",
+                       "Couleur inconnue : " + valeur.versTexte() + ".");
+            return couleur;
+        };
+        if (propriete == "facecolor") s.modeFaces = mode(v);
+        else if (propriete == "edgecolor") s.modeAretes = mode(v);
+        else if (propriete == "facealpha") s.opacite = v.scal();
+        else if (propriete == "linestyle") s.style = v.versTexte();
+        else if (propriete == "linewidth") s.epaisseur = v.scal();
+        else if (propriete == "displayname") s.etiquette = v.versTexte();
+        else if (propriete == "edgealpha" || propriete == "facelighting" ||
+                 propriete == "edgelighting" || propriete == "ambientstrength" ||
+                 propriete == "diffusestrength" || propriete == "specularstrength" ||
+                 propriete == "meshstyle" || propriete == "cdatamapping") {
+            // L'éclairage n'est pas rendu : accepté sans effet.
+        } else {
+            erreur("MATLAB:hg:InvalidProperty",
+                   "Unrecognized property '" + args[k].versTexte() + "' for class 'Surface'.");
+        }
+        k += 2;
+    }
+    if (cible) {
+        auto f = figureCourante(it);
+        for (std::size_t i = 0; i < f->axes.size(); ++i)
+            if (f->axes[i] == cible) f->axeCourant = (int)i;
+    }
+    nouveauTrace(it);
+    auto axes = axesCourants(it);
+    int identifiant = ajouterSerie(it, s);
+    passerEnEspace(it);
+    if (nargout <= 0) return {};
+    return {poigneeLigne(figureCourante(it)->numero, axes->identifiant, identifiant)};
 }
 
-FONCTION(fnSurf) {
-    INUTILISE
-    std::vector<Valeur> donnees = sansProprietes(args, "surf");
-    return surfDonnees(it, donnees, nargout);
-}
+FONCTION(fnSurf) { return surface(it, args, nargout, false); }
+FONCTION(fnMesh) { return surface(it, args, nargout, true); }
 
 // ---------------------------------------------------------- contours
 //
@@ -984,6 +1175,7 @@ std::vector<Valeur> tracerContours(Interpreteur& it, std::vector<Valeur>& args,
     Valeur Z;
     std::string style;
     lireArgumentsContour(it, args, nom, x, y, Z, niveaux, style);
+    const bool espace = std::string(nom) == "contour3";
     nouveauTrace(it);
     auto axes = axesCourants(it);
     if (remplir) {
@@ -1031,6 +1223,8 @@ std::vector<Valeur> tracerContours(Interpreteur& it, std::vector<Valeur>& args,
             s.genre = GenreTrace::Ligne;
             s.x = courbe.first;
             s.y = courbe.second;
+            // contour3 pose chaque ligne à la hauteur de son niveau.
+            if (espace) s.z.assign(s.x.size(), niveau);
             s.couleur = "#000000";
             if (!style.empty()) decoderStyle(style, s);
             if (!couleurImposee) {
@@ -1047,6 +1241,7 @@ std::vector<Valeur> tracerContours(Interpreteur& it, std::vector<Valeur>& args,
             courbes.push_back({niveau, courbe});
         }
     }
+    if (espace) passerEnEspace(it);
     if (nargout <= 0) return {};
     Valeur C = matriceContours(courbes);
     if (nargout == 1) return {C};
@@ -1067,8 +1262,8 @@ FONCTION(fnContourf) {
     return tracerContours(it, args, "contourf", true, nargout);
 }
 
-// « contour3 » dessine les memes lignes ; le rendu de MatLibre est plan,
-// comme pour plot3 et surf.
+// « contour3 » dessine les memes lignes, chacune a la hauteur de son
+// niveau, en perspective.
 FONCTION(fnContour3) {
     INUTILISE
     return tracerContours(it, args, "contour3", false, nargout);
@@ -1328,60 +1523,68 @@ FONCTION(fnAxes) {
                        : std::vector<Valeur>{};
 }
 
-FONCTION(fnXlabel) {
-    axesCourants(it)->etiquetteX = args.empty() ? "" : args[0].versTexte();
-    // MATLAB rend la poignee du texte : « z = title(...) ; set(z,...) ».
-    if (nargout > 0) return {poigneeTexteCourant(it, "xlabel")};
+// Un interprète de texte : 'tex', 'latex' ou 'none', comme MATLAB.
+std::string interpreteDepuis(const Valeur& v) {
+    std::string mode = enMinuscules(v.versTexte());
+    if (mode != "tex" && mode != "latex" && mode != "none")
+        erreur("MATLAB:hg:InvalidInterpreter",
+               "Interpreter must be 'tex', 'latex', or 'none'.");
+    return mode;
+}
+
+// Le texte d'un titre ou d'une étiquette : une cellule donne une ligne par
+// élément dans MATLAB ; MatLibre, qui écrit sur une seule ligne, les met
+// bout à bout.
+std::string texteDe(const Valeur& v) {
+    if (v.classe == Classe::Cellule) {
+        std::string t;
+        for (const auto& c : v.cellules) t += (t.empty() ? "" : " ") + c.versTexte();
+        return t;
+    }
+    if (v.estChaine() && v.nelem() > 1) {
+        std::string t;
+        for (const auto& c : v.chaines) t += (t.empty() ? "" : " ") + c;
+        return t;
+    }
+    return v.versTexte();
+}
+
+// title, xlabel, ylabel, zlabel : TITLE(TEXTE), TITLE(AX,TEXTE), et les
+// paires Interpreter et FontSize ; les autres (Color, FontWeight…) sont
+// acceptées sans effet. Rend la poignée du texte : « z = title(...) ;
+// set(z,...) ».
+std::vector<Valeur> texteAxe(Interpreteur& it, Arguments args, int nargout,
+                             const std::string& cible) {
+    auto a = axesCourants(it);
+    std::size_t k = 0;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        a = axesDeLaPoignee(it, args[0]);
+        k = 1;
+    }
+    std::string texte = k < args.size() ? texteDe(args[k++]) : std::string();
+    const bool droite = cible == "ylabel" && coteVise(*a, k == 1 ? &args[0] : nullptr) == 1;
+    if (cible == "title") a->titre = texte;
+    else if (cible == "xlabel") a->etiquetteX = texte;
+    else if (droite) a->etiquetteYDroite = texte;
+    else if (cible == "ylabel") a->etiquetteY = texte;
+    else a->etiquetteZ = texte;
+    for (; k + 1 < args.size(); k += 2) {
+        std::string nom = enMinuscules(args[k].versTexte());
+        if (nom == "interpreter")
+            a->interpretes[droite ? "ylabeldroite" : cible] = interpreteDepuis(args[k + 1]);
+        else if (nom == "fontsize" && cible == "title") a->taillePoliceTitre = args[k + 1].scal();
+    }
+    if (nargout > 0) return {poigneeTexteCourant(it, cible)};
     return {};
 }
-FONCTION(fnYlabel) {
-    axesCourants(it)->etiquetteY = args.empty() ? "" : args[0].versTexte();
-    // MATLAB rend la poignee du texte : « z = title(...) ; set(z,...) ».
-    if (nargout > 0) return {poigneeTexteCourant(it, "ylabel")};
-    return {};
-}
-FONCTION(fnZlabel) {
-    axesCourants(it)->etiquetteZ = args.empty() ? "" : args[0].versTexte();
-    // Comme TITLE, XLABEL et YLABEL : la poignee du texte pose, pour
-    // pouvoir le reprendre ensuite. L'omettre rendait ZLABEL seul de sa
-    // famille a ne rien rendre.
-    if (nargout > 0) return {poigneeTexteCourant(it, "zlabel")};
-    return {};
-}
-FONCTION(fnTitle) {
-    axesCourants(it)->titre = args.empty() ? "" : args[0].versTexte();
-    // MATLAB rend la poignee du texte : « z = title(...) ; set(z,...) ».
-    if (nargout > 0) return {poigneeTexteCourant(it, "title")};
-    return {};
-}
+
+FONCTION(fnXlabel) { return texteAxe(it, args, nargout, "xlabel"); }
+FONCTION(fnYlabel) { return texteAxe(it, args, nargout, "ylabel"); }
+FONCTION(fnZlabel) { return texteAxe(it, args, nargout, "zlabel"); }
+FONCTION(fnTitle) { return texteAxe(it, args, nargout, "title"); }
 
 // Les axes que désigne une poignée graphique : celle d'un axe, ou d'une
 // courbe (son axe). Nul si la valeur n'est pas une poignée graphique.
-std::shared_ptr<Axes> axesDeLaPoignee(Interpreteur& it, const Valeur& p, std::size_t e = 0) {
-    if (p.classe != Classe::Objet || !p.aChamp("NumeroFigure") || !p.aChamp("NumeroAxe"))
-        return nullptr;
-    int numero = (int)p.champ("NumeroFigure", e).scal();
-    auto trouve = it.figures.find(numero);
-    if (trouve == it.figures.end() || !trouve->second)
-        erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
-    int identifiant = (int)p.champ("NumeroAxe", e).scal();
-    for (const auto& a : trouve->second->axes)
-        if (a && a->identifiant == identifiant) return a;
-    erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
-}
-
-bool estPoigneeAxes(const Valeur& p) {
-    return p.classe == Classe::Objet && p.nomObjet == "matlab.graphics.axis.Axes";
-}
-
-bool estPoigneeFigure(const Valeur& p) {
-    return p.classe == Classe::Objet && p.nomObjet == "matlab.ui.Figure";
-}
-
-std::string enMinuscules(std::string t) {
-    for (auto& c : t) c = (char)std::tolower((unsigned char)c);
-    return t;
-}
 
 // Les positions qu'accepte « legend(...,'Location',L) ».
 bool positionLegendeConnue(const std::string& p) {
@@ -1484,6 +1687,8 @@ FONCTION(fnLegend) {
             a->boiteLegende = enMinuscules(valeur.versTexte()) != "off";
         } else if (nom == "visible") {
             a->legendeVisible = enMinuscules(valeur.versTexte()) != "off";
+        } else if (nom == "interpreter") {
+            a->interpretes["legend"] = interpreteDepuis(valeur);
         } else if (nom == "string") {
             etiquettes.clear();
             if (valeur.classe == Classe::Cellule)
@@ -1549,10 +1754,17 @@ FONCTION(fnAxis) {
     INUTILISE
     auto a = axesCourants(it);
     // « v = axis » rend [xmin xmax ymin ymax], comme sous MATLAB.
+    // En perspective, six bornes : [xmin xmax ymin ymax zmin zmax].
     auto rendreBornes = [&]() -> std::vector<Valeur> {
         double xmin, xmax, ymin, ymax;
         bornesAffichees(*a, xmin, xmax, ymin, ymax);
         std::vector<double> v = {xmin, xmax, ymin, ymax};
+        if (vueEspace(*a)) {
+            double zmin, zmax;
+            limitesAxeZ(*a, zmin, zmax);
+            v.push_back(zmin);
+            v.push_back(zmax);
+        }
         return {Valeur::ligne(v)};
     };
     if (args.empty()) return nargout > 0 ? rendreBornes() : std::vector<Valeur>{};
@@ -1562,7 +1774,28 @@ FONCTION(fnAxis) {
         if (s == "auto") {
             a->limitesManuellesX = false;
             a->limitesManuellesY = false;
+            a->limitesManuellesZ = false;
         } else if (s == "manual" || s == "tight" || s == "image") {
+            // En perspective, la troisième dimension suit.
+            if (vueEspace(*a) && s != "image") {
+                double zmin = INFINITY, zmax = -INFINITY;
+                if (s == "manual") {
+                    limitesAxeZ(*a, zmin, zmax);
+                } else {
+                    for (const auto& serie : a->series)
+                        if (serieEspace(serie) && serie.genre != GenreTrace::Texte)
+                            for (double v : serie.z)
+                                if (std::isfinite(v)) {
+                                    zmin = std::min(zmin, v);
+                                    zmax = std::max(zmax, v);
+                                }
+                }
+                if (std::isfinite(zmin) && zmax > zmin) {
+                    a->zmin = zmin;
+                    a->zmax = zmax;
+                    a->limitesManuellesZ = true;
+                }
+            }
             // « tight » serre sur les donnees et fige ; « manual » fige ce
             // qui est affiche ; « image » y ajoute des echelles egales.
             double xmin, xmax, ymin, ymax;
@@ -1610,6 +1843,11 @@ FONCTION(fnAxis) {
         a->ymax = args[0].re[3];
         a->limitesManuellesX = true;
         a->limitesManuellesY = true;
+    }
+    if (args[0].nelem() >= 6) {
+        a->zmin = args[0].re[4];
+        a->zmax = args[0].re[5];
+        a->limitesManuellesZ = true;
     }
     return nargout > 0 ? rendreBornes() : std::vector<Valeur>{};
 }
@@ -1749,7 +1987,15 @@ FONCTION(fnLine) {
     s.genre = GenreTrace::Ligne;
     s.x = valeursDe(args[0]);
     s.y = valeursDe(args[1]);
-    for (std::size_t k = 2; k + 1 < args.size(); k += 2) {
+    // line(x,y,z) : une ligne de l'espace.
+    std::size_t debutPaires = 2;
+    if (args.size() >= 3 && args[2].estNumerique() && !args[2].estTexte()) {
+        s.z = valeursDe(args[2]);
+        if (s.z.size() != s.x.size())
+            erreur("MATLAB:line:XYZLengthMismatch", "Vectors must be the same length.");
+        debutPaires = 3;
+    }
+    for (std::size_t k = debutPaires; k + 1 < args.size(); k += 2) {
         std::string propriete = args[k].versTexte();
         for (auto& c : propriete) c = (char)std::tolower((unsigned char)c);
         if (propriete == "color") {
@@ -1776,21 +2022,82 @@ FONCTION(fnLine) {
     return {};
 }
 
-// « zlim » et « view » : acceptés pour que les scripts de tracé
-// tridimensionnel passent. Le rendu de MatLibre est plan ; ce qu'ils
-// posent est gardé et rendu, mais ne change pas l'image.
+// zlim([bas haut]), zlim('auto'), zlim() : les bornes de la troisième
+// dimension.
 FONCTION(fnZlim) {
     INUTILISE
     auto a = axesCourants(it);
-    if (args.empty()) return {Valeur::ligne({0.0, 1.0})};
-    (void)a;
+    std::size_t k = 0;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        a = axesDeLaPoignee(it, args[0]);
+        k = 1;
+    }
+    if (k >= args.size()) {
+        double bas, haut;
+        limitesAxeZ(*a, bas, haut);
+        return {Valeur::ligne({bas, haut})};
+    }
+    if (args[k].estTexte() || args[k].estChaine()) {
+        std::string mode = enMinuscules(args[k].versTexte());
+        if (mode == "auto") a->limitesManuellesZ = false;
+        else if (mode == "manual") {
+            double bas, haut;
+            limitesAxeZ(*a, bas, haut);
+            a->zmin = bas;
+            a->zmax = haut;
+            a->limitesManuellesZ = true;
+        } else {
+            erreur("MATLAB:zlim:InvalidMode", "zlim : 'auto', 'manual' ou deux bornes.");
+        }
+        return {};
+    }
+    exigerNumerique(args[k], "zlim");
+    if (args[k].nelem() != 2 || !(args[k].re[1] > args[k].re[0]))
+        erreur("MATLAB:zlim:InvalidLimits",
+               "Limits must be a 2-element vector of increasing numeric values.");
+    a->zmin = args[k].re[0];
+    a->zmax = args[k].re[1];
+    a->limitesManuellesZ = true;
     return {};
 }
 
+// view(az,el), view([az el]), view(2) — la vue de dessus —, view(3) — la
+// vue par défaut de l'espace, azimut -37,5, élévation 30 —, view(ax,...),
+// et [az,el] = view : la vue de l'axe.
 FONCTION(fnView) {
     INUTILISE
-    if (nargout > 0) return {Valeur::ligne({0.0, 90.0})};
-    return {};
+    auto a = axesCourants(it);
+    std::size_t k = 0;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        a = axesDeLaPoignee(it, args[0]);
+        k = 1;
+    }
+    if (k < args.size()) {
+        exigerNumerique(args[k], "view");
+        std::vector<double> v = valeursDe(args[k]);
+        if (k + 1 < args.size()) {
+            exigerNumerique(args[k + 1], "view");
+            v = {args[k].scal(), args[k + 1].scal()};
+        }
+        if (v.size() == 1 && (v[0] == 2 || v[0] == 3)) {
+            a->azimut = v[0] == 2 ? 0 : -37.5;
+            a->elevation = v[0] == 2 ? 90 : 30;
+        } else if (v.size() == 2 && std::isfinite(v[0]) && std::isfinite(v[1])) {
+            a->azimut = v[0];
+            a->elevation = v[1];
+        } else if (v.size() == 3) {
+            // Une direction d'observation [x y z], comme MATLAB.
+            double r = std::hypot(v[0], v[1]);
+            a->azimut = std::atan2(v[0], -v[1]) * 180 / 3.14159265358979323846;
+            a->elevation = std::atan2(v[2], r) * 180 / 3.14159265358979323846;
+        } else {
+            erreur("MATLAB:view:InvalidInput",
+                   "view attend 2, 3, [az el], az et el, ou une direction [x y z].");
+        }
+        if (nargout <= 0) return {};
+    }
+    if (nargout >= 2) return {Valeur::scalaire(a->azimut), Valeur::scalaire(a->elevation)};
+    return {Valeur::ligne({a->azimut, a->elevation})};
 }
 
 FONCTION(fnXline) { return droiteConstante(it, args, nargout, 'x'); }
@@ -1799,11 +2106,28 @@ FONCTION(fnYline) { return droiteConstante(it, args, nargout, 'y'); }
 // « xticks([0 5 10]) » pose les graduations ; sans argument, il les rend.
 std::vector<Valeur> graduationsAxe(Interpreteur& it, Arguments args, char axe) {
     auto a = axesCourants(it);
-    std::vector<double>& cible = axe == 'x' ? a->ticksX : a->ticksY;
+    const bool droite = axe == 'y' && a->deuxOrdonnees && a->coteActif == 1;
+    std::vector<double>& cible = axe == 'x'   ? a->ticksX
+                                 : droite     ? a->ticksYDroite
+                                 : axe == 'y' ? a->ticksY
+                                              : a->ticksZ;
+    if (args.empty() && droite) {
+        double ymin, ymax;
+        limitesAxeDroite(*a, ymin, ymax);
+        return {Valeur::ligne(a->ticksYDroite.empty()
+                                  ? matlibre::graduationsAxe(ymin, ymax, 6, a->logYDroite)
+                                  : a->ticksYDroite)};
+    }
     if (args.empty()) {
         // Les graduations montrées, même choisies d'office, comme MATLAB.
         double xmin, xmax, ymin, ymax;
         limitesAxe(*a, xmin, xmax, ymin, ymax);
+        if (axe == 'z') {
+            double zmin, zmax;
+            limitesAxeZ(*a, zmin, zmax);
+            return {Valeur::ligne(a->ticksZ.empty() ? matlibre::graduationsAxe(zmin, zmax, 6, false)
+                                                    : a->ticksZ)};
+        }
         return {Valeur::ligne(axe == 'x' ? graduationsEffectives(*a, 'x', xmin, xmax, a->logX)
                                          : graduationsEffectives(*a, 'y', ymin, ymax, a->logY))};
     }
@@ -1813,17 +2137,22 @@ std::vector<Valeur> graduationsAxe(Interpreteur& it, Arguments args, char axe) {
         if (mode == "auto") cible.clear();
         return {};
     }
-    exigerNumerique(args[0], axe == 'x' ? "xticks" : "yticks");
+    exigerNumerique(args[0], axe == 'x' ? "xticks" : axe == 'y' ? "yticks" : "zticks");
     cible.assign(args[0].re.begin(), args[0].re.end());
     return {};
 }
 
 FONCTION(fnXticks) { INUTILISE return graduationsAxe(it, args, 'x'); }
 FONCTION(fnYticks) { INUTILISE return graduationsAxe(it, args, 'y'); }
+FONCTION(fnZticks) { INUTILISE return graduationsAxe(it, args, 'z'); }
 
 std::vector<Valeur> etiquettesAxe(Interpreteur& it, Arguments args, char axe) {
     auto a = axesCourants(it);
-    std::vector<std::string>& cible = axe == 'x' ? a->etiquettesTicksX : a->etiquettesTicksY;
+    const bool droite = axe == 'y' && a->deuxOrdonnees && a->coteActif == 1;
+    std::vector<std::string>& cible = axe == 'x'   ? a->etiquettesTicksX
+                                      : droite     ? a->etiquettesTicksYDroite
+                                      : axe == 'y' ? a->etiquettesTicksY
+                                                   : a->etiquettesTicksZ;
     if (args.empty()) {
         std::vector<Valeur> c;
         for (const std::string& t : cible) c.push_back(Valeur::texte(t));
@@ -1848,6 +2177,7 @@ std::vector<Valeur> etiquettesAxe(Interpreteur& it, Arguments args, char axe) {
 
 FONCTION(fnXticklabels) { INUTILISE return etiquettesAxe(it, args, 'x'); }
 FONCTION(fnYticklabels) { INUTILISE return etiquettesAxe(it, args, 'y'); }
+FONCTION(fnZticklabels) { INUTILISE return etiquettesAxe(it, args, 'z'); }
 
 // « cla » vide l'axe courant sans toucher aux autres.
 FONCTION(fnCla) {
@@ -1865,6 +2195,13 @@ FONCTION(fnCla) {
     a->ticksY.clear();
     a->etiquettesTicksX.clear();
     a->etiquettesTicksY.clear();
+    a->deuxOrdonnees = false;
+    a->coteActif = 0;
+    a->limitesManuellesYDroite = false;
+    a->logYDroite = false;
+    a->ticksYDroite.clear();
+    a->etiquettesTicksYDroite.clear();
+    a->etiquetteYDroite.clear();
     return {};
 }
 
@@ -1886,15 +2223,78 @@ FONCTION(fnXlim) {
 FONCTION(fnYlim) {
     INUTILISE
     auto a = axesCourants(it);
-    if (!args.empty()) exigerNumerique(args[0], "ylim");
-    if (args.empty() || args[0].nelem() < 2) {
+    std::size_t k = 0;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        a = axesDeLaPoignee(it, args[0]);
+        k = 1;
+    }
+    // Sous « yyaxis », les bornes du côté visé.
+    const int cote = coteVise(*a, k == 1 ? &args[0] : nullptr);
+    if (k < args.size() && (args[k].estTexte() || args[k].estChaine())) {
+        if (enMinuscules(args[k].versTexte()) == "auto") {
+            if (cote == 1) a->limitesManuellesYDroite = false;
+            else a->limitesManuellesY = false;
+        }
+        return {};
+    }
+    if (k < args.size()) exigerNumerique(args[k], "ylim");
+    if (k >= args.size() || args[k].nelem() < 2) {
         double xmin, xmax, ymin, ymax;
-        limitesAxe(*a, xmin, xmax, ymin, ymax);
+        if (cote == 1) limitesAxeDroite(*a, ymin, ymax);
+        else limitesAxe(*a, xmin, xmax, ymin, ymax);
         return {Valeur::ligne({ymin, ymax})};
     }
-    a->ymin = args[0].re[0];
-    a->ymax = args[0].re[1];
-    a->limitesManuellesY = true;
+    if (cote == 1) {
+        a->yminDroite = args[k].re[0];
+        a->ymaxDroite = args[k].re[1];
+        a->limitesManuellesYDroite = true;
+    } else {
+        a->ymin = args[k].re[0];
+        a->ymax = args[k].re[1];
+        a->limitesManuellesY = true;
+    }
+    return {};
+}
+
+// matlibre_cote_axe(ax, cote) : la poignée de l'axe AX qui vise un côté
+// de ses ordonnées (0 à gauche, 1 à droite). « plotyy » rend ses deux
+// axes ainsi : ylim(AX(2), ...) et ylabel(AX(2), ...) visent la droite.
+FONCTION(fnCoteAxe) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "matlibre_cote_axe");
+    if (!estPoigneeAxes(args[0]))
+        erreur("MATLAB:matlibre_cote_axe:InvalidAxes", "Le premier argument est un axe.");
+    Valeur p = args[0];
+    p.poserChamp("Cote", Valeur::scalaire(args[1].scal() != 0 ? 1.0 : 0.0));
+    return {p};
+}
+
+// yyaxis left, yyaxis right, yyaxis(ax, ...) : un second axe des
+// ordonnées, à droite. Le premier appel range à gauche ce qui est déjà
+// tracé ; ensuite, les tracés, ylim, ylabel et yticks visent le côté
+// actif. Chaque côté prend sa couleur : la première de MATLAB à gauche,
+// la deuxième à droite.
+FONCTION(fnYyaxis) {
+    INUTILISE
+    auto a = axesCourants(it);
+    std::size_t k = 0;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        a = axesDeLaPoignee(it, args[0]);
+        k = 1;
+    }
+    if (k >= args.size()) erreur("MATLAB:narginchk:notEnoughInputs", "Not enough input arguments.");
+    std::string cote = enMinuscules(args[k].versTexte());
+    if (cote != "left" && cote != "right")
+        erreur("MATLAB:yyaxis:InvalidSide", "Specify 'left' or 'right'.");
+    if (!a->deuxOrdonnees) {
+        a->deuxOrdonnees = true;
+        for (auto& s : a->series) {
+            s.cote = 0;
+            for (std::size_t c = 0; c < 7; ++c)
+                if (s.couleur == palette(c)) s.couleur = couleurCote(0);
+        }
+    }
+    a->coteActif = cote == "right" ? 1 : 0;
     return {};
 }
 
@@ -2170,8 +2570,8 @@ FONCTION(fnColorbar) {
 // par point que la palette met à l'échelle, ou une ligne RVB par point.
 // Les marqueurs sont creux, comme dans MATLAB, sauf sous 'filled'. Le
 // tracé générique de plot lisait SZ comme une seconde courbe.
-FONCTION(fnScatter) {
-    INUTILISE
+std::vector<Valeur> nuage(Interpreteur& it, Arguments args, int nargout, bool espace) {
+    const std::size_t premiers = espace ? 3 : 2;
     std::size_t k = 0;
     std::shared_ptr<Axes> cible;
     if (!args.empty() && estPoigneeAxes(args[0])) {
@@ -2179,11 +2579,13 @@ FONCTION(fnScatter) {
         k = 1;
     }
     std::vector<const Valeur*> nombres;
-    while (k < args.size() && nombres.size() < 4 && !args[k].estTexte() && !args[k].estChaine())
+    while (k < args.size() && nombres.size() < premiers + 2 && !args[k].estTexte() &&
+           !args[k].estChaine())
         nombres.push_back(&args[k++]);
-    if (nombres.size() < 2)
-        erreur("MATLAB:scatter:NotEnoughInputs", "scatter attend au moins X et Y.");
-    for (const Valeur* v : nombres) exigerNumerique(*v, "scatter");
+    if (nombres.size() < premiers)
+        erreur("MATLAB:scatter:NotEnoughInputs",
+               espace ? "scatter3 attend au moins X, Y et Z." : "scatter attend au moins X et Y.");
+    for (const Valeur* v : nombres) exigerNumerique(*v, espace ? "scatter3" : "scatter");
     Serie s;
     s.genre = GenreTrace::Points;
     s.couleur.clear();
@@ -2191,6 +2593,14 @@ FONCTION(fnScatter) {
     s.style = "none";
     s.x = valeursDe(*nombres[0]);
     s.y = valeursDe(*nombres[1]);
+    if (espace) {
+        s.z = valeursDe(*nombres[2]);
+        if (s.z.size() != s.x.size())
+            erreur("MATLAB:scatter3:InvalidData",
+                   "X, Y et Z doivent avoir le même nombre d'éléments.");
+        // Les tailles et les couleurs suivent Z.
+        nombres.erase(nombres.begin() + 2);
+    }
     if (s.x.size() != s.y.size())
         erreur("MATLAB:scatter:InvalidXYData",
                "X et Y doivent avoir le même nombre d'éléments.");
@@ -2292,12 +2702,209 @@ FONCTION(fnScatter) {
     nouveauTrace(it);
     auto axes = axesCourants(it);
     int identifiant = ajouterSerie(it, s);
+    if (espace) passerEnEspace(it);
     if (nargout <= 0) return {};
     return {poigneeLigne(figureCourante(it)->numero, axes->identifiant, identifiant)};
 }
 
+FONCTION(fnScatter) { return nuage(it, args, nargout, false); }
+FONCTION(fnScatter3) { return nuage(it, args, nargout, true); }
+
+// Des faces : fill3(X,Y,Z,C) et le « patch » de bas niveau. X, Y et Z sont
+// des vecteurs (une face) ou des matrices (une face par colonne) ; C une
+// couleur, un triplet, une valeur (mise à l'échelle par CLim), une valeur
+// ou un triplet par face, ou une valeur par sommet (la face prend leur
+// moyenne). Les faces sont rangées dans une seule série, séparées par des
+// NaN. HAUTNIVEAU : fill3 remplace le tracé (sauf « hold on ») et passe en
+// perspective ; patch ajoute ses faces sans rien changer d'autre.
+std::vector<Valeur> faces(Interpreteur& it, Arguments args, int nargout, bool hautNiveau,
+                          const char* nom) {
+    std::size_t k = 0;
+    std::vector<const Valeur*> nombres;
+    while (k < args.size() && nombres.size() < 4 && !args[k].estTexte() && !args[k].estChaine())
+        nombres.push_back(&args[k++]);
+    const Valeur* couleurTexte = nullptr;
+    if (nombres.size() == 3 && k < args.size() && (args[k].estTexte() || args[k].estChaine()) &&
+        (k + 1 >= args.size() || estSpecificationStyle(args[k].versTexte()) ||
+         !couleurDepuisValeur(args[k]).empty())) {
+        // fill3(X,Y,Z,'r') : la couleur écrite.
+        std::string mot = enMinuscules(args[k].versTexte());
+        static const std::set<std::string> proprietes = {"facecolor", "edgecolor", "facealpha",
+                                                         "linewidth", "linestyle", "displayname"};
+        if (!proprietes.count(mot)) couleurTexte = &args[k++];
+    }
+    if (nombres.size() < 3)
+        erreur("MATLAB:narginchk:notEnoughInputs", "Not enough input arguments.");
+    for (const Valeur* v : nombres) exigerNumerique(*v, nom);
+    const Valeur& X = *nombres[0];
+    const Valeur& Y = *nombres[1];
+    const Valeur& Z = *nombres[2];
+    const bool avecZ = !Z.estVide();
+    const bool vecteur = X.nlignes() == 1 || X.ncolonnes() == 1;
+    const std::size_t sommets = vecteur ? X.nelem() : (std::size_t)X.nlignes();
+    const std::size_t nbFaces = vecteur ? 1 : (std::size_t)X.ncolonnes();
+    if (Y.nelem() != X.nelem() || (avecZ && Z.nelem() != X.nelem()))
+        erreur("MATLAB:" + std::string(nom) + ":InvalidDimensions",
+               "X, Y et Z doivent avoir la même forme.");
+    Serie s;
+    s.genre = GenreTrace::Polygone;
+    s.couleur.clear();
+    s.modeFaces = "flat";
+    s.modeAretes = "#000000";
+    s.epaisseur = 0.5;
+    for (std::size_t f = 0; f < nbFaces; ++f) {
+        if (f) {
+            s.x.push_back(NAN);
+            s.y.push_back(NAN);
+            if (avecZ) s.z.push_back(NAN);
+        }
+        for (std::size_t i = 0; i < sommets; ++i) {
+            std::size_t r = i + f * sommets;
+            if (!std::isfinite(X.re[r]) || !std::isfinite(Y.re[r])) continue;
+            s.x.push_back(X.re[r]);
+            s.y.push_back(Y.re[r]);
+            if (avecZ) s.z.push_back(Z.re[r]);
+        }
+    }
+    auto lireCouleur = [&](const Valeur& C) {
+        if (C.estVide()) return;
+        if (C.estTexte() || C.estChaine()) {
+            std::string couleur = couleurDepuisValeur(C);
+            if (couleur.empty())
+                erreur("MATLAB:" + std::string(nom) + ":InvalidColor",
+                       "Couleur inconnue : " + C.versTexte() + ".");
+            s.couleur = couleur;
+            return;
+        }
+        if (C.nlignes() == 1 && C.ncolonnes() == 3 && nbFaces != 3) {
+            s.couleur = couleurDepuisValeur(C);
+            return;
+        }
+        if (C.nelem() == 1) {
+            s.valeursCouleurPoints = {C.re[0]};
+            return;
+        }
+        if ((std::size_t)C.nlignes() == nbFaces && C.ncolonnes() == 3 && nbFaces > 1) {
+            for (std::size_t f = 0; f < nbFaces; ++f)
+                s.couleursPoints.push_back(couleurDepuisValeur(
+                    Valeur::ligne({C.re[f], C.re[f + nbFaces], C.re[f + 2 * nbFaces]})));
+            return;
+        }
+        if (C.nelem() == nbFaces) {
+            s.valeursCouleurPoints = valeursDe(C);
+            return;
+        }
+        if (C.nelem() == X.nelem()) {
+            // Une valeur par sommet : la face prend leur moyenne.
+            for (std::size_t f = 0; f < nbFaces; ++f) {
+                double somme = 0;
+                std::size_t compte = 0;
+                for (std::size_t i = 0; i < sommets; ++i) {
+                    double v = C.re[i + f * sommets];
+                    if (std::isfinite(v)) {
+                        somme += v;
+                        ++compte;
+                    }
+                }
+                s.valeursCouleurPoints.push_back(compte ? somme / (double)compte : NAN);
+            }
+            return;
+        }
+        erreur("MATLAB:" + std::string(nom) + ":InvalidColor",
+               "La couleur est une couleur, une valeur ou un triplet par face, ou une valeur "
+               "par sommet.");
+    };
+    if (couleurTexte) lireCouleur(*couleurTexte);
+    else if (nombres.size() == 4) lireCouleur(*nombres[3]);
+    auto mode = [&](const Valeur& v) {
+        if (v.estTexte() || v.estChaine()) {
+            std::string t = enMinuscules(v.versTexte());
+            if (t == "flat" || t == "interp" || t == "none") return t;
+        }
+        std::string couleur = couleurDepuisValeur(v);
+        if (couleur.empty())
+            erreur("MATLAB:" + std::string(nom) + ":InvalidColor",
+                   "Couleur inconnue : " + v.versTexte() + ".");
+        return couleur;
+    };
+    while (k < args.size()) {
+        if (!(args[k].estTexte() || args[k].estChaine()) || k + 1 >= args.size())
+            erreur("MATLAB:" + std::string(nom) + ":InvalidArgument",
+                   std::string("Argument de ") + nom + " inattendu.");
+        std::string propriete = enMinuscules(args[k].versTexte());
+        const Valeur& v = args[k + 1];
+        if (propriete == "facecolor") {
+            // Une couleur imposée aux faces garde les couleurs par face,
+            // dont les arêtes peuvent se servir (« EdgeColor », 'flat').
+            s.modeFaces = mode(v);
+        } else if (propriete == "edgecolor") {
+            s.modeAretes = mode(v);
+        } else if (propriete == "facealpha") {
+            s.opacite = v.scal();
+        } else if (propriete == "linewidth") {
+            s.epaisseur = v.scal();
+        } else if (propriete == "linestyle") {
+            s.style = v.versTexte();
+            if (s.style == "none") s.modeAretes = "none";
+        } else if (propriete == "displayname") {
+            s.etiquette = v.versTexte();
+        } else if (propriete == "edgealpha" || propriete == "facelighting" ||
+                   propriete == "edgelighting") {
+            // L'éclairage n'est pas rendu : accepté sans effet.
+        } else {
+            erreur("MATLAB:hg:InvalidProperty",
+                   "Unrecognized property '" + args[k].versTexte() + "' for class 'Patch'.");
+        }
+        k += 2;
+    }
+    // Le tracé plan d'une face unie lit couleur et bord comme « fill ».
+    if (s.modeFaces == "none") s.couleur = "none";
+    else if (s.modeFaces != "flat" && s.modeFaces != "interp") s.couleur = s.modeFaces;
+    if (s.modeAretes != "flat" && s.modeAretes != "interp") s.couleurBord = s.modeAretes;
+    if (hautNiveau) nouveauTrace(it);
+    auto axes = axesCourants(it);
+    if (s.couleur.empty() && s.valeursCouleurPoints.empty() && s.couleursPoints.empty())
+        s.couleur = palette(axes->series.size());
+    if (s.couleur.empty()) s.couleur = "#000000";
+    int identifiant = ajouterSerie(it, s);
+    if (hautNiveau && avecZ) passerEnEspace(it);
+    if (nargout <= 0) return {};
+    return {poigneeLigne(figureCourante(it)->numero, axes->identifiant, identifiant)};
+}
+
+FONCTION(fnFill3) { return faces(it, args, nargout, true, "fill3"); }
+FONCTION(fnPatchFaces) { return faces(it, args, nargout, false, "patch"); }
+
 FONCTION(fnBox) { INUTILISE return {}; }
-FONCTION(fnShading) { INUTILISE return {}; }
+// shading faceted | flat | interp : le rendu des surfaces de l'axe
+// courant — mailles bordées de noir, mailles sans bord, couleurs fondues.
+FONCTION(fnShading) {
+    INUTILISE
+    auto a = axesCourants(it);
+    std::size_t k = 0;
+    if (!args.empty() && estPoigneeAxes(args[0])) {
+        a = axesDeLaPoignee(it, args[0]);
+        k = 1;
+    }
+    if (k >= args.size()) erreur("MATLAB:narginchk:notEnoughInputs", "Not enough input arguments.");
+    std::string mode = enMinuscules(args[k].versTexte());
+    if (mode != "faceted" && mode != "flat" && mode != "interp")
+        erreur("MATLAB:shading:InvalidInput",
+               "Shading type must be 'flat', 'faceted', or 'interp'.");
+    for (auto& s : a->series) {
+        if (s.genre != GenreTrace::Surface && !(s.genre == GenreTrace::Polygone && !s.z.empty()))
+            continue;
+        bool maillage = s.modeFaces == "#FFFFFF" || s.modeFaces == "none";
+        if (mode == "faceted") {
+            if (!maillage) s.modeFaces = "flat";
+            s.modeAretes = maillage ? "flat" : "#000000";
+        } else {
+            if (!maillage) s.modeFaces = mode;
+            s.modeAretes = maillage ? mode : "none";
+        }
+    }
+    return {};
+}
 
 // « text(x,y,'ici') » pose un texte dans l'axe, aux coordonnees des
 // donnees. Il ne dilate pas les bornes — un mot n'est pas une donnee —
@@ -2309,20 +2916,29 @@ FONCTION(fnText) {
     exigerNumerique(args[1], "text");
     std::vector<double> xs = valeursDe(args[0]);
     std::vector<double> ys = valeursDe(args[1]);
+    // text(x,y,z,'texte') : un texte posé dans l'espace.
+    std::size_t rangTexte = 2;
+    std::vector<double> zs;
+    if (args.size() >= 4 && args[2].estNumerique() && !args[2].estTexte()) {
+        zs = valeursDe(args[2]);
+        rangTexte = 3;
+    }
     // Le troisieme argument : un texte, ou une cellule de textes, un par
     // point.
     std::vector<std::string> textes;
-    if (args[2].classe == Classe::Cellule)
-        for (const auto& c : args[2].cellules) textes.push_back(c.versTexte());
-    else if (args[2].estChaine() && args[2].nelem() > 1)
-        for (const auto& c : args[2].chaines) textes.push_back(c);
+    const Valeur& source = args[rangTexte];
+    if (source.classe == Classe::Cellule)
+        for (const auto& c : source.cellules) textes.push_back(c.versTexte());
+    else if (source.estChaine() && source.nelem() > 1)
+        for (const auto& c : source.chaines) textes.push_back(c);
     else
-        textes.push_back(args[2].versTexte());
+        textes.push_back(source.versTexte());
 
     std::string couleur = "#000000";
     double taille = 0;
     char alignement = 'l';
-    for (std::size_t k = 3; k + 1 < args.size(); k += 2) {
+    std::string interprete = "tex";
+    for (std::size_t k = rangTexte + 1; k + 1 < args.size(); k += 2) {
         std::string propriete = args[k].versTexte();
         for (auto& c : propriete) c = (char)std::tolower((unsigned char)c);
         if (propriete == "color") {
@@ -2333,6 +2949,8 @@ FONCTION(fnText) {
         } else if (propriete == "horizontalalignment") {
             std::string a = args[k + 1].versTexte();
             alignement = a.empty() ? 'l' : (a[0] == 'c' ? 'c' : (a[0] == 'r' ? 'r' : 'l'));
+        } else if (propriete == "interpreter") {
+            interprete = interpreteDepuis(args[k + 1]);
         }
     }
 
@@ -2344,10 +2962,12 @@ FONCTION(fnText) {
         s.genre = GenreTrace::Texte;
         s.x = {xs[k]};
         s.y = {ys[k]};
+        if (!zs.empty()) s.z = {zs[std::min(k, zs.size() - 1)]};
         s.legendeConstante = textes[std::min(k, textes.size() - 1)];
         s.couleur = couleur;
         s.taillePoliceTexte = taille;
         s.alignement = alignement;
+        s.interprete = interprete;
         s.identifiant = ++axes->prochaineSerie;
         identifiants.push_back(s.identifiant);
         axes->series.push_back(s);
@@ -2370,12 +2990,16 @@ FONCTION(fnFigureSVG) {
 
 void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("plot", fnPlot, "graphique", "plot  Trace des courbes 2-D.");
-    it.enregistrer("plot3", fnPlot3, "graphique", "plot3  Trace une courbe de l'espace, projetee dans le plan.");
+    it.enregistrer("plot3", fnPlot3, "graphique", "plot3  Trace une courbe de l'espace.");
     it.enregistrer("semilogx", fnSemilogx, "graphique", "semilogx  Axe des x logarithmique.");
     it.enregistrer("semilogy", fnSemilogy, "graphique", "semilogy  Axe des y logarithmique.");
     it.enregistrer("loglog", fnLoglog, "graphique", "loglog  Deux axes logarithmiques.");
     it.enregistrer("bar", fnBar, "graphique", "bar  Diagramme en barres.");
     it.enregistrer("scatter", fnScatter, "graphique", "scatter  Nuage de points.");
+    it.enregistrer("scatter3", fnScatter3, "graphique", "scatter3  Nuage de points de l'espace.");
+    it.enregistrer("fill3", fnFill3, "graphique", "fill3  Polygones remplis de l'espace.");
+    it.enregistrer("matlibre_patch", fnPatchFaces, "graphique",
+                   "matlibre_patch  Faces d'un patch, sans effacer le trace.");
     it.enregistrer("stairs", fnStairs, "graphique", "stairs  Trace en escalier.");
     it.enregistrer("stem", fnStem, "graphique", "stem  Trace en tiges.");
     it.enregistrer("histogram", fnHistogramme, "graphique", "histogram  Histogramme.");
@@ -2383,8 +3007,8 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("imagesc", fnImagesc, "graphique", "imagesc  Image en fausses couleurs.");
     it.enregistrer("image", fnImage, "graphique",
                    "image  Affiche une image : indices de palette, ou couleurs vraies.");
-    it.enregistrer("surf", fnSurf, "graphique", "surf  Surface (rendue en carte de couleurs).");
-    it.enregistrer("mesh", fnSurf, "graphique", "mesh  Maillage (rendu en carte de couleurs).");
+    it.enregistrer("surf", fnSurf, "graphique", "surf  Surface en trois dimensions.");
+    it.enregistrer("mesh", fnMesh, "graphique", "mesh  Maillage en trois dimensions.");
     it.enregistrer("contourf", fnContourf, "graphique",
                    "contourf  Lignes de niveau, sur fond colore.");
     it.enregistrer("contour3", fnContour3, "graphique",
@@ -2407,6 +3031,9 @@ void enregistrerGraphique(Interpreteur& it) {
                    "xticklabels  Etiquettes des graduations en x.");
     it.enregistrer("yticklabels", fnYticklabels, "graphique",
                    "yticklabels  Etiquettes des graduations en y.");
+    it.enregistrer("zticks", fnZticks, "graphique", "zticks  Graduations de l'axe des z.");
+    it.enregistrer("zticklabels", fnZticklabels, "graphique",
+                   "zticklabels  Textes des graduations de l'axe des z.");
     it.enregistrer("cla", fnCla, "graphique", "cla  Vide l'axe courant.");
     it.enregistrer("area", fnArea, "graphique", "area  Trace une aire remplie.");
     it.enregistrer("fill", fnFill, "graphique", "fill  Remplit un polygone.");
@@ -2425,6 +3052,10 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("axis", fnAxis, "graphique", "axis  Regle les limites des axes.");
     it.enregistrer("xlim", fnXlim, "graphique", "xlim  Limites en x.");
     it.enregistrer("ylim", fnYlim, "graphique", "ylim  Limites en y.");
+    it.enregistrer("yyaxis", fnYyaxis, "graphique",
+                   "yyaxis  Second axe des ordonnees, a droite.");
+    it.enregistrer("matlibre_cote_axe", fnCoteAxe, "graphique",
+                   "matlibre_cote_axe  Poignee d'un cote d'un axe a deux ordonnees.");
     it.enregistrer("gcf", fnGcf, "graphique", "gcf  Numero de la figure courante.");
     it.enregistrer("gca", fnGca, "graphique", "gca  Axes courants.");
     it.enregistrer("print", fnPrint, "graphique", "print  Ecrit la figure dans un fichier SVG.");

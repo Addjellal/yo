@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-684 fonctions ecrites en C++, reparties en 22 groupes.
+691 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|

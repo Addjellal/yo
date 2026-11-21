@@ -3,9 +3,9 @@ function rotate3d(mode)
 %   ROTATE3D ON permet, dans MATLAB, de faire tourner une figure
 %   tridimensionnelle à la souris ; ROTATE3D OFF l'interdit.
 %
-%   Les figures de MatLibre ne sont pas manipulables à la souris et son
-%   rendu est plan : l'appel est accepté pour qu'un programme tourne sans
-%   retouche.
+%   Les figures de MatLibre ne se tournent pas à la souris : l'appel est
+%   accepté pour qu'un programme tourne sans retouche ; VIEW change le
+%   point de vue.
 %
 %   Exemple :
 %      surf(peaks(30)); rotate3d('on');

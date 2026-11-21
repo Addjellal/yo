@@ -42,6 +42,8 @@ struct Morceau {
     bool italique = false;
     bool gras = false;
     double echelle = 1.0;
+    // Vide : la couleur du texte ; sinon celle de « \color{...} ».
+    std::string couleur;
 };
 
 struct StyleTexte {
@@ -98,8 +100,12 @@ public:
 void dessinerFigure(const Figure& figure, Toile& toile, int largeur, int hauteur);
 
 // Les morceaux d'un texte : un seul morceau sans interprète, ceux que
-// donne le TeX de MATLAB sinon.
+// donne le TeX de MATLAB sinon (Tex.cpp).
 std::vector<Morceau> morceauxTexte(const std::string& texte, bool tex = true);
+// Selon la propriété « Interpreter » de MATLAB : 'tex' (le défaut),
+// 'none' (le texte tel quel) ou 'latex' (lu comme du TeX, sans dollars).
+std::vector<Morceau> morceauxInterpretes(const std::string& texte,
+                                         const std::string& interprete);
 
 // La chasse d'un texte en Helvetica (Arial et Liberation Sans ont les
 // mêmes), d'après les métriques AFM : ce que mesure la toile SVG.

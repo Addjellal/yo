@@ -1,12 +1,10 @@
 function H = surfc(varargin)
 %SURFC Surface, avec ses lignes de niveau en dessous.
-%   SURFC(X,Y,Z) trace la surface et, dans le plan du bas, ses lignes de
-%   niveau. SURFC(Z) prend une grille entière.
+%   SURFC(X,Y,Z) trace la surface (SURF) et, dans le plan du bas de l'axe,
+%   ses lignes de niveau, chacune de la couleur de son niveau. SURFC(Z)
+%   prend une grille entière.
 %
-%   H = SURFC(...) rend les poignées.
-%
-%   Le rendu de MatLibre est plan : la surface est montrée en couleurs,
-%   et les lignes de niveau par-dessus.
+%   H = SURFC(...) rend la poignée de la surface.
 %
 %   Exemples :
 %      surfc(peaks(30));
@@ -14,7 +12,13 @@ function H = surfc(varargin)
 %      surfc(X, Y, X.^2 - Y.^2);
 %
 %   Voir aussi SURF, MESHC, CONTOUR, SURFL, PEAKS.
-    H = meshc(varargin{:});
+    H = surf(varargin{:});
+    tenu = ishold();
+    hold('on');
+    matlibre_courbes_dessous(varargin);
+    if ~tenu
+        hold('off');
+    end
     if nargout == 0
         clear H;
     end

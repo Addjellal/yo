@@ -167,14 +167,22 @@ public:
         if (!s.couleur.empty()) out_ << " fill=\"" << s.couleur << "\"";
         out_ << ">";
         for (const auto& m : morceaux) {
-            bool simple = m.niveau == 0 && !m.italique && !m.gras && m.echelle == 1.0;
+            bool simple = m.niveau == 0 && !m.italique && !m.gras && m.echelle == 1.0 &&
+                          m.couleur.empty();
             if (simple) {
                 out_ << echapperXml(m.texte);
                 continue;
             }
+            // Un exposant ou un indice se décale de la ligne de base du
+            // texte : « super » ou « sub » au premier niveau, une hauteur
+            // en pixels au-delà (« x^{a^b} »).
             out_ << "<tspan";
-            if (m.niveau > 0) out_ << " baseline-shift=\"super\"";
-            else if (m.niveau < 0) out_ << " baseline-shift=\"sub\"";
+            if (m.niveau == 1) out_ << " baseline-shift=\"super\"";
+            else if (m.niveau == -1) out_ << " baseline-shift=\"sub\"";
+            else if (m.niveau != 0)
+                out_ << " baseline-shift=\""
+                     << px((m.niveau > 0 ? 0.33 : 0.2) * s.taille * m.niveau) << "px\"";
+            if (!m.couleur.empty()) out_ << " fill=\"" << m.couleur << "\"";
             if (m.echelle != 1.0) out_ << " font-size=\"" << px(s.taille * m.echelle) << "px\"";
             if (m.italique) out_ << " font-style=\"italic\"";
             if (m.gras) out_ << " font-weight=\"bold\"";

@@ -554,8 +554,10 @@ cla;
 [~, effectifsRose] = rose([0 0 0 pi pi], 4);
 assert(isequal(effectifsRose, [3 0 2 0]));
 cla;
+% Un patch est un seul objet, quel que soit son nombre de faces, comme
+% dans MATLAB.
 assert(numel(patch('Faces', [1 2 3; 1 3 4], 'Vertices', [0 0; 1 0; 1 1; 0 1], ...
-                   'FaceColor', [0.6 0.8 1])) == 2);
+                   'FaceColor', [0.6 0.8 1])) == 1);
 cla;
 rectangle('Position', [0 0 2 2], 'Curvature', 1, 'FaceColor', [0.9 0.9 0.5]);
 cla;
@@ -777,7 +779,7 @@ cla; meshz(peaks(20));
 cla; surfl(peaks(20), [45 30]);
 cla; waterfall(peaks(10));
 cla; ribbon(peaks(10));
-cla; assert(numel(bar3(magic(4))) == 16);
+cla; assert(numel(bar3(magic(4))) == 4);     % une serie par colonne, comme MATLAB
 cla; bar3h(magic(4));
 cla; plotmatrix(randn(30, 2));
 cla; plotyy(1:10, sin(1:10), 1:10, 1000 * exp(-(1:10)));
@@ -828,12 +830,14 @@ assert(isequal(fOpt.Position(3:4), [640 480]), 'figure, un nom en chaine');
 figure(Position=[0 0 500 300]);
 fOpt = gcf;
 assert(isequal(fOpt.Position(3:4), [500 300]), 'figure, nom=valeur');
-% le rendu est celui des seules donnees : les options n'y changent rien
+% les options de surf sont lues, en char comme en nom=valeur, et non
+% prises pour des donnees
 cla; surf(magic(4)); svgSeul = matlibre_svg();
-cla; surf(magic(4), 'EdgeColor', 'none');
-assert(strcmp(matlibre_svg(), svgSeul), 'surf : les donnees, non l''option');
-cla; surf(magic(4), EdgeColor="none", FaceAlpha=0.5);
-assert(strcmp(matlibre_svg(), svgSeul), 'surf, nom=valeur');
+cla; surf(magic(4), 'EdgeColor', 'none'); svgSansBord = matlibre_svg();
+assert(~strcmp(svgSansBord, svgSeul), 'surf : EdgeColor est lu');
+cla; surf(magic(4), EdgeColor="none");
+assert(strcmp(matlibre_svg(), svgSansBord), 'surf, nom=valeur');
+assert(numel(get(gca, 'Children')) == 1, 'surf : l''option n''est pas une donnee');
 cla; imagesc(magic(3)); svgSeul = matlibre_svg();
 cla; imagesc(magic(3), 'AlphaData', 0.5);
 assert(strcmp(matlibre_svg(), svgSeul), 'imagesc : les donnees, non l''option');
@@ -1375,6 +1379,164 @@ catch err
     refusPosition = strcmp(err.identifier, 'MATLAB:colorbar:InvalidLocation');
 end
 assert(refusPosition);
+close all;
+
+%% --------------------------------------------------------- l'espace
+% plot3 garde les vraies coordonnees et pose la vue de MATLAB ; les bornes
+% sont celles des donnees, non d'une projection.
+figure;
+t = linspace(0, 4 * pi, 50);
+h = plot3(cos(t), sin(t), t);
+assert(isequal(get(h, 'ZData'), t) && isequal(get(h, 'XData'), cos(t)));
+assert(isequal(view, [-37.5 30]));
+assert(isequal(xlim, [-1 1]) && isequal(zlim, [0 14]));
+assert(numel(axis) == 6, 'axis rend six bornes en perspective');
+[az, el] = view;
+assert(az == -37.5 && el == 30);
+view(2);
+assert(isequal(view, [0 90]));
+view(3);
+view([30 45]);
+assert(isequal(get(gca, 'View'), [30 45]));
+zlim([-5 20]);
+assert(isequal(zlim, [-5 20]) && isequal(get(gca, 'ZLim'), [-5 20]));
+zlabel('hauteur');
+dessinEspace = matlibre_svg();
+assert(~isempty(strfind(dessinEspace, '>hauteur<')) && ~isempty(strfind(dessinEspace, '<path')));
+assert(numel(strfind(dessinEspace, 'class="grille"')) > 10, 'la grille des plans du fond');
+set(get(gca, 'ZLabel'), 'String', 'z');
+assert(strcmp(get(get(gca, 'ZLabel'), 'String'), 'z'), 'l''etiquette z n''ecrase pas le titre');
+% Un trace plan remplace l'espace : la vue de dessus revient, sans grille.
+plot(1:3);
+assert(isequal(view, [0 90]) && strcmp(get(gca, 'XGrid'), 'off'));
+% surf : une maille par carre de la grille, les donnees en matrices.
+figure;
+h = surf(peaks(5));
+assert(isequal(size(get(h, 'ZData')), [5 5]) && isequal(get(h, 'CData'), peaks(5)));
+assert(strcmp(get(h, 'Type'), 'surface') && strcmp(get(h, 'FaceColor'), 'flat'));
+assert(numel(strfind(matlibre_svg(), 'Z" fill="#')) == 16, 'seize mailles');
+shading interp
+assert(strcmp(get(h, 'EdgeColor'), 'none') && strcmp(get(h, 'FaceColor'), 'interp'));
+mesh(peaks(5));
+assert(strcmp(get(gca().Children, 'FaceColor'), '#FFFFFF'));
+refusSurf = false;
+try
+    surf(1:5);
+catch err
+    refusSurf = strcmp(err.identifier, 'MATLAB:surf:NonMatrixData');
+end
+assert(refusSurf, 'surf veut une matrice');
+% L'ordre du peintre : vue de dessus en perspective, le carre du haut est
+% peint apres celui du bas ; vue de dessous, l'inverse.
+figure;
+fill3([0 1 1 0], [0 0 1 1], [0 0 0 0], 'r');
+hold on
+fill3([0 1 1 0], [0 0 1 1], [1 1 1 1], 'b');
+hold off
+view(-37.5, 30);
+dessinDessus = matlibre_svg();
+assert(strfind(dessinDessus, 'fill="#FF0000"') < strfind(dessinDessus, 'fill="#0000FF"'));
+view(-37.5, -30);
+dessinDessous = matlibre_svg();
+assert(strfind(dessinDessous, 'fill="#0000FF"') < strfind(dessinDessous, 'fill="#FF0000"'));
+% scatter3, stem3, bar3, patch en faces et sommets, texte de l'espace.
+figure;
+scatter3([1 2 3], [3 1 2], [2 3 1], 'filled');
+assert(numel(strfind(matlibre_svg(), '<circle')) == 3 && isequal(view, [-37.5 30]));
+stem3([1 2 3]);
+assert(numel(get(gca, 'Children')) == 2, 'les tiges et leurs tetes');
+h = bar3([1 2; 3 4]);
+assert(numel(h) == 2 && isequal(xticks, 1:2));
+cla;
+h = patch('Faces', [1 2 3; 1 2 4], 'Vertices', [0 0 0; 1 0 0; 0 1 0; 0 0 1], ...
+          'FaceVertexCData', [1; 2], 'FaceColor', 'flat');
+assert(numel(h) == 1 && strcmp(get(h, 'Type'), 'patch'));
+text(0, 0, 1, 'sommet');
+assert(~isempty(strfind(matlibre_svg(), '>sommet<')));
+close all;
+
+%% ------------------------------------------------------------- TeX
+% Les textes passent par le TeX de MATLAB : exposants, indices, lettres
+% grecques, gras, couleurs ; 'none' les laisse tels quels.
+figure;
+plot(1:3);
+title('x^2 + \alpha_1');
+dessinTex = matlibre_svg();
+assert(~isempty(strfind(dessinTex, char([206 177]))), 'alpha devient la lettre grecque');
+assert(~isempty(regexp(dessinTex, 'baseline-shift="super"[^>]*>2<', 'once')), 'un exposant');
+assert(~isempty(regexp(dessinTex, 'baseline-shift="sub"[^>]*>1<', 'once')), 'un indice');
+assert(isempty(strfind(dessinTex, '\alpha')));
+title('a_b', 'Interpreter', 'none');
+assert(~isempty(strfind(matlibre_svg(), '>a_b<')), 'sans interprete, le texte tel quel');
+assert(strcmp(get(get(gca, 'Title'), 'Interpreter'), 'none'));
+xlabel('\omega (rad/s)');
+assert(~isempty(strfind(matlibre_svg(), [char([207 137]) ' (rad/s)'])));
+ylabel('x_{max}^{2}');
+assert(~isempty(regexp(matlibre_svg(), 'baseline-shift="sub"[^>]*>max<', 'once')), 'un groupe');
+text(2, 2, '\bf gras \rm et \color{red}rouge');
+dessinTexte = matlibre_svg();
+assert(~isempty(regexp(dessinTexte, 'font-weight="bold">gras', 'once')));
+assert(~isempty(regexp(dessinTexte, 'fill="#FF0000">rouge', 'once')));
+text(1, 1, 'a\_b\^c');
+assert(~isempty(strfind(matlibre_svg(), '>a_b^c<')), 'les echappements');
+legend('\sigma^2');
+assert(~isempty(strfind(matlibre_svg(), char([207 131]))));
+title('$x^2$', 'Interpreter', 'latex');
+assert(~isempty(regexp(matlibre_svg(), 'baseline-shift="super"[^>]*>2<', 'once')), 'LaTeX simple');
+set(gca, 'XTick', 1:3, 'XTickLabel', {'t_1', 't_2', 't_3'});
+assert(~isempty(regexp(matlibre_svg(), 'baseline-shift="sub"[^>]*>3<', 'once')));
+set(gca, 'TickLabelInterpreter', 'none');
+assert(~isempty(strfind(matlibre_svg(), '>t_3<')));
+refusInterprete = false;
+try
+    title('x', 'Interpreter', 'markdown');
+catch err
+    refusInterprete = strcmp(err.identifier, 'MATLAB:hg:InvalidInterpreter');
+end
+assert(refusInterprete);
+close all;
+
+%% ------------------------------------------- deux axes des ordonnees
+% yyaxis : chaque cote a ses bornes, ses graduations, son etiquette et sa
+% couleur ; un trace ne remplace que ceux de son cote.
+figure;
+x = 0:0.1:10;
+yyaxis left
+hGauche = plot(x, sin(x));
+ylabel('sinus');
+yyaxis right
+hDroite = plot(x, 1000 * exp(-x));
+ylabel('exponentielle');
+assert(isequal(ylim, [0 1000]), 'les bornes de droite');
+assert(strcmp(get(hDroite, 'Color'), '#D95319') && strcmp(get(hGauche, 'Color'), '#0072BD'));
+dessinDeux = matlibre_svg();
+assert(~isempty(strfind(dessinDeux, '>exponentielle<')) && ...
+       ~isempty(strfind(dessinDeux, '>sinus<')));
+assert(~isempty(regexp(dessinDeux, 'fill="#D95319">1000<', 'once')), 'les graduations de droite');
+yyaxis left
+assert(isequal(ylim, [-1 1]), 'et celles de gauche');
+yyaxis right
+plot(x, 500 * exp(-x));
+assert(numel(get(gca, 'Children')) == 2, 'un trace ne remplace que son cote');
+assert(isequal(ylim, [0 500]));
+ylim([0 2000]);
+assert(isequal(get(gca, 'YLim'), [0 2000]));
+yyaxis left
+assert(isequal(get(gca, 'YLim'), [-1 1]));
+% plotyy rend deux axes, un par cote.
+cla;
+[ax, h1, h2] = plotyy(x, sin(x), x, 1000 * exp(-x));
+assert(numel(ax) == 2);
+ylabel(ax(2), 'droite');
+assert(isequal(ylim(ax(2)), [0 1000]) && isequal(ylim(ax(1)), [-1 1]));
+assert(~isempty(strfind(matlibre_svg(), '>droite<')));
+refusCote = false;
+try
+    yyaxis milieu
+catch err
+    refusCote = strcmp(err.identifier, 'MATLAB:yyaxis:InvalidSide');
+end
+assert(refusCote);
 close all;
 
 disp('graphique : toutes les verifications passent');

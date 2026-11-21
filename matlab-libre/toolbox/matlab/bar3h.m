@@ -4,7 +4,8 @@ function H = bar3h(varargin)
 %
 %   H = BAR3H(...) rend les poignées.
 %
-%   Le rendu de MatLibre est plan, comme pour BAR3.
+%   Dans MatLibre, les barres restent verticales comme celles de BAR3,
+%   rangées et colonnes échangées ; MATLAB les couche le long des x.
 %
 %   Exemples :
 %      bar3h(magic(4));

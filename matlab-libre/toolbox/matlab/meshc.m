@@ -1,13 +1,10 @@
 function H = meshc(varargin)
 %MESHC Maillage d'une surface, avec ses lignes de niveau en dessous.
-%   MESHC(X,Y,Z) trace le maillage de la surface et, dans le plan du bas,
-%   ses lignes de niveau. MESHC(Z) prend une grille entière.
+%   MESHC(X,Y,Z) trace le maillage de la surface (MESH) et, dans le plan
+%   du bas de l'axe, ses lignes de niveau, chacune de la couleur de son
+%   niveau. MESHC(Z) prend une grille entière.
 %
-%   H = MESHC(...) rend les poignées.
-%
-%   Le rendu de MatLibre est plan : la surface est montrée en couleurs,
-%   et les lignes de niveau par-dessus, ce qui met exactement la même
-%   information sous les yeux.
+%   H = MESHC(...) rend la poignée du maillage.
 %
 %   Exemples :
 %      meshc(peaks(30));
@@ -15,10 +12,13 @@ function H = meshc(varargin)
 %      meshc(X, Y, X .* exp(-X.^2 - Y.^2));
 %
 %   Voir aussi MESH, SURFC, CONTOUR, MESHZ, PEAKS.
-    H = surf(varargin{:});
+    H = mesh(varargin{:});
+    tenu = ishold();
     hold('on');
-    contour(varargin{:});
-    hold('off');
+    matlibre_courbes_dessous(varargin);
+    if ~tenu
+        hold('off');
+    end
     if nargout == 0
         clear H;
     end

@@ -1,46 +1,42 @@
 function H = trimesh(triangles, x, y, z, varargin)
-%TRIMESH Maillage d'une triangulation.
-%   TRIMESH(T,X,Y,Z) trace les arêtes des triangles de T, dont les
-%   sommets sont (X,Y,Z). C'est TRISURF sans le remplissage : on voit à
-%   travers.
-%
+%TRIMESH Maillage défini par une triangulation.
+%   TRIMESH(T,X,Y,Z) trace les arêtes des triangles de T — chaque ligne
+%   donne les trois indices des sommets d'une face —, colorées par la
+%   moyenne des Z de leur face, sur des faces blanches, comme MESH.
 %   TRIMESH(T,X,Y) trace la triangulation à plat.
+%   TRIMESH(...,'EdgeColor',C,...) ou TRIMESH(...,'Color',C) règle la
+%   couleur des arêtes.
 %
-%   TRIMESH(...,'Color',C) fixe la couleur des arêtes.
-%
-%   H = TRIMESH(...) rend les poignées.
-%
-%   Le rendu de MatLibre est plan, comme pour TRISURF.
+%   H = TRIMESH(...) rend la poignée du maillage.
 %
 %   Exemples :
-%      x = rand(30, 1); y = rand(30, 1);
-%      T = delaunay(x, y);
-%      trimesh(T, x, y);
+%      [x, y] = meshgrid(1:4);
+%      T = delaunay(x(:), y(:));
+%      trimesh(T, x(:), y(:), sin(x(:)) .* cos(y(:)));
 %
-%   Voir aussi TRISURF, DELAUNAY, VORONOI, PATCH, PLOT.
-    if nargin < 4
-        z = [];
-    end
-    couleur = 'b';
-    k = 1;
-    while k + 1 <= numel(varargin)
-        if strcmpi(char(varargin{k}), 'color')
-            couleur = varargin{k + 1};
+%   Voir aussi TRISURF, DELAUNAY, PATCH, MESH.
+    plan = nargin < 4 || ischar(z) || isstring(z);
+    if plan
+        if nargin >= 4
+            varargin = [{z}, varargin];
         end
-        k = k + 2;
+        z = zeros(size(x));
     end
-    aEffacer = ishold();
-    if ~aEffacer
-        cla;
+    reglages = {};
+    for k = 1:2:numel(varargin) - 1
+        if strcmpi(char(varargin{k}), 'color')
+            reglages(end + 1:end + 2) = {'EdgeColor', varargin{k + 1}};
+        else
+            reglages(end + 1:end + 2) = varargin(k:k + 1);
+        end
     end
-    hold('on');
-    H = [];
-    for f = 1:size(triangles, 1)
-        indices = [triangles(f, :), triangles(f, 1)];
-        H(end + 1) = plot(x(indices), y(indices), 'Color', couleur);   %#ok<AGROW>
-    end
-    if ~aEffacer
-        hold('off');
+    F = triangles';
+    if plan
+        H = fill3(x(F), y(F), z(F), z(F), 'FaceColor', 'w', 'EdgeColor', [0 0.447 0.741], ...
+                  reglages{:});
+        view(2);
+    else
+        H = fill3(x(F), y(F), z(F), z(F), 'FaceColor', 'w', 'EdgeColor', 'flat', reglages{:});
     end
     if nargout == 0
         clear H;

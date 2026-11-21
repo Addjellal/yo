@@ -621,6 +621,87 @@ void arrondirAuxDecades(double& bas, double& haut) {
 
 }  // namespace
 
+const char* couleurCote(int cote) { return cote == 1 ? "#D95319" : "#0072BD"; }
+
+void limitesAxeDroite(const Axes& a, double& ymin, double& ymax) {
+    if (a.limitesManuellesYDroite) {
+        ymin = a.yminDroite;
+        ymax = a.ymaxDroite;
+        return;
+    }
+    ymin = INFINITY;
+    ymax = -INFINITY;
+    for (const auto& s : a.series) {
+        if (s.cote != 1 || s.genre == GenreTrace::Constante || s.genre == GenreTrace::Texte)
+            continue;
+        if (s.genre == GenreTrace::Barres) {
+            ymin = std::min(ymin, 0.0);
+            ymax = std::max(ymax, 0.0);
+        }
+        for (double v : s.y) {
+            if (!std::isfinite(v) || (a.logYDroite && v <= 0)) continue;
+            ymin = std::min(ymin, v);
+            ymax = std::max(ymax, v);
+        }
+    }
+    if (!std::isfinite(ymin)) {
+        ymin = 0;
+        ymax = 1;
+        return;
+    }
+    if (!(ymax > ymin)) {
+        ymin -= 0.5;
+        ymax += 0.5;
+    }
+    if (a.logYDroite) arrondirAuxDecades(ymin, ymax);
+    else arrondirAuxGraduations(ymin, ymax);
+}
+
+bool serieEspace(const Serie& s) {
+    if (s.genre == GenreTrace::Surface) return true;
+    if (s.genre == GenreTrace::Image || s.z.empty()) return false;
+    return s.genre == GenreTrace::Ligne || s.genre == GenreTrace::Points ||
+           s.genre == GenreTrace::Polygone || s.genre == GenreTrace::Texte;
+}
+
+const std::string& interpreteDe(const Axes& a, const std::string& cible) {
+    static const std::string tex = "tex";
+    auto trouve = a.interpretes.find(cible);
+    return trouve == a.interpretes.end() ? tex : trouve->second;
+}
+
+bool vueEspace(const Axes& a) {
+    return !(std::fabs(a.elevation - 90) < 1e-9 && std::fabs(std::fmod(a.azimut, 360.0)) < 1e-9);
+}
+
+void limitesAxeZ(const Axes& a, double& zmin, double& zmax) {
+    if (a.limitesManuellesZ) {
+        zmin = a.zmin;
+        zmax = a.zmax;
+        return;
+    }
+    zmin = INFINITY;
+    zmax = -INFINITY;
+    for (const auto& s : a.series) {
+        if (!serieEspace(s) || s.genre == GenreTrace::Texte) continue;
+        for (double v : s.z)
+            if (std::isfinite(v)) {
+                zmin = std::min(zmin, v);
+                zmax = std::max(zmax, v);
+            }
+    }
+    if (!std::isfinite(zmin)) {
+        zmin = -1;
+        zmax = 1;
+        return;
+    }
+    if (!(zmax > zmin)) {
+        zmin -= 0.5;
+        zmax += 0.5;
+    }
+    arrondirAuxGraduations(zmin, zmax);
+}
+
 void limitesAxe(const Axes& a, double& xmin, double& xmax, double& ymin, double& ymax) {
     etendueDonnees(a, xmin, xmax, ymin, ymax);
     // Une image serre l'axe sur son étendue, comme dans MATLAB ; sinon les
@@ -658,6 +739,8 @@ void etendueDonnees(const Axes& a, double& xmin, double& xmax, double& ymin, dou
         haut = -INFINITY;
         for (const auto& s : a.series) {
             if (s.genre == GenreTrace::Constante || s.genre == GenreTrace::Texte) continue;
+            // Les ordonnées de gauche ne comptent que les séries de gauche.
+            if (!enX && a.deuxOrdonnees && s.cote != 0) continue;
             const std::vector<double>& valeurs = enX ? s.x : s.y;
             double demi = 0;
             // Des barres débordent de leur abscisse d'une demi-largeur.

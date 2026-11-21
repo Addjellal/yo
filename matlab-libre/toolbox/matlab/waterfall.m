@@ -1,17 +1,15 @@
 function H = waterfall(varargin)
-%WATERFALL Surface dessinée en lignes, une par rangée.
-%   WATERFALL(X,Y,Z) trace une courbe par ligne de Z, décalée de sorte
-%   que les courbes se suivent comme les marches d'une cascade. C'est la
-%   façon de montrer une famille de signaux — un spectre au fil du temps,
-%   par exemple — sans les superposer.
+%WATERFALL Surface dessinée en rideaux, un par rangée.
+%   WATERFALL(X,Y,Z) trace, pour chaque ligne de Z, la courbe de ses
+%   valeurs le long de X, à la profondeur Y de sa ligne, et la referme
+%   jusqu'au plus bas de Z : une suite de rideaux blancs aux bords
+%   colorés par leur hauteur, comme dans MATLAB. C'est la façon de montrer
+%   une famille de signaux — un spectre au fil du temps — sans les
+%   superposer.
 %
 %   WATERFALL(Z) prend une grille entière.
 %
-%   H = WATERFALL(...) rend les poignées.
-%
-%   Le rendu de MatLibre est plan : les courbes sont décalées
-%   verticalement d'un pas constant, ce qui donne la même lecture que la
-%   perspective de MATLAB.
+%   H = WATERFALL(...) rend la poignée.
 %
 %   Exemples :
 %      waterfall(peaks(20));
@@ -22,36 +20,29 @@ function H = waterfall(varargin)
 %      waterfall(S);
 %
 %   Voir aussi RIBBON, MESH, SURF, PLOT3, STACKEDPLOT.
-    entrees = varargin;
-    if numel(entrees) >= 3
-        x = entrees{1};
-        Z = entrees{3};
-        if ~isvector(x)
-            x = x(1, :);
+    numeriques = varargin(cellfun(@isnumeric, varargin));
+    if numel(numeriques) >= 3
+        [X, Y, Z] = numeriques{1:3};
+        if ~isvector(X)
+            X = X(1, :);
+        end
+        if ~isvector(Y)
+            Y = Y(:, 1);
         end
     else
-        Z = entrees{1};
-        x = 1:size(Z, 2);
+        Z = numeriques{1};
+        X = 1:size(Z, 2);
+        Y = 1:size(Z, 1);
     end
-    x = x(:)';
-    [lignes, ~] = size(Z);
-    etendue = max(Z(:)) - min(Z(:));
-    if etendue == 0
-        etendue = 1;
-    end
-    pas = etendue / max(lignes - 1, 1);
-    aEffacer = ishold();
-    if ~aEffacer
-        cla;
-    end
-    hold('on');
-    H = [];
-    for k = 1:lignes
-        H(end + 1) = plot(x, Z(k, :) + (k - 1) * pas);    %#ok<AGROW>
-    end
-    if ~aEffacer
-        hold('off');
-    end
+    X = X(:);
+    Y = Y(:);
+    [m, n] = size(Z);
+    bas = min(Z(:));
+    % Un rideau par ligne de Z : une face par colonne de ces matrices.
+    PX = [X(1); X; X(end)] * ones(1, m);
+    PY = ones(n + 2, 1) * Y';
+    PZ = [bas * ones(1, m); Z'; bas * ones(1, m)];
+    H = fill3(PX, PY, PZ, mean(Z, 2), 'FaceColor', 'w', 'EdgeColor', 'flat');
     if nargout == 0
         clear H;
     end

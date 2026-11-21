@@ -138,7 +138,7 @@ function h = open_system(modele)
         xlim(bornesX);
         ylim(bornesY);
     end
-    title(modele.nom);
+    title(modele.nom, 'Interpreter', 'none');
     poignee = gcf;
     matlibre_sl_ouverts('inscrire', modele.nom, modele, poignee);
     if nargout > 0

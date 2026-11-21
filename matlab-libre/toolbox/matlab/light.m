@@ -5,10 +5,10 @@ function h = light(varargin)
 %   couleur et son genre — 'infinite' pour une source à l'infini, 'local'
 %   pour une source ponctuelle.
 %
-%   Le rendu de MatLibre est plan et ne calcule pas d'éclairage. LIGHT
-%   est acceptée pour qu'un programme écrit pour MATLAB tourne sans
-%   retouche ; elle ne change rien à l'image. LIGHTING et MATERIAL sont
-%   dans le même cas.
+%   MatLibre ne calcule pas d'éclairage : les surfaces gardent les couleurs
+%   de leur palette. LIGHT est acceptée pour qu'un programme écrit pour
+%   MATLAB tourne sans retouche ; elle ne change rien à l'image. LIGHTING et
+%   MATERIAL sont dans le même cas.
 %
 %   Ce qui manque est documenté dans documentation/manques.md, au
 %   chapitre du rendu tridimensionnel.

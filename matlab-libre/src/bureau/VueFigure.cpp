@@ -121,11 +121,13 @@ public:
         p_.save();
         p_.translate(x, y);
         if (s.angle != 0) p_.rotate(-s.angle);
-        p_.setPen(s.couleur.empty() ? QColor(0x22, 0x22, 0x22) : couleurQt(s.couleur));
+        const QColor couleurTexte =
+            s.couleur.empty() ? QColor(0x22, 0x22, 0x22) : couleurQt(s.couleur);
         double curseur = depart;
         for (const auto& m : morceaux) {
             QFont f = police(s.taille * m.echelle, s.gras || m.gras, m.italique);
             p_.setFont(f);
+            p_.setPen(m.couleur.empty() ? couleurTexte : couleurQt(m.couleur));
             // Un exposant monte d'un tiers de la taille, un indice descend
             // d'un cinquième : ce que fait « baseline-shift » en SVG.
             double decalage = m.niveau > 0 ? -0.33 * s.taille * m.niveau

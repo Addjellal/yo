@@ -107,7 +107,31 @@ struct Serie {
     std::vector<double> valeursCouleurPoints;
     std::vector<std::string> couleursPoints;
     bool pointsRemplis = false;
+    // Une surface (« surf », « mesh ») est une grille de LIGNESGRILLE x
+    // COLONNESGRILLE sommets : x, y et z rangés par colonnes, la couleur de
+    // chaque sommet dans valeursCouleurPoints (Z par défaut). Un polygone
+    // peut porter plusieurs faces, séparées par des NaN, et une couleur par
+    // face dans valeursCouleurPoints ou couleursPoints.
+    int lignesGrille = 0, colonnesGrille = 0;
+    // Le rendu des faces et des arêtes d'une surface ou d'un polygone à
+    // couleurs : « flat » (une couleur par maille ou par face), « interp »
+    // (la moyenne de ses sommets), « none », ou une couleur. « surf » :
+    // faces « flat », arêtes noires ; « mesh » : faces blanches, arêtes
+    // « flat ».
+    std::string modeFaces = "flat";
+    std::string modeAretes = "#000000";
+    // L'interprète d'un texte posé (« Interpreter ») : 'tex', 'none',
+    // 'latex'.
+    std::string interprete = "tex";
+    // Sous « yyaxis », le côté de la série : 0 à gauche, 1 à droite.
+    int cote = 0;
 };
+
+// Vrai si la série a une troisième coordonnée à projeter : une surface,
+// ou une courbe, un nuage, un polygone ou un texte qui porte un z par
+// point. (Le z d'une image est la valeur de ses pixels, non une
+// coordonnée.)
+bool serieEspace(const Serie& s);
 
 struct Axes {
     // Identifiant stable dans sa figure : les poignees designent un axe par
@@ -173,7 +197,32 @@ struct Axes {
     std::vector<std::string> etiquettesTicksBarre;
     // L'inclinaison des étiquettes de graduation, en degrés dans le sens
     // trigonométrique : « xtickangle(45) », « XTickLabelRotation ».
-    double angleTicksX = 0, angleTicksY = 0;
+    double angleTicksX = 0, angleTicksY = 0, angleTicksZ = 0;
+    // La vue (« view ») : azimut et élévation, en degrés. (0, 90), la vue
+    // de dessus, est celle d'un tracé plan ; « surf », « plot3 »… posent
+    // (-37,5, 30), la vue par défaut de MATLAB en trois dimensions. La
+    // troisième dimension a ses bornes, ses graduations et leurs textes.
+    double azimut = 0, elevation = 90;
+    // L'interprète de chaque texte de l'axe (« Interpreter » de MATLAB) :
+    // « title », « xlabel », « ylabel », « zlabel », « legend »,
+    // « colorbarlabel » et « ticks » (« TickLabelInterpreter »). Absent :
+    // 'tex', le défaut de MATLAB.
+    std::map<std::string, std::string> interpretes;
+    // « yyaxis » : un second axe des ordonnées, à droite. Chaque série
+    // porte son côté ; le côté actif reçoit les tracés, ylim, ylabel et
+    // yticks. La droite a ses bornes, ses graduations et son étiquette.
+    bool deuxOrdonnees = false;
+    int coteActif = 0;
+    bool limitesManuellesYDroite = false;
+    double yminDroite = 0, ymaxDroite = 1;
+    bool logYDroite = false;
+    std::vector<double> ticksYDroite;
+    std::vector<std::string> etiquettesTicksYDroite;
+    std::string etiquetteYDroite;
+    bool limitesManuellesZ = false;
+    double zmin = 0, zmax = 1;
+    std::vector<double> ticksZ;
+    std::vector<std::string> etiquettesTicksZ;
     // La légende : sa position (« Location » de MATLAB, en minuscules), son
     // orientation, son cadre, et les courbes qu'elle nomme quand
     // « legend(h, ...) » les désigne (vide : toutes).
@@ -198,6 +247,21 @@ void limitesAxe(const Axes& a, double& xmin, double& xmax, double& ymin, double&
 // L'étendue des données d'un axe, sans arrondi ni limite imposée : ce que
 // « axis tight » et « axis image » serrent.
 void etendueDonnees(const Axes& a, double& xmin, double& xmax, double& ymin, double& ymax);
+// Les bornes de l'axe des ordonnées de droite (« yyaxis right ») : celles
+// qu'on a fixées, ou l'étendue des séries de droite, arrondie.
+void limitesAxeDroite(const Axes& a, double& ymin, double& ymax);
+// La couleur d'un côté sous « yyaxis » : la première couleur de MATLAB à
+// gauche, la deuxième à droite. Les courbes et l'axe de ce côté la
+// prennent.
+const char* couleurCote(int cote);
+// Les bornes de la troisième dimension : celles qu'on a fixées (« zlim »),
+// ou l'étendue des z des séries de l'espace, arrondie aux graduations.
+void limitesAxeZ(const Axes& a, double& zmin, double& zmax);
+// L'interprète d'un texte de l'axe : 'tex', 'none' ou 'latex'.
+const std::string& interpreteDe(const Axes& a, const std::string& cible);
+// Vrai si l'axe se dessine en perspective : une vue autre que celle de
+// dessus. La vue de dessus est le tracé plan ordinaire.
+bool vueEspace(const Axes& a);
 
 // Vrai si les deux axes se recouvrent. MATLAB efface les axes qu'une
 // nouvelle case recouvre : c'est ce qui fait que « subplot(2,1,1) » après

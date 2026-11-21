@@ -37,7 +37,7 @@ function matlibre_sl_forme(bloc, x, y, largeur, hauteur)
                     place = y;
                 end
                 text(x - hauteur * 0.24, place, signes(k), ...
-                     'HorizontalAlignment', 'center', 'FontSize', 10);
+                     'HorizontalAlignment', 'center', 'FontSize', 10, 'Interpreter', 'none');
             end
         case {'inport', 'outport'}
             % Les bornes du modèle : un pentagone pointé vers le sens du
@@ -78,10 +78,12 @@ function matlibre_sl_forme(bloc, x, y, largeur, hauteur)
     end
     % Le nom du bloc va dessous, hors du cadre : c'est là que Simulink le
     % met, et cela laisse l'intérieur à ce que le bloc calcule.
+    % Les noms de blocs s'écrivent tels quels, comme dans Simulink : un
+    % « Gain_1 » n'a pas d'indice.
     text(x, y - hauteur * 0.85, bloc.nom, 'HorizontalAlignment', 'center', ...
-         'FontSize', 9);
+         'FontSize', 9, 'Interpreter', 'none');
 end
 
 function texte(x, y, contenu)
-    text(x, y, contenu, 'HorizontalAlignment', 'center', 'FontSize', 11);
+    text(x, y, contenu, 'HorizontalAlignment', 'center', 'FontSize', 11, 'Interpreter', 'none');
 end

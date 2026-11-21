@@ -16,7 +16,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | identification | 40 | 0 | 100 % |
 | images | 74 | 0 | 100 % |
 | instruments-financiers | 55 | 0 | 100 % |
-| matlab-graphique | 144 | 1 | 99 % |
+| matlab-graphique | 145 | 0 | 100 % |
 | matlab-langage | 614 | 0 | 100 % |
 | ondelettes | 112 | 0 | 100 % |
 | optimisation-globale | 15 | 0 | 100 % |
@@ -29,11 +29,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | symbolique | 36 | 0 | 100 % |
 | types | 100 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2409** | **1** | **100 %** |
-
-## matlab-graphique
-
-`ztickangle`
+| **ensemble** | **2410** | **0** | **100 %** |
 
 ## Ce qui manque au-delà des fonctions
 
@@ -115,13 +111,21 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
 Les noms du tableau ci-dessus sont tous présents ; ce qui suit est ce
 qu'ils ne font pas encore comme MATLAB.
 
-- **Rendu tridimensionnel** : le rendu de MatLibre est plan. `surf`,
-  `mesh`, `plot3`, `contour3`, `scatter3` et leurs voisins tracent, mais
-  sans perspective ; `view`, `light`, `lighting`, `material` et `hidden`
-  sont acceptés sans effet. Chaque fiche d'aide le dit.
-- **Second axe des ordonnées** : `plotyy` et `yyaxis` remettent la
-  seconde courbe à l'échelle de la première au lieu de lui donner ses
-  propres graduations à droite.
+- **Rendu tridimensionnel** : `surf`, `mesh`, `plot3`, `scatter3`,
+  `fill3`, `patch`, `contour3`, `bar3`, `stem3`, `quiver3`, `slice` et
+  leurs voisins sont projetés comme dans MATLAB (projection
+  orthographique de `viewmtx`, `view`, boîte étirée sauf sous
+  `axis equal`), les faces triées de la plus lointaine à la plus proche.
+  Trois écarts : l'algorithme du peintre ne coupe pas deux faces qui se
+  traversent ; `shading interp` donne à chaque maille la moyenne de ses
+  sommets au lieu d'un dégradé ; aucun éclairage n'est calculé (`light`,
+  `lighting` et `material` sont acceptés sans effet). `bar3h` garde ses
+  barres verticales, et `slice` coupe sur le plan de grille le plus
+  proche au lieu d'interpoler.
+- **Second axe des ordonnées** : `yyaxis` et `plotyy` donnent à la droite
+  ses bornes, ses graduations, son étiquette et sa couleur, comme MATLAB ;
+  `plotyy` rend un seul axe sous deux poignées, une par côté, là où
+  MATLAB en superpose deux.
 - **Axes polaires** : `polarplot`, `compass` et `rose` convertissent en
   coordonnées cartésiennes et dessinent eux-mêmes cercles et rayons ; la
   graduation angulaire du cadre manque.
@@ -145,11 +149,13 @@ qu'ils ne font pas encore comme MATLAB.
   MATLAB ; la mise à jour automatique (`AutoUpdate`) et `NumColumns` sont
   acceptées sans effet, et une légende de contour montre un trait, non
   l'icône de MATLAB.
-- **Pas d'interpréteur TeX** dans les titres, étiquettes, légendes et
-  textes : `Z_L` ou `10^{-3}` s'écrivent tels quels, là où MATLAB
-  (`Interpreter` vaut `'tex'` par défaut) met en indice et en exposant et
-  traduit `\alpha`, `\pi`... Seules les graduations des axes
-  logarithmiques écrivent leurs puissances de dix en exposant.
+- **TeX** : les titres, étiquettes, légendes, textes et graduations
+  passent par le TeX de MATLAB (exposants, indices, groupes, lettres
+  grecques et symboles, `\bf`, `\it`, `\color`, `\fontsize`) ;
+  `'Interpreter','none'` les écrit tels quels. L'interprète `'latex'` est
+  lu comme du TeX sans les dollars : `\frac`, `\sqrt{}` et les
+  environnements de LaTeX ne sont pas mis en page. Un texte sur plusieurs
+  lignes (cellule) s'écrit sur une seule.
 - **Barre de couleurs** : ses huit positions, son étiquette
   (`cb.Label.String`), ses graduations et leurs textes suivent MATLAB ;
   `Direction`, `Limits` en écriture et la police (`FontSize`) ne sont pas
