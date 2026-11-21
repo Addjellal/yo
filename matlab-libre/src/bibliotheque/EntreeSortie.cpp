@@ -401,17 +401,31 @@ FONCTION(fnNum2str) {
     if (args.size() > 1 && (args[1].estTexte() || args[1].estChaine()))
         return {Valeur::texte(formatMatlab(args[1].versTexte(), {v}, 0))};
     int chiffres = args.size() > 1 ? (int)args[1].scal() : 0;
+    // Sans précision donnée, MATLAB garde quatre chiffres après celui des
+    // unités du plus grand élément, cinq significatifs au moins :
+    // num2str(pi) vaut '3.1416', num2str(123.456) '123.456'. Le « %.4g »
+    // d'avant rendait '3.142' et '123.5'.
+    int significatifs = 5;
+    if (chiffres <= 0) {
+        double plusGrand = 0;
+        for (double x : v.re)
+            if (std::isfinite(x)) plusGrand = std::max(plusGrand, std::fabs(x));
+        for (double y : v.im)
+            if (std::isfinite(y)) plusGrand = std::max(plusGrand, std::fabs(y));
+        if (plusGrand > 0)
+            significatifs = std::min(17, std::max((int)std::floor(std::log10(plusGrand)) + 5, 5));
+    }
     auto un = [&](double x, double y) {
         std::string s;
         if (nonFini(x, s)) {
         } else if (chiffres > 0) s = formater("%.*g", chiffres, x);
         else if (x == std::floor(x) && std::fabs(x) < 1e15) s = formater("%.0f", x);
-        else s = formater("%.4g", x);
+        else s = formater("%.*g", significatifs, x);
         if (y != 0) {
             std::string si;
             if (!nonFini(std::fabs(y), si))
                 si = (chiffres > 0) ? formater("%.*g", chiffres, std::fabs(y))
-                                    : formater("%.4g", std::fabs(y));
+                                    : formater("%.*g", significatifs, std::fabs(y));
             s += (y < 0 ? "-" : "+") + si + "i";
         }
         return s;

@@ -728,6 +728,17 @@ ignore = @(x, ~) x;
 assert(ignore(1, 2) == 1, 'un ~ compte pour un argument');
 clear identite constante compte ignore
 
+%% ------- NUM2STR garde cinq chiffres significatifs, comme MATLAB
+% Le « %.4g » rendait '3.142' pour pi ; MATLAB documente '3.1416', et
+% garde quatre chiffres apres celui des unites du plus grand element.
+assert(strcmp(num2str(pi), '3.1416'), num2str(pi));
+assert(strcmp(num2str(-pi), '-3.1416'));
+assert(strcmp(num2str(123.456), '123.456'));
+assert(strcmp(num2str(pi * 1000), '3141.5927'));
+assert(strcmp(num2str(0.001234567), '0.0012346'));
+assert(strcmp(num2str(3.14159, 4), '3.142'), 'une precision donnee l''emporte');
+assert(strcmp(num2str(42), '42') && strcmp(num2str(0.1), '0.1'));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)
