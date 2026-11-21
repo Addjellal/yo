@@ -648,4 +648,22 @@ assert(max(max(abs(ycbcr2rgb(rgb2ycbcr(couleurs)) - couleurs))) < 1e-5, ...
 assert(isequal(size(rgb2ycbcr(rand(4, 5, 3))), [4 5 3]));
 assert(isequal(size(ycbcr2rgb(rand(4, 5, 3))), [4 5 3]));
 
+%% ------------- IMWRITE refuse un format qu'il ne sait pas ecrire
+% Il ecrivait un PGM en texte sous n'importe quel nom : « image.png »
+% n'etait pas un PNG, et aucun autre logiciel ne l'ouvrait.
+dossierImages = tempname();
+mkdir(dossierImages);
+try
+    imwrite(uint8(magic(8)), fullfile(dossierImages, 'image.png'));
+    assert(false, 'un PNG ne doit pas etre ecrit en PGM');
+catch e
+    assert(strcmp(e.identifier, 'MatLibre:imwrite:FormatNonPris'), e.identifier);
+end
+assert(~isfile(fullfile(dossierImages, 'image.png')), 'aucun fichier trompeur');
+imwrite(uint8(magic(8)), fullfile(dossierImages, 'image.pgm'));
+assert(isequal(imread(fullfile(dossierImages, 'image.pgm')), uint8(magic(8))));
+imwrite(uint8(magic(8)), fullfile(dossierImages, 'sansExtension'), 'pgm');
+assert(isfile(fullfile(dossierImages, 'sansExtension')));
+rmdir(dossierImages, 's');
+
 disp('images : toutes les verifications passent');
