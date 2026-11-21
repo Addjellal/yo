@@ -7,8 +7,10 @@ le rendu sont bâtis), `developpeur.md` (compiler, ajouter une fonction,
 conventions), `reference-matlab/hors-fonctions.md` (ce qui diffère de
 MATLAB, domaine par domaine).
 
-Dernière mise à jour : 21 novembre 2026, après le commit 9f0c666. La
-batterie complète passait alors : 49 tests sur 49.
+Dernière mise à jour : 21 novembre 2026. La batterie complète passait
+alors, 49 tests sur 49, au commit 9f0c666 (le dernier changement de
+code) ; les commits suivants n'ajoutent que de la documentation et des
+outils.
 
 ## 1. Les règles du dépôt
 
@@ -81,6 +83,11 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 
 ### Outils de vérification
 
+- `outils/banc.m` est le banc de performance : vingt-deux mesures
+  (interpréteur, copie sur écriture, calcul vectoriel, algèbre linéaire,
+  texte, rendu, `parfor`, Simulink), chacune vérifiée et comparée à sa
+  référence ; un rapport au-delà de 3 est signalé.
+  `build/bin/matlibre --path toolbox outils/banc.m`, une minute.
 - `outils/capturer.js` rend en PNG les SVG d'un dossier (Playwright et
   son Chromium sont installés dans le conteneur) :
   `node outils/capturer.js dossier_svg dossier_png`. Les figures
@@ -93,6 +100,17 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 - `outils/vueFigure.sh script.m dossier_png` peint les figures d'un
   script dans la fenêtre du bureau (`VueFigure`), hors écran, pour les
   comparer au SVG.
+- **Captures de l'application de bureau** :
+  `MATLIBRE_CAPTURE=/chemin/fenetre.png build/bin/matlibre_tests_bureau`
+  écrit, en fin de test, la fenêtre principale et celle de l'aide. Pour la voir vivre : `xvfb-run -a
+  build/bin/matlibre-bureau &` puis `import -window root capture.png`
+  (Xvfb et ImageMagick sont installés).
+- **Contrôles de cohérence** : `outils/verifierDoublons.m` (deux `.m` de
+  même nom, un `.m` qui masque une fonction native), `outils/audit.m`
+  (aide, exemples, tests par boîte à outils), `outils/verifierExemples.m`
+  (tous les exemples d'aide), `outils/eprouverNatives.sh` (chaque native
+  appelée avec des arguments absurdes : une erreur MATLAB est juste, un
+  plantage jamais ; une demi-heure).
 - **Vérifications croisées en Python** : les cas de la littérature ont
   été confrontés à des implémentations indépendantes. L'environnement se
   recrée ainsi (le scratchpad d'une session ne survit pas) :
@@ -118,6 +136,7 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 | `a9a20b9` | Une toile commune au SVG et à la fenêtre du bureau : le dessin n'est écrit qu'une fois. |
 | `17ed9dd` | `scatter` propre (aires, couleurs par point, creux), la barre de couleurs dans ses huit positions avec étiquette et graduations, `xtickangle`/`ytickangle`, une graduation par barre, couleurs pures des lettres. |
 | `9f0c666` | La perspective (`surf`, `mesh`, `plot3`, `scatter3`, `fill3`, `patch`, `bar3`, `stem3`, `quiver3`, `slice`, `meshc`...), l'interprète TeX des textes, `yyaxis` et `plotyy`. |
+| `67fb95c` et suivant | Cette fiche, le banc de performance (`outils/banc.m`) et les outils de vérification du rendu (`outils/capturer.js`, `comparerImages.py`, `vueFigure.sh`). |
 
 ## 4. Les pièces récentes, et où elles sont
 
@@ -149,28 +168,89 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 - **Base de données** — `toolbox/base-de-donnees/` : des tables en
   mémoire (`dbTable`, `dbSelect`...) sauvées en CSV.
 
-## 5. Ce qui reste, par ordre d'intérêt
+## 5. L'audit de reprise
+
+Avant d'ajouter quoi que ce soit, une session qui reprend fait le point,
+et le rend écrit dans `documentation/audit-reprise.md` (date, commit,
+constats chiffrés, ce qui a été corrigé, ce qui est proposé).
+
+1. **Construire** et vérifier qu'aucun avertissement nouveau n'apparaît
+   (ceux de `Base.cpp`, `Mat.cpp`, `Math.cpp`, `Statistiques.cpp` sont
+   connus).
+2. **La batterie complète** (49 tests) et le bureau (`ctest -R bureau`).
+   Un test rouge est le premier travail : en trouver la cause — défaut
+   réel, ou test qui ne tenait qu'au hasard — avant toute autre chose.
+3. **Le banc** (`outils/banc.m`) : comparer aux références ; une mesure
+   plus lente d'un facteur 1,5 se regarde, d'un facteur 3 se cherche
+   (régression, ou machine différente : le dire). Le banc du 21 novembre
+   2026 montre déjà où MatLibre est lent face à MATLAB :
+   - l'algèbre linéaire dense est écrite à la main, sans LAPACK : `eig`
+     d'une matrice symétrique 300×300 prend 0,27 s, `svd` 0,44 s, quand
+     MATLAB y met quelques millisecondes ;
+   - `jsondecode` de 4000 nombres prend 0,6 s ;
+   - un `parfor` coûte 0,23 s de démarrage, même vide (section 6) ;
+   - une boucle scalaire tourne à 0,4 µs le tour : c'est un interpréteur
+     à parcours d'arbre, sans compilation à la volée.
+4. **Les conflits** :
+   - avec la branche par défaut : `git fetch origin main` puis
+     `git rev-list --left-right --count origin/main...HEAD` et
+     `git merge-tree --write-tree origin/main HEAD` (le 21 novembre :
+     0 commit de retard, 29 d'avance, fusion sans conflit) ;
+   - de noms : `outils/verifierDoublons.m` (doublons, masquages du
+     natif), et les collisions de casse que `test_aide.m` refuse ;
+   - de comportements : deux chemins qui devraient s'accorder et ne le
+     font pas. Un exemple connu : un modèle Simulink créé par
+     `m = new_system('m')` (la forme à sortie, propre à MatLibre) part
+     en `ode1` au pas de 0,01, quand `new_system('m')` part, comme
+     Simulink, en `VariableStepAuto` — d'où un intégrateur faux de 5e-3
+     sur un sinus, là où ode45 donne 3e-10. À trancher.
+5. **Le logiciel** : relire le code des grands ajouts récents (`Toile`,
+   `Dessin.cpp`, `Espace.cpp`, `Tex.cpp`, `Tampon.h`, `Aleatoire.cpp`)
+   en cherchant les défauts réels, avec le scénario qui les déclenche ;
+   passer `outils/eprouverNatives.sh` ; vérifier la couverture
+   (`outils/manques.m`, `outils/audit.m`).
+6. **Le design** :
+   - les figures : rendre en PNG un corpus varié (tracés plans, barres,
+     images, contours, légendes, sous-figures, 3D, TeX) et le regarder
+     face à ce que MATLAB montre (couleurs, polices, marges, graduations,
+     vues 3D) ; comparer la fenêtre (`outils/vueFigure.sh`) au SVG ;
+   - l'application de bureau : capturer la fenêtre principale, l'éditeur,
+     la console, l'aide, l'éditeur Simulink, et juger lisibilité,
+     cohérence, encombrement, raccourcis, messages, à la manière d'un
+     utilisateur de MATLAB qui la découvre.
+7. **Rendre compte** : corriger tout de suite ce qui est un défaut avéré
+   (test rouge, résultat faux, plantage, conflit, régression du banc),
+   chacun dans son commit ; pour le reste — améliorations du logiciel et
+   du design —, une liste classée par intérêt et par coût, à soumettre à
+   l'utilisateur avant de s'y mettre.
+
+## 6. Ce qui reste, par ordre d'intérêt
 
 1. **Un pool de travailleurs persistant pour `parfor`.** Chaque `parfor`
-   crée ses fils et ses interpréteurs, environ 0,5 s de coût fixe qu'une
-   boucle courte ne rembourse pas (mesure dans `hors-fonctions.md`). Il
+   crée ses fils et ses interpréteurs : 0,23 s de coût fixe au banc,
+   jusqu'à une demi-seconde selon la machine, qu'une boucle courte ne
+   rembourse pas. Il
    faudrait garder les travailleurs d'une boucle à l'autre (`parpool`,
    `gcp`, `delete(gcp)` en règlent la vie dans MATLAB), en s'assurant
    que leur état ne fuit pas d'une boucle à la suivante.
-2. **L'interface SQL de la Database Toolbox** : `sqlite`, `database`,
+2. **L'algèbre linéaire dense** : `eig`, `svd` et `A\b` à la vitesse de
+   MATLAB demanderaient LAPACK (OpenBLAS ou la référence), en dépendance
+   facultative, la version écrite à la main restant le repli — ce qui
+   touche aussi la construction pour Windows.
+3. **L'interface SQL de la Database Toolbox** : `sqlite`, `database`,
    `fetch`, `sqlread`, `sqlwrite`, `execute`, `close`. `libsqlite3-dev`
    est installé dans le conteneur ; la construction pour Windows
    (`outils/mingw.cmake`) devra soit trouver SQLite, soit embarquer
    l'amalgame `sqlite3.c`, soit construire sans ces fonctions en le
    disant. Les tables en mémoire existantes (`dbTable`...) restent.
-3. **`get(h,'Color')` rend un code `'#FF0000'`** là où MATLAB rend le
+4. **`get(h,'Color')` rend un code `'#FF0000'`** là où MATLAB rend le
    triplet `[1 0 0]` (idem `MarkerFaceColor`, `FaceColor` quand c'est
    une couleur). Les deux s'écrivent déjà ; changer la lecture touche
    `findobj` et des tests qui comparent des chaînes.
-4. **L'API d'acquisition de MATLAB** : `addinput`, `read`, `write`,
+5. **L'API d'acquisition de MATLAB** : `addinput`, `read`, `write`,
    `start` manquent ; `addAnalogInput`, `readData`, `writeData` en
    tiennent lieu (`toolbox/acquisition`).
-5. **Les limites du rendu**, toutes écrites dans `hors-fonctions.md` :
+6. **Les limites du rendu**, toutes écrites dans `hors-fonctions.md` :
    - perspective : deux faces qui se traversent ne sont pas découpées
      (algorithme du peintre) ; `shading interp` donne la moyenne d'une
      maille au lieu d'un dégradé ; pas d'éclairage ; `bar3h` garde des
@@ -188,18 +268,38 @@ cd build && ctest -R bureau                          # l'application de bureau, 
      continu ;
    - pas d'interaction à la souris (zoom, rotation 3D, curseur), pas de
      format `.fig`.
-6. **Interface utilisateur** : `uicontrol`, `uifigure` et App Designer
+7. **Interface utilisateur** : `uicontrol`, `uifigure` et App Designer
    absents ; pas de boucle d'événements modale (`uiwait` n'attend pas).
 
-## 6. Pour démarrer un nouveau chat
+## 7. Pour démarrer un nouveau chat
 
 Coller ce message :
 
 > Reprends le projet MatLibre (dépôt `addjellal/yo`, dossier
 > `matlab-libre`, branche `claude/matlab-libre-reprise-lgnad9`). Lis
-> d'abord `matlab-libre/documentation/reprise.md`, puis `etat.md` et
-> `architecture.md`. Construis (`cmake -S . -B build
-> -DCMAKE_BUILD_TYPE=Release` puis `cmake --build build -j4`), vérifie
-> que la batterie passe (`cd build && ctest -j2 --timeout 7000`, une
-> demi-heure), puis propose-moi la suite parmi « Ce qui reste »
-> (section 5).
+> d'abord `matlab-libre/documentation/reprise.md` en entier, puis
+> `etat.md` et `architecture.md`.
+>
+> Avant d'ajouter quoi que ce soit, fais l'audit de reprise décrit à la
+> section 5 de `reprise.md` :
+> 1. Construis (`cmake -S . -B build -DCMAKE_BUILD_TYPE=Release` puis
+>    `cmake --build build -j4`) et passe la batterie complète (`cd build
+>    && ctest -j2 --timeout 7000`, une demi-heure) et le bureau.
+> 2. Fais le benchmark du projet avec `outils/banc.m` et compare aux
+>    références ; dis où MatLibre est lent, et pourquoi.
+> 3. Vérifie que tout fonctionne : tests, exemples d'aide, fonctions
+>    natives éprouvées (`outils/eprouverNatives.sh`), couverture.
+> 4. Cherche les conflits : avec la branche `main`, entre noms de
+>    fichiers et fonctions natives, et entre comportements qui devraient
+>    s'accorder (la section 5 en donne un exemple à trancher).
+> 5. Examine le logiciel (relecture du code récent, robustesse,
+>    performance) et le design (figures rendues en PNG face à MATLAB,
+>    captures de l'application de bureau : lisibilité, cohérence,
+>    ergonomie).
+>
+> Corrige directement les défauts avérés — test rouge, résultat faux,
+> plantage, conflit, régression du banc —, un commit par correction.
+> Écris le rapport dans `documentation/audit-reprise.md`, puis
+> propose-moi, classées par intérêt et par coût, les améliorations et
+> corrections restantes, autant logicielles que de design, avant de les
+> entreprendre.
