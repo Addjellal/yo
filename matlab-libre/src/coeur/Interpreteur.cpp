@@ -4,6 +4,8 @@
 #include "matlibre/Parallele.h"
 
 #include <algorithm>
+#include <new>
+#include <stdexcept>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -1500,7 +1502,22 @@ void Interpreteur::affecter(const NoeudPtr& cible, const Valeur& v) {
     ecrireVariable(nom, std::move(nouvelle));
 }
 
+// Un tableau trop grand pour la mémoire — « x = 1:1e18 », « zeros(1e10) » —
+// levait std::bad_alloc, qu'aucun try/catch du langage n'attrapait : la
+// console s'arrêtait sur « Erreur interne », l'espace de travail perdu.
+// C'est une erreur comme une autre, que MATLAB lève et laisse attraper.
+// La demande n'a pas eu lieu : la mémoire n'est pas épuisée pour autant.
 void Interpreteur::executerInstruction(const NoeudPtr& n) {
+    try {
+        executerInstructionBrute(n);
+    } catch (const std::bad_alloc&) {
+        erreur("MATLAB:nomem", "Out of memory. The requested array is too large.");
+    } catch (const std::length_error&) {
+        erreur("MATLAB:nomem", "Out of memory. The requested array is too large.");
+    }
+}
+
+void Interpreteur::executerInstructionBrute(const NoeudPtr& n) {
     if (!n) return;
     // Ctrl-C : un test de booléen atomique par instruction. C'est ce qui
     // permet de sortir d'une boucle qui ne finit pas, et de couper

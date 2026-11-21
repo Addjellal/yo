@@ -118,6 +118,9 @@ public:
                          const std::vector<Valeur>& arguments = {});
     void executerBloc(const NoeudPtr& b);
     void executerInstruction(const NoeudPtr& n);
+    // Le corps d'executerInstruction : celle-ci n'y ajoute que la
+    // conversion d'un manque de mémoire en erreur MATLAB.
+    void executerInstructionBrute(const NoeudPtr& n);
 
     // --- évaluation ---
     Valeur evaluer(const NoeudPtr& n);

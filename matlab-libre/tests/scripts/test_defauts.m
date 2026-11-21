@@ -768,6 +768,17 @@ catch e
     assert(strcmp(e.identifier, 'MATLAB:parseError'), e.identifier);
 end
 
+%% ---------- un tableau trop grand est une erreur, non une fin brutale
+% std::bad_alloc n'etait attrape par aucun try/catch : « 1:1e18 » et
+% « ones(1e6, 1e6) » arretaient la session (« Erreur interne »).
+try
+    trop = 1:1e18; %#ok<NASGU>
+    assert(false, '1:1e18 doit echouer');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:nomem'), e.identifier);
+end
+assert(verifierRefus(@() ones(1e6, 1e6)));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)
