@@ -770,14 +770,22 @@ end
 
 %% ---------- un tableau trop grand est une erreur, non une fin brutale
 % std::bad_alloc n'etait attrape par aucun try/catch : « 1:1e18 » et
-% « ones(1e6, 1e6) » arretaient la session (« Erreur interne »).
+% « ones(1e6, 1e6) » arretaient la session (« Erreur interne »). Une plage
+% trop longue est refusee avant d'allouer ; un tableau que la memoire ne
+% peut pas tenir leve MATLAB:nomem.
 try
     trop = 1:1e18; %#ok<NASGU>
     assert(false, '1:1e18 doit echouer');
 catch e
+    assert(strcmp(e.identifier, 'MATLAB:array:SizeLimitExceeded'), e.identifier);
+end
+assert(verifierRefus(@() 1:Inf));
+try
+    ones(1e6, 1e6);
+    assert(false, 'huit teraoctets doivent etre refuses');
+catch e
     assert(strcmp(e.identifier, 'MATLAB:nomem'), e.identifier);
 end
-assert(verifierRefus(@() ones(1e6, 1e6)));
 
 %% ---------- une taille non representable est refusee, non ramenee a zero
 % « (int)1e10 » valait INT_MIN, ramene a zero : zeros(1e10) rendait un

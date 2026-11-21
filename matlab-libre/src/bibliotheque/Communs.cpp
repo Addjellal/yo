@@ -232,6 +232,15 @@ Valeur construirePlage(const Valeur& debut, const Valeur& pas, const Valeur& fin
         return v;
     }
     double brut = (b - a) / s;
+    // Une plage dont la longueur n'est pas représentable — « 1:Inf »,
+    // « 1:1e18 » — est refusée avant d'allouer : la conversion en long long
+    // d'un infini est un comportement indéfini, et les dimensions sont des
+    // int. Une borne NaN rend une plage vide, comme avant, sans passer par
+    // cette conversion.
+    if (std::isnan(brut)) return Valeur::matrice(1, 0);
+    if (brut + 1 > 2147483647.0)
+        erreur("MATLAB:array:SizeLimitExceeded",
+               "Requested array exceeds the maximum possible variable size.");
     long long n = (long long)std::floor(brut + 1e-10) + 1;
     if (n < 0) n = 0;
     std::vector<double> valeurs;
