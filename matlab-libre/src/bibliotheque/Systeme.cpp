@@ -8,7 +8,9 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <cstdio>
 #ifndef _WIN32
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
@@ -345,19 +347,45 @@ FONCTION(fnSetenv) {
     return {};
 }
 
+// La sortie de la commande se lit par un tube, sans fichier intermédiaire :
+// un nom fixe dans le dossier temporaire mêlait les sorties de deux appels
+// simultanés (deux sessions, deux travailleurs d'un parfor), et un lien
+// symbolique posé à ce nom par un autre utilisateur faisait écraser le
+// fichier qu'il désigne. La commande est mise entre parenthèses : sans
+// elles, la redirection ne valait que pour sa dernière partie, et
+// « system('echo a; exit 1') » laissait « a » partir sur le terminal.
+// Le code rendu est celui de la commande, comme dans MATLAB — non le
+// statut brut de wait, qui vaut 256 fois le code sous POSIX.
 FONCTION(fnSystem) {
     INUTILISE
     exigerArguments(args, 1, 2, "system");
-    std::string commande = args[0].versTexte();
-    std::string fichier = fs::temp_directory_path().string() + "/matlibre_system.txt";
-    int code = std::system((commande + " > " + fichier + " 2>&1").c_str());
-    std::ifstream f(fichier);
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    std::error_code ec;
-    fs::remove(fichier, ec);
-    if (nargout >= 2) return {Valeur::scalaire(code), Valeur::texte(ss.str())};
-    it.sortie() << ss.str();
+    std::string commande = "(" + args[0].versTexte() + ") 2>&1";
+    std::cout.flush();
+    std::fflush(nullptr);
+#ifdef _WIN32
+    FILE* tube = _popen(commande.c_str(), "r");
+#else
+    FILE* tube = ::popen(commande.c_str(), "r");
+#endif
+    if (!tube)
+        erreur("MATLAB:system:CannotRun",
+               "La commande n'a pas pu etre lancee : " + args[0].versTexte());
+    std::string sortie;
+    char morceau[4096];
+    std::size_t lus;
+    while ((lus = std::fread(morceau, 1, sizeof morceau, tube)) > 0) sortie.append(morceau, lus);
+#ifdef _WIN32
+    int code = _pclose(tube);
+#else
+    int statut = ::pclose(tube);
+    int code = statut;
+    if (statut != -1) {
+        if (WIFEXITED(statut)) code = WEXITSTATUS(statut);
+        else if (WIFSIGNALED(statut)) code = 128 + WTERMSIG(statut);
+    }
+#endif
+    if (nargout >= 2) return {Valeur::scalaire(code), Valeur::texte(sortie)};
+    it.sortie() << sortie;
     return {Valeur::scalaire(code)};
 }
 

@@ -695,6 +695,23 @@ J = [1 2; 3 4];
 assert(isequal(I * J, J), 'I et J, poses, sont des variables comme les autres');
 clear I J
 
+%% ----------------- SYSTEM rend le code de la commande, et toute sa sortie
+% Le statut brut de wait valait 256 fois le code sous POSIX : « exit 3 »
+% rendait 768. Et la redirection ne couvrait que la derniere commande
+% d'une suite : la sortie de « echo a; exit 1 » partait sur le terminal,
+% et la sortie rendue etait vide.
+[codeSys, sortieSys] = system('exit 3');
+assert(codeSys == 3 && isempty(sortieSys), 'system rend le code de sortie, non le statut');
+[codeSys, sortieSys] = system('echo bonjour');
+assert(codeSys == 0 && strcmp(strtrim(sortieSys), 'bonjour'));
+if isunix
+    [codeSys, sortieSys] = system('echo premier; echo second >&2; exit 1');
+    assert(codeSys == 1, 'le code est celui de la derniere commande');
+    assert(contains(sortieSys, 'premier') && contains(sortieSys, 'second'), ...
+           'la sortie de chaque commande, erreurs comprises, est rendue');
+end
+clear codeSys sortieSys
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)
