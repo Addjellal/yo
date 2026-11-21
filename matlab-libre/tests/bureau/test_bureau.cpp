@@ -1415,8 +1415,13 @@ int main(int argc, char** argv) {
             // Le polygone blanc doit garder son contour : de l'encre
             // sombre quelque part dans sa moitie de l'image. La fenetre
             // parait avant que son contenu n'arrive du fil de calcul : on
-            // attend qu'il soit peint. Une seule capture, prise tout de
-            // suite, echouait une fois sur deux sur une machine chargee.
+            // attend qu'il soit peint. Et le trait, d'un pixel, peut tomber
+            // a cheval sur deux colonnes : lisse, il donne alors deux
+            // pixels gris a moitie (qGray ~ 128), que le seuil de 100
+            // d'avant ne comptait pas — le test echouait ou passait selon
+            // l'alignement au sous-pixel du carre. Un contour absent, ou
+            // pris sur la couleur du fond, ne laisse lui aucun pixel sous
+            // 200.
             int sombres = 0;
             attendre([&] {
                 image.fill(Qt::white);
@@ -1424,7 +1429,7 @@ int main(int argc, char** argv) {
                 sombres = 0;
                 for (int y = 0; y < 400; ++y)
                     for (int x = 0; x < 300; ++x)
-                        if (qGray(image.pixel(x, y)) < 100) ++sombres;
+                        if (qGray(image.pixel(x, y)) < 200) ++sombres;
                 return sombres > 200;
             }, 5000);
             verifier(sombres > 200,
