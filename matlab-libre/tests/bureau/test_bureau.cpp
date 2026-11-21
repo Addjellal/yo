@@ -718,6 +718,13 @@ int main(int argc, char** argv) {
         int repliesLarge = nombreReplies(fenetre);
         verifier(aucunLibelleRogne(fenetre), "au large, aucun libelle du ruban n'est rogne");
 
+        // La cause de l'ancien echec : le ruban exigeait la largeur de ses
+        // groupes deployes, si bien que la fenetre ne pouvait pas devenir
+        // plus etroite que lui — et qu'il ne se repliait donc jamais.
+        if (Ruban* ruban = fenetre.findChild<Ruban*>())
+            verifier(ruban->minimumSizeHint().width() < ruban->sizeHint().width(),
+                     "le ruban se contente de ses groupes replies comme largeur minimale");
+
         fenetre.resize(760, avant.height());
         QCoreApplication::processEvents();
         int repliesEtroit = nombreReplies(fenetre);

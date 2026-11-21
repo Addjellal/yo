@@ -63,6 +63,11 @@ public:
     // redimensionnement ; public pour qu'un test puisse le provoquer.
     void ajusterGroupes();
 
+    // La largeur minimale est celle des groupes repliés, non déployés :
+    // sans cela, la fenêtre ne pouvait pas devenir plus étroite que le
+    // ruban déployé, et le ruban ne se repliait donc jamais.
+    QSize minimumSizeHint() const override;
+
 protected:
     void resizeEvent(QResizeEvent* evenement) override;
 
