@@ -1408,16 +1408,22 @@ int main(int argc, char** argv) {
                  "la figure des surfaces remplies s'ouvre");
         if (vuePatch) {
             vuePatch->resize(600, 400);
-            QCoreApplication::processEvents();
             QImage image(600, 400, QImage::Format_ARGB32);
-            image.fill(Qt::white);
-            vuePatch->render(&image);
             // Le polygone blanc doit garder son contour : de l'encre
-            // sombre quelque part dans sa moitie de l'image.
+            // sombre quelque part dans sa moitie de l'image. La fenetre
+            // parait avant que son contenu n'arrive du fil de calcul : on
+            // attend qu'il soit peint. Une seule capture, prise tout de
+            // suite, echouait une fois sur deux sur une machine chargee.
             int sombres = 0;
-            for (int y = 0; y < 400; ++y)
-                for (int x = 0; x < 300; ++x)
-                    if (qGray(image.pixel(x, y)) < 100) ++sombres;
+            attendre([&] {
+                image.fill(Qt::white);
+                vuePatch->render(&image);
+                sombres = 0;
+                for (int y = 0; y < 400; ++y)
+                    for (int x = 0; x < 300; ++x)
+                        if (qGray(image.pixel(x, y)) < 100) ++sombres;
+                return sombres > 200;
+            }, 5000);
             verifier(sombres > 200,
                      "un polygone blanc garde le contour noir qu'on lui a donne");
             // Le polygone rouge doit etre franc, non delave : au centre,
