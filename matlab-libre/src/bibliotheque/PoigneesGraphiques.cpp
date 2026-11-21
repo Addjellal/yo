@@ -8,6 +8,7 @@
 // champs cachés, et les crochets de l'interpréteur routent la lecture et
 // l'écriture vers la figure elle-même.
 #include <algorithm>
+#include <mutex>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -1073,6 +1074,13 @@ bool supprimerGraphique(Interpreteur& moteur, const Valeur& p) {
 }
 
 void enregistrerPoigneesGraphiques(Interpreteur& it) {
+    // Les crochets sont communs au processus, et chaque interpréteur —
+    // chaque travailleur d'un parfor — installe sa bibliothèque : ils
+    // étaient réécrits pendant qu'un autre fil pouvait les appeler, une
+    // course que ThreadSanitizer signale. Ils ne changent jamais : on les
+    // pose une fois.
+    static std::once_flag pose;
+    std::call_once(pose, [] {
     crochetEcrirePropriete = [](Interpreteur& moteur, const Valeur& objet,
                                 const std::string& nom, const Valeur& valeur) {
         if (estPoignee(objet, CLASSE_AXES)) return ecrireAxes(moteur, objet, nom, valeur);
@@ -1096,6 +1104,7 @@ void enregistrerPoigneesGraphiques(Interpreteur& it) {
     crochetSupprimerGraphique = [](Interpreteur& moteur, const Valeur& objet) {
         return supprimerGraphique(moteur, objet);
     };
+    });
     it.enregistrer("set", fnSetPoignee, "graphique",
                    "set  Ecrit une propriete d'une poignee graphique.");
     it.enregistrer("get", fnGetPoignee, "graphique",
