@@ -492,9 +492,19 @@ void FenetrePrincipale::construireMenus() {
                     &FenetrePrincipale::aPropos);
 
     QMenu* affichage = menuBar()->addMenu(QStringLiteral("&Affichage"));
-    affichage->addAction(QStringLiteral("Afficher le &ruban"), this, [this](bool) {
-        if (ruban_) ruban_->setVisible(!ruban_->isVisible());
-    })->setCheckable(true);
+    // La coche dit si le ruban est visible. Elle partait décochée, ruban
+    // affiché, si bien qu'elle disait l'inverse de ce qu'on voyait ; elle
+    // est relue à chaque ouverture du menu, le ruban ayant pu changer.
+    QAction* afficherRuban = affichage->addAction(QStringLiteral("Afficher le &ruban"));
+    afficherRuban->setObjectName(QStringLiteral("afficherRuban"));
+    afficherRuban->setCheckable(true);
+    afficherRuban->setChecked(true);
+    connect(afficherRuban, &QAction::triggered, this, [this](bool coche) {
+        if (ruban_) ruban_->setVisible(coche);
+    });
+    connect(affichage, &QMenu::aboutToShow, this, [this, afficherRuban] {
+        if (ruban_) afficherRuban->setChecked(ruban_->isVisible());
+    });
     affichage->addAction(QStringLiteral("Rétablir la disposition par défaut"), this, [this] {
         for (QDockWidget* d : findChildren<QDockWidget*>()) d->show();
         QSettings().remove(QStringLiteral("fenetre/etat"));

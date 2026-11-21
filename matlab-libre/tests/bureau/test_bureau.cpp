@@ -2927,6 +2927,20 @@ end
         }
     }
 
+    // La coche « Afficher le ruban » dit si le ruban est visible : elle
+    // partait decochee, ruban affiche.
+    {
+        auto* action = fenetre.findChild<QAction*>(QStringLiteral("afficherRuban"));
+        verifier(action != nullptr && action->isChecked(),
+                 "« Afficher le ruban » est coche quand le ruban est visible");
+        if (action) {
+            action->trigger();
+            verifier(!action->isChecked(), "decocher l'entree le masque");
+            action->trigger();
+            verifier(action->isChecked(), "et la recocher le rend");
+        }
+    }
+
     // Un onglet modifie ne se ferme pas sans qu'on l'ait dit : la croix
     // de l'onglet le supprimait, et le travail avec. « Annuler » le garde,
     // « Ne pas enregistrer » le ferme.
