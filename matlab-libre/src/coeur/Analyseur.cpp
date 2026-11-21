@@ -731,13 +731,24 @@ std::shared_ptr<FonctionUtilisateur> Analyseur::definitionFonction() {
     // Dans un fichier dont les fonctions sont fermées par « end », une
     // fonction écrite avant ce « end » est imbriquée : elle partage
     // l'espace de travail de celle qui l'entoure.
+    // Le corps peut reprendre après une fonction imbriquée, comme MATLAB
+    // l'admet : « function r = p(x), function y = aide(z) ... end,
+    // r = aide(x); end ». Seules les fonctions imbriquées placées à la fin
+    // étaient lues, et la suite tombait sur « Unexpected token at file
+    // level ».
     if (fonctionsTerminees_) {
-        sauterSeparateurs();
-        while (jeton().estMot("function")) {
-            auto sous = definitionFonction();
-            sous->imbriquee = true;
-            f->imbriquees[sous->nom] = sous;
+        for (;;) {
             sauterSeparateurs();
+            if (jeton().estMot("function")) {
+                auto sous = definitionFonction();
+                sous->imbriquee = true;
+                f->imbriquees[sous->nom] = sous;
+                continue;
+            }
+            if (fini() || motFin() || f->imbriquees.empty()) break;
+            NoeudPtr suite = bloc({"function"});
+            if (suite->enfants.empty()) break;
+            for (auto& n : suite->enfants) f->corps->enfants.push_back(n);
         }
     }
     if (motFin()) avancer();

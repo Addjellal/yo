@@ -27,6 +27,9 @@ assert(lire() == 17);
 % Une fonction imbriquée modifie la variable de sa parente pendant l'appel.
 assert(accumuleImbrique([1 2 3 4]) == 10);
 assert(accumuleImbrique([]) == 0);
+% Le corps reprend apres une fonction imbriquee : (1 + 10) * 2. Le
+% fichier ne s'analysait pas (« Unexpected token at file level »).
+assert(imbriqueeAuMilieu(1) == 22);
 
 %% ------------------------------------------------ registre des composants
 liste = matlibre_ui_liste();
