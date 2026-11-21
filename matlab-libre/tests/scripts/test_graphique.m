@@ -547,6 +547,11 @@ assert(ordrePareto(1) == 3);        % « c » est la plus grande
 cla;
 assert(numel(pie([3 1 1])) == 6);   % trois secteurs et trois etiquettes
 cla;
+% PIE(X,ETIQUETTES), la forme de MATLAB : la cellule etait prise pour le
+% vecteur des secteurs a decoller, et « ~= 0 » sur une cellule echouait.
+pie([3 2 1], {'x', 'y', 'z'});
+assert(~isempty(strfind(matlibre_svg(), '>y<')), 'les etiquettes sont ecrites');
+cla;
 pie([30 20 50], [0 0 1], {'nord', 'sud', 'est'});
 cla;
 pie3([3 1 1]);

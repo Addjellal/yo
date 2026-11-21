@@ -8,8 +8,9 @@ function H = pie(x, decoller, etiquettes)
 %   PIE(X,DECOLLER) écarte du centre les secteurs dont l'élément de
 %   DECOLLER n'est pas nul : c'est ainsi qu'on met en avant une part.
 %
-%   PIE(X,DECOLLER,ETIQUETTES) nomme les secteurs. Sans étiquettes, ce
-%   sont les pourcentages qui sont écrits.
+%   PIE(X,DECOLLER,ETIQUETTES) nomme les secteurs, et PIE(X,ETIQUETTES)
+%   aussi, sans en décoller aucun. Sans étiquettes, ce sont les
+%   pourcentages qui sont écrits.
 %
 %   H = PIE(...) rend les poignées des secteurs et des textes.
 %
@@ -24,8 +25,16 @@ function H = pie(x, decoller, etiquettes)
 %   Exemples :
 %      pie([3 1 1]);
 %      pie([30 20 50], [0 0 1], {'nord', 'sud', 'est'});
+%      pie([30 20 50], {'nord', 'sud', 'est'});
 %
 %   Voir aussi PIE3, BAR, PARETO, FILL, LEGEND.
+    % PIE(X,ETIQUETTES), la forme de MATLAB : une cellule ou un tableau de
+    % textes en second argument nomme les secteurs. Il était pris pour
+    % DECOLLER, et « ~= 0 » sur une cellule échouait.
+    if nargin == 2 && (iscell(decoller) || isstring(decoller))
+        etiquettes = decoller;
+        decoller = [];
+    end
     x = double(x(:));
     x = x(~isnan(x));
     if any(x < 0)
@@ -42,7 +51,7 @@ function H = pie(x, decoller, etiquettes)
         decoller = zeros(n, 1);
     end
     decoller = decoller(:);
-    if nargin < 3
+    if ~exist('etiquettes', 'var')
         etiquettes = {};
     end
 
