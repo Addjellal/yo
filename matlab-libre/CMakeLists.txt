@@ -53,6 +53,32 @@ else()
   add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 endif()
 
+# Assainisseurs et couverture, pour chercher ce que les tests ne voient
+# pas (gcc et clang) :
+#   -DMATLIBRE_ASSAINIR=ON       lectures hors bornes, fuites, comportements
+#                                indefinis (ASan et UBSan)
+#   -DMATLIBRE_ASSAINIR=thread   courses entre fils, pour parfor (TSan)
+#   -DMATLIBRE_COUVERTURE=ON     instrumentation gcov : ce que les tests
+#                                exercent, ligne par ligne
+# Un arbre a part pour chacun : build-asan, build-tsan, build-couverture.
+set(MATLIBRE_ASSAINIR OFF CACHE STRING "ON (address,undefined), thread, ou OFF")
+option(MATLIBRE_COUVERTURE "Instrumenter pour la couverture (gcov)" OFF)
+if(MATLIBRE_ASSAINIR AND NOT MSVC)
+  if(MATLIBRE_ASSAINIR STREQUAL "thread")
+    set(MATLIBRE_FSANITIZE thread)
+  else()
+    set(MATLIBRE_FSANITIZE address,undefined)
+  endif()
+  add_compile_options(-fsanitize=${MATLIBRE_FSANITIZE} -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=${MATLIBRE_FSANITIZE})
+  message(STATUS "MatLibre : assaini (-fsanitize=${MATLIBRE_FSANITIZE})")
+endif()
+if(MATLIBRE_COUVERTURE AND NOT MSVC)
+  add_compile_options(--coverage -g)
+  add_link_options(--coverage)
+  message(STATUS "MatLibre : instrumente pour la couverture (gcov)")
+endif()
+
 # Un arbre de construction lisible : les executables dans bin/, les
 # bibliotheques dans lib/, et tout le reste — le cache de CMake, les
 # fichiers intermediaires, les sources engendrees par moc — la ou CMake
