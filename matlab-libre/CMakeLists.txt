@@ -207,7 +207,11 @@ if(MATLIBRE_BUREAU)
                      ${CMAKE_CURRENT_SOURCE_DIR}/tests/bureau/test_bureau.cpp)
       target_link_libraries(matlibre_tests_bureau PRIVATE matlibre_bureau)
       add_test(NAME bureau COMMAND matlibre_tests_bureau)
-      set_tests_properties(bureau PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+      # La toolbox est donnee comme aux tests en langage : sans elle, un
+      # arbre de construction range hors du depot (build-asan ailleurs)
+      # ne la trouvait pas, et le test echouait pour une autre raison.
+      set_tests_properties(bureau PROPERTIES ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen;MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
     endif()
 
     # Pas de console derriere la fenetre, sous Windows.
