@@ -8,6 +8,8 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <random>
+#include <mutex>
 #include <cstdio>
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -318,13 +320,37 @@ FONCTION(fnTempdir) {
     return {Valeur::texte(fs::temp_directory_path(ec).string())};
 }
 
+// Un nom tiré au hasard, « tp » puis un identifiant à la façon de MATLAB.
+// Le nom d'avant, « matlibre_<processus>_<compteur> », se devinait : un
+// autre utilisateur de la machine pouvait poser d'avance, sous ce nom, un
+// lien symbolique vers l'un de vos fichiers, que websave aurait écrasé.
+// Le compteur, un int statique, était de plus incrémenté sans verrou par
+// les fils d'un parfor, et deux travailleurs pouvaient recevoir le même
+// nom. TEMPNAME(DOSSIER) place le nom dans DOSSIER, qui était ignoré.
 FONCTION(fnTempname) {
     INUTILISE
+    exigerArguments(args, 0, 1, "tempname");
+    static std::mutex verrou;
+    static std::mt19937_64 alea = [] {
+        std::random_device source;
+        std::seed_seq graine{source(), source(), source(), source(),
+                             (unsigned)std::chrono::steady_clock::now()
+                                 .time_since_epoch().count()};
+        return std::mt19937_64(graine);
+    }();
+    unsigned long long a, b;
+    {
+        std::lock_guard<std::mutex> garde(verrou);
+        a = alea();
+        b = alea();
+    }
+    std::string nom = formater("tp%08llx_%04llx_%04llx_%04llx_%012llx", a >> 32,
+                               (a >> 16) & 0xFFFFull, a & 0xFFFFull, b >> 48,
+                               b & 0xFFFFFFFFFFFFull);
     std::error_code ec;
-    static int compteur = 0;
-    fs::path p = fs::temp_directory_path(ec) /
-                 formater("matlibre_%d_%d", (int)identifiantProcessus(), compteur++);
-    return {Valeur::texte(p.string())};
+    fs::path dossier = args.empty() ? fs::temp_directory_path(ec)
+                                    : fs::path(args[0].versTexte());
+    return {Valeur::texte((dossier / nom).string())};
 }
 
 FONCTION(fnGetenv) {

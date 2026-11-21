@@ -834,6 +834,17 @@ assert(verifierRefus(@() -compteurCompte()) && appelsOperande == 1);
 clear global appelsOperande
 clear somme
 
+%% ---------- TEMPNAME : un nom tire au hasard, dans le dossier demande
+% « matlibre_<processus>_<compteur> » se devinait (un lien symbolique
+% pose d'avance faisait ecraser un autre fichier), le compteur n'etait
+% pas protege des fils d'un parfor, et TEMPNAME(DOSSIER) ignorait DOSSIER.
+[dossierTemp, nomTemp] = fileparts(tempname());
+assert(startsWith(nomTemp, 'tp') && numel(nomTemp) > 30, nomTemp);
+assert(~strcmp(tempname(), tempname()));
+[dossierDemande, ~] = fileparts(tempname(fullfile(dossierTemp, 'ici')));
+assert(strcmp(dossierDemande, fullfile(dossierTemp, 'ici')), dossierDemande);
+clear dossierTemp nomTemp dossierDemande
+
 disp('defauts : toutes les verifications passent');
 
 function c = compteurCompte()
