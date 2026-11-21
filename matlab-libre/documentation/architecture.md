@@ -139,10 +139,18 @@ remplissage de zéros.
 
 ## Graphique
 
-Le rendu se fait en SVG, écrit à la main dans `src/graphique`. C'est un
-format vectoriel, lisible, que tous les navigateurs affichent, et qui ne
-demande aucune bibliothèque. `print` et `saveas` écrivent le fichier ;
-`matlibre_svg` rend le texte, ce qui permet de tester le tracé.
+Une figure se dessine une seule fois, par `dessinerFigure`
+(`src/graphique/Dessin.cpp`), sur une `Toile` (`Toile.h`) : quelques
+primitives — traits, polygones, rectangles, cercles, textes en morceaux,
+découpe. La mise en page, les graduations, la légende et la barre de
+couleurs ne connaissent que la toile.
+
+Deux toiles l'implantent. `ToileSVG` écrit du SVG — un format vectoriel,
+lisible, que tous les navigateurs affichent, et qui ne demande aucune
+bibliothèque : `print` et `saveas` écrivent le fichier, `matlibre_svg`
+rend le texte, ce qui permet de tester le tracé. La toile du bureau
+(`VueFigure.cpp`) peint avec QPainter. La fenêtre montre donc exactement
+ce que `print` écrirait ; une nouveauté du dessin s'écrit une fois.
 
 ## Ce que coûte un interpréteur à parcours d'arbre
 

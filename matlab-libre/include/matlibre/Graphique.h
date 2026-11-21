@@ -322,6 +322,11 @@ double ecartBarres(const std::vector<double>& x);
 // passe par la.
 std::shared_ptr<Axes> ajouterAxes(Figure& f);
 
+// Un nombre comme les graduations l'écrivent : court, sans zéros inutiles,
+// en notation scientifique au-delà de 1e5 ou en deçà de 1e-3.
+std::string nombreCourt(double v);
+
+// La figure en SVG (voir Toile.h : le dessin est commun aux deux rendus).
 std::string rendreSVG(const Figure& figure);
 std::shared_ptr<Figure> figureCourante(Interpreteur& it);
 std::shared_ptr<Axes> axesCourants(Interpreteur& it);

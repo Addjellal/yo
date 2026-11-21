@@ -1,8 +1,8 @@
 // VueFigure.h — une figure peinte à même le widget.
 //
-// Le noyau sait rendre une figure en SVG ; ici on peint directement avec
-// QPainter à partir du même modèle. C'est net à toutes les tailles, ça se
-// redimensionne avec la fenêtre, et ça n'ajoute aucune dépendance.
+// Le dessin est celui du SVG (dessinerFigure, voir Toile.h), peint avec
+// QPainter : net à toutes les tailles, redimensionné avec la fenêtre, sans
+// autre dépendance que Qt.
 #pragma once
 
 #include <QWidget>
@@ -21,8 +21,6 @@ protected:
     void paintEvent(QPaintEvent* evenement) override;
 
 private:
-    void peindreAxes(QPainter& peintre, const matlibre::Axes& axes, const QRectF& cadre);
-
     FigureCopiee figure_;
     bool aFigure_ = false;
 };
