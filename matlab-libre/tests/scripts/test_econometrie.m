@@ -224,14 +224,18 @@ for essai = 1:20
     if rejets(1), fauxJci = fauxJci + 1; end
 end
 assert(fauxJci <= 4);
+% Les series n'ont pas de derive : le modele H1*, constante restreinte a
+% la relation, est le bon. Sous H1 (derive libre), le dernier test rejette
+% trop souvent une marche aleatoire sans derive — un quart des essais —,
+% ce que le test ne laissait passer qu'avec un tirage favorable.
 unes = 0; deux = 0;
 for essai = 1:20
     commune = cumsum(randn(300, 1));
     rejets = jcitest([commune + randn(300, 1), commune, cumsum(randn(300, 1))], ...
-                     'display', 'off');
+                     'model', 'H1*', 'display', 'off');
     if rejets(1) == 1 && rejets(2) == 0, unes = unes + 1; end
     rejets = jcitest([commune + randn(300, 1), commune + randn(300, 1), commune], ...
-                     'display', 'off');
+                     'model', 'H1*', 'display', 'off');
     if rejets(1) == 1 && rejets(2) == 1 && rejets(3) == 0, deux = deux + 1; end
 end
 assert(unes >= 15 && deux >= 14);

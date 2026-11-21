@@ -126,11 +126,27 @@ function r = meilleurRayon(M, tailles)
     etat = rng();
     rng(20240120);
     r = 0;
-    n = size(M, 1);
+    meilleures = zeros(1, numel(tailles));
+    rayon = @(angles) max(abs(eig(M * diag(matlibre_etendre_blocs(exp(1i * angles), tailles)))));
     for essai = 1:200
-        phases = exp(2i * pi * rand(1, numel(tailles)));
-        Delta = diag(matlibre_etendre_blocs(phases, tailles));
-        r = max(r, max(abs(eig(M * Delta))));
+        angles = 2 * pi * rand(1, numel(tailles));
+        valeur = rayon(angles);
+        if valeur > r
+            r = valeur;
+            meilleures = angles;
+        end
     end
     rng(etat);
+    % Le meilleur tirage, affiné : la phase du premier bloc est fixée (une
+    % phase commune ne change pas le rayon), les autres montent jusqu'au
+    % maximum local. Sans cela, le minorant ne valait que ce que valait le
+    % hasard du tirage, à 1e-6 près.
+    if numel(tailles) > 1
+        relatives = meilleures(2:end) - meilleures(1);
+        objectif = @(a) -rayon([0, a]);
+        options = optimset('TolX', 1e-12, 'TolFun', 1e-14, 'MaxFunEvals', 4000, ...
+                           'MaxIter', 4000, 'Display', 'off');
+        affinees = fminsearch(objectif, relatives, options);
+        r = max(r, -objectif(affinees));
+    end
 end

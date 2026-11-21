@@ -62,11 +62,17 @@ function [modele, dedans, dehors, erreurMoyenne] = pcfitplane(entree, distanceMa
     dehors = find(distances > distanceMax);
     % Le consensus trouvé, on réajuste par moindres carrés sur ses seuls
     % points : le tirage donne le bon sous-ensemble, non le meilleur plan.
+    % Le réajustement doit respecter la direction imposée : sans contrôle,
+    % il pouvait faire pivoter la normale au-delà de l'angle permis.
     if numel(dedans) >= 3
-        meilleurModele = matlibre_plan_moindres_carres(points(dedans, :));
-        distances = abs(points * meilleurModele(1:3).' + meilleurModele(4));
-        dedans = find(distances <= distanceMax);
-        dehors = find(distances > distanceMax);
+        reajuste = matlibre_plan_moindres_carres(points(dedans, :));
+        if isempty(vecteurReference) || ...
+                abs(reajuste(1:3) * vecteurReference) >= cos(angleMax * pi / 180)
+            meilleurModele = reajuste;
+            distances = abs(points * meilleurModele(1:3).' + meilleurModele(4));
+            dedans = find(distances <= distanceMax);
+            dehors = find(distances > distanceMax);
+        end
     end
     erreurMoyenne = mean(distances(dedans));
     modele = struct('Parameters', meilleurModele, ...

@@ -1045,7 +1045,21 @@ for k = 1:60
     reponse(k) = strcmp(facteurActif{k}, 'b') * 2 + 0.3 * randn();
 end
 pAnovan = anovan(reponse, {facteurActif, facteurInerte}, 'display', 'off');
-assert(pAnovan(1) < 0.001 && pAnovan(2) > 0.1);
+assert(pAnovan(1) < 0.001);
+% Le facteur inerte : sa p-valeur est uniforme sous l'hypothese nulle, et
+% exiger p > 0.1 echouait un tirage sur dix. Le plan est equilibre (dix
+% observations par case) : elle se calcule exactement par les sommes de
+% carres du modele additif, et anovan doit la retrouver.
+moyenne = mean(reponse);
+[~, ~, rangA] = unique(facteurActif);
+[~, ~, rangI] = unique(facteurInerte);
+effectifs = @(rang) accumarray(rang, 1);
+ecartCarre = @(rang) sum(effectifs(rang) .* ...
+                         (accumarray(rang, reponse) ./ effectifs(rang) - moyenne) .^ 2);
+scA = ecartCarre(rangA);
+scI = ecartCarre(rangI);
+scR = sum((reponse - moyenne) .^ 2) - scA - scI;
+assert(abs(pAnovan(2) - (1 - fcdf(scI / (scR / 56), 1, 56))) < 1e-10);
 assert(numel(anovan(reponse, {facteurActif, facteurInerte}, ...
                     'model', 'interaction', 'display', 'off')) == 3);
 % MANOVA : la dimension est nulle quand les moyennes coïncident.

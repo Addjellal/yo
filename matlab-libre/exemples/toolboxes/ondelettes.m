@@ -115,7 +115,14 @@ approche = approche(:);
 fprintf('\nCompression a %d %% des coefficients :\n', round(garde / numel(coefficients) * 100));
 fprintf('  energie retenue : %.2f %%\n', sum(triees(1:garde) .^ 2) / sum(triees .^ 2) * 100);
 fprintf('  erreur relative : %.4f\n', norm(approche - bruite) / norm(bruite));
-assert(sum(triees(1:garde) .^ 2) / sum(triees .^ 2) > 0.85, ...
+% L'energie retenue depend de la forme du signal et du tirage du bruit :
+% sa reference est la meme compression du signal sans bruit, que le
+% bruit ne doit pas degrader de beaucoup.
+coefficientsPurs = wavedec(signal, niveaux, 'db4');
+trieesPures = sort(abs(coefficientsPurs), 'descend');
+energiePure = sum(trieesPures(1:garde) .^ 2) / sum(trieesPures .^ 2);
+fprintf('  sans bruit, les memes 5 %% en retiendraient %.2f %%\n', 100 * energiePure);
+assert(sum(triees(1:garde) .^ 2) / sum(triees .^ 2) > 0.9 * energiePure, ...
        'un vingtieme des coefficients doit porter l''essentiel de l''energie');
 
 %% 6. Transformée continue

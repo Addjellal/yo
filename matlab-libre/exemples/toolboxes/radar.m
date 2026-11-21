@@ -83,16 +83,27 @@ assert(abs(retardTrouve - retardEchantillons) <= 2, ...
 % les N echantillons de l'impulsion en phase, alors que le bruit s'y
 % ajoute au hasard. Le signal croit donc comme N, le bruit comme racine
 % de N, et le rapport gagne un facteur N en puissance.
-loinDuPic = abs(decalagesCompression - retardEchantillons) > 50;
-fondCompresse = std(abs(comprime(loinDuPic)));
+% Le rapport se mesure en puissance des deux cotes : le pic au carre sur
+% la puissance moyenne du bruit (le module d'un bruit complexe suit une loi
+% de Rayleigh, et son ecart type n'en est pas l'amplitude). En entree, une
+% amplitude unite contre un bruit de variance 2 x 9.
+% Le fond se lit loin du pic, et la ou l'impulsion recouvre tout
+% l'enregistrement : aux bords, la correlation somme moins de bruit.
+loinDuPic = abs(decalagesCompression - retardEchantillons) > 50 & ...
+            decalagesCompression >= 0 & ...
+            decalagesCompression <= numel(recu) - numel(impulsion);
+fondCompresse = sqrt(mean(abs(comprime(loinDuPic)) .^ 2));
 rapportApres = 20 * log10(pic / fondCompresse);
-rapportAvant = 20 * log10(1 / (3 * sqrt(2)));
+rapportAvant = 10 * log10(1 / 18);
 nEchantillons = numel(impulsion);
 fprintf('  rapport apres compression : %.1f dB\n', rapportApres);
 fprintf('  gain obtenu %.1f dB, attendu 10 log10(N) = %.1f dB\n', ...
         rapportApres - rapportAvant, 10 * log10(nEchantillons));
 assert(pic > 4 * fondCompresse, 'le pic doit ressortir du fond');
-assert(abs((rapportApres - rapportAvant) - 10 * log10(nEchantillons)) < 8, ...
+% Le pic mesure porte lui-meme le bruit : N plus ou moins l'ecart type du
+% bruit comprime, racine(18 N) = 60 pour N = 200, soit environ 2,5 dB
+% selon le tirage. Sans bruit, le pic vaut exactement N.
+assert(abs((rapportApres - rapportAvant) - 10 * log10(nEchantillons)) < 3, ...
        'le gain doit etre de l''ordre de N');
 % Ensuite une resolution : le pic comprime est large de 1/bande au lieu
 % de la duree de l'impulsion. Le rapport des deux — le produit duree fois
