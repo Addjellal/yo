@@ -6,6 +6,17 @@
 #include <functional>
 #include <memory>
 #include <sstream>
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 #include "matlibre/Affichage.h"
 #include "matlibre/Bibliotheque.h"
@@ -131,7 +142,51 @@ static int tailleDemandee(double x) {
     return (int)x;
 }
 
+// La mémoire physique de la machine, en octets ; zéro si on ne sait pas
+// la lire.
+static double memoirePhysique() {
+#ifdef _WIN32
+    MEMORYSTATUSEX etat;
+    etat.dwLength = sizeof etat;
+    if (GlobalMemoryStatusEx(&etat)) return (double)etat.ullTotalPhys;
+    return 0;
+#else
+    long pages = sysconf(_SC_PHYS_PAGES), taille = sysconf(_SC_PAGESIZE);
+    return pages > 0 && taille > 0 ? (double)pages * (double)taille : 0;
+#endif
+}
+
+// Comme MATLAB (« maximum array size preference », la mémoire physique par
+// défaut) : un tableau plus grand que la mémoire de la machine est refusé
+// avant d'être alloué. Sous Linux, une telle demande pouvait être
+// acceptée à crédit, puis la session tuée en le remplissant.
+static void exigerTailleRaisonnable(const Dims& d) {
+    double elements = 1;
+    for (int n : d) elements *= (double)n;
+    double octets = elements * 8.0;
+    static const double limite = memoirePhysique();
+    if (limite > 0 && octets > limite) {
+        std::string forme;
+        for (std::size_t k = 0; k < d.size(); ++k)
+            forme += (k ? "x" : "") + std::to_string(d[k]);
+        erreur("MATLAB:array:SizeLimitExceeded",
+               formater("Requested %s (%.1fGB) array exceeds maximum array size preference "
+                        "(%.1fGB). This might cause MatLibre to become unresponsive.",
+                        forme.c_str(), octets / 1073741824.0, limite / 1073741824.0));
+    }
+}
+
+static Dims dimsDepuisArgumentsBruts(const std::vector<Valeur>& args, std::size_t debut,
+                                     std::size_t fin);
+
 Dims dimsDepuisArguments(const std::vector<Valeur>& args, std::size_t debut, std::size_t fin) {
+    Dims d = dimsDepuisArgumentsBruts(args, debut, fin);
+    exigerTailleRaisonnable(d);
+    return d;
+}
+
+static Dims dimsDepuisArgumentsBruts(const std::vector<Valeur>& args, std::size_t debut,
+                                     std::size_t fin) {
     Dims d;
     if (debut >= fin) return Dims{1, 1};
     for (std::size_t k = debut; k < fin; ++k) exigerTailleNumerique(args[k]);
