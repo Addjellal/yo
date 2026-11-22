@@ -477,19 +477,53 @@ FONCTION(fnIsmac) {
 
 // ------------------------------------------------------ chemin de recherche
 
+// Les dossiers d'arguments de addpath et rmpath : chacun peut en porter
+// plusieurs, séparés par pathsep — c'est ce que rend genpath.
+static std::vector<std::string> dossiersDuChemin(Arguments args, bool* enFin) {
+#ifdef _WIN32
+    const char separateur = ';';
+#else
+    const char separateur = ':';
+#endif
+    std::vector<std::string> dossiers;
+    for (const auto& a : args) {
+        if (a.estNumerique() && !a.estVide()) {   // l'ancienne forme : 0 tête, 1 fin
+            if (enFin) *enFin = a.scal() != 0;
+            continue;
+        }
+        std::string s = a.versTexte();
+        if (s == "-end" || s == "-END") { if (enFin) *enFin = true; continue; }
+        if (s == "-begin" || s == "-BEGIN") { if (enFin) *enFin = false; continue; }
+        if (s == "-frozen") continue;
+        std::size_t debut = 0;
+        while (debut <= s.size()) {
+            std::size_t fin = s.find(separateur, debut);
+            if (fin == std::string::npos) fin = s.size();
+            if (fin > debut) dossiers.push_back(s.substr(debut, fin - debut));
+            debut = fin + 1;
+        }
+    }
+    return dossiers;
+}
+
+// addpath(D1, ..., DN, POSITION), comme MATLAB : D1 passe en tête, puis
+// D2... ; chaque argument peut porter plusieurs dossiers séparés par
+// pathsep (genpath) ; '-end' les met en fin. Chaque argument était pris
+// pour un seul dossier — « addpath(genpath(d)) » n'ajoutait rien d'utile —,
+// le dernier passait en tête, à l'inverse de MATLAB, si bien qu'une
+// fonction homonyme se résolvait dans le mauvais dossier, et '-end' était
+// ignoré.
 FONCTION(fnAddpath) {
     INUTILISE
-    for (const auto& a : args) {
-        std::string s = a.versTexte();
-        if (s == "-end" || s == "-begin") continue;
-        it.ajouterChemin(s, true);
-    }
+    bool enFin = false;
+    std::vector<std::string> dossiers = dossiersDuChemin(args, &enFin);
+    if (!dossiers.empty()) it.ajouterChemins(dossiers, !enFin);
     return {};
 }
 
 FONCTION(fnRmpath) {
     INUTILISE
-    for (const auto& a : args) it.retirerChemin(a.versTexte());
+    for (const auto& d : dossiersDuChemin(args, nullptr)) it.retirerChemin(d);
     return {};
 }
 

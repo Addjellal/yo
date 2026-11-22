@@ -847,6 +847,29 @@ assert(~strcmp(tempname(), tempname()));
 assert(strcmp(dossierDemande, fullfile(dossierTemp, 'ici')), dossierDemande);
 clear dossierTemp nomTemp dossierDemande
 
+%% ---------- ADDPATH : genpath, l'ordre de MATLAB, '-end' ; RMPATH aussi
+% Chaque argument etait pris pour un seul dossier : addpath(genpath(d))
+% n'ajoutait rien d'utile. Le dernier argument passait en tete, a
+% l'inverse de MATLAB, et '-end' etait ignore.
+racineChemin = tempname();
+mkdir(fullfile(racineChemin, 'a'));
+mkdir(fullfile(racineChemin, 'x'));
+mkdir(fullfile(racineChemin, 'y'));
+ecrireFonction(fullfile(racineChemin, 'a', 'fonctionDeA.m'), 'fonctionDeA', 1);
+ecrireFonction(fullfile(racineChemin, 'x', 'homonymeChemin.m'), 'homonymeChemin', 10);
+ecrireFonction(fullfile(racineChemin, 'y', 'homonymeChemin.m'), 'homonymeChemin', 20);
+addpath(genpath(fullfile(racineChemin, 'a')));
+assert(fonctionDeA() == 1, 'genpath puis addpath');
+addpath(fullfile(racineChemin, 'x'), fullfile(racineChemin, 'y'));
+assert(homonymeChemin() == 10, 'le premier dossier passe en tete');
+addpath(fullfile(racineChemin, 'a'), '-end');
+morceaux = strsplit(path(), pathsep);
+assert(strcmp(morceaux{end}, fullfile(racineChemin, 'a')), '''-end'' met en fin');
+rmpath(genpath(racineChemin));
+assert(~any(startsWith(strsplit(path(), pathsep), racineChemin)), 'rmpath(genpath(...))');
+rmdir(racineChemin, 's');
+clear racineChemin morceaux
+
 disp('defauts : toutes les verifications passent');
 
 function c = compteurCompte()
@@ -855,6 +878,13 @@ function c = compteurCompte()
     global appelsOperande
     appelsOperande = appelsOperande + 1;
     c = Compteur(1);
+end
+
+function ecrireFonction(fichier, nom, valeur)
+% Une fonction d'une ligne qui rend VALEUR.
+    fid = fopen(fichier, 'w');
+    fprintf(fid, 'function r = %s()\n    r = %d;\nend\n', nom, valeur);
+    fclose(fid);
 end
 
 function ok = verifierRefus(f)
