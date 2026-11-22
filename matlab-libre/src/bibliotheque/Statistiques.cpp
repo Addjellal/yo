@@ -500,6 +500,11 @@ FONCTION(fnHistcounts) {
         }
         for (int k = 0; k <= nbClasses; ++k)
             bords.push_back(mn + (mx - mn) * k / nbClasses);
+        // mn + (mx - mn) ne redonne pas toujours mx en virgule flottante :
+        // il lui manquait parfois un ulp, et le maximum tombait hors de la
+        // dernière classe — histcounts(randn(1,1000)) comptait 999 valeurs
+        // une fois sur deux. Le dernier bord est le maximum, exactement.
+        bords.back() = mx;
     }
     std::vector<double> compte(bords.size() - 1, 0.0);
     for (double x : v.re) {

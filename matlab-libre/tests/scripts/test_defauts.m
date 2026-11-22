@@ -870,6 +870,16 @@ assert(~any(startsWith(strsplit(path(), pathsep), racineChemin)), 'rmpath(genpat
 rmdir(racineChemin, 's');
 clear racineChemin morceaux
 
+%% ---------- HISTCOUNTS compte toutes les valeurs, bords automatiques
+% Le dernier bord, calcule mn + (mx - mn) * n / n, pouvait manquer le
+% maximum d'un ulp : une valeur sur mille n'etait pas comptee.
+for graine = 1:20
+    rng(graine);
+    donneesHisto = randn(1, 1000);
+    assert(sum(histcounts(donneesHisto)) == 1000, sprintf('graine %d', graine));
+end
+clear graine donneesHisto
+
 disp('defauts : toutes les verifications passent');
 
 function c = compteurCompte()
