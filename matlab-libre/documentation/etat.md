@@ -4,7 +4,9 @@ Ce document dit ce qui est fait, comment on le sait, et ce qui reste. Il
 est écrit à la main ; `documentation/audit.md`, lui, est produit par
 `outils/audit.m` et donne les chiffres bruts. Pour reprendre le travail
 d'une session à l'autre — règles du dépôt, commandes, derniers ajouts,
-la suite —, voir `documentation/reprise.md`.
+la suite —, voir `documentation/reprise.md` ; pour l'audit de reprise des
+21 et 22 novembre 2026 — ses constats, ses preuves, les corrections et les
+propositions —, `documentation/audit-reprise.md`.
 
 ## 1. Ce que MatLibre est aujourd'hui
 
@@ -16,7 +18,7 @@ documentation publique et vérifiée sur la propriété qui la définit.
 | partie | contenu | lignes |
 |---|---|---:|
 | `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 087 |
-| `src/bibliotheque` | 679 fonctions natives, en C++ | 20 223 |
+| `src/bibliotheque` | 691 fonctions natives, en C++ | 20 223 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 902 |
 | `toolbox` | 2 992 fichiers `.m`, dont 2 233 fonctions publiques recensées par `outils/audit.m` | 137 158 |
 | `tests` | 44 scripts `.m` et 2 fichiers C++ | 24 030 |
@@ -57,6 +59,15 @@ portent un exemple, et celles qu'un test ou un exemple nomme. Il écrit
 - `tests/scripts/test_aide.m` fait le même contrôle dans la suite de
   tests, sur les 655 fiches natives et les 2 198 fiches de toolbox, et
   exige de surcroît un « Voir aussi » sur chacune.
+- `outils/verifierValeurs.m` compare aux valeurs qu'ils annoncent en
+  commentaire (« `num2str(pi) % '3.1416'` ») les exemples des fiches :
+  1 417 valeurs, 34 écarts au premier passage — un défaut de
+  `histcounts`, corrigé, et une trentaine de fiches à reprendre.
+- Sous ASan, UBSan, TSan et valgrind (`-DMATLIBRE_ASSAINIR`), avec deux
+  fuzzeurs (`outils/fuzz/`) et `outils/eprouverNatives.sh`, l'audit de
+  reprise a trouvé et corrigé une lecture hors bornes, dix-huit courses
+  entre les fils de `parfor`, quatorze plantages de fonctions natives et
+  un lexeur qui bouclait sans fin ; `valgrind` ne trouve aucune fuite.
 - `tests/scripts/test_exemples.m` exécute les 53 programmes d'école, qui
   ne se contentent pas d'appeler les fonctions : chacun vérifie ce que la
   théorie prédit.
@@ -233,9 +244,9 @@ programme d'école qui montre à quoi il sert.
 | Simscape | circuits électriques linéaires, continu et transitoire | composants non linéaires, autres domaines physiques |
 | Coder | sous-ensemble scalaire et matriciel vers C et C++ | structures, cellules, fonctions imbriquées |
 | Symbolique | dérivation — trigonométriques, hyperboliques, réciproques, logarithmes de toute base —, intégration des formes usuelles, limites, séries de Taylor, jacobienne et hessienne, développement, regroupement, forme de Horner, éléments simples, isolement d'une inconnue, réécriture entre familles de fonctions, factorisation sur les rationnels, résolution exacte des polynômes et numérique du reste, sortie LaTeX | factorisation au-delà des racines rationnelles — x⁴+1 reste entier —, décomposition en éléments simples, arithmétique rationnelle exacte, expressions à plusieurs variables dans COLLECT et FACTOR |
-| Calcul parallèle | `parfor`, `spmd` et `parfeval` s'exécutent vraiment sur un pool de fils ; chaque travailleur est un interpréteur neuf, sans mémoire partagée | tableaux distribués sur plusieurs machines, GPU |
+| Calcul parallèle | `parfor`, `spmd` et `parfeval` s'exécutent vraiment sur un pool de fils ; chaque travailleur est un interpréteur neuf, sans mémoire partagée ; un `parfor` vide coûte 0,012 s depuis que les travailleurs n'indexent plus le chemin en temps quadratique (il en coûtait 0,23), et ThreadSanitizer ne trouve plus de course sur l'épreuve de l'audit | tableaux distribués sur plusieurs machines, GPU ; un état — la table des fichiers ouverts — propre à chaque travailleur, comme les processus de MATLAB |
 | Grandes matrices creuses | stockage et opérations de base ; PCG, BICG, CGS, MINRES et GMRES résolvent sans former la matrice ; ICHOL et ILU préconditionnent, SYMRCM, SYMAMD et COLAMD réordonnent | factorisations creuses complètes — LU et Cholesky creux avec leur permutation |
-| Lecture de fichiers | `.mat` v4, v6 et v7, CSV, images PGM et PPM en texte ; un `.mat` v7.3 est reconnu et refusé avec la raison | HDF5, donc `.mat` v7.3 ; PNG, JPEG et TIFF, qui demandent une bibliothèque externe |
+| Lecture de fichiers | `.mat` v4, v6 et v7, CSV, images PGM et PPM en texte ; un `.mat` v7.3 est reconnu et refusé avec la raison ; un `.mat` abîmé est refusé, sans lecture hors du fichier ; `imwrite` refuse un format qu'il ne sait pas écrire au lieu d'écrire du PGM sous un nom `.png` | HDF5, donc `.mat` v7.3 ; PNG, JPEG et TIFF — le PNG s'écrirait sans dépendance, le DEFLATE étant déjà là (P10 de l'audit) |
 | Équations aux dérivées partielles | `pdepe` résout le cas parabolique et elliptique en 1-D, en plan, cylindrique et sphérique, par volumes finis et méthode des lignes ; `bvp4c` les problèmes aux limites par collocation d'ordre quatre | maillage adaptatif dans `bvp4c`, qui garde celui qu'on lui donne ; `bvp5c`, `ode15i`, les EDP en deux et trois dimensions |
 | Classes | `classdef` complet : propriétés, méthodes, opérateurs surchargés, `subsref`/`subsasgn`, méthodes statiques, événements, héritage simple et multiple avec appel au constructeur du parent, les paquets — un dossier `+geo` fait `geo.f` et `geo.Point`, emboîtés à toute profondeur —, et la réflexion — `methods`, `properties`, `events`, `enumeration`, `metaclass`, `superclasses` — ; les énumérations : `Jour.Mardi` est un membre, qui porte sa valeur (`classdef Jour < int32`, `Simulink.IntEnumType`) ou passe ses arguments au constructeur ; les membres forment des tableaux, se comparent entre eux et à leur nom, calculent sur leur valeur dans la classe de base, se convertissent (`char`, `string`, `int32`, `double`) et se retrouvent par valeur ou par nom (`Jour(2)`, `Jour('Mardi')`) ; un tableau agrandi se comble du membre par défaut, et `feval('Jour.Mardi')` atteint un membre comme `feval('Classe.methode')` une méthode statique ; `switch`, `ismember`, `sort`, `unique`, `max`, `isenum` et `[m, s] = enumeration(...)` les connaissent, et ils s'affichent comme dans MATLAB | le destructeur `delete` d'une classe `handle` (`onCleanup` est écrit au niveau de la portée, ce qui couvre son usage mais pas l'effacement d'une variable), les attributs d'accès (`Access`, `SetAccess`) |
 | Géométrie du plan | `polyshape` porte les régions percées, les mesures, les transformations et les quatre opérations booléennes par l'algorithme de Greiner et Hormann | la simplification d'un contour qui se recoupe, et le traitement exact des contacts — deux régions qui se touchent sont séparées d'un cheveu, ce qui coûte six chiffres de précision sur ces cas-là |
@@ -246,8 +257,8 @@ programme d'école qui montre à quoi il sert.
 | Parquet | `parquetwrite`, `parquetread` et `parquetinfo` écrivent et lisent le format en colonnes : protocole compact Thrift pour les métadonnées, encodage PLAIN pour les données, classes restituées par le type converti, colonnes facultatives lues par leurs niveaux de définition | la compression et l'encodage en dictionnaire, refusés par leur nom ; les colonnes répétées ; les valeurs absentes dans une colonne entière, booléenne ou textuelle, faute de valeur pour les dire |
 | Graphes | `graph` et `digraph` portent les parcours, les plus courts chemins, les composantes, l'arbre couvrant, le flot maximal, la centralité, et désormais l'énumération des cycles et des chemins simples, la base de cycles, la fermeture et la réduction transitives, la condensation, la renumérotation et l'isomorphisme | la réduction transitive d'un graphe à circuits, refusée parce qu'elle n'y est pas unique ; les composantes biconnexes |
 | Boîtes esquissées | 30 boîtes de 2 à 9 fonctions | les compléter domaine par domaine, en gardant la règle : rien sans test |
-| Performance | l'interpréteur est un parcours d'arbre | compilation en bytecode, vectorisation des boucles internes |
-| Durée des tests | les quarante-sept scripts tournent de front, autant que la machine a de cœurs ; chacun écrit dans son journal, et seul celui qui échoue est montré. `make test SERIE=1` les remet en file | la suite est passée de cinquante minutes à trente-deux, mesurées sur quatre cœurs. Le gain s'arrête là : elle ne peut plus descendre sous son plus long script, et `test_aide` en occupe à lui seul près de trente — il faudrait le découper pour aller plus loin |
+| Performance | l'interpréteur est un parcours d'arbre, une instruction scalaire coûte 0,5 µs dont un quart en allocations ; la console démarre en 0,03 s (0,3 avant l'audit) ; `eig` et `svd` sont écrits sans LAPACK, `jsondecode` en langage MATLAB, Simulink interprété bloc par bloc | un scalaire sans allocation, LAPACK facultatif, `jsondecode` natif, Simulink par son programme engendré (P13, P5, P11, P38 de l'audit), puis du bytecode |
+| Durée des tests | cinquante-deux tests — les quarante-sept scripts, les vérifications C++, le bureau, la ligne de commande — en 25 minutes avec `ctest -j3` ; `make test` les fait tourner de front, `make test SERIE=1` en file | elle ne peut descendre sous son plus long script, `test_simulink` (25 minutes) ; le découper en quatre et `test_aide` en deux la ramènerait à une douzaine de minutes (P9 de l'audit) |
 
 Aucun de ces points n'est une régression : ce sont des limites connues,
 écrites dans l'aide des fonctions concernées, qui disent ce qu'elles ne

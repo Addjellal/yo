@@ -7,10 +7,9 @@ le rendu sont bâtis), `developpeur.md` (compiler, ajouter une fonction,
 conventions), `reference-matlab/hors-fonctions.md` (ce qui diffère de
 MATLAB, domaine par domaine).
 
-Dernière mise à jour : 21 novembre 2026. La batterie complète passait
-alors, 49 tests sur 49, au commit 9f0c666 (le dernier changement de
-code) ; les commits suivants n'ajoutent que de la documentation et des
-outils.
+Dernière mise à jour : 22 novembre 2026, à la fin de l'audit de reprise
+(`audit-reprise.md`). La batterie complète passe, 52 tests sur 52, au
+dernier commit de code de l'audit.
 
 ## 1. Les règles du dépôt
 
@@ -65,10 +64,13 @@ cd build && ctest -j2 --timeout 7000 > log          # la batterie complète
 cd build && ctest -R bureau                          # l'application de bureau, hors écran
 ```
 
-- La batterie compte 49 tests et dure **environ une demi-heure** avec
-  `-j2` : `test_simulink` à lui seul 25 minutes, `test_aide` 15. Les
-  autres tiennent en quelques secondes ou minutes ; on les lance un par un
-  pendant le travail.
+- La batterie compte 52 tests (les 47 scripts, les vérifications C++, le
+  bureau, trois tests de la ligne de commande) et dure **25 minutes avec
+  `-j3`** : `test_simulink` à lui seul 25 minutes, `test_aide` 13,
+  `test_exemples` 5. ctest lance d'abord les plus longs ; au-delà de trois
+  cœurs, rien ne se gagne tant que `test_simulink` reste d'un bloc (P9 de
+  l'audit). Les autres tiennent en quelques secondes ou minutes ; on les
+  lance un par un pendant le travail.
 - **Ne rien modifier pendant que la batterie tourne** : les `.m` de
   `toolbox/` sont lus au fil de l'exécution, et une fonction réécrite en
   cours de route fait échouer des tests qui n'ont rien à voir (c'est
@@ -77,9 +79,9 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 - Les tests de cas de la littérature, un par boîte à outils, sont dans
   `tests/scripts/test_litterature.m` (49 boîtes à outils). Les exemples
   d'école, un par boîte, dans `exemples/toolboxes/` (`test_exemples.m`).
-- Les avertissements de compilation dans `Base.cpp`, `Mat.cpp`,
-  `Math.cpp` et `Statistiques.cpp` sont anciens ; une modification ne
-  doit pas en ajouter.
+- Les avertissements de compilation de `Base.cpp:970` et `Mat.cpp:187-208`
+  sont anciens (ceux de `Math.cpp` et `Statistiques.cpp`, du code mort,
+  sont partis avec lui) ; une modification ne doit pas en ajouter.
 
 ### Outils de vérification
 
@@ -108,9 +110,24 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 - **Contrôles de cohérence** : `outils/verifierDoublons.m` (deux `.m` de
   même nom, un `.m` qui masque une fonction native), `outils/audit.m`
   (aide, exemples, tests par boîte à outils), `outils/verifierExemples.m`
-  (tous les exemples d'aide), `outils/eprouverNatives.sh` (chaque native
-  appelée avec des arguments absurdes : une erreur MATLAB est juste, un
-  plantage jamais ; une demi-heure).
+  (tous les exemples d'aide), `outils/verifierValeurs.m` (les valeurs
+  qu'annoncent les exemples, « expr % valeur », comparées à ce que rend
+  l'expression ; 33 s, 34 écarts à corriger, voir l'audit),
+  `outils/eprouverNatives.sh` (chaque native appelée avec des arguments
+  absurdes : une erreur MATLAB est juste, un plantage jamais ; 6 min 30 s
+  depuis que le démarrage a été divisé par dix).
+- **Fuzzeurs** (`outils/fuzz/`) : `fuzzer.py` abîme des `.m` du dépôt et
+  les passe dans l'analyseur seul (`analyseSeule.cpp`, à compiler contre
+  un arbre assaini, la commande est en tête du fichier) puis en exécute
+  une partie ; `fichiersAbimes.py` fait relire des `.mat`, `.csv`,
+  `.json`, `.slx`, images, sons, XML et Parquet abîmés.
+- **Assainisseurs et couverture**, chacun dans un arbre à part :
+  `-DMATLIBRE_ASSAINIR=ON` (ASan et UBSan), `-DMATLIBRE_ASSAINIR=thread`
+  (TSan), `-DMATLIBRE_COUVERTURE=ON` (gcov). Sous ASan, passer
+  `ASAN_OPTIONS=detect_leaks=0:allocator_may_return_null=1` ; compter un
+  facteur 4 sur les durées (deux heures pour `test_simulink`). Un arbre
+  construit hors du dépôt reçoit la toolbox par `MATLIBRE_TOOLBOX`, que
+  CTest pose désormais pour tous les tests.
 - **Vérifications croisées en Python** : les cas de la littérature ont
   été confrontés à des implémentations indépendantes. L'environnement se
   recrée ainsi (le scratchpad d'une session ne survit pas) :
@@ -137,6 +154,7 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 | `17ed9dd` | `scatter` propre (aires, couleurs par point, creux), la barre de couleurs dans ses huit positions avec étiquette et graduations, `xtickangle`/`ytickangle`, une graduation par barre, couleurs pures des lettres. |
 | `9f0c666` | La perspective (`surf`, `mesh`, `plot3`, `scatter3`, `fill3`, `patch`, `bar3`, `stem3`, `quiver3`, `slice`, `meshc`...), l'interprète TeX des textes, `yyaxis` et `plotyy`. |
 | `67fb95c` et suivant | Cette fiche, le banc de performance (`outils/banc.m`) et les outils de vérification du rendu (`outils/capturer.js`, `comparerImages.py`, `vueFigure.sh`). |
+| `a8b2305` → `c0f5734` | **L'audit de reprise**, en douze volets (`audit-reprise.md`) : quarante-huit commits, dont trente-cinq corrections du code — résultats faux silencieux (anonymes, `zeros(1e10)`, creux, `histcounts`, `webread`, `system`, `addpath`, opérandes évalués deux fois), injection de commande dans `webread`, dix-huit courses de `parfor` (TSan), lecture hors bornes d'un `.mat`, lexeur bouclant sur `%{`, quatorze plantages de natives, perte d'un onglet du bureau — et l'indexation quadratique du chemin (démarrage 0,3 → 0,03 s, `parfor` vide 0,39 → 0,012 s). |
 
 ## 4. Les pièces récentes, et où elles sont
 
@@ -170,6 +188,10 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 
 ## 5. L'audit de reprise
 
+**L'audit des 21 et 22 novembre 2026 est fait** : `audit-reprise.md`.
+Ce qui suit en reste la méthode, pour le prochain ; les faits cités sont
+ceux d'avant cet audit, et le rapport dit ce qu'ils sont devenus.
+
 Avant d'ajouter quoi que ce soit, une session qui reprend fait le point
 sur tout ce qui peut profiter à l'application, et le rend écrit dans
 `documentation/audit-reprise.md`. Chaque constat y porte : ce qui a été
@@ -184,9 +206,11 @@ avec gcc), `valgrind` (memcheck, callgrind pour le profil), `clang-tidy`,
 `clang-format`, `gcov`, Xvfb et ImageMagick (`import`), Playwright et
 Chromium (`outils/capturer.js`). Absents : `cppcheck`, `lcov`, `perf`,
 la chaîne MinGW (la construction pour Windows ne s'éprouve donc pas ici).
-Le CMake n'a pas encore d'option pour les assainisseurs ni pour la
-couverture : les ajouter (`-DMATLIBRE_ASSAINIR=ON`,
-`-DMATLIBRE_COUVERTURE=ON`) est en soi une amélioration.
+Le CMake a ses options pour les assainisseurs et la couverture
+(`-DMATLIBRE_ASSAINIR=ON` ou `thread`, `-DMATLIBRE_COUVERTURE=ON`), et
+`outils/fuzz/` ses fuzzeurs. L'exécution de code MATLAB téléchargé a été
+refusée par le garde-fou de la session pendant l'audit : du code réel se
+passe dans `analyseSeule` (analyse sans exécution).
 
 ### Les douze volets
 
@@ -222,7 +246,9 @@ couverture : les ajouter (`-DMATLIBRE_ASSAINIR=ON`,
      d'une matrice symétrique 300×300 prend 0,27 s, `svd` 0,44 s, quand
      MATLAB y met quelques millisecondes ;
    - `jsondecode` de 4000 nombres prend 0,6 s ;
-   - un `parfor` coûte 0,23 s de démarrage, même vide (section 6) ;
+   - un `parfor` coûte 0,23 s de démarrage, même vide (section 6) —
+     l'audit l'a ramené à 0,012 s : c'était l'indexation quadratique du
+     chemin, non la création des fils ;
    - une boucle scalaire tourne à 0,4 µs le tour : c'est un interpréteur
      à parcours d'arbre, sans compilation à la volée.
    La durée de la batterie elle-même (`test_simulink` : 25 minutes) freine
@@ -239,7 +265,8 @@ couverture : les ajouter (`-DMATLIBRE_ASSAINIR=ON`,
      `m = new_system('m')` (la forme à sortie, propre à MatLibre) part
      en `ode1` au pas de 0,01, quand `new_system('m')` part, comme
      Simulink, en `VariableStepAuto` — d'où un intégrateur faux de 5e-3
-     sur un sinus, là où ode45 donne 3e-10. À trancher.
+     sur un sinus, là où ode45 donne 3e-10. À trancher : décision D1 de
+     l'audit.
 7. **La fidélité à MATLAB sur du vrai code** : faire tourner des
    programmes MATLAB réels — les exemples de la documentation publique
    de MathWorks, des projets libres sous licence permissive — et relever
@@ -287,15 +314,14 @@ couverture : les ajouter (`-DMATLIBRE_ASSAINIR=ON`,
       dans un terminal et dans un journal, historique et complétion de
       la console ;
     - **la rapidité ressentie** : démarrage de la console (0,2 à 0,26 s
-      le 21 novembre), premier tracé, première simulation, ouverture du
+      le 21 novembre, 0,03 s depuis l'audit), premier tracé, première simulation, ouverture du
       bureau, réactivité pendant un long calcul, possibilité de
       l'interrompre ;
     - **l'accessibilité** : clavier seul, contrastes, agrandissement,
       lecteur d'écran.
-    Un défaut est déjà trouvé : `matlibre -q` (et `--quiet`), annoncé
-    par `matlibre --help`, n'est pas lu — l'option est prise pour un nom
-    de script (« Unable to open file '-q' »), dans
-    `src/console/Principal.cpp`. À corriger en premier.
+    Un défaut était déjà trouvé : `matlibre -q` (et `--quiet`), annoncé
+    par `matlibre --help`, n'était pas lu — corrigé par l'audit
+    (`81ee733`).
 11. **La documentation** : le README et les comptes qu'il annonce sont-ils
     justes ? Manque-t-il un guide de démarrage pour qui vient de MATLAB,
     un guide de migration (ce qui diffère, ce qui manque), des tutoriels
@@ -328,13 +354,29 @@ remanie un gros fichier se décide avec l'utilisateur. À la fin, mettre
 
 ## 6. Ce qui reste, par ordre d'intérêt
 
-1. **Un pool de travailleurs persistant pour `parfor`.** Chaque `parfor`
-   crée ses fils et ses interpréteurs : 0,23 s de coût fixe au banc,
-   jusqu'à une demi-seconde selon la machine, qu'une boucle courte ne
-   rembourse pas. Il
-   faudrait garder les travailleurs d'une boucle à l'autre (`parpool`,
-   `gcp`, `delete(gcp)` en règlent la vie dans MATLAB), en s'assurant
-   que leur état ne fuit pas d'une boucle à la suivante.
+**D'abord, les quatre décisions de l'audit** (`audit-reprise.md`,
+section 14), qui attendent l'utilisateur parce qu'elles changent ce qu'il
+voit : D1, le solveur de départ d'un modèle Simulink créé par valeur
+(`ode1` au pas de 0,01, cinq millions de fois moins précis que la forme
+par nom) ; D2, `format short` par défaut ; D3, la langue des messages
+d'erreur et des titres de tracés ; D4, pas d'invite quand l'entrée n'est
+pas un terminal.
+
+**Puis les propositions de l'audit**, classées dans son tableau, en
+tête : corriger les trente fiches d'aide dont la valeur annoncée est
+fausse et faire tourner `outils/verifierValeurs.m` dans la batterie (P2),
+« Did you mean » (P4), l'intégration continue à la racine du dépôt (P6),
+un guide pour qui vient de MATLAB (P7), l'édition de ligne dans la
+console (P3), une batterie de douze minutes (P9), LAPACK (P5).
+
+Les suites d'avant l'audit restent, avec ce qu'il en a appris :
+
+1. **Un pool de travailleurs persistant pour `parfor`.** Le coût fixe
+   d'un `parfor` vide est tombé de 0,23 s à 0,012 s quand l'audit a
+   supprimé l'indexation quadratique du chemin (`c16566f`) : il venait de
+   là, non de la création des fils. Un pool garde un intérêt — un état et
+   une table des fichiers propres à chaque travailleur, comme les
+   processus de MATLAB —, mais il n'est plus pressé (P1 de l'audit).
 2. **L'algèbre linéaire dense** : `eig`, `svd` et `A\b` à la vitesse de
    MATLAB demanderaient LAPACK (OpenBLAS ou la référence), en dépendance
    facultative, la version écrite à la main restant le repli — ce qui
@@ -375,7 +417,25 @@ remanie un gros fichier se décide avec l'utilisateur. À la fin, mettre
 
 ## 7. Pour démarrer un nouveau chat
 
-Coller ce message :
+Pour **la suite de l'audit**, coller ce message, après avoir tranché les
+décisions D1 à D4 :
+
+> Reprends le projet MatLibre (dépôt `addjellal/yo`, dossier
+> `matlab-libre`, branche `claude/matlab-libre-reprise-lgnad9`). Lis
+> d'abord `matlab-libre/documentation/reprise.md` en entier, puis
+> `audit-reprise.md`, `etat.md` et `architecture.md`.
+>
+> Décisions de l'audit : D1 … ; D2 … ; D3 … ; D4 … (écrire ici ce qui a
+> été tranché). Applique-les, puis prends les propositions du tableau de
+> la section 14 d'`audit-reprise.md` dans l'ordre, en commençant par P2
+> (corriger les fiches dont la valeur annoncée est fausse, puis faire
+> tourner `outils/verifierValeurs.m` dans la batterie). Un commit par
+> sujet, la batterie complète repassée avant de pousser ; demande-moi
+> avant d'ajouter une dépendance, de changer un comportement visible ou
+> de remanier un gros fichier. À la fin, mets à jour `reprise.md` et
+> `etat.md`.
+
+Pour **un nouvel audit complet**, coller celui-ci :
 
 > Reprends le projet MatLibre (dépôt `addjellal/yo`, dossier
 > `matlab-libre`, branche `claude/matlab-libre-reprise-lgnad9`). Lis
