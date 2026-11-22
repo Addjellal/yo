@@ -51,7 +51,11 @@ mesures(end + 1, :) = {'regexprep (1e4 lignes)', meilleur(@expressions), 0.036};
 mesures(end + 1, :) = {'plot de 1e5 points en SVG', meilleur(@tracePlan), 0.005};
 mesures(end + 1, :) = {'surf(peaks(60)) en SVG', meilleur(@traceEspace), 0.019};
 % --- le parallélisme et Simulink -----------------------------------------
-mesures(end + 1, :) = {'parfor de 8 tours vides', meilleur(@parforVide), 0.23};
+% Le parfor vide coutait 0,23 s : chaque travailleur indexait le chemin
+% dossier par dossier, en temps quadratique. Une seule indexation
+% (c16566f) l'a ramene a 0,012 s ; la reference suit, sans quoi le banc
+% ne verrait pas ce cout revenir.
+mesures(end + 1, :) = {'parfor de 8 tours vides', meilleur(@parforVide), 0.015};
 mesures(end + 1, :) = {'sim d''un modele a 4 blocs', meilleur(@simulation), 0.107};
 
 fprintf('\n%-34s %10s %10s %8s\n', 'operation', 'temps (s)', 'reference', 'rapport');
