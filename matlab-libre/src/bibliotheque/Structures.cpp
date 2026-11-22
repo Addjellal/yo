@@ -528,6 +528,9 @@ FONCTION(fnNum2cell) {
     // dimensions données, une par position des autres. num2cell(A, 1) rend
     // les colonnes de A.
     exigerNumerique(args[1], "num2cell");
+    // Une poignée de fonction est un scalaire qui ne se découpe pas : elle
+    // était lue comme un tableau de nombres, et le programme tombait.
+    if (v.classe == Classe::Fonction) return {Valeur::celluleLigne({v})};
     std::vector<bool> reunie;
     for (std::size_t k = 0; k < args[1].nelem(); ++k) {
         double d = args[1].re[k];

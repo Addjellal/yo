@@ -880,6 +880,18 @@ for graine = 1:20
 end
 clear graine donneesHisto
 
+%% ---------- des arguments absurdes sont refuses, sans faire tomber
+% outils/eprouverNatives.sh : nthroot lisait « re » d'une cellule ou
+% d'une structure au-dela de sa fin, logm ne controlait pas son argument,
+% num2cell decoupait une poignee comme un tableau — erreurs de
+% segmentation.
+assert(verifierRefus(@() nthroot({1, 2}, 1)) && verifierRefus(@() nthroot(1, {1, 2})));
+assert(verifierRefus(@() nthroot(struct(), 1)) && verifierRefus(@() nthroot(@sin, 1)));
+assert(verifierRefus(@() nthroot(1, [])));
+assert(verifierRefus(@() logm(struct())) && verifierRefus(@() logm(@sin)));
+assert(verifierRefus(@() logm("")) && verifierRefus(@() logm(ones(2, 3))));
+assert(iscell(num2cell(@sin, 1)) && isequal(nthroot(-27, 3), -3));
+
 disp('defauts : toutes les verifications passent');
 
 function c = compteurCompte()

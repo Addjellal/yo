@@ -100,6 +100,12 @@ FONCTION(fnExpm) {
 }
 FONCTION(fnLogm) {
     INUTILISE
+    // Sans ce contrôle, une structure, une poignée ou un texte vide
+    // faisaient tomber le programme (outils/eprouverNatives.sh).
+    exigerArguments(args, 1, 1, "logm");
+    exigerNumerique(args[0], "logm");
+    if (args[0].dims.size() > 2 || args[0].nlignes() != args[0].ncolonnes())
+        erreur("MATLAB:square", "Matrix must be square.");
     return {logarithmeMatrice(args[0])};
 }
 FONCTION(fnSqrtm) {

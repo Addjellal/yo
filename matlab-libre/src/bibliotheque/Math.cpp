@@ -583,6 +583,13 @@ FONCTION(fnFactor) {
 FONCTION(fnNthroot) {
     INUTILISE
     exigerArguments(args, 2, 2, "nthroot");
+    // Une cellule, une structure ou une poignée ne portent pas de nombres :
+    // la boucle ci-dessous lisait « re » au-delà de sa fin (plantage,
+    // outils/eprouverNatives.sh), et un N vide faisait déborder nelem() - 1.
+    exigerNumerique(args[0], "nthroot");
+    exigerNumerique(args[1], "nthroot");
+    if (args[1].nelem() == 0 && args[0].nelem() > 0)
+        erreur("MATLAB:dimagree", "Matrix dimensions must agree.");
     // NTHROOT rend la racine reelle. Un negatif n'en a une que si N est
     // impair : sinon std::pow rendait NaN, ce qui ressemble a un resultat
     // et n'en est pas un. MATLAB refuse, et dit pourquoi.
