@@ -6027,7 +6027,8 @@ MATLIBRE_VALIDER Lève l'erreur d'un validateur quand la condition échoue.
 MATLIBRE_WEB_CONTENU Interprétation du corps d'une réponse web.
   C = MATLIBRE_WEB_CONTENU(TEXTE,URL) rend le contenu décodé : un
   document JSON devient structure ou cellule, un fichier délimité
-  devient une matrice, le reste reste du texte.
+  (.csv, .tsv) fait de nombres devient une matrice, le reste — un .txt
+  compris — reste du texte.
 
   C = MATLIBRE_WEB_CONTENU(TEXTE,URL,TYPE) impose l'interprétation :
   'auto' devine, 'json' décode, 'text' et 'raw' rendent le texte tel
@@ -7593,8 +7594,9 @@ PIE Diagramme circulaire.
   PIE(X,DECOLLER) écarte du centre les secteurs dont l'élément de
   DECOLLER n'est pas nul : c'est ainsi qu'on met en avant une part.
 
-  PIE(X,DECOLLER,ETIQUETTES) nomme les secteurs. Sans étiquettes, ce
-  sont les pourcentages qui sont écrits.
+  PIE(X,DECOLLER,ETIQUETTES) nomme les secteurs, et PIE(X,ETIQUETTES)
+  aussi, sans en décoller aucun. Sans étiquettes, ce sont les
+  pourcentages qui sont écrits.
 
   H = PIE(...) rend les poignées des secteurs et des textes.
 
@@ -7609,8 +7611,12 @@ PIE Diagramme circulaire.
   Exemples :
      pie([3 1 1]);
      pie([30 20 50], [0 0 1], {'nord', 'sud', 'est'});
+     pie([30 20 50], {'nord', 'sud', 'est'});
 
   Voir aussi PIE3, BAR, PARETO, FILL, LEGEND.
+PIE(X,ETIQUETTES), la forme de MATLAB : une cellule ou un tableau de
+textes en second argument nomme les secteurs. Il était pris pour
+DECOLLER, et « ~= 0 » sur une cellule échouait.
 ```
 
 ## `pie3`

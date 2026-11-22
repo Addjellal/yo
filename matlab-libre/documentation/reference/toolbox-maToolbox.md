@@ -1,6 +1,0 @@
-# Toolbox `maToolbox`
-
-```
-% Ma toolbox
-```
-
