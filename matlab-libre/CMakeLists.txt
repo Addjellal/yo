@@ -350,6 +350,13 @@ if(MATLIBRE_TESTS)
              COMMAND sh -c "echo 'disp(6*7)' | '$<TARGET_FILE:matlibre>' -q")
     set_tests_properties(console_silencieuse PROPERTIES
       PASS_REGULAR_EXPRESSION "42" FAIL_REGULAR_EXPRESSION "MatLibre")
+    # Une entree qui n'est pas un terminal n'appelle ni banniere ni invite,
+    # meme sans -q : comme « matlab -batch », la sortie ne porte que ce que
+    # les commandes ecrivent.
+    add_test(NAME console_tube
+             COMMAND sh -c "echo 'disp(6*7)' | '$<TARGET_FILE:matlibre>'")
+    set_tests_properties(console_tube PROPERTIES
+      PASS_REGULAR_EXPRESSION "42" FAIL_REGULAR_EXPRESSION "MatLibre|>>")
   endif()
   file(GLOB MATLIBRE_TESTS_M CONFIGURE_DEPENDS
        ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/test_*.m)

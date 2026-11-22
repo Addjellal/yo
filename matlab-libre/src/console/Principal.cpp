@@ -14,6 +14,12 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -119,10 +125,24 @@ void armerCtrlC(Interpreteur& it) {
 #endif
 }
 
+// Vrai si l'entrée standard est un terminal, où quelqu'un tape. Lue dans
+// un tube ou un fichier (« echo 'disp(1)' | matlibre »), elle n'appelle
+// ni bannière ni invite : comme « matlab -batch », la sortie ne porte que
+// ce que les commandes écrivent.
+bool entreeEstUnTerminal() {
+#ifdef _WIN32
+    return _isatty(_fileno(stdin)) != 0;
+#else
+    return isatty(fileno(stdin)) != 0;
+#endif
+}
+
 int executerFluxInteractif(Interpreteur& it, bool silencieux) {
     it.modeInteractif = true;
     std::string tampon;
     std::string ligne;
+    const bool terminal = entreeEstUnTerminal();
+    if (!terminal) silencieux = true;
     if (!silencieux)
         std::cout << "MatLibre " << MATLIBRE_VERSION
                   << " — clone libre du langage MATLAB.\n"
@@ -130,7 +150,7 @@ int executerFluxInteractif(Interpreteur& it, bool silencieux) {
                      "complete.\n"
                      "« exit » pour quitter.\n\n";
     for (;;) {
-        std::cout << (tampon.empty() ? ">> " : "... ") << std::flush;
+        if (terminal) std::cout << (tampon.empty() ? ">> " : "... ") << std::flush;
         if (!std::getline(std::cin, ligne)) break;
         tampon += ligne + "\n";
         // Continuation explicite.
@@ -166,7 +186,7 @@ int executerFluxInteractif(Interpreteur& it, bool silencieux) {
             tampon.clear();
         }
     }
-    std::cout << "\n";
+    if (terminal) std::cout << "\n";
     return 0;
 }
 
