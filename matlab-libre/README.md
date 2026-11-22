@@ -24,10 +24,9 @@ Continuous-time transfer function.
 >> A \ [1; 2]
 ans =
 
-   0.090909090909091
-   0.636363636363636
+   0.0909
+   0.6364
 
->> format short
 >> [V, D] = eig(A); diag(D)'
 ans =
 
@@ -137,11 +136,11 @@ par temps, et le code de chacune ligne à ligne avec ses passages. Qt6 est
 la seule dépendance, et elle reste facultative — sans Qt, tout le reste se
 compile comme avant.
 
-**Les nombres s'affichent entiers.** MatLibre montre par défaut tous les
-chiffres que la valeur porte — `pi` s'écrit `3.141592653589793`, un
-`single` s'arrête à `3.1415927`, qui est tout ce qu'il porte. C'est le
-seul écart d'affichage avec MATLAB, qui démarre en `format short` ;
-`format short` le rétablit, `format` seul revient au réglage de départ.
+**Les nombres s'affichent comme dans MATLAB.** MatLibre démarre en
+`format short` : `pi` s'écrit `3.1416`. `format long` montre tous les
+chiffres que la valeur porte — `3.141592653589793`, et `3.1415927` pour
+un `single`, qui n'en porte pas davantage ; `format` seul revient au
+réglage de départ.
 
 **Quand quelque chose casse**, le message dit où : la fonction qui a
 échoué, le fichier et la ligne de chaque appel traversé, avec la ligne de

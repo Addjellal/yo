@@ -1291,19 +1291,25 @@ FONCTION(fnInput) {
 FONCTION(fnFormat) {
     INUTILISE
     if (args.empty()) {
-        // « format » tout seul revient au réglage de départ. Ici c'est
-        // « long » : MatLibre montre par défaut tous les chiffres portés.
-        it.format = Format::Long;
+        // « format » tout seul revient au réglage de départ, « short »
+        // et « loose », comme dans MATLAB.
+        it.format = Format::Court;
         it.formatCompact = false;
         return {};
     }
-    std::string mode = args[0].versTexte();
+    // MATLAB ignore la casse et les blancs : « format longG », « format
+    // longg », « format long g » (deux arguments) et format('long g') se
+    // valent.
+    std::string mode;
+    for (const Valeur& a : args)
+        for (char c : a.versTexte())
+            if (c != ' ') mode += (char)std::tolower((unsigned char)c);
     if (mode == "short") it.format = Format::Court;
     else if (mode == "long") it.format = Format::Long;
-    else if (mode == "shortE" || mode == "short e") it.format = Format::CourtE;
-    else if (mode == "longE" || mode == "long e") it.format = Format::LongE;
-    else if (mode == "shortG" || mode == "short g") it.format = Format::CourtG;
-    else if (mode == "longG" || mode == "long g") it.format = Format::LongG;
+    else if (mode == "shorte") it.format = Format::CourtE;
+    else if (mode == "longe") it.format = Format::LongE;
+    else if (mode == "shortg") it.format = Format::CourtG;
+    else if (mode == "longg") it.format = Format::LongG;
     else if (mode == "hex") it.format = Format::Hex;
     else if (mode == "rat") it.format = Format::Rationnel;
     else if (mode == "bank") it.format = Format::Banque;

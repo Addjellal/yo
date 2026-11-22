@@ -263,11 +263,9 @@ public:
     void fermerJournal();
 
     // --- état visible par l'utilisateur ---
-    // MatLibre montre par défaut tous les chiffres que la valeur porte —
-    // « pi » s'écrit 3.141592653589793, un single 3.1415927. MATLAB, lui,
-    // démarre en « format short » et n'en montre que quatre décimales :
-    // c'est le seul écart, et « format short » le rétablit.
-    Format format = Format::Long;
+    // L'affichage démarre en « format short », comme MATLAB : « pi »
+    // s'écrit 3.1416. « format long » montre tous les chiffres portés.
+    Format format = Format::Court;
     bool formatCompact = false;
     // Le générateur de rand, randn, randi et randperm : celui de MATLAB,
     // si bien que rng(0) donne les mêmes nombres (voir Aleatoire.h).

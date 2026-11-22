@@ -96,12 +96,11 @@ totalité.
    l'éditeur de schémas-blocs, l'édition collaborative, les Live Scripts
    (cellules exécutables mêlées au texte), la comparaison de fichiers, le
    repliement de code et la recherche multi-fichiers.
-2. **L'affichage montre tous les chiffres, MATLAB quatre.** MatLibre
-   démarre en `format long` : `pi` s'écrit `3.141592653589793`, et un
-   `single` `3.1415927` — sept décimales, tout ce qu'il porte. MATLAB
-   démarre en `format short`. C'est le seul écart d'affichage, et
-   `format short` le rétablit ; `format` seul revient à `long`. Le reste
-   s'affiche comme dans la fenêtre de commande de MATLAB : une cellule
+2. **L'affichage est celui de MATLAB.** MatLibre démarre en
+   `format short` : `pi` s'écrit `3.1416`. `format long` montre tous les
+   chiffres, `3.141592653589793`, et `3.1415927` pour un `single` — sept
+   décimales, tout ce qu'il porte ; `format` seul revient à `short`. Le
+   reste s'affiche comme dans la fenêtre de commande de MATLAB : une cellule
    sous son en-tête « 2×2 cell array », ses cases entre accolades —
    `{[  1]}`, `{'Egg'   }`, `{2×3 double}` — ; une structure sous
    « struct with fields: », les noms calés à droite ; un objet sous

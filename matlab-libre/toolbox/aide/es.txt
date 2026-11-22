@@ -410,13 +410,18 @@ TYPE  Affiche le contenu d'un fichier.
 
 ### format
 FORMAT  Choisit l'affichage des nombres.
-    FORMAT SHORT donne cinq chiffres significatifs, FORMAT LONG en donne
-    seize. FORMAT COMPACT retire les lignes vides.
+    FORMAT SHORT, le réglage de départ comme dans MATLAB, donne cinq
+    chiffres significatifs ; FORMAT LONG en donne seize, ou tous ceux
+    d'un single. SHORTE, LONGE, SHORTG, LONGG, BANK, RAT, HEX et + suivent
+    MATLAB ; la casse et les blancs ne comptent pas. FORMAT COMPACT retire
+    les lignes vides, FORMAT LOOSE les rend, et FORMAT seul revient au
+    départ : short et loose.
 
     Syntaxe
        format short
        format long
        format compact
+       format
 
     Exemples
        format long
