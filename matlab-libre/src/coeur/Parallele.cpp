@@ -367,8 +367,7 @@ bool executerParforParallele(Interpreteur& it, const NoeudPtr& boucle,
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
             if (hote) ouvrier.porteeBase().fonction = hote;
-            for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
-                ouvrier.ajouterChemin(*p, true);
+            ouvrier.ajouterChemins(chemins, true);   // une seule indexation
             std::ostringstream muet;
             ouvrier.definirSortie(&muet);
             for (const auto& kv : diffusees) ouvrier.ecrireVariable(kv.first, kv.second);
@@ -480,8 +479,7 @@ std::vector<std::vector<Valeur>> appliquerEnParallele(
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
             if (hote) ouvrier.porteeBase().fonction = hote;
-            for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
-                ouvrier.ajouterChemin(*p, true);
+            ouvrier.ajouterChemins(chemins, true);   // une seule indexation
             std::ostringstream muet;
             ouvrier.definirSortie(&muet);
             for (;;) {
@@ -547,8 +545,7 @@ bool executerSpmd(Interpreteur& it, const NoeudPtr& bloc) {
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
             if (hote) ouvrier.porteeBase().fonction = hote;
-            for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
-                ouvrier.ajouterChemin(*p, true);
+            ouvrier.ajouterChemins(chemins, true);   // une seule indexation
             std::ostringstream muet;
             ouvrier.definirSortie(&muet);
             for (const auto& kv : valeursDiffusees) ouvrier.ecrireVariable(kv.first, kv.second);
@@ -668,8 +665,7 @@ long long lancerTravail(Interpreteur& it, const Valeur& fonction, int nargout,
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
             if (hote) ouvrier.porteeBase().fonction = hote;
-            for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
-                ouvrier.ajouterChemin(*p, true);
+            ouvrier.ajouterChemins(chemins, true);   // une seule indexation
             std::ostringstream muet;
             ouvrier.definirSortie(&muet);
             std::vector<Valeur> arguments = args;

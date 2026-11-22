@@ -359,6 +359,19 @@ void Interpreteur::ajouterChemin(const std::string& dossier, bool enTete) {
     reindexerChemin();
 }
 
+void Interpreteur::ajouterChemins(const std::vector<std::string>& dossiers, bool enTete) {
+    std::vector<std::string> absolus;
+    for (const auto& dossier : dossiers) {
+        const std::string d = dossierAbsolu(dossier);
+        if (std::find(absolus.begin(), absolus.end(), d) != absolus.end()) continue;
+        auto it = std::find(chemin_.begin(), chemin_.end(), d);
+        if (it != chemin_.end()) chemin_.erase(it);
+        absolus.push_back(d);
+    }
+    chemin_.insert(enTete ? chemin_.begin() : chemin_.end(), absolus.begin(), absolus.end());
+    reindexerChemin();
+}
+
 void Interpreteur::retirerChemin(const std::string& dossier) {
     auto it = std::find(chemin_.begin(), chemin_.end(), dossierAbsolu(dossier));
     if (it != chemin_.end()) chemin_.erase(it);

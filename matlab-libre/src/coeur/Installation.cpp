@@ -81,11 +81,12 @@ void chargerToolboxes(Interpreteur& it, const std::string& racine) {
         if (fs::is_directory(homonymes, ec)) dossiers.push_back(homonymes.string());
     }
     std::sort(dossiers.begin(), dossiers.end());
-    // Ajoutés en tête, du dernier au premier : l'ordre final est
-    // alphabétique, et la racine passe devant.
-    for (auto rit = dossiers.rbegin(); rit != dossiers.rend(); ++rit)
-        it.ajouterChemin(*rit, true);
-    it.ajouterChemin(racine, true);
+    // La racine devant, puis les modules dans l'ordre alphabétique, en une
+    // seule fois : ajoutés un à un, chacun réindexait tout le chemin — une
+    // soixantaine de dossiers, quelque mille huit cents parcours, la moitié
+    // du démarrage de la console et de chaque travailleur d'un parfor.
+    dossiers.insert(dossiers.begin(), racine);
+    it.ajouterChemins(dossiers, true);
 }
 
 }  // namespace matlibre

@@ -104,6 +104,9 @@ public:
     // --- mise en route ---
     void installerBibliotheque();
     void ajouterChemin(const std::string& dossier, bool enTete = true);
+    // Plusieurs dossiers d'un coup, dans l'ordre donné, pour une seule
+    // réindexation : ajoutés un à un, chacun réindexait tout le chemin.
+    void ajouterChemins(const std::vector<std::string>& dossiers, bool enTete = true);
     void retirerChemin(const std::string& dossier);
     const std::vector<std::string>& chemin() const { return chemin_; }
     void reindexerChemin();
