@@ -59,7 +59,9 @@ d'avertissement, neuf distinctes, toutes dans les quatre fichiers connus :
 `Base.cpp:967` (rétrécissement), `Mat.cpp:187-208` (initialiseur manquant
 de `VariableMat::avertissement`, quatre fois), `Math.cpp:1018,1079` et
 `Statistiques.cpp:551,555` (quatre fonctions jamais appelées). **Aucun
-avertissement nouveau**, ni avant ni après les corrections de l'audit.
+avertissement nouveau**, ni avant ni après les corrections de l'audit ;
+les quatre fonctions mortes retirées (`edd366c`), il ne reste que les
+avertissements de `Base.cpp` et `Mat.cpp`.
 
 **Dette mesurée** (arbre à part, rien corrigé) :
 
@@ -77,8 +79,9 @@ partout. Le seul avertissement qui signale du code mort est
 et définissait `MATLIBRE_LAPACK`, `MATLIBRE_FFTW`... ; or aucune ligne du
 code ne lit ces macros (`grep -rn MATLIBRE_LAPACK src include` : rien).
 Sur une machine qui les a, le binaire en dépendait pour rien, et le
-paquet `.deb`, qui ne déclare que `libc6` et `libstdc++6`, ne
-s'installait pas proprement ailleurs. Six documents promettaient une
+paquet `.deb` qui en sortait, ne déclarant que `libc6` et `libstdc++6`,
+donnait ailleurs un `matlibre` qui ne démarrait pas, faute de ces
+bibliothèques. Six documents promettaient une
 accélération qui n'existe pas. Les options sont retirées, les documents
 disent vrai ; brancher LAPACK pour de bon est la proposition P5.
 
@@ -223,12 +226,17 @@ forme courte annonçant plus de 4 octets est refusée : « Unable to read
 the MAT-file: a small data element is longer than 4 bytes ».
 
 **Corrigé — un tableau trop grand arrêtait la session** (haute,
-`d5388eb`). Une longueur Parquet abîmée demandait une plage de 2⁶¹
-éléments ; plus simplement, `x = 1:1e18` ou `ones(1e6, 1e6)` levaient
-`std::bad_alloc`, qu'aucun `try/catch` n'attrapait : « Erreur interne :
-std::bad_alloc », code 3, espace de travail perdu. C'est désormais
-l'erreur `MATLAB:nomem`, que l'on attrape et après laquelle la session
-continue.
+`d5388eb`, `422b8c0`, `009856d`). Une longueur Parquet abîmée demandait
+une plage de 2⁶¹ éléments ; plus simplement, `x = 1:1e18` ou
+`ones(1e6, 1e6)` levaient `std::bad_alloc`, qu'aucun `try/catch`
+n'attrapait : « Erreur interne : std::bad_alloc », code 3, espace de
+travail perdu. Une plage trop longue et un tableau plus grand que la
+mémoire de la machine sont désormais refusés avant d'être alloués, comme
+dans MATLAB (« Requested 50000x50000 (18.6GB) array exceeds maximum
+array size preference (15.7GB) ») — sous Linux, une demande à peine plus
+grande que la mémoire pouvait sinon être acceptée à crédit, puis la
+session tuée en la remplissant ; ce qui échappe à ce contrôle lève
+`MATLAB:nomem`, que l'on attrape et après laquelle la session continue.
 
 **Corrigé — une taille non représentable rendait un tableau vide**
 (haute, `1f5647c`). `zeros(1e10)` rendait 0×0, `ones(2^31, 1)` 0×1,
