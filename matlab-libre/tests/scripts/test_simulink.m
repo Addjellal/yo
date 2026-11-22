@@ -458,7 +458,9 @@ m = new_system('reglages');
 m = add_block(m, 'constant', 'c', 'Value', 1);
 m = add_block(m, 'integrator', 'x');
 m = add_line(m, 'c', 'x');
-assert(strcmp(get_param(m, 'Solver'), 'ode1') && get_param(m, 'StopTime') == 10, ...
+% Un modele neuf part, comme dans Simulink, du solveur automatique a pas
+% variable.
+assert(strcmp(get_param(m, 'Solver'), 'VariableStepAuto') && get_param(m, 'StopTime') == 10, ...
        'un modele neuf porte les reglages par defaut');
 m = set_param(m, 'Solver', 'ode4', 'StartTime', 1, 'StopTime', 3, 'FixedStep', 0.5);
 assert(strcmp(get_param(m, 'Solver'), 'ode4'));
@@ -2119,7 +2121,8 @@ casErreurs = {
     @() sim(largeurRemise), 'Simulink:Engine:DimensionMismatch', 'de remise'
     @() sim(set_param(balle, 'vitesse', 'ExternalReset', 'parfois')), 'Simulink:Parameters:InvalidValue', 'level hold'
     @() add_line(balle, 'gravite', 'vitesse', 4), 'Simulink:Commands:AddLineInvalidPort', '3 port(s)'
-    @() matlibre_sl_programme(balle), 'Simulink:programme:BlocNonEcrit', 'balle/vitesse'
+    @() matlibre_sl_programme(set_param(balle, 'Solver', 'ode1')), ...
+        'Simulink:programme:BlocNonEcrit', 'balle/vitesse'
     };
 for kE = 1:size(casErreurs, 1)
     vu = '';
@@ -2485,7 +2488,8 @@ casErreurs = {
         'Simulink:Parameters:InvalidValue', 'sawtooth'
     @() sim(add_block(new_system('z'), 'discretezeropole', 'z', 'Zeros', [1 2], 'Poles', 0.5)), ...
         'Simulink:blocks:TransferFcnImproper', 'propre'
-    @() matlibre_sl_programme(add_block(new_system('p'), 'chirp', 'c')), ...
+    @() matlibre_sl_programme(add_block(set_param(new_system('p'), 'Solver', 'ode1'), ...
+                                        'chirp', 'c')), ...
         'Simulink:programme:BlocNonEcrit', 'p/c'
     };
 for kE = 1:size(casErreurs, 1)
@@ -2884,7 +2888,7 @@ m = add_block(m, 'toworkspace', 'versEspace', 'VariableName', 'simout');
 m = add_block(m, 'outport', 'y', 'Port', 1);
 m = add_line(m, 'c', 'versEspace');
 m = add_line(m, 'c', 'y');
-m = set_param(m, 'StopTime', 0.1, 'FixedStep', 0.1);
+m = set_param(m, 'StopTime', 0.1, 'Solver', 'FixedStepAuto', 'FixedStep', 0.1);
 evalin('base', 'clear out tout yout');
 set_param(m, 'SimulationCommand', 'start');
 dehors = evalin('base', 'out');

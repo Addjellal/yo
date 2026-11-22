@@ -23,8 +23,9 @@ function varargout = matlibre_sl_config(action, varargin)
 %   Les réglages reconnus, avec leur valeur par défaut :
 %     StartTime            0          l'instant initial
 %     StopTime             10         l'instant final
-%     SolverType           'Fixed-step'  ou 'Variable-step'
-%     Solver               'ode1'     le solveur. À pas fixe : ode1 à
+%     SolverType           'Variable-step'  ou 'Fixed-step'
+%     Solver               'VariableStepAuto'  le solveur, comme dans un
+%                                     modèle neuf de Simulink. À pas fixe : ode1 à
 %                                     ode5, ode8, ode14x et ode1be
 %                                     (raides), odeN (la formule que
 %                                     choisit ODENIntegrationMethod),
@@ -285,15 +286,15 @@ function varargout = matlibre_sl_config(action, varargin)
 %   Variable-step quand le solveur est à pas fixe le remplace par
 %   VariableStepAuto, et inversement par FixedStepAuto.
 %
-%   MatLibre part du pas fixe et d'Euler, là où Simulink part du pas
-%   variable : les modèles écrits avant que le pas variable n'existe
-%   gardent ainsi leur comportement.
+%   Un modèle part, comme dans Simulink, du pas variable automatique ;
+%   un programme qui veut le pas fixe d'Euler le demande
+%   (set_param(m, 'Solver', 'ode1')).
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
 %   Exemple :
 %      c = matlibre_sl_config('lire', new_system('m'));
-%      c.Solver                                   % 'ode1'
+%      c.Solver                                   % 'VariableStepAuto'
 %      matlibre_sl_config('nom', 'reltol')        % 'RelTol'
 %
 %   Voir aussi SET_PARAM, GET_PARAM, SIM, SIMSET.
@@ -318,8 +319,12 @@ function varargout = matlibre_sl_config(action, varargin)
 end
 
 function d = defauts()
-    d = struct('StartTime', 0, 'StopTime', 10, 'SolverType', 'Fixed-step', ...
-               'Solver', 'ode1', 'FixedStep', 0.01, 'MaxStep', 'auto', ...
+    % Le solveur d'un modèle neuf de Simulink : l'automatique à pas
+    % variable (ode45, ou le discret sans état continu). Tous les chemins
+    % — un modèle créé par nom ou par valeur, un fichier qui n'en dit
+    % rien — en partent.
+    d = struct('StartTime', 0, 'StopTime', 10, 'SolverType', 'Variable-step', ...
+               'Solver', 'VariableStepAuto', 'FixedStep', 0.01, 'MaxStep', 'auto', ...
                'MinStep', 'auto', 'InitialStep', 'auto', 'RelTol', 1e-3, ...
                'AbsTol', 'auto', 'MaxOrder', 5, 'ExtrapolationOrder', 4, ...
                'NumberNewtonIterations', 1, 'ODENIntegrationMethod', 'ode3', ...

@@ -880,7 +880,7 @@ assert(isequal(discret.liens, edition.liens), 'le cablage n''a pas bouge');
 %% ------------------------------ SIMULINK : LES REGLAGES DU MODELE
 regle = new_system('regle');
 regle = add_block(regle, 'constant', 'c', 'Value', 3);
-regle = add_param(regle, 'StopTime', 2, 'FixedStep', 0.5);
+regle = add_param(regle, 'StopTime', 2, 'Solver', 'ode1', 'FixedStep', 0.5);
 assert(get_param(regle, 'StopTime') == 2);
 resRegle = sim(regle);
 assert(resRegle.temps(end) == 2 && numel(resRegle.temps) == 5, ...
@@ -1395,6 +1395,7 @@ schemaSource = add_line(schemaSource, 'procede', 'sortie');
 schemaSource = add_line(schemaSource, 'sortie', 'vitesse');
 schemaSource = add_line(schemaSource, 'vitesse', 'carre');
 
+schemaSource = set_param(schemaSource, 'Solver', 'ode1');
 texteProgramme = matlibre_sl_programme(schemaSource);
 assert(~isempty(strfind(texteProgramme, 'function resultat = asserviProg')));
 assert(isempty(strfind(texteProgramme, 'add_block')), ...
@@ -1451,7 +1452,8 @@ evalin('base', 'clear asserviProg');
 % traduit de travers.
 refuseEcriture = false;
 try
-    matlibre_sl_programme(add_block(new_system('x'), 'zoh', 'z', 'SampleTime', 0.1));
+    matlibre_sl_programme(add_block(set_param(new_system('x'), 'Solver', 'ode1'), 'zoh', 'z', ...
+                                    'SampleTime', 0.1));
 catch err
     refuseEcriture = strcmp(err.identifier, 'Simulink:programme:BlocNonEcrit');
 end
@@ -1475,7 +1477,7 @@ correcteurPI = add_line(correcteurPI, 'kp', 'total', 1);
 correcteurPI = add_line(correcteurPI, 'ki', 'total', 2);
 correcteurPI = add_line(correcteurPI, 'total', 's');
 
-emboite = new_system('emboite');
+emboite = set_param(new_system('emboite'), 'Solver', 'ode1');
 emboite = add_block(emboite, 'step', 'consigne', 'Time', 0, 'After', 1);
 emboite = add_block(emboite, 'sum', 'ecart', 'Signs', '+-');
 emboite = add_block(emboite, 'subsystem', 'correcteur', 'Model', correcteurPI);
@@ -1485,7 +1487,7 @@ emboite = add_line(emboite, 'sortie', 'ecart', 2);
 emboite = add_line(emboite, 'ecart', 'correcteur', 1);
 emboite = add_line(emboite, 'correcteur', 'sortie');
 
-aPlat = new_system('aPlat');
+aPlat = set_param(new_system('aPlat'), 'Solver', 'ode1');
 aPlat = add_block(aPlat, 'step', 'consigne', 'Time', 0, 'After', 1);
 aPlat = add_block(aPlat, 'sum', 'ecart', 'Signs', '+-');
 aPlat = add_block(aPlat, 'gain', 'kp', 'Gain', 2);
@@ -1518,7 +1520,7 @@ dehors = add_block(dehors, 'inport', 'e', 'Port', 1);
 dehors = add_block(dehors, 'subsystem', 'dedans', 'Model', correcteurPI);
 dehors = add_block(dehors, 'outport', 's', 'Port', 1);
 dehors = add_line(add_line(dehors, 'e', 'dedans', 1), 'dedans', 's');
-deuxNiveaux = new_system('deuxNiveaux');
+deuxNiveaux = set_param(new_system('deuxNiveaux'), 'Solver', 'ode1');
 deuxNiveaux = add_block(deuxNiveaux, 'step', 'consigne', 'Time', 0, 'After', 1);
 deuxNiveaux = add_block(deuxNiveaux, 'sum', 'ecart', 'Signs', '+-');
 deuxNiveaux = add_block(deuxNiveaux, 'subsystem', 'correcteur', 'Model', dehors);

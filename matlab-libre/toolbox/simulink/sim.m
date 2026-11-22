@@ -10,7 +10,9 @@ function varargout = sim(modele, varargin)
 %
 %   SIM(MODELE,TFINAL) fixe l'instant final ; SIM(MODELE,[TDEBUT TFINAL])
 %   les deux ; SIM(MODELE,INSTANTS) donne aussi le pas par l'écart de
-%   deux instants réguliers. SIM(MODELE,TFINAL,PAS) fixe le pas, et
+%   deux instants réguliers. SIM(MODELE,TFINAL,PAS) fixe le pas — un
+%   modèle resté sur le solveur automatique à pas variable passe alors à
+%   son pendant à pas fixe, FixedStepAuto —, et
 %   SIM(MODELE,TFINAL,SIMSET(...)) accepte un jeu d'options à la place.
 %   SIM(MODELE,INTERVALLE,OPTIONS,[T, U]) alimente les entrées du modèle :
 %   le temps, puis une colonne par élément des entrées, rangées par leur
@@ -40,7 +42,7 @@ function varargout = sim(modele, varargin)
 %   vient qu'une fois par bloc et par simulation. Un argument explicite
 %   l'emporte toujours sur le réglage enregistré.
 %
-%   Les solveurs à pas fixe : ode1 (Euler, celui par défaut), ode2
+%   Les solveurs à pas fixe : ode1 (Euler), ode2
 %   (Heun), ode3 (Bogacki-Shampine), ode4 (Runge-Kutta), ode5
 %   (Dormand-Prince) et ode8 (Prince-Dormand) ; l'erreur d'un solveur
 %   d'ordre p décroît comme le pas à la puissance p. Pour les systèmes
@@ -53,8 +55,9 @@ function varargout = sim(modele, varargin)
 %   (Bogacki-Shampine 3(2)), ode113 (Adams, d'ordre variable, pour les
 %   tolérances fines), et pour les systèmes raides ode15s (NDF, d'ordre 1
 %   à MaxOrder), ode23s (Rosenbrock), ode23t (trapèzes) et ode23tb
-%   (TR-BDF2) ; VariableStepDiscrete, et VariableStepAuto qui choisit
-%   ode45 ou le discret. Le pas suit l'erreur estimée — RelTol, AbsTol —, borné
+%   (TR-BDF2) ; VariableStepDiscrete, et VariableStepAuto, le solveur
+%   d'un modèle neuf comme dans Simulink, qui choisit ode45 ou le
+%   discret. Le pas suit l'erreur estimée — RelTol, AbsTol —, borné
 %   par MaxStep (le cinquantième de la durée par défaut) et MinStep. Il
 %   s'arrête exactement sur les instants d'échantillonnage et les
 %   cassures des sources (échelon, fronts d'impulsion) ; un seuil franchi
@@ -859,6 +862,12 @@ function [config, imposes, externe, tousLesPas] = lireArguments(config, args)
                     config = poser(config, nom{1}, choisi);
                 end
             end
+            % Un pas donné par SIMSET vaut demande de pas fixe, comme le
+            % troisième argument numérique.
+            if isempty(demande) && ~isempty(simget(troisieme, 'FixedStep')) ...
+               && strcmpi(config.Solver, 'VariableStepAuto')
+                config = poser(config, 'Solver', 'FixedStepAuto');
+            end
             for nom = {'Refine', 'Decimation', 'SaveFormat', 'ExtrapolationOrder', ...
                        'NumberNewtonIterations'}
                 choisi = simget(troisieme, nom{1});
@@ -901,6 +910,13 @@ function [config, imposes, externe, tousLesPas] = lireArguments(config, args)
                 error('Simulink:SolverConfig:InvalidFixedStep', 'Le pas doit etre un nombre strictement positif.');
             end
             config.FixedStep = double(troisieme);
+            % Un pas imposé demande le pas fixe : le modèle resté sur le
+            % solveur automatique à pas variable prend son pendant à pas
+            % fixe (FixedStepAuto : ode3, ou le discret sans état continu).
+            % Un solveur choisi n'est pas changé.
+            if strcmpi(config.Solver, 'VariableStepAuto')
+                config = poser(config, 'Solver', 'FixedStepAuto');
+            end
         end
     end
     if numel(args) >= 3

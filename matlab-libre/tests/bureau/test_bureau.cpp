@@ -2028,6 +2028,17 @@ end
                              contenu.contains(QLatin1String("add_block")),
                          "et il rebatit le modele, bloc par bloc");
 
+                // Comme dans Simulink, un modele neuf part du solveur
+                // automatique a pas variable. Le programme engendre integre
+                // par Euler et demande, comme Simulink Coder, un pas fixe :
+                // on choisit ode1 dans la barre, qui le pose sur le modele.
+                verifier(simulink->choixSolveur()->currentText() ==
+                             QLatin1String("VariableStepAuto"),
+                         "la barre montre le solveur d'un modele neuf, VariableStepAuto");
+                simulink->choixSolveur()->setCurrentIndex(
+                    simulink->choixSolveur()->findText(QStringLiteral("ode1")));
+                verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                         "le choix de ode1 passe");
                 simulink->genererVers(cheminProgramme);
                 verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
                          "la generation passe");
@@ -2338,8 +2349,8 @@ end
                          simulink->choixSolveur()->findText(QStringLiteral("ode5")) >= 0,
                      "la barre offre les solveurs a pas fixe, ode5 compris");
             verifier(simulink->choixSolveur()->currentText() ==
-                         QLatin1String("ode1"),
-                     "et montre celui du modele, ode1 par defaut");
+                         QLatin1String("VariableStepAuto"),
+                     "et montre celui du modele relu, VariableStepAuto comme dans Simulink");
             commandeVue.clear();
             simulink->choixSolveur()->setCurrentIndex(
                 simulink->choixSolveur()->findText(QStringLiteral("ode4")));

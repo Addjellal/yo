@@ -68,7 +68,7 @@ function valeur = get_param(modele, nom, parametre)
 %      get_param(m, 'g').type               % 'gain'
 %      get_param(m, 'g', 'Multiplication')  % 'Element-wise(K.*u)', le défaut
 %      get_param(m, 'essai/g', 'Ports')     % [1 1 0 0 0 0 0 0]
-%      get_param(m, 'Solver')               % 'ode1'
+%      get_param(m, 'Solver')               % 'VariableStepAuto'
 %
 %   Voir aussi SET_PARAM, ADD_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
     % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
