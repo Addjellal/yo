@@ -548,24 +548,6 @@ double normpdfFn(double x, double mu, double sigma) {
     double z = (x - mu) / sigma;
     return std::exp(-0.5 * z * z) / (sigma * std::sqrt(2 * PI));
 }
-double normcdfFn(double x, double mu, double sigma) {
-    return 0.5 * std::erfc(-(x - mu) / (sigma * std::sqrt(2.0)));
-}
-
-double erfinvLocal(double y) {
-    if (y <= -1) return -INFINITY;
-    if (y >= 1) return INFINITY;
-    double x = 0;
-    for (int k = 0; k < 60; ++k) {
-        double err = std::erf(x) - y;
-        double d = 2.0 / std::sqrt(PI) * std::exp(-x * x);
-        if (d == 0) break;
-        double pas = err / d;
-        x -= pas;
-        if (std::fabs(pas) < 1e-15) break;
-    }
-    return x;
-}
 
 // Les paramètres de la loi normale : X, MU, SIGMA de même taille ou
 // scalaires, comme dans MATLAB ; SIGMA <= 0 donne NaN.

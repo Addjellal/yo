@@ -1026,12 +1026,6 @@ static void betaIncompleteDeux(double x, double a, double b, double& p, double& 
     }
 }
 
-double betaIncompleteRegularisee(double x, double a, double b) {
-    double p, q;
-    betaIncompleteDeux(x, a, b, p, q);
-    return p;
-}
-
 // P(a,x) et Q(a,x) = 1 - P(a,x), la plus petite calculée directement :
 // la série sous a+1, la fraction continue au-delà.
 static void gammaIncompleteDeux(double x, double a, double& p, double& q) {
@@ -1085,12 +1079,6 @@ static void gammaIncompleteDeux(double x, double a, double& p, double& q) {
     }
     q = std::exp(-x + a * std::log(x) - std::lgamma(a)) * h;
     p = 1.0 - q;
-}
-
-double gammaIncompleteRegularisee(double x, double a) {
-    double p, q;
-    gammaIncompleteDeux(x, a, p, q);
-    return p;
 }
 
 // Queue demandée : « lower » (défaut) ou « upper ».
