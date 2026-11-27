@@ -9,7 +9,7 @@ function expression = poly2sym(coefficients, variable)
 %
 %   Exemple :
 %      f = poly2sym([1 0 -4]);
-%      char(f)                        % '((x ^ 2) - 4)'
+%      char(f)                        % 'x^2 - 4'
 %      sym2poly(f)                    % [1 0 -4]
 %
 %   Voir aussi SYM2POLY, SYM, ROOTS, POLYVAL.

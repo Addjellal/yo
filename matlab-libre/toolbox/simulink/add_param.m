@@ -19,7 +19,7 @@ function modele = add_param(modele, varargin)
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'constant', 'c', 'Value', 3);
-%      m = add_param(m, 'StopTime', 2, 'FixedStep', 0.5);
+%      m = add_param(m, 'StopTime', 2, 'Solver', 'ode1', 'FixedStep', 0.5);
 %      r = sim(m);
 %      r.temps(end)                     % 2
 %      numel(r.temps)                   % 5 : de 0 a 2 par pas de 0,5

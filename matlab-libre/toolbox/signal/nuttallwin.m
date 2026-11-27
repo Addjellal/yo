@@ -3,8 +3,8 @@ function w = nuttallwin(n)
 %   Coefficients : 0,3635819 ; 0,4891775 ; 0,1365995 ; 0,0106411.
 %
 %   Exemple :
-%      w = nuttallwin(64);
-%      max(w)                      % 1
+%      w = nuttallwin(65);
+%      max(w)                      % 1 : en son centre, sur une longueur impaire
 %
 %   Voir aussi BLACKMANHARRIS, FLATTOPWIN, WINDOW.
     n = round(n);

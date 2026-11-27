@@ -16,7 +16,7 @@ function [fonctions, xval] = wpfun(nom, numero, iterations)
 %   Exemple :
 %      [w, x] = wpfun('db2', 3, 7);
 %      size(w, 1)                     % 4 : W0 à W3
-%      trapz(x, w(1, :))              % 1 : W0 est la fonction d'échelle
+%      sum(w(1, :)) * (x(2) - x(1))   % 1 : W0 est la fonction d'échelle
 %      abs(trapz(x, w(2, :)))         % nul : W1 est l'ondelette
 %
 %   Voir aussi WAVEFUN, WPDEC, WPCOEF, WFILTERS.

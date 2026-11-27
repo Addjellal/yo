@@ -186,6 +186,10 @@ qu'ils ne font pas encore comme MATLAB.
 
 ### Systèmes asservis
 
+- **`c2d` connaît `'zoh'`, `'foh'`, `'impulse'` et `'tustin'`** ; les
+  méthodes `'matched'` et `'least-squares'`, l'option de pré-distorsion
+  de Tustin et les objets `c2dOptions` sont refusés en le disant. `d2c`
+  connaît `'zoh'` et `'tustin'`.
 - **Pas de retards internes** : `InputDelay`, `OutputDelay` et `IODelay`
   sont portés et honorés — la réponse fréquentielle en `e^(-jwD)`, la
   réponse temporelle par décalage, exactement —, mais un retard *dans*
@@ -742,6 +746,10 @@ de MatLibre ne fait pas comme celle de MathWorks.
   (MSAC, `MaxDistance` 1,5 pixel, `MaxNumTrials`, `Confidence`), et
   connaît les quatre types ; elle rend la matrice 3 x 3, non l'objet
   `rigid2d`, `affine2d` ou `projective2d`.
+- **`disparityBM` n'a pas les seuils d'OpenCV** (`UniquenessThreshold`,
+  `TextureThreshold`, `ContrastThreshold`) : dans une zone sans texture,
+  où plusieurs décalages s'apparient aussi bien, le plus petit l'emporte,
+  là où MATLAB marque le pixel comme non fiable.
 
 ### Robotique
 

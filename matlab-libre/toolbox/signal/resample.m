@@ -17,7 +17,7 @@ function [y, t] = resample(x, p, q)
 %
 %   Exemple :
 %      x = sin(2 * pi * 0.01 * (0:99));
-%      numel(resample(x, 3, 2))        % 149
+%      numel(resample(x, 3, 2))        % 150 : ceil(100 * 3 / 2)
 %      isrow(resample(x, 3, 2))        % true
 %
 %   Voir aussi UPFIRDN, DECIMATE, INTERP, INTERP1.

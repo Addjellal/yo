@@ -14,7 +14,7 @@ function s = symstr(e)
 %
 %   Exemple :
 %      x = sym('x');
-%      symstr(symmul(symadd(x, symnum(1)), symnum(2)))     % '(x + 1) * 2'
+%      symstr(symmul(symadd(x, symnum(1)), symnum(2)))     % '(x + 1)*2'
 %      symstr(symadd(symmul(x, symnum(2)), symnum(1)))     % 'x*2 + 1'
 %
 %   Voir aussi SYMSIMPLIFY, SYMSUBS, SYMADD.

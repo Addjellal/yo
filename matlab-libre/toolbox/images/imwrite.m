@@ -9,8 +9,8 @@ function imwrite(x, nomFichier, format)
 %   d'écrire un PGM sous un nom qui annonce autre chose.
 %
 %   Exemple :
-%      imwrite(uint8(magic(8) * 4), 'essai.pgm');
-%      max(max(abs(double(imread('essai.pgm')) - magic(8) * 4)))   % 0 : rien ne se perd
+%      imwrite(uint8(magic(8) * 3), 'essai.pgm');
+%      max(max(abs(double(imread('essai.pgm')) - magic(8) * 3)))   % 0 : rien ne se perd
 %
 %   Voir aussi IMREAD, IMSHOW.
     if nargin < 3 || isempty(format)

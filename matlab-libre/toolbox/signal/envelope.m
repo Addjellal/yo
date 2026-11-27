@@ -19,7 +19,7 @@ function [haut, bas] = envelope(x)
 %      t = (0:999) / 1000;
 %      x = sin(2*pi*50*t) .* (1 + 0.5 * sin(2*pi*2*t));
 %      [h, b] = envelope(x);
-%      all(h(20:end-20) >= x(20:end-20))    % true : elle majore
+%      all(h(20:end-20) >= x(20:end-20) - 1e-12)    % true : elle majore, aux arrondis pres
 %
 %   Voir aussi HILBERT, RMS, FINDPEAKS.
     m = mean(x(:));

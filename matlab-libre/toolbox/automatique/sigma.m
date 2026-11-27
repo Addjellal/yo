@@ -21,7 +21,7 @@ function [valeurs, w] = sigma(varargin)
 %   H-infini, que rend HINFNORM.
 %
 %   Exemple :
-%      max(sigma(tf(1, [1 1])))   % 1 : le gain le plus fort est en zéro
+%      sigma(tf(1, [1 1]), 0)     % 1 : le gain le plus fort est en zéro
 %
 %   Voir aussi FREQRESP, BODE, BODEMAG, HINFNORM.
     [modeles, styles, w] = matlibre_arguments_lti(varargin);

@@ -12,7 +12,7 @@ function p = dbm2w(dbm)
 %   Exemple :
 %      dbm2w(0)                        % 1e-3
 %      dbm2w(30)                       % 1
-%      dbm2w(3) / dbm2w(0)             % 2, a 0,2 %% pres
+%      dbm2w(3) / dbm2w(0)             % 1.9953 : 3 dB doublent presque la puissance
 %
 %   Voir aussi W2DBM, FRIIS, PATHLOSS.
     p = 10 .^ ((dbm - 30) / 10);
