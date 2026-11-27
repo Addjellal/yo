@@ -968,7 +968,7 @@ FONCTION(fnSuperclasses) {
         for (const auto& q : vus) deja = deja || q == ancetre;
         if (!deja) vus.push_back(ancetre);
     }
-    r = Valeur::celluleDims({vus.size(), 1});
+    r = Valeur::celluleDims({static_cast<int>(vus.size()), 1});
     for (std::size_t k = 0; k < vus.size(); ++k) r.cellules[k] = Valeur::texte(vus[k]);
     return {r};
 }

@@ -184,11 +184,11 @@ FONCTION(fnSave) {
         std::set<std::string> voulus(motifs.begin() + 1, motifs.end());
         for (const std::string& champ : s.st->ordre) {
             if (!voulus.empty() && !voulus.count(champ)) continue;
-            aEcrire.push_back({champ, s.champ(champ, 0), false});
+            aEcrire.push_back({champ, s.champ(champ, 0), false, {}});
         }
     } else if (motifs.empty()) {
         for (const std::string& nom : it.nomsVariables())
-            aEcrire.push_back({nom, it.lireVariable(nom), false});
+            aEcrire.push_back({nom, it.lireVariable(nom), false, {}});
     } else {
         std::vector<std::string> noms = it.nomsVariables();
         std::set<std::string> deja;
@@ -199,13 +199,13 @@ FONCTION(fnSave) {
                     erreur("MATLAB:save:variableNotFound",
                            "Variable '" + motif + "' not found.");
                 if (deja.insert(motif).second)
-                    aEcrire.push_back({motif, it.lireVariable(motif), false});
+                    aEcrire.push_back({motif, it.lireVariable(motif), false, {}});
                 continue;
             }
             std::regex r = parRegex ? std::regex(motif) : motifVersRegex(motif);
             for (const std::string& nom : noms)
                 if (std::regex_search(nom, r) && deja.insert(nom).second)
-                    aEcrire.push_back({nom, it.lireVariable(nom), false});
+                    aEcrire.push_back({nom, it.lireVariable(nom), false, {}});
         }
     }
 
