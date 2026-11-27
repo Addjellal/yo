@@ -111,8 +111,32 @@ chemin de recherche.
 
 ## Intégration continue
 
-Il n'y en a pas qui tourne. `.github/workflows/construire.yml` est rangé
-dans `matlab-libre/`, or GitHub ne lit que le `.github/workflows` de la
-racine du dépôt : ce fichier n'a jamais été exécuté. Le remplacer par un
-ensemble à la racine — construction et tests rapides à chaque poussée,
-batterie complète chaque nuit — est une proposition de `audit-reprise.md`.
+Deux workflows GitHub Actions, à la racine du dépôt (GitHub ne lit que
+le `.github/workflows` de la racine ; celui qu'on avait rangé dans
+`matlab-libre/.github/` n'a jamais tourné, et il est retiré) :
+
+| workflow | quand | ce qu'il fait | durée |
+| --- | --- | --- | --- |
+| `matlab-libre-rapide.yml` | chaque poussée et chaque demande de fusion qui touchent `matlab-libre/` | construction Release sous Ubuntu, bureau Qt compris, qui échoue au premier avertissement du compilateur ; puis `ctest -LE lent` : les vérifications C++, la ligne de commande, le bureau hors écran, les valeurs des fiches d'aide, les doublons de noms et les scripts de moins d'une minute | une dizaine de minutes |
+| `matlab-libre-nuit.yml` | chaque nuit à 1 h 23 UTC, à la main, et à chaque poussée qui le modifie | la batterie complète ; la construction sans Qt, l'installation lancée d'ailleurs et les archives `.tar.gz` et `.deb` ; la batterie sous ASan et UBSan, puis `test_parallele` sous TSan ; la couverture du code C++ par la batterie, en tableau dans le résumé de la tâche ; macOS (Apple clang, Qt de Homebrew) et Windows (MinGW de MSYS2, Qt), tests rapides | deux à cinq heures, les tâches en parallèle |
+
+GitHub ne lance un workflow planifié que depuis la branche par défaut :
+la nuit ne tourne d'elle-même qu'une fois le fichier sur `main`.
+
+Les tests qui passent la minute portent l'étiquette CTest `lent` (la
+liste est dans `CMakeLists.txt`). Pendant le travail, la même passe que
+l'intégration continue :
+
+```bash
+cd build && ctest -LE lent -j4     # quelques minutes
+cd build && ctest -L lent -j4      # les longs seuls
+```
+
+La couverture se mesure de même chez soi :
+
+```bash
+cmake -S . -B build-couverture -DCMAKE_BUILD_TYPE=Debug -DMATLIBRE_COUVERTURE=ON
+cmake --build build-couverture -j4
+(cd build-couverture && ctest -LE lent -j4)
+outils/couverture.sh build-couverture     # tableau Markdown, total en dernier
+```

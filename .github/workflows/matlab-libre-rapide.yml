@@ -1,0 +1,81 @@
+# MatLibre — construction et tests rapides, à chaque poussée.
+#
+# Une construction Release sous Ubuntu, bureau Qt compris, qui ne doit
+# écrire aucun avertissement ; puis tout ce que CTest ne marque pas
+# « lent » : les vérifications C++, la ligne de commande, le bureau hors
+# écran, les valeurs annoncées par les fiches d'aide, et les scripts de
+# test qui tiennent en moins d'une minute. Une dizaine de minutes.
+#
+# La batterie entière — 25 minutes sur quatre cœurs, que borne
+# test_simulink — tourne chaque nuit, avec ASan, TSan, la couverture,
+# la construction sans Qt, macOS et Windows : matlab-libre-nuit.yml.
+#
+# Le même tri se fait à la main :  cd build && ctest -LE lent -j4
+# (la liste des tests lents est dans matlab-libre/CMakeLists.txt).
+name: matlab-libre rapide
+
+on:
+  push:
+    paths:
+      - 'matlab-libre/**'
+      - '.github/workflows/matlab-libre-rapide.yml'
+  pull_request:
+    paths:
+      - 'matlab-libre/**'
+      - '.github/workflows/matlab-libre-rapide.yml'
+  workflow_dispatch:
+
+# Deux poussées rapprochées sur la même branche : seule la dernière compte.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ubuntu:
+    name: Ubuntu, Release, bureau Qt
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        # « shell: bash » nommé explicitement ajoute -o pipefail : sans lui,
+        # « cmake --build | tee » réussirait même quand la construction échoue.
+        shell: bash
+        working-directory: matlab-libre
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Paquets (Qt6 pour le bureau)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qt6-base-dev libgl1-mesa-dev
+
+      - name: Configurer
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      # gcc écrit ses avertissements sur la sortie d'erreur : on garde les
+      # deux dans le journal, et la construction échoue s'il y en a un.
+      - name: Construire, sans avertissement
+        run: |
+          cmake --build build -j4 2>&1 | tee build/construction.log
+          if grep -n 'warning:' build/construction.log; then
+            echo "::error::La construction écrit des avertissements (voir ci-dessus)."
+            exit 1
+          fi
+
+      - name: Tests rapides
+        working-directory: matlab-libre/build
+        run: ctest -LE lent -j4 --timeout 900 --output-on-failure
+
+      - name: Journaux des tests, en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journaux-rapide
+          path: |
+            matlab-libre/build/Testing/Temporary/
+            matlab-libre/build/construction.log
+          retention-days: 7
+          if-no-files-found: ignore

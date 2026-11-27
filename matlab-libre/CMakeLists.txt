@@ -358,6 +358,16 @@ if(MATLIBRE_TESTS)
     set_tests_properties(console_tube PROPERTIES
       PASS_REGULAR_EXPRESSION "42" FAIL_REGULAR_EXPRESSION "MatLibre|>>")
   endif()
+  # Les scripts qui passent la minute portent l'etiquette « lent » :
+  # « ctest -LE lent » les laisse de cote — c'est la passe de chaque
+  # poussee dans l'integration continue, et celle qu'on lance pendant le
+  # travail, trois minutes sur quatre coeurs —, la batterie entiere les
+  # prend. Durees du 27 novembre 2026, « ctest -j3 » sur quatre coeurs :
+  # test_simulink 25 min, test_aide 18, test_exemples 4 min 40 s,
+  # test_ondelettes et test_domaines 2 min 25 s, test_robuste 1 min 25 s ;
+  # le plus long des autres, test_couverture, 56 s.
+  set(MATLIBRE_TESTS_LENTS
+      test_simulink test_aide test_exemples test_ondelettes test_domaines test_robuste)
   file(GLOB MATLIBRE_TESTS_M CONFIGURE_DEPENDS
        ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/test_*.m)
   foreach(fichier ${MATLIBRE_TESTS_M})
@@ -367,7 +377,18 @@ if(MATLIBRE_TESTS)
                      --path ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts ${fichier})
     set_tests_properties(langage_${nom} PROPERTIES
       ENVIRONMENT "MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
+    if(nom IN_LIST MATLIBRE_TESTS_LENTS)
+      set_tests_properties(langage_${nom} PROPERTIES LABELS lent)
+    endif()
   endforeach()
+  # Deux .m de meme nom, ou un .m qui masque une fonction native : le
+  # controle de « make test », que CTest — et donc l'integration
+  # continue — ne faisait pas.
+  add_test(NAME outils_doublons
+           COMMAND matlibre --path ${CMAKE_CURRENT_SOURCE_DIR}/toolbox
+                   ${CMAKE_CURRENT_SOURCE_DIR}/outils/verifierDoublons.m)
+  set_tests_properties(outils_doublons PROPERTIES
+    ENVIRONMENT "MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
   # Les valeurs qu'annoncent les fiches d'aide en commentaire de leurs
   # exemples (« pi % 3.1416 ») : test_aide execute les exemples sans lire
   # ces commentaires, verifierValeurs les compare a ce que rend la ligne,

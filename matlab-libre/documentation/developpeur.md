@@ -131,10 +131,17 @@ chemin de recherche au démarrage, sans autre déclaration.
 ## Tests
 
 ```bash
-./build/bin/matlibre_tests                       # 57 vérifications C++
+./build/bin/matlibre_tests                       # les vérifications C++
 ./build/bin/matlibre tests/scripts/test_langage.m
+ctest --test-dir build -LE lent -j4          # sans les tests de plus d'une minute
 ctest --test-dir build --output-on-failure   # tout
 ```
+
+L'intégration continue (`installation.md`) refait à chaque poussée la
+passe `-LE lent` sur une construction qui ne doit écrire aucun
+avertissement, et chaque nuit la batterie entière, sous ASan, TSan et en
+couverture, sur macOS et Windows aussi. Un script de test qui dépasse la
+minute s'ajoute à `MATLIBRE_TESTS_LENTS` dans `CMakeLists.txt`.
 
 Une suite en langage MATLAB est un fichier `test_*.m` qui appelle
 `assert`. La règle est de comparer à une valeur exacte connue, pas de

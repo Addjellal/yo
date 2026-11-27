@@ -47,8 +47,9 @@ fichier est produit par mesure, non écrit à la main.
   rend les rappels d'application naturels.
 - **Une chaîne d'installation** : scripts de compilation pour Linux,
   macOS et Windows, paquets `.tar.gz`, `.deb` et `.zip`, gestion des
-  toolboxes depuis le langage, intégration continue sur les trois
-  systèmes.
+  toolboxes depuis le langage, intégration continue : Ubuntu à chaque
+  poussée, et chaque nuit la batterie entière, les assainisseurs, la
+  couverture, macOS et Windows.
 - **Des tests** : 78 vérifications C++ sur le cœur, 22 suites écrites
   dans le langage — dont une qui contrôle un résultat exact par toolbox,
   une les types de données, une le calcul parallèle, une qui compile puis

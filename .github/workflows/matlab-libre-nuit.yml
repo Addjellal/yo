@@ -1,0 +1,247 @@
+# MatLibre — tout ce qui est trop long pour chaque poussée, chaque nuit.
+#
+#   batterie      la batterie complète (25 minutes sur 4 cœurs)
+#   sans-qt       construction sans bureau, installation, archives
+#   asan          la batterie sous ASan et UBSan, hors bureau : l'audit
+#                 n'avait pu y passer ni test_simulink ni test_aide
+#                 (deux heures), ni les tests de domaine
+#   tsan          test_parallele sous ThreadSanitizer : parfor, spmd
+#   couverture    la batterie instrumentée (gcov), le tableau par fichier
+#                 dans le résumé de la tâche
+#   macos         construction (Apple clang, libc++, Qt) et tests rapides
+#   windows       construction MinGW (MSYS2, Qt) et tests rapides
+#
+# Les tâches sont indépendantes : une qui échoue n'arrête pas les autres.
+# GitHub ne lance un workflow planifié que depuis la branche par défaut :
+# tant que ce fichier n'est pas sur main, la nuit ne tourne pas d'elle-même.
+# Elle se lance aussi à la main (onglet Actions, « Run workflow »), et à
+# chaque poussée qui modifie ce fichier, pour qu'un changement de la nuit
+# se voie sans attendre la nuit.
+name: matlab-libre nuit
+
+on:
+  schedule:
+    - cron: '23 1 * * *'        # 1 h 23 UTC
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/matlab-libre-nuit.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # pipefail, et le même interprète partout (Git Bash sous Windows).
+    shell: bash
+    working-directory: matlab-libre
+
+jobs:
+  batterie:
+    name: Batterie complète (Ubuntu, Release, bureau Qt)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Paquets
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qt6-base-dev libgl1-mesa-dev
+      - name: Construire
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j4
+      - name: Batterie
+        working-directory: matlab-libre/build
+        run: ctest -j4 --timeout 7000 --output-on-failure
+      - name: Journaux, en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journaux-batterie
+          path: matlab-libre/build/Testing/Temporary/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  sans-qt:
+    name: Sans bureau, installation et archives
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire sans Qt
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMATLIBRE_BUREAU=OFF
+          cmake --build build -j4
+          test ! -e build/bin/matlibre-bureau
+      - name: Tests rapides
+        working-directory: matlab-libre/build
+        run: ctest -LE lent -j4 --timeout 900 --output-on-failure
+      # L'installé doit trouver sa toolbox seul, lancé d'ailleurs et sans
+      # MATLIBRE_TOOLBOX : il la cherche dans ../share/matlibre.
+      - name: Installer, lancer l'installé
+        run: |
+          cmake --install build --prefix "$RUNNER_TEMP/prefixe"
+          cd "$RUNNER_TEMP"
+          env -u MATLIBRE_TOOLBOX "$RUNNER_TEMP/prefixe/bin/matlibre" -q \
+            -e "disp(exist('tf')); s = evalc('help ode45'); disp(numel(s) > 100)" \
+            | tee sortie.txt
+          grep -Eq '^ *2$' sortie.txt && grep -Eq '^ *1$' sortie.txt
+      # Sans le bureau, le paquet .deb ne dépend vraiment que de libc6 et
+      # libstdc++6, ce qu'il déclare.
+      - name: Archives
+        working-directory: matlab-libre/build
+        run: cpack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matlibre-linux-sans-bureau
+          path: |
+            matlab-libre/build/MatLibre-*.tar.gz
+            matlab-libre/build/MatLibre-*.deb
+          retention-days: 7
+
+  asan:
+    name: ASan et UBSan (batterie hors bureau)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      # allocator_may_return_null : un tableau démesuré doit lever l'erreur
+      # de MATLAB, non arrêter ASan ; halt_on_error : un comportement
+      # indéfini fait échouer le test au lieu d'être signalé et oublié.
+      ASAN_OPTIONS: detect_leaks=0:allocator_may_return_null=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v4
+      # Les noyaux récents tirent leurs adresses sur 32 bits ; les
+      # assainisseurs de gcc 13 n'y trouvent plus leur place.
+      - name: Adresses aléatoires sur 28 bits
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Construire assaini
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                -DMATLIBRE_ASSAINIR=ON -DMATLIBRE_BUREAU=OFF
+          cmake --build build -j4
+      # Quatre fois plus lent : test_simulink approche les deux heures.
+      - name: Batterie assainie
+        working-directory: matlab-libre/build
+        run: ctest -j4 --timeout 14400 --output-on-failure
+      - name: Journaux, en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journaux-asan
+          path: matlab-libre/build/Testing/Temporary/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  tsan:
+    name: TSan (parfor, spmd)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Adresses aléatoires sur 28 bits
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Construire pour TSan
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                -DMATLIBRE_ASSAINIR=thread -DMATLIBRE_BUREAU=OFF
+          cmake --build build -j4
+      # Une course signalée rend le code 66 : le test échoue.
+      - name: test_parallele
+        working-directory: matlab-libre/build
+        run: ctest -R '^langage_test_parallele$' --timeout 3600 --output-on-failure
+
+  couverture:
+    name: Couverture (gcov, batterie hors bureau)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire instrumenté
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
+                -DMATLIBRE_COUVERTURE=ON -DMATLIBRE_BUREAU=OFF
+          cmake --build build -j4
+      - name: Batterie instrumentée
+        working-directory: matlab-libre/build
+        run: ctest -j4 --timeout 14400 --output-on-failure
+      # Le tableau se dresse même si un test a échoué : la mesure reste
+      # utile, et l'échec se voit à l'étape précédente.
+      - name: Tableau de couverture
+        if: success() || failure()
+        run: |
+          outils/couverture.sh build > couverture.md
+          { echo '## Couverture du code C++ par la batterie'; echo
+            tail -n 1 couverture.md; echo; cat couverture.md; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: couverture
+          path: matlab-libre/couverture.md
+          retention-days: 30
+          if-no-files-found: ignore
+
+  macos:
+    name: macOS (Apple clang, Qt), tests rapides
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Qt
+        run: brew install qt
+      - name: Construire
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+          cmake --build build -j3
+      - name: Tests rapides
+        working-directory: matlab-libre/build
+        run: ctest -LE lent -j3 --timeout 1800 --output-on-failure
+      - name: Journaux, en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journaux-macos
+          path: matlab-libre/build/Testing/Temporary/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  windows:
+    name: Windows (MinGW de MSYS2, Qt), tests rapides
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: msys2 {0}
+        working-directory: matlab-libre
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-qt6-base
+      - name: Construire
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j4
+      - name: Tests rapides
+        working-directory: matlab-libre/build
+        run: ctest -LE lent -j4 --timeout 1800 --output-on-failure
+      - name: Journaux, en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journaux-windows
+          path: matlab-libre/build/Testing/Temporary/
+          retention-days: 14
+          if-no-files-found: ignore

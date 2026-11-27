@@ -14,8 +14,9 @@
 # recompiler ; il n'y reste que bin/, lib/ et les archives.
 # « --incrementale » garde l'arbre et son ménage, pour itérer.
 #
-# Aucune dépendance n'est requise : un compilateur C++17 et CMake suffisent.
-# LAPACK, BLAS et FFTW sont utilisés s'ils sont trouvés.
+# Aucune dépendance n'est requise : un compilateur C++17 et CMake suffisent ;
+# Qt6, s'il est trouvé, ajoute le bureau. Aucune bibliothèque de calcul
+# n'est cherchée.
 set -eu
 
 racine=$(cd "$(dirname "$0")/.." && pwd)
