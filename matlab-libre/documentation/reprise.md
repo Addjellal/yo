@@ -8,8 +8,9 @@ conventions), `reference-matlab/hors-fonctions.md` (ce qui diffère de
 MATLAB, domaine par domaine).
 
 Dernière mise à jour : 27 novembre 2026, après les quatre décisions de
-l'audit de reprise (`audit-reprise.md`) et sa proposition P2. La batterie
-complète passe, 54 tests sur 54.
+l'audit de reprise (`audit-reprise.md`) et ses propositions P2 (valeurs
+des fiches vérifiées, tableaux compris) et P4 (« Did you mean »). La
+batterie complète passe, 54 tests sur 54.
 
 ## 1. Les règles du dépôt
 
@@ -22,10 +23,12 @@ complète passe, 54 tests sur 54.
   `Simulink : ...`), un corps qui dit le pourquoi et ce qui a été
   mesuré. Ils se terminent par les deux lignes d'attribution
   (`Co-Authored-By: ...` et `Claude-Session: ...`) que la session donne.
-- **Langue** : code commenté, aide, documents et messages d'erreur
-  propres à MatLibre en français. Les identifiants d'erreur suivent
-  MATLAB (`MATLAB:hg:InvalidProperty`) quand MATLAB en a un, sinon
-  `MatLibre:domaine:Cause`.
+- **Langue** : code commenté, aide, documents et interface du bureau en
+  français. Les erreurs et avertissements que lève une fonction de MATLAB
+  ou d'une toolbox sont dans l'anglais de MATLAB (décision D3), une
+  limite propre à MatLibre aussi. Les identifiants suivent MATLAB
+  (`MATLAB:hg:InvalidProperty`) quand MATLAB en a un, sinon
+  `MatLibre:domaine:Cause`, en français.
 - **Lignes de 100 colonnes au plus**, en C++ comme en `.m`.
 - **Chaque fiche d'aide** porte un bloc « Exemple : » ou « Exemples : »
   et une ligne « Voir aussi » : `tests/scripts/test_aide.m` exécute

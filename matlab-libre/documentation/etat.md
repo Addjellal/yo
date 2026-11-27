@@ -10,7 +10,11 @@ propositions —, `documentation/audit-reprise.md`. Ses quatre décisions
 sont appliquées : un modèle Simulink neuf part en `VariableStepAuto`,
 l'affichage démarre en `format short`, les erreurs des fonctions de
 MATLAB et des toolboxes sont en anglais, et la console n'écrit ni invite
-ni bannière quand son entrée n'est pas un terminal.
+ni bannière quand son entrée n'est pas un terminal. Deux de ses
+propositions sont faites aussi : les valeurs qu'annoncent les fiches
+d'aide sont vérifiées dans la batterie (P2), et une faute de frappe dans
+une commande fait proposer la commande corrigée, « Did you mean: »
+(P4).
 
 ## 1. Ce que MatLibre est aujourd'hui
 
