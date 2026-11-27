@@ -39,7 +39,7 @@ fichier est produit par mesure, non écrit à la main.
   MATLAB (tranches, réductions, diffusées, temporaires).
 - **Un générateur de code C** qui traduit l'arbre syntaxique, propage les
   types et les dimensions, et produit du C sans allocation.
-- **Une documentation qui ne ment pas** : 672 fonctions ont leur fiche —
+- **Une documentation qui ne ment pas** : 671 fonctions ont leur fiche —
   syntaxe, description, exemples, voisines —, le bureau les montre dans un
   navigateur d'aide, et chaque exemple est exécuté à chaque passage des
   tests.
@@ -50,11 +50,11 @@ fichier est produit par mesure, non écrit à la main.
   toolboxes depuis le langage, intégration continue : Ubuntu à chaque
   poussée, et chaque nuit la batterie entière, les assainisseurs, la
   couverture, macOS et Windows.
-- **Des tests** : 78 vérifications C++ sur le cœur, 22 suites écrites
+- **Des tests** : 126 vérifications C++ sur le cœur, 22 suites écrites
   dans le langage — dont une qui contrôle un résultat exact par toolbox,
   une les types de données, une le calcul parallèle, une qui compile puis
   exécute le C produit pour le comparer à l'interpréteur, une qui exécute
-  les 672 exemples de l'aide — et 409 vérifications du bureau natif,
+  les 671 exemples de l'aide — et 413 vérifications du bureau natif,
   pilotées sans ouvrir de fenêtre. `outils/eprouverNatives.sh` appelle en
   plus chacune des 690 fonctions natives avec des arguments qu'elle
   n'attend pas — une cellule, une structure, une poignée, une taille
@@ -298,7 +298,7 @@ totalité.
    L'Image Processing Toolbox en compte 143 — filtrage avec
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
-   124 : construction et conversion des modèles dans les trois
+   125 : construction et conversion des modèles dans les trois
    représentations — `tf` et `ss` sont des classes, avec les opérateurs
    de MATLAB : `s = tf('s')`, `z = tf('z',Te)`, puis
    `G = 1/(s^2+2*s+1)` s'écrivent comme on les écrit à la main, et
@@ -449,7 +449,7 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test              # 57 vérifications C++ + les suites en langage MATLAB
+make test              # 126 vérifications C++ + les suites en langage MATLAB
 matlibre --test tests/scripts
 ```
 

@@ -15,7 +15,7 @@ existant appellera.
 | `antennes` | Antenna Toolbox — rayonnement et réseaux. | 5 |
 | `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 141 |
 | `audio` | Audio Toolbox — sons et descripteurs. | 13 |
-| `automatique` | Control System Toolbox — systèmes asservis linéaires. | 124 |
+| `automatique` | Control System Toolbox — systèmes asservis linéaires. | 125 |
 | `base-de-donnees` | Database Toolbox — stockage tabulaire. | 9 |
 | `bioinformatique` | Bioinformatics Toolbox — séquences biologiques. | 14 |
 | `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 6 |
@@ -39,7 +39,7 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 463 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 464 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 134 |
