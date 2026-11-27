@@ -696,6 +696,24 @@ les zéros de `biorwavf` non centrés) —, l'outil compare désormais 1 424
 valeurs, sans faux « exemple qui ne tourne pas », et tourne dans la
 batterie (test `aide_valeurs`, 22 s), qui échoue au premier écart.
 
+Étendu ensuite aux tableaux annoncés (`[1 0.5; 2 3]`, chaque élément à
+sa précision ; une matrice doit avoir la forme annoncée, un vecteur se
+compare dans l'ordre), l'outil compare 1 730 valeurs et en a trouvé six
+de plus, dont deux défauts du code : **`normalize`** était une native
+qui ignorait toutes ses options (`'range'`, `'norm'`, `'scale'`,
+`'center'`, la dimension) et réduisait le tableau entier au lieu de
+chaque colonne — réécrite en `.m`, avec les méthodes, les sorties `C` et
+`S` et les NaN de MATLAB ; **`fillmissing`** prolongeait les bouts par
+la valeur la plus proche quelle que soit la méthode, si bien que
+`'previous'` comblait un NaN de tête et que `'linear'` n'extrapolait pas
+— les bouts suivent désormais la méthode, comme le défaut `'extrap'` de
+MATLAB, et la deuxième sortie ne marque plus les positions restées
+vides. Les quatre autres étaient des fiches : `imhmax` (une hauteur
+supérieure au sommet abaisse toute l'image, comme dans MATLAB),
+`jcitest` (exemple sans `rng`), `rgb2lab` et `whitepoint` (le D65 est
+ici la somme des lignes de la matrice sRGB, 0,95047, là où MATLAB
+documente 0,9504 ; la fiche le dit).
+
 **Ce qui manque** : un guide de démarrage pour qui vient de MATLAB (ce
 qui diffère — l'affichage long par défaut, la forme par valeur des
 modèles Simulink, les formats d'image —, ce qui manque, où chercher) ;

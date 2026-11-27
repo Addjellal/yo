@@ -22,7 +22,7 @@ documentation publique et vérifiée sur la propriété qui la définit.
 | partie | contenu | lignes |
 |---|---|---:|
 | `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 087 |
-| `src/bibliotheque` | 691 fonctions natives, en C++ | 20 223 |
+| `src/bibliotheque` | 690 fonctions natives, en C++ | 20 223 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 902 |
 | `toolbox` | 2 992 fichiers `.m`, dont 2 233 fonctions publiques recensées par `outils/audit.m` | 137 158 |
 | `tests` | 44 scripts `.m` et 2 fichiers C++ | 24 030 |
@@ -66,7 +66,9 @@ portent un exemple, et celles qu'un test ou un exemple nomme. Il écrit
 - `outils/verifierValeurs.m` compare aux valeurs qu'ils annoncent en
   commentaire (« `num2str(pi) % '3.1416'` ») les exemples des fiches :
   1 417 valeurs, 34 écarts au premier passage — un défaut de
-  `histcounts`, corrigé, et une trentaine de fiches à reprendre.
+  `histcounts`, corrigé, et une trentaine de fiches à reprendre. Il
+  tourne dans la batterie (test `aide_valeurs`) et lit aussi les
+  tableaux : 1 730 valeurs, aucun écart.
 - Sous ASan, UBSan, TSan et valgrind (`-DMATLIBRE_ASSAINIR`), avec deux
   fuzzeurs (`outils/fuzz/`) et `outils/eprouverNatives.sh`, l'audit de
   reprise a trouvé et corrigé une lecture hors bornes, dix-huit courses

@@ -429,13 +429,16 @@ DISPARITYBM Carte de disparité par appariement de blocs.
 
   [D,C] = DISPARITYBM(...) rend aussi le coût du meilleur appariement,
   qui sert à repérer les zones sans texture où la mesure ne veut rien
-  dire.
+  dire : plusieurs décalages s'y apparient aussi bien, et le plus petit
+  l'emporte. MATLAB y marque le pixel comme non fiable, par des seuils
+  d'unicité et de texture que MatLibre n'a pas.
 
   Exemple :
-     g = zeros(20, 40); g(:, 10:15) = 1;
-     d = zeros(20, 40); d(:, 7:12) = 1;
+     rng(0);
+     g = rand(20, 40);
+     d = circshift(g, [0 -3]);          % la même scène, vue 3 pixels plus loin
      carte = disparityBM(g, d, 'BlockSize', 5, 'DisparityRange', [0 8]);
-     round(median(carte(:, 10:15)(:)))   % 3
+     median(carte(isfinite(carte)))     % 3
 
   Voir aussi STEREOANAGLYPH.
 ```

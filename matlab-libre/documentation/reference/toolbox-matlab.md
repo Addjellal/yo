@@ -1717,9 +1717,14 @@ FILLMISSING Comble les valeurs manquantes.
   B = FILLMISSING(A,'movmean',K) donne la largeur de fenêtre.
   B = FILLMISSING(...,'EndValues',E) dit quoi faire des trous en bout,
   là où l'interpolation n'a pas de voisin des deux côtés : 'extrap'
-  (défaut) prolonge, 'none' les laisse, ou une constante les comble.
+  (défaut) les comble par la méthode elle-même ; 'previous', 'next',
+  'nearest', 'linear', 'spline' ou 'pchip' par cette autre méthode ;
+  'none' les laisse ; une constante les comble. 'previous' n'a rien à
+  mettre avant la première valeur connue, ni 'next' après la dernière :
+  ces trous-là restent.
 
-  [B,MARQUE] = FILLMISSING(...) rend aussi les positions comblées.
+  [B,MARQUE] = FILLMISSING(...) rend aussi les positions comblées — non
+  celles restées manquantes.
 
   Un trou en bout n'est pas un trou comme un autre : il n'est pas
   encadré. C'est pourquoi il a son option à lui — et pourquoi la
@@ -1730,6 +1735,8 @@ FILLMISSING Comble les valeurs manquantes.
      fillmissing([1 NaN 3], 'linear')        % [1 2 3]
      fillmissing([1 NaN 3], 'constant', 0)   % [1 0 3]
      fillmissing([NaN 2 3], 'previous')      % [NaN 2 3] : rien avant
+     fillmissing([NaN 2 3], 'linear')        % [1 2 3] : prolongée
+     fillmissing([NaN 2 3], 'previous', 'EndValues', 'nearest')   % [2 2 3]
 
   Voir aussi ISMISSING, RMMISSING, STANDARDIZEMISSING, INTERP1.
 ```
@@ -6937,6 +6944,52 @@ NEXTTILE Passe à la case suivante d'un TILEDLAYOUT.
   Voir aussi TILEDLAYOUT, SUBPLOT, AXES, GCA.
 ```
 
+## `normalize`
+
+```
+NORMALIZE Centre et met à l'échelle des données, vecteur par vecteur.
+  N = NORMALIZE(A) centre et réduit A : chaque vecteur, pris le long de
+  la première dimension non singleton (chaque colonne d'une matrice),
+  devient de moyenne nulle et d'écart type un.
+  N = NORMALIZE(A, DIM) travaille le long de la dimension DIM.
+
+  N = NORMALIZE(..., METHODE) ou NORMALIZE(..., METHODE, OPTION) :
+     'zscore'      centrage et réduction ; OPTION 'std' (défaut) ou
+                   'robust' (médiane et écart absolu médian)
+     'norm'        division par la norme P (OPTION, 2 par défaut, Inf
+                   pour le maximum des valeurs absolues)
+     'scale'       division seule ; OPTION 'std' (défaut), 'mad',
+                   'first', 'iqr' ou un nombre
+     'range'       ramène dans [A B] (OPTION, [0 1] par défaut)
+     'center'      soustraction seule ; OPTION 'mean' (défaut),
+                   'median' ou un nombre
+     'medianiqr'   retranche la médiane, divise par l'écart
+                   interquartile
+  'center' et 'scale' se combinent : NORMALIZE(A, 'center', 'median',
+  'scale', 'mad').
+
+  [N, C, S] = NORMALIZE(...) rend aussi le centre C et l'échelle S
+  appliqués, de sorte que N = (A - C) ./ S. C et S ont la taille de A,
+  réduite à un le long de DIM ; ils servent à appliquer la même
+  transformation à d'autres données, celles d'un jeu de test par exemple.
+
+  Les NaN sont laissés de côté dans le calcul des statistiques et restent
+  NaN dans le résultat. Un vecteur constant a une échelle nulle : elle
+  est prise égale à un, si bien qu'il devient nul (ou la borne basse de
+  'range') plutôt qu'une suite de NaN.
+
+  Exemple :
+     z = normalize([1 2 3], 'range');
+     [min(z) max(z)]                         % [0 1]
+     normalize([1 2 3])                      % [-1 0 1]
+     normalize([1 2; 3 6])                   % [-0.7071 -0.7071; 0.7071 0.7071]
+     normalize([3 4], 'norm')                % [0.6 0.8]
+     [n, c, s] = normalize([2 4 6], 'center', 'median', 'scale', 2);
+     n                                       % [-1 0 1]
+
+  Voir aussi ZSCORE, RESCALE, MEAN, STD, MEDIAN, IQR.
+```
+
 ## `normest`
 
 ```
@@ -8847,7 +8900,7 @@ SURFNORM Normales d'une surface.
      [X, Y] = meshgrid(-2:0.5:2);
      Z = X .* exp(-X.^2 - Y.^2);
      [nx, ny, nz] = surfnorm(X, Y, Z);
-     max(max(abs(nx.^2 + ny.^2 + nz.^2 - 1)))     % 1 : elles sont unitaires
+     max(max(abs(nx.^2 + ny.^2 + nz.^2 - 1)))     % 0 : elles sont unitaires
 
      surfnorm(X, Y, Z);
 

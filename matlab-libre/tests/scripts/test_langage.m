@@ -584,19 +584,35 @@ assert(isequal(fillmissing([1 NaN 3], 'constant', 0), [1 0 3]));
 % L'orientation est preservee.
 assert(isrow(fillmissing([1 NaN 3], 'constant', 0)));
 assert(iscolumn(fillmissing([1; NaN; 3], 'constant', 0)));
-% Les bouts n'ont pas de voisin des deux cotes : par defaut on prolonge,
-% « none » les laisse.
-assert(isequal(fillmissing([NaN 2 3], 'previous'), [2 2 3]));
-manquantEnBout = fillmissing([NaN 2 3], 'previous', 'EndValues', 'none');
+% Les bouts n'ont pas de voisin des deux cotes : par defaut (« extrap »)
+% la methode elle-meme les comble, comme dans MATLAB. « previous » n'a
+% rien a mettre avant la premiere valeur, « next » apres la derniere.
+rienAvant = fillmissing([NaN 2 3], 'previous');
+assert(isnan(rienAvant(1)) && isequal(rienAvant(2:3), [2 3]));
+assert(isequal(fillmissing([1 NaN NaN], 'previous'), [1 1 1]));
+rienApres = fillmissing([1 2 NaN], 'next');
+assert(isnan(rienApres(3)) && isequal(rienApres(1:2), [1 2]));
+assert(isequal(fillmissing([NaN NaN 3], 'next'), [3 3 3]));
+assert(isequal(fillmissing([NaN 2 NaN], 'nearest'), [2 2 2]));
+% « linear » extrapole lineairement, aux deux bouts.
+assert(isequal(fillmissing([NaN 2 3 NaN], 'linear'), [1 2 3 4]));
+% Les bouts peuvent suivre une autre methode, ou rester.
+assert(isequal(fillmissing([NaN 2 3], 'previous', 'EndValues', 'nearest'), [2 2 3]));
+lineaireBouts = fillmissing([NaN 2 3 NaN], 'linear', 'EndValues', 'previous');
+assert(isnan(lineaireBouts(1)) && isequal(lineaireBouts(2:4), [2 3 3]));
+manquantEnBout = fillmissing([NaN 2 3], 'linear', 'EndValues', 'none');
 assert(isnan(manquantEnBout(1)));
 assert(isequal(fillmissing([NaN 2 3], 'previous', 'EndValues', 0), [0 2 3]));
+% Seules les positions effectivement comblees sont marquees.
+[~, combleesBout] = fillmissing([NaN 2 NaN], 'previous');
+assert(isequal(combleesBout, [false false true]));
 % Les positions comblees sont rendues.
 [rempli, ou] = fillmissing([1 NaN 3], 'linear');
 assert(isequal(ou, [false true false]));
 assert(isequal(rempli, [1 2 3]));
 % Une matrice se comble colonne par colonne.
 combleeMatrice = fillmissing([1 NaN; NaN 4; 3 6], 'linear');
-assert(isequal(combleeMatrice, [1 4; 2 4; 3 6]));
+assert(isequal(combleeMatrice, [1 2; 2 4; 3 6]));
 % Les methodes mobiles moyennent le voisinage.
 assert(isequal(fillmissing([1 NaN 3 NaN 5], 'movmean', 3), [1 2 3 4 5]));
 % Rien a combler : le tableau ressort intact.
@@ -610,6 +626,65 @@ catch
 end
 assert(refuseComble);
 disp('fillmissing : ok');
+
+% NORMALIZE : colonne par colonne, et toutes les methodes de MATLAB.
+procheN = @(a, b) isequal(size(a), size(b)) && all(abs(a(:) - b(:)) < 1e-12 | ...
+                                                 (isnan(a(:)) & isnan(b(:))));
+assert(procheN(normalize([1 2 3]), [-1 0 1]));
+assert(procheN(normalize([1; 2; 3]), [-1; 0; 1]));
+% Une matrice : chaque colonne a sa moyenne et son ecart type.
+normeMatrice = normalize([1 10; 2 20; 3 30]);
+assert(procheN(normeMatrice, [-1 -1; 0 0; 1 1]));
+% Le long de la dimension demandee.
+assert(procheN(normalize([1 2 3; 10 20 30], 2), [-1 0 1; -1 0 1]));
+% Les methodes.
+assert(procheN(normalize([1 2 3], 'range'), [0 0.5 1]));
+assert(procheN(normalize([1 2 3], 'range', [-1 1]), [-1 0 1]));
+assert(procheN(normalize([3 4], 'norm'), [0.6 0.8]));
+assert(procheN(normalize([3 -4], 'norm', 1), [3 -4] / 7));
+assert(procheN(normalize([3 -4], 'norm', Inf), [0.75 -1]));
+assert(procheN(normalize([2 4 6], 'center'), [-2 0 2]));
+assert(procheN(normalize([1 2 10], 'center', 'median'), [-1 0 8]));
+assert(procheN(normalize([2 4 6], 'center', 1), [1 3 5]));
+assert(procheN(normalize([2 4 6], 'scale'), [1 2 3]));
+assert(procheN(normalize([2 4 8], 'scale', 'first'), [1 2 4]));
+assert(procheN(normalize([1 2 3 100], 'scale', 'mad'), [1 2 3 100]));
+assert(procheN(normalize([2 4 6], 'scale', 2), [1 2 3]));
+assert(procheN(normalize([1 2 3 100], 'zscore', 'robust'), [-1.5 -0.5 0.5 97.5]));
+assert(procheN(normalize(1:8, 'medianiqr'), ((1:8) - 4.5) / 4));
+assert(procheN(normalize([2 4 6], 'center', 'median', 'scale', 2), [-1 0 1]));
+% N = (A - C) ./ S, avec C et S reduits le long de la dimension.
+donneesN = [1 5; 2 7; 6 9];
+[nN, cN, sN] = normalize(donneesN);
+assert(isequal(size(cN), [1 2]) && isequal(size(sN), [1 2]));
+assert(procheN((donneesN - cN) ./ sN, nN));
+assert(procheN(cN, mean(donneesN)) && procheN(sN, std(donneesN)));
+[~, cR, sR] = normalize([2 4 6], 'range', [0 2]);
+assert(procheN(([2 4 6] - cR) ./ sR, [0 1 2]));
+% Les NaN sont laisses de cote et restent NaN.
+assert(procheN(normalize([1 NaN 3]), [-1 NaN 1] / sqrt(2)));
+% Une colonne constante devient nulle plutot que NaN.
+assert(isequal(normalize([5 5 5]), [0 0 0]));
+assert(isequal(normalize([5 5 5], 'range', [2 3]), [2 2 2]));
+% Un tableau a trois dimensions garde sa forme.
+cubeN = reshape(1:24, 2, 3, 4);
+cubeNormalise = normalize(cubeN, 3);
+assert(isequal(size(cubeNormalise), [2 3 4]));
+% Chaque vecteur le long de la troisieme dimension est traite seul.
+assert(procheN(squeeze(cubeNormalise(2, 3, :)), normalize(squeeze(cubeN(2, 3, :)))));
+% Les combinaisons interdites et les methodes inconnues sont refusees.
+refusN = {};
+for essai = {{'range', 'scale'}, {'norm', 'center'}, {'bidule'}}
+    try
+        normalize([1 2 3], essai{1}{:});
+    catch err
+        refusN{end + 1} = err.identifier;   %#ok<SAGROW>
+    end
+end
+assert(isequal(refusN, {'MATLAB:normalize:InvalidMethodCombination', ...
+                        'MATLAB:normalize:InvalidMethodCombination', ...
+                        'MATLAB:normalize:InvalidMethod'}));
+disp('normalize : ok');
 
 
 % ISOUTLIER et compagnie : reperer, remplacer, retirer.

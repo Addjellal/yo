@@ -1371,7 +1371,7 @@ GFWEIGHT Distance minimale d'un code linéaire en bloc.
   FLOOR((D-1)/2) erreurs et en détecte D-1.
 
   Exemple :
-     gfweight(hammgen(3))           % 3 : le code de Hamming corrige
+     gfweight(hammgen(3), 'par')    % 3 : le code de Hamming corrige
                                     % une erreur
      gfweight([1 1 0 1], 7)         % 3 : par le polynôme générateur
                                     % du même code

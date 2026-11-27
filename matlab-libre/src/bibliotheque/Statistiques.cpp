@@ -894,17 +894,6 @@ FONCTION(fnMovvar) {
     return glissante(args, "movvar", Glisse::Variance);
 }
 
-FONCTION(fnNormalize) {
-    INUTILISE
-    exigerArguments(args, 1, 3, "normalize");
-    Valeur v = versDouble(args[0]);
-    std::vector<double> t(v.re.begin(), v.re.end());
-    double m = moyenneDe(t), s = std::sqrt(varianceDe(t, 0));
-    Valeur r = v;
-    for (auto& x : r.re) x = s == 0 ? 0 : (x - m) / s;
-    return {r};
-}
-
 }  // namespace
 
 void enregistrerStatistiques(Interpreteur& it) {
@@ -939,7 +928,6 @@ void enregistrerStatistiques(Interpreteur& it) {
     it.enregistrer("movmin", fnMovmin, "statistiques", "movmin  Minimum glissant.");
     it.enregistrer("movstd", fnMovstd, "statistiques", "movstd  Ecart type glissant.");
     it.enregistrer("movvar", fnMovvar, "statistiques", "movvar  Variance glissante.");
-    it.enregistrer("normalize", fnNormalize, "statistiques", "normalize  Centrage et reduction.");
 }
 
 }  // namespace matlibre

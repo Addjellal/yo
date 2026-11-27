@@ -3,8 +3,14 @@ function xyz = whitepoint(nom)
 %   XYZ = WHITEPOINT(NOM) où NOM vaut 'ICC' (par défaut), 'D50', 'D55',
 %   'D65', 'A' ou 'C'. Le blanc est normalisé à Y = 1.
 %
+%   Le D65 n'a pas une valeur unique : selon la source, sa cinquième
+%   décimale change. MATLAB documente [0.9504 1.0000 1.0888] ; on prend
+%   ici la somme des lignes de la matrice sRGB (BT.709), si bien que le
+%   blanc sRGB tombe sur a* = b* = 0 au lieu d'en être écarté d'un
+%   centième.
+%
 %   Exemple :
-%      whitepoint('d65')   % [0.9504 1.0000 1.0888]
+%      whitepoint('d65')   % [0.9505 1.0000 1.0888]
 %
 %   Voir aussi XYZ2LAB, ADAPTERBLANC, RGB2XYZ.
     if nargin < 1 || isempty(nom), nom = 'ICC'; end
@@ -23,6 +29,6 @@ function xyz = whitepoint(nom)
             xyz = [0.9807 1.0000 1.1822];
         otherwise
             error('images:whitepoint:UnknownIlluminant', ...
-                  'Illuminant inconnu : %s.', char(nom));
+                  'Unknown illuminant ''%s''.', char(nom));
     end
 end

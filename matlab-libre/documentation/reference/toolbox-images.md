@@ -1427,8 +1427,13 @@ IMHMAX Supprime les maxima de hauteur inférieure à H.
   La reconstruction de l'image depuis elle-même abaissée de H rabote
   les sommets peu marqués et laisse les autres.
 
+  Un sommet plus haut que H perd H ; un sommet moins haut disparaît,
+  et l'image entière s'abaisse alors jusqu'à la hauteur de son fond
+  diminuée de H, comme dans MATLAB pour une image en double.
+
   Exemple :
-     imhmax([1 3 1], 5)   % [1 1 1] : le sommet ne fait que 2
+     imhmax([1 3 1], 1)   % [1 2 1] : le sommet perd 1
+     imhmax([1 3 1], 5)   % [-2 -2 -2] : le sommet (2) est sous H
 
   Voir aussi IMRECONSTRUCT, IMREGIONALMAX, WATERSHED.
 ```
@@ -1878,8 +1883,8 @@ IMWRITE Écrit une image au format PGM (gris) ou PPM (couleur).
   d'écrire un PGM sous un nom qui annonce autre chose.
 
   Exemple :
-     imwrite(uint8(magic(8) * 4), 'essai.pgm');
-     max(max(abs(double(imread('essai.pgm')) - magic(8) * 4)))   % 0 : rien ne se perd
+     imwrite(uint8(magic(8) * 3), 'essai.pgm');
+     max(max(abs(double(imread('essai.pgm')) - magic(8) * 3)))   % 0 : rien ne se perd
 
   Voir aussi IMREAD, IMSHOW.
 ```
@@ -2008,7 +2013,7 @@ LIN2RGB Applique la correction gamma de sRGB.
   Réciproque exacte de RGB2LIN.
 
   Exemple :
-     lin2rgb(0.214)   % 0.4999
+     lin2rgb(0.214)   % 0.5000
 
   Voir aussi RGB2LIN, XYZ2RGB.
 ```
@@ -2340,8 +2345,9 @@ REGIONPROPS Mesures sur les régions d'une image étiquetée.
   'EquivDiameter', 'Extent', 'FilledArea', 'all'.
 
   Exemple :
-     s = regionprops(bwlabel([1 1 0; 1 1 0; 0 0 1]));
+     s = regionprops(bwlabel([1 1 0 0; 1 1 0 0; 0 0 0 1]));
      s(1).Area   % 4
+     s(2).Area   % 1 : le pixel isole
 
   Voir aussi BWLABEL, BWCONNCOMP, BWAREAFILT.
 ```
@@ -2419,7 +2425,7 @@ RGB2LAB Passage de sRGB à L*a*b*.
   perçues.
 
   Exemple :
-     rgb2lab([1 1 1])   % [100 0 0]
+     rgb2lab([1 1 1])   % [100.0000 0.0000 0.0000] : le blanc
 
   Voir aussi LAB2RGB, RGB2XYZ, XYZ2LAB.
 ```
@@ -2637,8 +2643,14 @@ WHITEPOINT Coordonnées XYZ d'un blanc de référence.
   XYZ = WHITEPOINT(NOM) où NOM vaut 'ICC' (par défaut), 'D50', 'D55',
   'D65', 'A' ou 'C'. Le blanc est normalisé à Y = 1.
 
+  Le D65 n'a pas une valeur unique : selon la source, sa cinquième
+  décimale change. MATLAB documente [0.9504 1.0000 1.0888] ; on prend
+  ici la somme des lignes de la matrice sRGB (BT.709), si bien que le
+  blanc sRGB tombe sur a* = b* = 0 au lieu d'en être écarté d'un
+  centième.
+
   Exemple :
-     whitepoint('d65')   % [0.9504 1.0000 1.0888]
+     whitepoint('d65')   % [0.9505 1.0000 1.0888]
 
   Voir aussi XYZ2LAB, ADAPTERBLANC, RGB2XYZ.
 ```

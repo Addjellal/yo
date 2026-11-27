@@ -32,9 +32,10 @@ complète passe, 54 tests sur 54.
   **tous** les exemples et exige le « Voir aussi ». Une valeur annoncée
   en commentaire d'un exemple (`pi   % 3.1416`) doit être juste : le test
   `aide_valeurs` (`outils/verifierValeurs.m`) la compare à ce que rend la
-  ligne — un nombre à la précision où il est écrit, un texte exactement,
-  `true` ou `false`. Les fonctions natives ont leur fiche dans
-  `toolbox/aide/*.txt`, sous `### nom`.
+  ligne — un nombre à la précision où il est écrit, un tableau
+  (`[1 0.5; 2 3]`), un texte exactement, `true` ou `false`. Les
+  fonctions natives ont leur fiche dans `toolbox/aide/*.txt`, sous
+  `### nom`.
 - **Fonctions internes** préfixées `matlibre_` (elles n'existent pas dans
   MATLAB et le disent dans leur aide). Deux fichiers dont les noms ne
   diffèrent que par la casse (`addMF`/`addmf`) : l'un va dans le
@@ -374,11 +375,14 @@ faite : les fiches annoncent des valeurs justes, et la batterie le
 vérifie (test `aide_valeurs`) ; elle a fait trouver trois défauts du
 code, corrigés (`c2d` et `d2c` faux dès qu'un modèle porte un
 intégrateur, les marges d'`allmargin` lues sur une grille, `biorwavf`
-qui ne centrait pas ses zéros). En tête de ce qui reste : « Did you
-mean » (P4), l'intégration continue à la racine du dépôt (P6), un guide
-pour qui vient de MATLAB (P7), l'édition de ligne dans la console (P3),
-une batterie de douze minutes (P9), LAPACK (P5) ; et P22, les détails de
-l'affichage en `format short`, que tout le monde voit depuis D2.
+qui ne centrait pas ses zéros) ; étendue aux tableaux annoncés, deux de
+plus (`normalize` ignorait ses options, `fillmissing` prolongeait les
+bouts par la valeur la plus proche quelle que soit la méthode). En
+tête de ce qui reste : « Did you mean » (P4), l'intégration continue à
+la racine du dépôt (P6), un guide pour qui vient de MATLAB (P7),
+l'édition de ligne dans la console (P3), une batterie de douze minutes
+(P9), LAPACK (P5) ; et P22, les détails de l'affichage en
+`format short`, que tout le monde voit depuis D2.
 
 Les suites d'avant l'audit restent, avec ce qu'il en a appris :
 

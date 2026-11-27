@@ -127,7 +127,7 @@ DIRECTIVITY Directivité estimée à partir d'un diagramme en puissance.
 
   Exemple :
      theta = linspace(1e-6, pi - 1e-6, 20001);
-     directivity(theta, ones(size(theta)))       % 1 : isotrope
+     directivity(theta, ones(size(theta)))       % 1.0000 : isotrope
      directivity(theta, dipolePattern(theta, 0.5))   % 1.64
 
   Voir aussi BEAMWIDTH, DIPOLEPATTERN, FRIIS.

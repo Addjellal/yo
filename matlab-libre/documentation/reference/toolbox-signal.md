@@ -521,8 +521,8 @@ BLACKMANHARRIS Fenêtre de Blackman-Harris à quatre termes.
   Coefficients : 0,35875 ; 0,48829 ; 0,14128 ; 0,01168.
 
   Exemple :
-     w = blackmanharris(64);
-     max(w)                      % 1 : la fenetre est normalisee a son sommet
+     w = blackmanharris(65);
+     max(w)                      % 1 : en son centre, sur une longueur impaire
 
   Voir aussi NUTTALLWIN, FLATTOPWIN, WINDOW.
 ```
@@ -1172,7 +1172,7 @@ ENVELOPE Enveloppes supérieure et inférieure d'un signal.
      t = (0:999) / 1000;
      x = sin(2*pi*50*t) .* (1 + 0.5 * sin(2*pi*2*t));
      [h, b] = envelope(x);
-     all(h(20:end-20) >= x(20:end-20))    % true : elle majore
+     all(h(20:end-20) >= x(20:end-20) - 1e-12)    % true : elle majore, aux arrondis pres
 
   Voir aussi HILBERT, RMS, FINDPEAKS.
 ```
@@ -1359,8 +1359,8 @@ FLATTOPWIN Fenêtre à sommet plat, pour la mesure d'amplitude.
   0,083578947 ; 0,006947368.
 
   Exemple :
-     w = flattopwin(64);
-     max(w)                      % 1 : elle sert a mesurer une amplitude
+     w = flattopwin(65);
+     max(w)                      % 1.0000 : elle sert a mesurer une amplitude
 
   Voir aussi BLACKMANHARRIS, NUTTALLWIN, WINDOW.
 ```
@@ -2272,8 +2272,8 @@ NUTTALLWIN Fenêtre de Blackman-Nuttall à quatre termes.
   Coefficients : 0,3635819 ; 0,4891775 ; 0,1365995 ; 0,0106411.
 
   Exemple :
-     w = nuttallwin(64);
-     max(w)                      % 1
+     w = nuttallwin(65);
+     max(w)                      % 1 : en son centre, sur une longueur impaire
 
   Voir aussi BLACKMANHARRIS, FLATTOPWIN, WINDOW.
 ```
@@ -2978,7 +2978,7 @@ RESAMPLE Rééchantillonnage d'un facteur rationnel P/Q.
 
   Exemple :
      x = sin(2 * pi * 0.01 * (0:99));
-     numel(resample(x, 3, 2))        % 149
+     numel(resample(x, 3, 2))        % 150 : ceil(100 * 3 / 2)
      isrow(resample(x, 3, 2))        % true
 
   Voir aussi UPFIRDN, DECIMATE, INTERP, INTERP1.
@@ -3014,7 +3014,8 @@ RISETIME Temps de montée d'un signal à deux états.
   RISETIME(...,'PercentReferenceLevels',[BAS HAUT]) change les seuils.
 
   Exemple :
-     risetime([0 0 0.5 1 1], 1)   % 0.8 : de 10 % à 90 %
+     risetime([0 0 0.5 1 1], 1)   % 1.584 : de 10 % à 90 % entre les états
+                                  % 0,005 et 0,995 que rend STATELEVELS
 
   Voir aussi FALLTIME, SLEWRATE, OVERSHOOT.
 ```
@@ -3555,14 +3556,17 @@ SS2ZP Zéros, pôles et gain d'une représentation d'état.
 STATELEVELS Niveaux bas et haut d'un signal à deux états.
   NIVEAUX = STATELEVELS(X) rend [BAS HAUT] par la méthode de
   l'histogramme : l'étendue est découpée en NBINS classes (100 par
-  défaut), séparées en deux moitiés, et chaque niveau est le mode de sa
-  moitié. METHODE vaut 'mode' (par défaut) ou 'mean'.
+  défaut), séparées en deux moitiés, et chaque niveau est le centre de
+  la classe la plus peuplée de sa moitié — non la valeur exacte des
+  données : c'est la définition de la norme IEEE 181 que suit MATLAB.
+  METHODE vaut 'mode' (par défaut) ou 'mean'.
 
   [NIVEAUX,HISTOGRAMME,BORNES] = STATELEVELS(...) rend aussi le compte
   par classe et les bornes utilisées.
 
   Exemple :
-     statelevels([zeros(1,50) ones(1,50)])   % [0 1]
+     statelevels([zeros(1,50) ones(1,50)])   % [0.005 0.995] : le centre des
+                                             % classes extrêmes, comme MATLAB
 
   Voir aussi MIDCROSS, RISETIME, SIGNALNIVEAUX.
 ```

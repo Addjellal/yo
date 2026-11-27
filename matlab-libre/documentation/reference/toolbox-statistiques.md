@@ -4870,7 +4870,7 @@ POISSCDF Répartition de la loi de Poisson.
   P(X <= k) est la gamma incomplète supérieure d'ordre k+1 en lambda.
 
   Exemple :
-     poisscdf(2, 1)   % 0.919698602928
+     poisscdf(2, 1)   % 0.919698602929 : 2,5/e
 
   Voir aussi POISSINV, POISSRND, POISSFIT, PDF, CDF, ICDF.
 ```

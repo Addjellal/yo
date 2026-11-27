@@ -354,26 +354,6 @@ MOVVAR  Variance glissante.
     Voir aussi MOVSTD, VAR, MOVMEAN.
 ```
 
-## `normalize`
-
-```
-NORMALIZE  Normalise des données.
-    NORMALIZE(X) centre et réduit : moyenne nulle, écart-type 1.
-    NORMALIZE(X,'range') ramène dans [0,1].
-
-    Syntaxe
-       y = normalize(x)
-       y = normalize(x,'range')
-
-    Exemples
-       y = normalize([1 2 3 4 5]);
-       abs(mean(y)) < 1e-12
-       z = normalize([1 2 3], 'range');
-       [min(z) max(z)]                % [0 1]
-
-    Voir aussi MEAN, STD, RESCALE, ZSCORE.
-```
-
 ## `normcdf`
 
 ```

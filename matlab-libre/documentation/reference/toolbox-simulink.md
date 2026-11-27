@@ -814,7 +814,7 @@ ADD_PARAM Pose un réglage sur le modèle lui-même.
   Exemple :
      m = new_system('essai');
      m = add_block(m, 'constant', 'c', 'Value', 3);
-     m = add_param(m, 'StopTime', 2, 'FixedStep', 0.5);
+     m = add_param(m, 'StopTime', 2, 'Solver', 'ode1', 'FixedStep', 0.5);
      r = sim(m);
      r.temps(end)                     % 2
      numel(r.temps)                   % 5 : de 0 a 2 par pas de 0,5
@@ -1342,7 +1342,7 @@ GET_PARAM Lit un paramètre d'un bloc, ou un réglage du modèle.
      get_param(m, 'g').type               % 'gain'
      get_param(m, 'g', 'Multiplication')  % 'Element-wise(K.*u)', le défaut
      get_param(m, 'essai/g', 'Ports')     % [1 1 0 0 0 0 0 0]
-     get_param(m, 'Solver')               % 'ode1'
+     get_param(m, 'Solver')               % 'VariableStepAuto'
 
   Voir aussi SET_PARAM, ADD_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
 La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
@@ -1878,8 +1878,9 @@ MATLIBRE_SL_CONFIG Les réglages d'un modèle : solveur, instants, diagnostics.
   Les réglages reconnus, avec leur valeur par défaut :
     StartTime            0          l'instant initial
     StopTime             10         l'instant final
-    SolverType           'Fixed-step'  ou 'Variable-step'
-    Solver               'ode1'     le solveur. À pas fixe : ode1 à
+    SolverType           'Variable-step'  ou 'Fixed-step'
+    Solver               'VariableStepAuto'  le solveur, comme dans un
+                                    modèle neuf de Simulink. À pas fixe : ode1 à
                                     ode5, ode8, ode14x et ode1be
                                     (raides), odeN (la formule que
                                     choisit ODENIntegrationMethod),
@@ -2140,15 +2141,15 @@ MATLIBRE_SL_CONFIG Les réglages d'un modèle : solveur, instants, diagnostics.
   Variable-step quand le solveur est à pas fixe le remplace par
   VariableStepAuto, et inversement par FixedStepAuto.
 
-  MatLibre part du pas fixe et d'Euler, là où Simulink part du pas
-  variable : les modèles écrits avant que le pas variable n'existe
-  gardent ainsi leur comportement.
+  Un modèle part, comme dans Simulink, du pas variable automatique ;
+  un programme qui veut le pas fixe d'Euler le demande
+  (set_param(m, 'Solver', 'ode1')).
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
   Exemple :
      c = matlibre_sl_config('lire', new_system('m'));
-     c.Solver                                   % 'ode1'
+     c.Solver                                   % 'VariableStepAuto'
      matlibre_sl_config('nom', 'reltol')        % 'RelTol'
 
   Voir aussi SET_PARAM, GET_PARAM, SIM, SIMSET.
@@ -4109,7 +4110,9 @@ SIM Simule un modèle.
 
   SIM(MODELE,TFINAL) fixe l'instant final ; SIM(MODELE,[TDEBUT TFINAL])
   les deux ; SIM(MODELE,INSTANTS) donne aussi le pas par l'écart de
-  deux instants réguliers. SIM(MODELE,TFINAL,PAS) fixe le pas, et
+  deux instants réguliers. SIM(MODELE,TFINAL,PAS) fixe le pas — un
+  modèle resté sur le solveur automatique à pas variable passe alors à
+  son pendant à pas fixe, FixedStepAuto —, et
   SIM(MODELE,TFINAL,SIMSET(...)) accepte un jeu d'options à la place.
   SIM(MODELE,INTERVALLE,OPTIONS,[T, U]) alimente les entrées du modèle :
   le temps, puis une colonne par élément des entrées, rangées par leur
@@ -4139,7 +4142,7 @@ SIM Simule un modèle.
   vient qu'une fois par bloc et par simulation. Un argument explicite
   l'emporte toujours sur le réglage enregistré.
 
-  Les solveurs à pas fixe : ode1 (Euler, celui par défaut), ode2
+  Les solveurs à pas fixe : ode1 (Euler), ode2
   (Heun), ode3 (Bogacki-Shampine), ode4 (Runge-Kutta), ode5
   (Dormand-Prince) et ode8 (Prince-Dormand) ; l'erreur d'un solveur
   d'ordre p décroît comme le pas à la puissance p. Pour les systèmes
@@ -4152,8 +4155,9 @@ SIM Simule un modèle.
   (Bogacki-Shampine 3(2)), ode113 (Adams, d'ordre variable, pour les
   tolérances fines), et pour les systèmes raides ode15s (NDF, d'ordre 1
   à MaxOrder), ode23s (Rosenbrock), ode23t (trapèzes) et ode23tb
-  (TR-BDF2) ; VariableStepDiscrete, et VariableStepAuto qui choisit
-  ode45 ou le discret. Le pas suit l'erreur estimée — RelTol, AbsTol —, borné
+  (TR-BDF2) ; VariableStepDiscrete, et VariableStepAuto, le solveur
+  d'un modèle neuf comme dans Simulink, qui choisit ode45 ou le
+  discret. Le pas suit l'erreur estimée — RelTol, AbsTol —, borné
   par MaxStep (le cinquantième de la durée par défaut) et MinStep. Il
   s'arrête exactement sur les instants d'échantillonnage et les
   cassures des sources (échelon, fronts d'impulsion) ; un seuil franchi

@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-691 fonctions ecrites en C++, reparties en 22 groupes.
+690 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-3144 fonctions ecrites dans le langage, reparties en 54 toolboxes.
+3146 fonctions ecrites dans le langage, reparties en 54 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -44,7 +44,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`antennes`](reference/toolbox-antennes.md) | 5 |
 | [`apprentissage-profond`](reference/toolbox-apprentissage-profond.md) | 141 |
 | [`audio`](reference/toolbox-audio.md) | 13 |
-| [`automatique`](reference/toolbox-automatique.md) | 124 |
+| [`automatique`](reference/toolbox-automatique.md) | 125 |
 | [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 9 |
 | [`bioinformatique`](reference/toolbox-bioinformatique.md) | 14 |
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 6 |
@@ -69,7 +69,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`interface`](reference/toolbox-interface.md) | 17 |
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
-| [`matlab`](reference/toolbox-matlab.md) | 463 |
+| [`matlab`](reference/toolbox-matlab.md) | 464 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 134 |

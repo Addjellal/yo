@@ -221,7 +221,8 @@ BIORFILT Banc de filtres biorthogonal à partir des deux filtres d'échelle.
   d'échelle soient alignés à un décalage pair près, faute de quoi le
   demi-bande change de parité et le repliement subsiste — la distorsion
   restant nulle, l'erreur ne se voit qu'à la reconstruction. C'est
-  pourquoi les zéros de complètement s'ajoutent par paires à gauche.
+  pourquoi les deux filtres se complètent, comme dans MATLAB, à une même
+  longueur paire.
 
   Exemple :
      [df, rf] = biorwavf('bior2.2');
@@ -238,7 +239,8 @@ BIORFILT Banc de filtres biorthogonal à partir des deux filtres d'échelle.
 BIORWAVF Filtres d'une ondelette biorthogonale spline.
   [RF,DF] = BIORWAVF('biorNr.Nd') rend le filtre d'échelle de synthèse
   RF et celui d'analyse DF, tous deux de somme un et complétés de zéros
-  pour avoir la même longueur — c'est la convention de MATLAB.
+  centrés pour avoir la même longueur — c'est la convention de MATLAB :
+  bior2.2 rend RF = [0 1 2 1 0]/4.
 
   La construction est celle de Cohen, Daubechies et Feauveau : le
   filtre de synthèse est le spline d'ordre Nr, c'est-à-dire le binôme
@@ -993,8 +995,8 @@ FILTRESSPLINES Couple de filtres biorthogonaux splines.
   conjuguée, son inverse et l'inverse de sa conjuguée. C'est ce qui
   garde chaque filtre réel et symétrique.
 
-  Les deux filtres sortent de même longueur, complétés de zéros comme
-  le fait MATLAB, et de somme un.
+  Les deux filtres sortent de même longueur, complétés de zéros centrés
+  comme le fait MATLAB, et de somme un.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
@@ -2818,8 +2820,8 @@ WPCOEF Coefficients d'un nœud d'un arbre de paquets.
 
   Exemple :
      t = wpdec(1:64, 2, 'db2');
-     numel(wpcoef(t, 3))            % 16
-     numel(wpcoef(t, [2 0]))        % 16 : le même nœud
+     numel(wpcoef(t, 3))            % 18 : l'extension symétrique allonge
+     numel(wpcoef(t, [2 0]))        % 18 : le même nœud
 
   Voir aussi WPRCOEF, WPDEC, LEAVES, WPSPLT.
 ```
@@ -2924,7 +2926,7 @@ WPFUN Fonctions de paquets d'ondelettes.
   Exemple :
      [w, x] = wpfun('db2', 3, 7);
      size(w, 1)                     % 4 : W0 à W3
-     trapz(x, w(1, :))              % 1 : W0 est la fonction d'échelle
+     sum(w(1, :)) * (x(2) - x(1))   % 1 : W0 est la fonction d'échelle
      abs(trapz(x, w(2, :)))         % nul : W1 est l'ondelette
 
   Voir aussi WAVEFUN, WPDEC, WPCOEF, WFILTERS.

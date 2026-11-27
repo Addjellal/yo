@@ -34,6 +34,7 @@ function [rejet, pValeur, statistique, valeurCritique, estimations] = jcitest(Y,
 %   log-vraisemblance.
 %
 %   Exemple :
+%      rng(1);
 %      x = cumsum(randn(300, 1));
 %      Y = [x + randn(300, 1), x, cumsum(randn(300, 1))];
 %      jcitest(Y)        % [1 0 0] : une relation

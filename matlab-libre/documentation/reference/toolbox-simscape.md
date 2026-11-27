@@ -147,7 +147,7 @@ ADDVOLTAGESOURCE Source de tension idéale de V volts.
      c = addVoltageSource(c, 1, 0, 10);
      c = addResistor(c, 1, 0, 1000);
      [v, i] = solveDC(c);
-     abs(i(1))                       % 0,01 A : dix volts dans mille ohms
+     abs(i(1))                       % 0.01 : dix volts dans mille ohms, en ampères
 
   Voir aussi ADDCURRENTSOURCE, SOLVEDC, SOLVETRANSIENT.
 ```

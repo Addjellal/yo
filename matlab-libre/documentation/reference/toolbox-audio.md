@@ -167,7 +167,7 @@ MEL2HZ Échelle de Mel vers les hertz : HZ = 700 (10^(MEL/2595) - 1).
   L'inverse exact de HZ2MEL (O'Shaughnessy, 1987).
 
   Exemple :
-     mel2hz(1000)               % 1000
+     mel2hz(1000)               % 1000.02 : presque l'identite a 1 kHz
 
   Voir aussi HZ2MEL, BARK2HZ, ERB2HZ.
 ```

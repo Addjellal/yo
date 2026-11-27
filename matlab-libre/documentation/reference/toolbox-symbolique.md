@@ -102,8 +102,8 @@ HESSIAN Matrice hessienne d'une expression symbolique.
   Exemple :
      syms x y
      H = hessian(x ^ 2 * y, {x, y});
-     char(H{1, 1})                  % '2 * y'
-     char(H{1, 2})                  % '2 * x'
+     char(H{1, 1})                  % '2*y'
+     char(H{1, 2})                  % '2*x'
 
   Voir aussi JACOBIAN, GRADIENT, DIFF.
 ```
@@ -810,7 +810,7 @@ POLY2SYM Expression symbolique d'un polynôme donné par ses coefficients.
 
   Exemple :
      f = poly2sym([1 0 -4]);
-     char(f)                        % '((x ^ 2) - 4)'
+     char(f)                        % 'x^2 - 4'
      sym2poly(f)                    % [1 0 -4]
 
   Voir aussi SYM2POLY, SYM, ROOTS, POLYVAL.
@@ -1249,7 +1249,7 @@ SYMSTR Écriture lisible d'une expression symbolique.
 
   Exemple :
      x = sym('x');
-     symstr(symmul(symadd(x, symnum(1)), symnum(2)))     % '(x + 1) * 2'
+     symstr(symmul(symadd(x, symnum(1)), symnum(2)))     % '(x + 1)*2'
      symstr(symadd(symmul(x, symnum(2)), symnum(1)))     % 'x*2 + 1'
 
   Voir aussi SYMSIMPLIFY, SYMSUBS, SYMADD.
@@ -1289,17 +1289,16 @@ SYMSUBS Substitution d'une variable par une expression ou un nombre.
   variable nommée par VALEUR, qui peut être un nombre ou une autre
   expression.
 
-  La substitution ne simplifie pas : remplacer x par 2 dans x + x donne
-  « 2 + 2 », non « 4 ». C'est voulu — SYMSIMPLIFY fait ce travail, et
-  les séparer permet de voir ce que chaque étape produit.
+  Le résultat passe par SYMSIMPLIFY : remplacer x par 2 dans x + x
+  donne « 4 », comme SUBS dans MATLAB.
 
   Substituer une expression, non un nombre, est ce qui permet de
   composer des fonctions symboliquement.
 
   Exemple :
      x = sym('x');
-     symstr(symsubs(symadd(x, x), 'x', 2))       % '2 + 2'
-     symstr(symsimplify(symsubs(symadd(x, x), 'x', 2)))   % '4'
+     symstr(symsubs(symadd(x, x), 'x', 2))       % '4'
+     symstr(symsubs(symmul(x, x), 'x', symadd(x, symnum(1))))   % '(x + 1)^2'
 
   Voir aussi SYMSIMPLIFY, SYMSTR, SUBS.
 ```

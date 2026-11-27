@@ -70,7 +70,7 @@ l'édition de liens.
 include/matlibre/   en-têtes publics du cœur
 src/coeur/          lexeur, analyseur, interpréteur, indexation, algèbre,
                     format MAT et décompression DEFLATE
-src/bibliotheque/   les 691 fonctions natives, par domaine
+src/bibliotheque/   les 690 fonctions natives, par domaine
 src/graphique/      rendu SVG
 src/console/        l'exécutable
 toolbox/            53 toolboxes écrites en langage MATLAB
@@ -191,6 +191,7 @@ bonne partie de l'interpréteur tourne aussi.
 - Une valeur annoncée en commentaire d'un exemple d'aide
   (`pi   % 3.1416`) est vérifiée par le test `aide_valeurs`
   (`outils/verifierValeurs.m`) : un nombre à la précision où il est
-  écrit, un texte exactement, `true` ou `false`. Écrire la valeur que
-  rend la ligne, arrondie comme MATLAB l'afficherait.
+  écrit, un tableau de nombres (`[1 0.5; 2 3]`, chaque élément à sa
+  précision), un texte exactement, `true` ou `false`. Écrire la valeur
+  que rend la ligne, arrondie comme MATLAB l'afficherait.
 - Quatre espaces d'indentation, lignes de 90 colonnes au plus.

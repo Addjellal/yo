@@ -352,6 +352,16 @@ C2D Discrétisation d'un modèle continu.
   conserve mieux la réponse fréquentielle près de la fréquence de
   Nyquist, au prix d'une légère distorsion.
 
+  SYSD = C2D(SYS,TS,'foh') suppose l'entrée linéaire entre deux instants
+  (bloqueur triangulaire) : la réponse à une rampe échantillonnée est
+  exacte. SYSD = C2D(SYS,TS,'impulse') rend un modèle dont la réponse
+  impulsionnelle vaut TS fois celle du modèle continu aux instants
+  d'échantillonnage.
+
+  Le bloqueur d'ordre zéro et le triangulaire se calculent par
+  l'exponentielle d'une matrice augmentée, exacte même quand A est
+  singulière — un intégrateur, le cas courant d'un asservissement.
+
   Exemples :
      d = c2d(tf(1, [1 1]), 0.1);
      d.Ts                             % 0.1
@@ -1814,6 +1824,32 @@ MATLIBRE_SANS_RETARD Refuse un modèle retardé, en le nommant.
   Voir aussi HASDELAY, TOTALDELAY, PADE, THIRAN.
 ```
 
+## `matlibre_traversee`
+
+```
+MATLIBRE_TRAVERSEE Pulsation exacte d'une traversée que la grille a située.
+  [W, PHASE, MODULE] = MATLIBRE_TRAVERSEE(SYS, 'gain', 0, WA, WB, PA, PB)
+  rend la pulsation W, entre WA et WB, où le gain de SYS traverse 0 dB ;
+  MATLIBRE_TRAVERSEE(SYS, 'phase', CIBLE, ...) celle où sa phase
+  traverse CIBLE degrés. PA et PB sont les phases de la grille en WA et
+  WB : elles choisissent la branche de la phase rendue, à 360 degrés
+  près. MODULE est le gain en W, en valeur absolue.
+
+  La grille de MARGIN et d'ALLMARGIN ne fait que situer la traversée ;
+  l'interpolation linéaire entre deux de ses points la laisserait fausse
+  au millionième. La traversée se lit donc sur la réponse exacte, par
+  dichotomie, jusqu'à la précision des nombres.
+
+  Exemple :
+     sys = tf(1, [1 2 1 0]);
+     w = logspace(-1, 1, 50);
+     [~, p] = bode(sys, w);
+     k = find((p(1:end-1) + 180) .* (p(2:end) + 180) < 0, 1);
+     wg = matlibre_traversee(sys, 'phase', -180, w(k), w(k+1), p(k), p(k+1))   % 1
+
+  Voir aussi MARGIN, ALLMARGIN.
+```
+
 ## `minreal`
 
 ```
@@ -2391,7 +2427,7 @@ SIGMA Valeurs singulières de la réponse fréquentielle.
   H-infini, que rend HINFNORM.
 
   Exemple :
-     max(sigma(tf(1, [1 1])))   % 1 : le gain le plus fort est en zéro
+     sigma(tf(1, [1 1]), 0)     % 1 : le gain le plus fort est en zéro
 
   Voir aussi FREQRESP, BODE, BODEMAG, HINFNORM.
 ```

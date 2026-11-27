@@ -968,7 +968,7 @@ DEPRDV Valeur restant à amortir.
   amortir une fois retranchés les amortissements déjà pratiqués.
 
   Exemple :
-     deprdv(10000, 1000, depsoyd(10000, 1000, 5)(1:2))    % 4600
+     deprdv(10000, 1000, depsoyd(10000, 1000, 5)(1:2))    % 3600 : 10000 - 1000 - 5400
 
   Voir aussi DEPSTLN, DEPSOYD, DEPFIXDB, DEPGENDB.
 ```
@@ -1249,7 +1249,7 @@ FVFIX Valeur future d'une série de versements constants.
   vaut 1 quand les versements tombent en début de période.
 
   Exemple :
-     fvfix(0.05, 10, 1000)      % 12578 : dix versements a 5 %
+     fvfix(0.05, 10, 1000)      % 12577.89 : dix versements a 5 %
 
   Voir aussi PVFIX, FVVAR, PAYPER, FV.
 ```
@@ -2403,7 +2403,7 @@ PVFIX Valeur actuelle d'une série de versements constants.
   période.
 
   Exemple :
-     pvfix(0.05, 10, 1000)      % 7721 : ce que valent dix versements
+     pvfix(0.05, 10, 1000)      % 7721.73 : ce que valent dix versements
 
   Voir aussi FVFIX, PVVAR, PAYPER, PV.
 ```
