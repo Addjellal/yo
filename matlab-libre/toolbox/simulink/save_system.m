@@ -45,7 +45,7 @@ function fichier = save_system(modele, fichier)
     end
     if ~isstruct(modele) || ~isfield(modele, 'blocs')
         error('Simulink:Commands:InvalidModel', ...
-              'SAVE_SYSTEM attend un modele bati par NEW_SYSTEM.');
+              'SAVE_SYSTEM requires a model built by NEW_SYSTEM.');
     end
     if nargin < 2
         fichier = [modele.nom '.m'];
@@ -85,7 +85,7 @@ function fichier = save_system(modele, fichier)
     identifiantFichier = fopen(fichier, 'w');
     if identifiantFichier < 0
         error('Simulink:Commands:SaveFailed', ...
-              'Impossible d''ecrire ''%s''.', fichier);
+              'Unable to write file ''%s''.', fichier);
     end
     for k = 1:numel(lignes)
         fprintf(identifiantFichier, '%s\n', lignes{k});
@@ -323,8 +323,8 @@ function texte = ecrireValeur(valeur, nomBloc, nomParametre)
         texte = ['struct(' strjoin(morceaux, ', ') ')'];
     else
         error('Simulink:Commands:SaveUnsupported', ...
-              ['Le parametre ''%s'' du bloc ''%s'' est de classe ''%s'' : ' ...
-               'SAVE_SYSTEM ne sait ecrire que des nombres, des booleens, ' ...
-               'du texte et des listes de textes.'], nomParametre, nomBloc, class(valeur));
+              ['Parameter ''%s'' of block ''%s'' is of class ''%s'': ' ...
+               'SAVE_SYSTEM can write only numbers, logicals, ' ...
+               'text, and lists of text.'], nomParametre, nomBloc, class(valeur));
     end
 end

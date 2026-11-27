@@ -27,8 +27,8 @@ function modele = deleteContents(systeme)
     [racine, chemin, genre] = matlibre_sl_nomme('systeme', systeme);
     if ~strcmp(genre, 'modele') || ~isempty(chemin)
         error('Simulink:BlockDiagram:DeleteContentsNotBlockDiagram', ...
-              ['Simulink.BlockDiagram.deleteContents vide un modele, designe par son nom : ' ...
-               'Simulink.SubSystem.deleteContents vide un sous-systeme.']);
+              ['Simulink.BlockDiagram.deleteContents empties a model, given by its name; ' ...
+               'Simulink.SubSystem.deleteContents empties a subsystem.']);
     end
     ctx = matlibre_sl_restructurer('ouvrir', racine, '');
     matlibre_sl_restructurer('fermer', ctx, matlibre_sl_restructurer('vider', ctx.systeme));

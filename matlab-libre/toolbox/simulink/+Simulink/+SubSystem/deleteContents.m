@@ -22,8 +22,8 @@ function deleteContents(sousSysteme)
     [racine, chemin, genre] = matlibre_sl_nomme('systeme', sousSysteme);
     if ~strcmp(genre, 'bloc') || isempty(chemin)
         error('Simulink:SubSystem:NotASubsystem', ...
-              ['Simulink.SubSystem.deleteContents vide un sous-systeme, designe par son ' ...
-               'chemin : Simulink.BlockDiagram.deleteContents vide un modele.']);
+              ['Simulink.SubSystem.deleteContents empties a subsystem, given by its ' ...
+               'path; Simulink.BlockDiagram.deleteContents empties a model.']);
     end
     barre = find(chemin == '/', 1, 'last');
     parent = '';

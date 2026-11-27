@@ -79,15 +79,15 @@ classdef SimulationInput
                 obj.ModelName = char(modele);
             else
                 error('Simulink:Simulation:InvalidModelName', ...
-                      ['Un SimulationInput se cree pour un modele : son nom, ou le modele ' ...
-                       'bati par NEW_SYSTEM.']);
+                      ['A SimulationInput is created for a model: its name, or the model ' ...
+                       'built by NEW_SYSTEM.']);
             end
         end
 
         function obj = setVariable(obj, nom, valeur, varargin)
             if nargin < 3
                 error('Simulink:Simulation:InvalidNumberOfArguments', ...
-                      'SETVARIABLE(IN,NOM,VALEUR) : il faut un nom et une valeur.');
+                      'SETVARIABLE(IN,NAME,VALUE) requires a name and a value.');
             end
             v = Simulink.Simulation.Variable(nom, valeur, varargin{:});
             k = obj.trouverVariable(v.Name, v.Workspace);
@@ -101,7 +101,7 @@ classdef SimulationInput
             k = obj.trouverVariable(char(nom), espaceDe(varargin));
             if isempty(k)
                 error('Simulink:Simulation:VariableNotFound', ...
-                      'Ce SimulationInput ne pose pas de variable ''%s''.', char(nom));
+                      'This SimulationInput does not set variable ''%s''.', char(nom));
             end
             valeur = obj.Variables(k).Value;
         end
@@ -109,7 +109,7 @@ classdef SimulationInput
             k = obj.trouverVariable(char(nom), espaceDe(varargin));
             if isempty(k)
                 error('Simulink:Simulation:VariableNotFound', ...
-                      'Ce SimulationInput ne pose pas de variable ''%s''.', char(nom));
+                      'This SimulationInput does not set variable ''%s''.', char(nom));
             end
             obj.Variables(k) = [];
         end
@@ -117,8 +117,8 @@ classdef SimulationInput
         function obj = setBlockParameter(obj, varargin)
             if isempty(varargin) || mod(numel(varargin), 3) ~= 0
                 error('Simulink:Simulation:InvalidNumberOfArguments', ...
-                      ['SETBLOCKPARAMETER(IN,BLOC,PARAMETRE,VALEUR) : les parametres de ' ...
-                       'blocs se donnent par triplets.']);
+                      ['SETBLOCKPARAMETER(IN,BLOCK,PARAMETER,VALUE): block parameters ' ...
+                       'must be given as triplets.']);
             end
             for i = 1:3:numel(varargin)
                 p = Simulink.Simulation.BlockParameter(varargin{i:i + 2});
@@ -134,7 +134,7 @@ classdef SimulationInput
             k = obj.trouverBloc(char(chemin), char(nom));
             if isempty(k)
                 error('Simulink:Simulation:BlockParameterNotFound', ...
-                      'Ce SimulationInput ne change pas le parametre ''%s'' du bloc ''%s''.', ...
+                      'This SimulationInput does not set parameter ''%s'' of block ''%s''.', ...
                       char(nom), char(chemin));
             end
             valeur = obj.BlockParameters(k).Value;
@@ -143,7 +143,7 @@ classdef SimulationInput
             k = obj.trouverBloc(char(chemin), char(nom));
             if isempty(k)
                 error('Simulink:Simulation:BlockParameterNotFound', ...
-                      'Ce SimulationInput ne change pas le parametre ''%s'' du bloc ''%s''.', ...
+                      'This SimulationInput does not set parameter ''%s'' of block ''%s''.', ...
                       char(nom), char(chemin));
             end
             obj.BlockParameters(k) = [];
@@ -152,8 +152,8 @@ classdef SimulationInput
         function obj = setModelParameter(obj, varargin)
             if isempty(varargin) || mod(numel(varargin), 2) ~= 0
                 error('Simulink:Simulation:InvalidNumberOfArguments', ...
-                      ['SETMODELPARAMETER(IN,NOM,VALEUR) : les reglages se donnent par ' ...
-                       'paires.']);
+                      ['SETMODELPARAMETER(IN,NAME,VALUE): parameters must be name-value ' ...
+                       'pairs.']);
             end
             for i = 1:2:numel(varargin)
                 p = Simulink.Simulation.ModelParameter(varargin{i:i + 1});
@@ -169,7 +169,7 @@ classdef SimulationInput
             k = obj.trouverReglage(char(nom));
             if isempty(k)
                 error('Simulink:Simulation:ModelParameterNotFound', ...
-                      'Ce SimulationInput ne change pas le reglage ''%s''.', char(nom));
+                      'This SimulationInput does not set model parameter ''%s''.', char(nom));
             end
             valeur = obj.ModelParameters(k).Value;
         end
@@ -177,7 +177,7 @@ classdef SimulationInput
             k = obj.trouverReglage(char(nom));
             if isempty(k)
                 error('Simulink:Simulation:ModelParameterNotFound', ...
-                      'Ce SimulationInput ne change pas le reglage ''%s''.', char(nom));
+                      'This SimulationInput does not set model parameter ''%s''.', char(nom));
             end
             obj.ModelParameters(k) = [];
         end
@@ -189,9 +189,10 @@ classdef SimulationInput
             if ~(isnumeric(x0) || ischar(x0) || isstring(x0) || ...
                  isa(x0, 'Simulink.op.ModelOperatingPoint'))
                 error('Simulink:Simulation:InvalidInitialState', ...
-                      ['L''etat initial est un vecteur — les etats continus, dans l''ordre ' ...
-                       'de xout —, un etat de fonctionnement, ou le nom d''une variable qui ' ...
-                       'le porte.']);
+                      ['The initial state must be a vector (the continuous states, in the order ' ...
+                       '' ...
+                       'of xout), an operating point, or the name of a variable that ' ...
+                       'holds one.']);
             end
             obj.InitialState = x0;
         end
@@ -206,7 +207,7 @@ classdef SimulationInput
                 texte = char(texte);
             end
             if ~(ischar(texte) && (isempty(texte) || isrow(texte)))
-                error('Simulink:Simulation:InvalidUserString', 'UserString est un texte.');
+                error('Simulink:Simulation:InvalidUserString', 'UserString must be text.');
             end
             obj.UserString = texte;
         end
@@ -266,6 +267,6 @@ end
 function f = fonction(f, nom)
     if ~isa(f, 'function_handle') && ~(isnumeric(f) && isempty(f))
         error('Simulink:Simulation:InvalidFunctionHandle', ...
-              '%s est une poignee de fonction, @f, ou [] pour n''en pas avoir.', nom);
+              '%s must be a function handle, @f, or [] for none.', nom);
     end
 end

@@ -43,7 +43,7 @@ function machine = sftransition(machine, depuis, vers, garde, action)
         if ~isempty(actionTransition)
             if ~isempty(action)
                 error('Stateflow:DeuxActions', ...
-                      'La transition porte deux actions : dans son étiquette et en argument.');
+                      'The transition has two actions: in its label and as an argument.');
             end
             action = actionTransition;
             garde = sansAction;

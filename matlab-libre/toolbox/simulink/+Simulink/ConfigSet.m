@@ -60,7 +60,7 @@ classdef ConfigSet < handle
         function set.Name(obj, nom)
             if ~((ischar(nom) && isrow(nom)) || (isstring(nom) && isscalar(nom)))
                 error('Simulink:ConfigSet:InvalidName', ...
-                      'Le nom d''un jeu de configuration est un texte.');
+                      'The configuration set name must be text.');
             end
             obj.renommer(char(nom), obj.Description);
         end
@@ -75,12 +75,12 @@ classdef ConfigSet < handle
         function set_param(obj, varargin)
             if isempty(varargin) || mod(numel(varargin), 2) ~= 0
                 error('Simulink:Commands:SetParamArguments', ...
-                      'SET_PARAM(CS,NOM,VALEUR,...) : les reglages vont par paires.');
+                      'SET_PARAM(CS,NAME,VALUE,...): parameters must be name-value pairs.');
             end
             for k = 1:2:numel(varargin)
                 if isempty(matlibre_sl_config('nom', varargin{k}))
                     error('Simulink:Commands:ParamUnknown', ...
-                          'Un jeu de configuration n''a pas de reglage nomme ''%s''.', ...
+                          'The configuration set has no parameter named ''%s''.', ...
                           char(varargin{k}));
                 end
             end
@@ -104,7 +104,7 @@ classdef ConfigSet < handle
                     return
                 end
                 error('Simulink:Commands:ParamUnknown', ...
-                      'Un jeu de configuration n''a pas de reglage nomme ''%s''.', char(nom));
+                      'The configuration set has no parameter named ''%s''.', char(nom));
             end
             jeu = obj.structure();
             porteur = struct('nom', obj.Nom, 'blocs', {{}}, 'liens', [], ...

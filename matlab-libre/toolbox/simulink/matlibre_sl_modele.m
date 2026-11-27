@@ -54,5 +54,5 @@ function modele = matlibre_sl_modele(entree)
               'Invalid Simulink object name: ''%s''.', nom);
     end
     error('Simulink:Commands:InvalidModel', ...
-          'Un modele se batit par NEW_SYSTEM, ou se designe par son nom.');
+          'A model is built by NEW_SYSTEM, or referred to by its name.');
 end

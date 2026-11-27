@@ -26,9 +26,9 @@ function poignees = findBlocks(systeme, varargin)
 %   Voir aussi SIMULINK.FINDBLOCKSOFTYPE, SIMULINK.FINDOPTIONS, FIND_SYSTEM.
     if isstruct(systeme)
         error('Simulink:Commands:FindBlocksNeedsLoadedModel', ...
-              ['Simulink.findBlocks rend des poignees, que seuls portent les modeles de la ' ...
-               'session : designez le modele par son nom. FIND_SYSTEM(MODELE,...) cherche ' ...
-               'dans un modele par valeur.']);
+              ['Simulink.findBlocks returns handles, which only models loaded in the ' ...
+               'session have: give the model by its name. FIND_SYSTEM(MODEL,...) searches ' ...
+               'a model passed by value.']);
     end
     options = Simulink.FindOptions;
     if ~isempty(varargin) && isa(varargin{end}, 'Simulink.FindOptions')
@@ -37,7 +37,7 @@ function poignees = findBlocks(systeme, varargin)
     end
     if mod(numel(varargin), 2) ~= 0
         error('Simulink:Commands:FindBlocksPairs', ...
-              'Simulink.findBlocks(SYSTEME,NOM,VALEUR,...) : les criteres vont par paires.');
+              'Simulink.findBlocks(SYSTEM,NAME,VALUE,...): criteria must be name-value pairs.');
     end
     arguments = options.enArguments();
     ici = getfullname(get_param(systeme, 'Handle'));

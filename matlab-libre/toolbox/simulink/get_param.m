@@ -75,7 +75,8 @@ function valeur = get_param(modele, nom, parametre)
     if ~isstruct(modele)
         if nargin ~= 2
             error('Simulink:Commands:GetParamArguments', ...
-                  'GET_PARAM(OBJET,NOM) : un objet, designe par son nom ou sa poignee, et un reglage.');
+                  ['GET_PARAM(OBJECT,NAME) requires an object, given by its name or handle, and ' ...
+                   'a parameter.']);
         end
         valeur = matlibre_sl_nomme('get_param', nargout, modele, nom);
         return
@@ -84,7 +85,7 @@ function valeur = get_param(modele, nom, parametre)
     if isnumeric(nom)
         if nargin < 3
             error('Simulink:Commands:GetParamArguments', ...
-                  'GET_PARAM(MODELE,PORT,NOM) : il faut nommer le reglage du port.');
+                  'GET_PARAM(MODEL,PORT,NAME) requires the name of the port parameter.');
         end
         valeur = matlibre_sl_signaux('lire', modele, nom, parametre);
         return
@@ -125,8 +126,8 @@ function valeur = get_param(modele, nom, parametre)
         end
     end
     if i == 0
-        error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
-               'aucun bloc ne s''appelle ''%s''.'], nom);
+        error('Simulink:Commands:InvSimulinkObjectName', ['Invalid Simulink object name: ' ...
+               'no block is named ''%s''.'], nom);
     end
     bloc = modele.blocs{i};
     if nargin < 3
@@ -201,7 +202,7 @@ function valeur = get_param(modele, nom, parametre)
     end
     if isempty(canon)
         error('Simulink:Commands:ParamUnknown', ...
-              'Le bloc ''%s'' n''a pas de paramètre ''%s''.', feuille, champ);
+              'Block ''%s'' does not have a parameter named ''%s''.', feuille, champ);
     end
     if isfield(bloc.parametres, canon)
         valeur = bloc.parametres.(canon);
@@ -218,7 +219,7 @@ function valeur = get_param(modele, nom, parametre)
         return
     end
     error('Simulink:Commands:ParamUnknown', ...
-          'Le bloc ''%s'' n''a pas de paramètre ''%s''.', feuille, champ);
+          'Block ''%s'' does not have a parameter named ''%s''.', feuille, champ);
 end
 
 % Ce que vaut un réglage que tout bloc porte quand on ne l'a pas posé : le
@@ -298,7 +299,7 @@ function valeur = compile(modele, nom, champ)
     k = find(strcmp(c.chemins, [prefixe nom]), 1);
     if isempty(k)
         error('Simulink:Commands:InvSimulinkObjectName', ...
-              ['Nom d''objet Simulink invalide : aucun bloc compile de ''%s'' ne s''appelle ' ...
+              ['Invalid Simulink object name: no compiled block of ''%s'' is named ' ...
                '''%s''.'], char(modele.nom), nom);
     end
     entrees = c.entrees{k};
@@ -324,7 +325,7 @@ function valeur = compile(modele, nom, champ)
             valeur = struct('Inport', complexes(c, entrees), 'Outport', complexes(c, sorties));
         otherwise
             error('Simulink:Commands:ParamUnknown', ...
-                  'Le bloc ''%s'' n''a pas de parametre ''%s''.', nom, champ);
+                  'Block ''%s'' does not have a parameter named ''%s''.', nom, champ);
     end
 end
 

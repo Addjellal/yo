@@ -65,7 +65,7 @@ function modele = new_system(nom, genre)
             case 'model'
             otherwise
                 error('Simulink:Commands:NewSystemType', ...
-                      ['NEW_SYSTEM(NOM,TYPE) : le type est ''Model'', ''Library'' ou ' ...
+                      ['NEW_SYSTEM(NAME,TYPE): the type must be ''Model'', ''Library'', or ' ...
                        '''Subsystem''.']);
         end
     end
@@ -76,7 +76,7 @@ function modele = new_system(nom, genre)
         if matlibre_sl_ouverts('connu', char(nom))
             error('Simulink:Commands:NewSysAlreadyExists', ...
                   ['A block diagram named ''%s'' already exists. BDCLOSE(''%s'') ' ...
-                   'le ferme.'], char(nom), char(nom));
+                   'closes it.'], char(nom), char(nom));
         end
         % Il y part des réglages d'un modèle neuf de Simulink, comme un
         % fichier .slx qui ne dit rien : le solveur automatique à pas

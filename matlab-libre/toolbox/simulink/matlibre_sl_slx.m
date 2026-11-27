@@ -67,9 +67,9 @@ function modele = lire(fichier)
     [modele, refuses] = construire(D.systeme, D.nom, D.defauts, refuses);
     if ~isempty(refuses)
         error('Simulink:slx:BlocsNonReconnus', ...
-              ['Le modele ''%s'' porte %d bloc(s) sans equivalent dans MatLibre : ' ...
-               '%s. Le reste du modele se lirait, mais le simuler sans eux le ' ...
-               'fausserait.'], D.nom, numel(refuses), strjoin(refuses, ', '));
+              ['Model ''%s'' has %d block(s) with no equivalent in MatLibre: ' ...
+               '%s. The rest of the model could be read, but simulating it without them would ' ...
+               'give wrong results.'], D.nom, numel(refuses), strjoin(refuses, ', '));
     end
     modele = poserConfiguration(modele, D.config);
     if isfield(D, 'genre') && ~isempty(D.genre)
@@ -124,13 +124,13 @@ function D = lireSlxArchive(fichier, base)
         unzip(fichier, dossier);
     catch err
         error('Simulink:slx:ArchiveIllisible', ...
-              'Le fichier ''%s'' n''est pas une archive .slx lisible : %s', fichier, ...
+              'File ''%s'' is not a readable .slx archive: %s', fichier, ...
               err.message);
     end
     principal = fullfile(dossier, 'simulink', 'blockdiagram.xml');
     if exist(principal, 'file') ~= 2
         error('Simulink:slx:ArchiveIllisible', ...
-              'Le fichier ''%s'' ne porte pas simulink/blockdiagram.xml.', fichier);
+              'File ''%s'' does not contain simulink/blockdiagram.xml.', fichier);
     end
     racine = matlibre_xml_analyser(fileread(principal));
     modeleXml = enfant(racine, 'Model');
@@ -149,7 +149,7 @@ function D = lireSlxArchive(fichier, base)
             modeleXml = racine;
         else
             error('Simulink:slx:ArchiveIllisible', ...
-                  'simulink/blockdiagram.xml ne porte pas d''element Model.');
+                  'simulink/blockdiagram.xml has no Model element.');
         end
     end
     D = struct('nom', base, 'defauts', struct(), 'config', struct(), 'genre', genre);
@@ -191,7 +191,7 @@ function s = systemeFichier(dossier, reference)
     chemin = fullfile(dossier, [reference '.xml']);
     if exist(chemin, 'file') ~= 2
         error('Simulink:slx:ArchiveIllisible', ...
-              'Le systeme ''%s'' manque a l''archive.', reference);
+              'System ''%s'' is missing from the archive.', reference);
     end
     s = matlibre_xml_analyser(fileread(chemin));
 end
@@ -373,7 +373,7 @@ function D = lireMdl(fichier, base)
     modeleMdl = enfant(arbre, 'Model');
     if isempty(modeleMdl)
         error('Simulink:slx:ArchiveIllisible', ...
-              'Le fichier ''%s'' ne porte pas de section Model.', fichier);
+              'File ''%s'' has no Model section.', fichier);
     end
     D = struct('nom', base, 'defauts', struct(), 'config', struct());
     P = parametresMdl(modeleMdl);
@@ -699,7 +699,7 @@ function [type, refus] = typeDe(b)
     P = b.parametres;
     if strcmp(b.type, 'SubSystem') && isfield(P, 'SFBlockType') && ...
        ~any(strcmp(P.SFBlockType, {'NONE', ''}))
-        refus = sprintf('SubSystem %s : son contenu Stateflow n''est pas lu', P.SFBlockType);
+        refus = sprintf('SubSystem %s: its Stateflow content is not read', P.SFBlockType);
         return
     end
     candidats = {b.type};
@@ -858,8 +858,8 @@ function modele = poserConfiguration(modele, C)
                 end
                 remplacant = matlibre_sl_config('automatique', type);
                 warning('Simulink:slx:SolveurRemplace', ...
-                        ['Le modele ''%s'' demande le solveur %s, que MatLibre n''a pas : ' ...
-                         '%s le remplace.'], modele.nom, valeur, remplacant);
+                        ['Model ''%s'' uses solver %s, which MatLibre does not have: ' ...
+                         '%s replaces it.'], modele.nom, valeur, remplacant);
                 valeur = remplacant;
             end
         end
@@ -1303,7 +1303,7 @@ end
 function ecrireTexte(chemin, texte)
     f = fopen(chemin, 'w');
     if f < 0
-        error('Simulink:Commands:SaveFailed', 'Impossible d''ecrire ''%s''.', chemin);
+        error('Simulink:Commands:SaveFailed', 'Unable to write file ''%s''.', chemin);
     end
     fprintf(f, '%s', texte);
     fclose(f);

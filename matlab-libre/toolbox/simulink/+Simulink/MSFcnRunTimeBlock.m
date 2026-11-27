@@ -85,7 +85,7 @@ classdef MSFcnRunTimeBlock < handle
         function RegBlockMethod(obj, nom, poignee)
             if ~(ischar(nom) || isstring(nom)) || ~isa(poignee, 'function_handle')
                 error('Simulink:blocks:SFunctionRegBlockMethod', ...
-                      'RegBlockMethod prend un nom de methode et une poignee de fonction.');
+                      'RegBlockMethod requires a method name and a function handle.');
             end
             obj.Methodes.(char(nom)) = poignee;
         end
@@ -124,7 +124,7 @@ classdef MSFcnRunTimeBlock < handle
         function n = compte(n, nom)
             if ~(isnumeric(n) && isscalar(n) && isreal(n) && n >= 0 && n == round(n))
                 error('Simulink:blocks:SFunctionInvalidCount', ...
-                      '%s est un entier positif ou nul ; pas %s.', nom, mat2str(n));
+                      '%s must be a nonnegative integer, not %s.', nom, mat2str(n));
             end
             n = double(n);
         end

@@ -122,7 +122,7 @@ function [systeme, nom] = regrouper(systeme, choisis, nom, unique, ou)
         i = find(strcmp(tous, char(choisis{k})), 1);
         if isempty(i)
             error('Simulink:Commands:InvSimulinkObjectName', ...
-                  'Le systeme ''%s'' n''a pas de bloc ''%s''.', ou, char(choisis{k}));
+                  'System ''%s'' has no block ''%s''.', ou, char(choisis{k}));
         end
         dedans(i) = true;
     end
@@ -130,9 +130,9 @@ function [systeme, nom] = regrouper(systeme, choisis, nom, unique, ou)
     for i = find(dedans)
         if any(strcmp(types{i}, portsDeControle()))
             error('Simulink:BlockDiagram:CreateSubsystemControlPort', ...
-                  ['Le bloc ''%s/%s'' est un port de controle de son systeme : il ne part ' ...
-                   'pas dans un sous-systeme neuf, qui changerait la facon dont le systeme ' ...
-                   's''execute.'], ou, tous{i});
+                  ['Block ''%s/%s'' is a control port of its system: it cannot go ' ...
+                   'into a new subsystem, which would change how the system ' ...
+                   'executes.'], ou, tous{i});
         end
     end
     % le nom du sous-système, parmi les blocs qui restent
@@ -143,13 +143,13 @@ function [systeme, nom] = regrouper(systeme, choisis, nom, unique, ou)
         nom = char(nom);
         if isempty(nom) || any(nom == '/')
             error('Simulink:BlockDiagram:CreateSubsystemInvalidName', ...
-                  'Le nom d''un sous-systeme est un texte non vide, sans barre oblique.');
+                  'The subsystem name must be nonempty text without a slash.');
         end
         if any(strcmp(restants, nom))
             if ~unique
                 error('Simulink:Commands:AddBlockCantAdd', ...
-                      ['Le systeme ''%s'' porte deja un bloc nomme ''%s'' ; ' ...
-                       'MakeNameUnique ''on'' en choisit un libre.'], ou, nom);
+                      ['System ''%s'' already has a block named ''%s''; ' ...
+                       'MakeNameUnique ''on'' picks a free one.'], ou, nom);
             end
             nom = libre(restants, nom);
         end
@@ -162,8 +162,8 @@ function [systeme, nom] = regrouper(systeme, choisis, nom, unique, ou)
     for r = 1:size(connexions, 1)
         if dedans(connexions(r, 1)) ~= dedans(connexions(r, 3))
             error('Simulink:BlockDiagram:CreateSubsystemPhysical', ...
-                  ['Une connexion physique relie ''%s/%s'' a ''%s/%s'', l''un dans le groupe, ' ...
-                   'l''autre dehors : un sous-systeme ne porte pas ici de port physique.'], ...
+                  ['A physical connection links ''%s/%s'' to ''%s/%s'', one inside the group, ' ...
+                   'the other outside: a subsystem cannot have a physical port here.'], ...
                   ou, tous{connexions(r, 1)}, ou, tous{connexions(r, 3)});
         end
     end
@@ -358,31 +358,31 @@ function [systeme, poses] = deplier(systeme, nomBloc, ou)
     complet = [ou '/' char(nomBloc)];
     if ~strcmp(typeDe(b), 'subsystem')
         error('Simulink:BlockDiagram:ExpandSubsystemNotSubsystem', ...
-              'Le bloc ''%s'' n''est pas un sous-systeme : il n''a rien a deplier.', complet);
+              'Block ''%s'' is not a subsystem: there is nothing to expand.', complet);
     end
     raison = '';
     if ~isempty(matlibre_sl_masque('variables', b)) || ...
        (isfield(b.parametres, 'Mask') && strcmpi(char(b.parametres.Mask), 'on'))
-        raison = 'masque';
+        raison = 'masked';
     elseif isfield(b, 'reference') && ~isempty(b.reference)
-        raison = 'lie a une bibliotheque';
+        raison = 'linked to a library';
     elseif estCommente(b)
-        raison = 'mis en commentaire';
+        raison = 'commented out';
     elseif reglage(b, 'TreatAsAtomicUnit', 'off', 'on')
-        raison = 'atomique';
+        raison = 'atomic';
     elseif reglage(b, 'Variant', 'off', 'on')
-        raison = 'a variantes';
+        raison = 'a variant subsystem';
     end
     c = contenuDe(b, complet);
     typesDedans = cellfun(@typeDe, c.blocs, 'UniformOutput', false);
     if isempty(raison) && any(ismember(typesDedans, portsDeControle()))
-        raison = 'conditionnel';
+        raison = 'conditional';
     end
     if ~isempty(raison)
         error('Simulink:BlockDiagram:ExpandSubsystemNotAllowed', ...
-              ['Le sous-systeme ''%s'' est %s : il ne se deplie pas. Se deplie un ' ...
-               'sous-systeme virtuel ni masque, ni lie, ni commente ; ni atomique, ni ' ...
-               'conditionnel, ni a variantes.'], complet, raison);
+              ['Subsystem ''%s'' is %s: it cannot be expanded. Only a virtual ' ...
+               'subsystem that is not masked, linked, or commented out, and not atomic, ' ...
+               'conditional, or variant, can be expanded.'], complet, raison);
     end
     entrees = rangsDePorts(c, typesDedans, 'inport');
     sorties = rangsDePorts(c, typesDedans, 'outport');
@@ -411,7 +411,7 @@ function [systeme, poses] = deplier(systeme, nomBloc, ou)
         connexions = systeme.connexions;
         if any(connexions(:, 1) == i | connexions(:, 3) == i)
             error('Simulink:BlockDiagram:ExpandSubsystemPhysical', ...
-                  'Le sous-systeme ''%s'' porte une connexion physique : il ne se deplie pas.', ...
+                  'Subsystem ''%s'' has a physical connection: it cannot be expanded.', ...
                   complet);
         end
         connexions = [versHors(connexions(:, 1)).', connexions(:, 2), ...
@@ -502,7 +502,7 @@ function c = contenu(systeme, nomBloc, ou)
     complet = [ou '/' char(nomBloc)];
     if ~strcmp(typeDe(b), 'subsystem')
         error('Simulink:SubSystem:NotASubsystem', ...
-              'Le bloc ''%s'' n''est pas un sous-systeme.', complet);
+              'Block ''%s'' is not a subsystem.', complet);
     end
     c = contenuDe(b, complet);
 end
@@ -530,8 +530,8 @@ function systeme = remplir(systeme, nomBloc, c, ou)
     actuel = contenuDe(b, complet);
     if ~isempty(actuel.blocs)
         error('Simulink:SubSystem:SubsystemNotEmpty', ...
-              ['Le sous-systeme ''%s'' contient deja des blocs : on n''y copie qu''un ' ...
-               'contenu vide. Simulink.SubSystem.deleteContents le vide.'], complet);
+              ['Subsystem ''%s'' already contains blocks: the target must be ' ...
+               'empty. Simulink.SubSystem.deleteContents empties it.'], complet);
     end
     plein = systemeVide(nomBloc);
     plein.blocs = c.blocs;
@@ -545,12 +545,12 @@ end
 function exigerModifiable(b, complet)
     if ~strcmp(typeDe(b), 'subsystem')
         error('Simulink:SubSystem:NotASubsystem', ...
-              'Le bloc ''%s'' n''est pas un sous-systeme.', complet);
+              'Block ''%s'' is not a subsystem.', complet);
     end
     if isfield(b, 'reference') && ~isempty(b.reference)
         error('Simulink:SubSystem:LinkedSubsystem', ...
-              ['Le sous-systeme ''%s'' est lie a la bibliotheque ''%s'' : son contenu ' ...
-               'est celui de la bibliotheque, et ne se change pas ici.'], complet, ...
+              ['Subsystem ''%s'' is linked to library ''%s'': its contents ' ...
+               'come from the library, and cannot be changed here.'], complet, ...
               char(b.reference));
     end
 end
@@ -566,7 +566,7 @@ function c = contenuDe(b, complet)
         c = systemeVide(b.nom);
     elseif ~(isstruct(c) && isfield(c, 'blocs'))
         error('Simulink:SubSystem:NotASubsystem', ...
-              'Le sous-systeme ''%s'' ne porte pas son contenu : il designe un autre modele.', ...
+              'Subsystem ''%s'' does not hold its contents: it refers to another model.', ...
               complet);
     end
 end
@@ -589,7 +589,7 @@ function i = rangDe(systeme, nom, ou)
     i = find(strcmp(nomsDe(systeme), char(nom)), 1);
     if isempty(i)
         error('Simulink:Commands:InvSimulinkObjectName', ...
-              'Le systeme ''%s'' n''a pas de bloc ''%s''.', ou, char(nom));
+              'System ''%s'' has no block ''%s''.', ou, char(nom));
     end
 end
 

@@ -48,7 +48,7 @@ function [matlibre__c, matlibre__v] = matlibre_sf_evaluer(matlibre__texte, matli
             rethrow(matlibre__err);
         end
         error('Stateflow:TexteInvalide', ...
-              'Le texte « %s » ne s''evalue pas : %s', matlibre__source, matlibre__err.message);
+              'Text ''%s'' cannot be evaluated: %s', matlibre__source, matlibre__err.message);
     end
     if matlibre__garde
         return

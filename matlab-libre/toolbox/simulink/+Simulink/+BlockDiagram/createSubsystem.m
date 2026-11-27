@@ -41,8 +41,8 @@ function createSubsystem(blocs, varargin)
 %   SIMULINK.SUBSYSTEM.DELETECONTENTS.
     if nargin == 0
         error('Simulink:BlockDiagram:CreateSubsystemNoSelection', ...
-              ['Simulink.BlockDiagram.createSubsystem() regroupe la selection de l''editeur ' ...
-               'de Simulink, qui n''existe pas ici : donnez les poignees des blocs, ' ...
+              ['Simulink.BlockDiagram.createSubsystem() groups the editor selection ' ...
+               'of Simulink, which does not exist here: pass the block handles, ' ...
                'Simulink.BlockDiagram.createSubsystem(Simulink.findBlocks(...)).']);
     end
     nom = '';
@@ -50,7 +50,7 @@ function createSubsystem(blocs, varargin)
     nomDonne = false;
     if mod(numel(varargin), 2) ~= 0
         error('Simulink:BlockDiagram:CreateSubsystemArguments', ...
-              'Les options de createSubsystem vont par paires : un nom, une valeur.');
+              'createSubsystem options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         option = char(varargin{k});
@@ -59,30 +59,30 @@ function createSubsystem(blocs, varargin)
             case 'name'
                 if ~((ischar(v) && (isrow(v) || isempty(v))) || (isstring(v) && isscalar(v)))
                     error('Simulink:BlockDiagram:CreateSubsystemInvalidName', ...
-                          'Le nom d''un sous-systeme est un texte.');
+                          'The subsystem name must be text.');
                 end
                 nom = char(v);
                 nomDonne = true;
                 if isempty(nom)
                     error('Simulink:BlockDiagram:CreateSubsystemInvalidName', ...
-                          'Le nom d''un sous-systeme est un texte non vide.');
+                          'The subsystem name must be nonempty text.');
                 end
             case 'makenameunique'
                 if ~((ischar(v) || (isstring(v) && isscalar(v))) && ...
                      any(strcmpi(char(v), {'on', 'off'})))
                     error('Simulink:BlockDiagram:CreateSubsystemArguments', ...
-                          'MakeNameUnique vaut ''on'' ou ''off''.');
+                          'MakeNameUnique must be ''on'' or ''off''.');
                 end
                 unique = strcmpi(char(v), 'on');
             otherwise
                 error('Simulink:BlockDiagram:CreateSubsystemArguments', ...
-                      ['createSubsystem n''a pas d''option ''%s'' : ses options sont Name et ' ...
+                      ['createSubsystem has no option ''%s''. Valid options are Name and ' ...
                        'MakeNameUnique.'], option);
         end
     end
     if ~unique && ~nomDonne
         error('Simulink:BlockDiagram:CreateSubsystemArguments', ...
-              'MakeNameUnique ne s''emploie qu''avec Name.');
+              'MakeNameUnique is only valid with Name.');
     end
     if isnumeric(blocs)
         blocs = num2cell(blocs(:).');
@@ -93,7 +93,7 @@ function createSubsystem(blocs, varargin)
     end
     if ~iscell(blocs) || isempty(blocs)
         error('Simulink:BlockDiagram:CreateSubsystemNoBlocks', ...
-              'createSubsystem attend au moins un bloc : sa poignee, ou son chemin.');
+              'createSubsystem requires at least one block, given by its handle or path.');
     end
     racine = '';
     parent = '';
@@ -102,7 +102,7 @@ function createSubsystem(blocs, varargin)
         [r, chemin, genre] = matlibre_sl_nomme('systeme', blocs{k});
         if ~strcmp(genre, 'bloc') || isempty(chemin)
             error('Simulink:BlockDiagram:CreateSubsystemNoBlocks', ...
-                  'createSubsystem regroupe des blocs : ni un modele, ni un port, ni une ligne.');
+                  'createSubsystem groups blocks, not models, ports, or lines.');
         end
         barre = find(chemin == '/', 1, 'last');
         if isempty(barre)
@@ -117,12 +117,12 @@ function createSubsystem(blocs, varargin)
             parent = p;
         elseif ~strcmp(r, racine)
             error('Simulink:BlockDiagram:CreateSubsystemDifferentModels', ...
-                  ['Les blocs a regrouper sont tous du meme modele : ''%s'' est de ''%s'', ' ...
-                   'le premier de ''%s''.'], getfullname(blocs{k}), r, racine);
+                  ['The blocks to group must belong to the same model: ''%s'' is in ''%s'', ' ...
+                   'the first one in ''%s''.'], getfullname(blocs{k}), r, racine);
         elseif ~strcmp(p, parent)
             error('Simulink:BlockDiagram:CreateSubsystemDifferentParents', ...
-                  ['Les blocs a regrouper sont tous du meme systeme : ''%s'' n''est pas dans ' ...
-                   'le systeme du premier.'], getfullname(blocs{k}));
+                  ['The blocks to group must belong to the same system: ''%s'' is not in ' ...
+                   'the system of the first one.'], getfullname(blocs{k}));
         end
     end
     ctx = matlibre_sl_restructurer('ouvrir', racine, parent);

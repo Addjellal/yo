@@ -30,7 +30,7 @@ function machine = sfjunction(machine, nom)
 %   Voir aussi SFTRANSITION, SFSTATE, SFCHART.
     nom = char(nom);
     if ~isvarname(strrep(nom, '.', '_'))
-        error('Stateflow:NomInvalide', 'Le nom de jonction ''%s'' n''est pas un nom valide.', nom);
+        error('Stateflow:NomInvalide', 'Junction name ''%s'' is not a valid name.', nom);
     end
     if ~isfield(machine, 'jonctions')
         machine.jonctions = {};
@@ -38,7 +38,7 @@ function machine = sfjunction(machine, nom)
     etats = cellfun(@(e) e.nom, machine.etats, 'UniformOutput', false);
     if any(strcmp(machine.jonctions, nom)) || any(strcmp(etats, nom))
         error('Stateflow:JonctionDouble', ...
-              'La machine ''%s'' a deja un etat ou une jonction nomme ''%s''.', machine.nom, nom);
+              'Chart ''%s'' already has a state or a junction named ''%s''.', machine.nom, nom);
     end
     machine.jonctions{end + 1} = nom;
 end

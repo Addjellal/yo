@@ -64,7 +64,7 @@ function close_system(modele, fichier)
     elseif nargin >= 2
         if isempty(modele)
             error('Simulink:Commands:InvalidModel', ...
-                  'Le modele ''%s'' n''est pas ouvert : rien a enregistrer.', nom);
+                  'Model ''%s'' is not open: there is nothing to save.', nom);
         end
         save_system(modele, fichier);
     end

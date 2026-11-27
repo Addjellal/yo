@@ -29,8 +29,8 @@ classdef Variant
             end
             if ~(ischar(texte) && (isempty(texte) || isrow(texte)))
                 error('Simulink:Variants:InvalidCondition', ...
-                      ['La condition d''un Simulink.Variant est un texte : ''Mode == 1'', ' ...
-                       'par exemple.']);
+                      ['The condition of a Simulink.Variant must be text, for example ' ...
+                       '''Mode == 1''.']);
             end
             obj.Condition = texte;
         end

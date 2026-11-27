@@ -65,7 +65,7 @@ function modele = load_system(nom)
     modele = feval(base);
     if ~isstruct(modele) || ~isfield(modele, 'blocs')
         error('Simulink:Commands:InvalidModel', ...
-              'Le fichier ''%s'' ne rend pas un modele.', chemin);
+              'File ''%s'' does not return a model.', chemin);
     end
     charge(modele, fichier);
 end

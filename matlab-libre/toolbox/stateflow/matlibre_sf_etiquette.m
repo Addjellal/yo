@@ -64,7 +64,7 @@ function [evenement, condition, actionCondition, actionTransition, garde] = ...
             return
         end
         error('Stateflow:Etiquette', ...
-              'Étiquette de transition illisible : « %s » (reste « %s »).', texte, texte(k:end));
+              'Cannot parse transition label ''%s'' (remaining ''%s'').', texte, texte(k:end));
     end
 end
 
@@ -105,7 +105,7 @@ function fin = fermante(texte, k)
         elseif any(c == fermantes)
             attendu = fermantes(ouvrantes == pile(end));
             if c ~= attendu
-                error('Stateflow:Etiquette', 'Délimiteurs mal appariés dans « %s ».', texte);
+                error('Stateflow:Etiquette', 'Mismatched delimiters in ''%s''.', texte);
             end
             pile(end) = [];
             if isempty(pile)
@@ -115,7 +115,7 @@ function fin = fermante(texte, k)
         end
         i = i + 1;
     end
-    error('Stateflow:Etiquette', 'Délimiteur « %s » non fermé dans « %s ».', texte(k), texte);
+    error('Stateflow:Etiquette', 'Unclosed delimiter ''%s'' in ''%s''.', texte(k), texte);
 end
 
 % Une apostrophe ouvre une chaîne sauf après un nom, un nombre ou une

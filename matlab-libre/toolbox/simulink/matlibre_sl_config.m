@@ -453,7 +453,7 @@ function v = valider(nom, v)
             end
             if isempty(trouve)
                 error('Simulink:Commands:SolveurInconnu', ...
-                      ['Le solveur (Solver) %s est inconnu ; les solveurs disponibles sont : ' ...
+                      ['Unknown solver (Solver) %s. Available solvers are: ' ...
                        '%s.'], decrire(v), strjoin(connus, ', '));
             end
             v = connus{trouve};
@@ -474,7 +474,7 @@ function v = valider(nom, v)
             end
             if ~ischar(v) || ~isvarname(v)
                 error('Simulink:Config:InvalidValue', ...
-                      '%s est un nom de variable ; pas %s.', nom, decrire(v));
+                      '%s must be a variable name, not %s.', nom, decrire(v));
             end
         case 'InitialState'
             if isstring(v)
@@ -483,9 +483,9 @@ function v = valider(nom, v)
             if ~(ischar(v) || ((isnumeric(v) || islogical(v)) && (isvector(v) || isempty(v))) || ...
                  isa(v, 'Simulink.op.ModelOperatingPoint'))
                 error('Simulink:Config:InvalidValue', ...
-                      ['Le reglage InitialState est un vecteur — les etats continus, dans ' ...
-                       'l''ordre de xout —, un etat de fonctionnement ' ...
-                       '(Simulink.op.ModelOperatingPoint), ou l''expression qui le donne.']);
+                      ['InitialState must be a vector (the continuous states, in ' ...
+                       'the order of xout), an operating point ' ...
+                       '(Simulink.op.ModelOperatingPoint), or the expression that gives it.']);
             end
         case {'PreLoadFcn', 'PostLoadFcn', 'InitFcn', 'StartFcn', 'StopFcn', ...
               'PreSaveFcn', 'PostSaveFcn', 'CloseFcn'}
@@ -497,13 +497,13 @@ function v = valider(nom, v)
             end
             if ~ischar(v)
                 error('Simulink:Config:InvalidValue', ...
-                      'Le rappel %s est du code MATLAB, en texte.', nom);
+                      'Callback %s must be MATLAB code, as text.', nom);
             end
         case 'ExternalInput'
             if ~(ischar(v) || isstring(v) || isnumeric(v) || isstruct(v))
                 error('Simulink:Config:InvalidValue', ...
-                      ['Le reglage ExternalInput est une expression : « [t, u] », ou des ' ...
-                       'noms de variables separes par des virgules.']);
+                      ['ExternalInput must be an expression: ''[t, u]'', or ' ...
+                       'variable names separated by commas.']);
             end
             if isstring(v)
                 v = char(v);
@@ -559,8 +559,8 @@ function v = valider(nom, v)
             end
             if ~(ischar(v) || ((isnumeric(v) || islogical(v)) && (isvector(v) || isempty(v))))
                 error('Simulink:Config:InvalidValue', ...
-                      ['Le reglage OutputTimes est un vecteur d''instants, ou l''expression ' ...
-                       'qui le donne.']);
+                      ['OutputTimes must be a vector of times, or the expression ' ...
+                       'that gives it.']);
             end
         case {'AutoScaleAbsTol', 'PositivePriorityOrder', 'ConcurrentTasks'}
             v = choix(nom, v, {'off', 'on'});
@@ -597,13 +597,13 @@ function v = valider(nom, v)
             end
             if ~ischar(v) || size(v, 1) > 1 || (isempty(strtrim(v)) && ~strcmp(nom, 'Description'))
                 error('Simulink:Config:InvalidValue', ...
-                      'Le reglage %s est un texte ; pas %s.', nom, decrire(v));
+                      '%s must be text, not %s.', nom, decrire(v));
             end
         case 'PacingRate'
             v = nombre(nom, v, false);
             if isnumeric(v) && ~(isscalar(v) && v > 0 && isfinite(v))
                 error('Simulink:Config:InvalidValue', ...
-                      'Le reglage PacingRate est un nombre strictement positif.');
+                      'PacingRate must be a strictly positive number.');
             end
         case 'ParameterArgumentNames'
             if isstring(v) && isscalar(v)
@@ -616,13 +616,13 @@ function v = valider(nom, v)
             end
             if ~ischar(v) || size(v, 1) > 1 || ~all(cellfun(@isvarname, noms))
                 error('Simulink:Config:InvalidValue', ...
-                      ['Le reglage ParameterArgumentNames nomme les arguments du modele, des ' ...
-                       'variables separees par des virgules (''K, decalage'') ; pas %s.'], ...
+                      ['ParameterArgumentNames names the arguments of the model, as ' ...
+                       'variables separated by commas (''K, offset''), not %s.'], ...
                       decrire(v));
             end
         case ''
             error('Simulink:Commands:ParamUnknown', ...
-                  'Le modele n''a pas de reglage nomme ''%s''.', char(nom));
+                  'The model does not have a parameter named ''%s''.', char(nom));
     end
 end
 
@@ -638,8 +638,8 @@ function v = proprietesPeriodes(v)
     end
     if ~(isstruct(v) && isfield(v, 'SamplePeriod'))
         error('Simulink:Config:InvalidValue', ...
-              ['Le reglage SampleTimeProperty est une structure par periode, de champs ' ...
-               'SamplePeriod, Offset et Priority, ou l''expression qui les donne.']);
+              ['SampleTimeProperty must be one structure per sample time, with fields ' ...
+               'SamplePeriod, Offset, and Priority, or the expression that gives them.']);
     end
 end
 
@@ -653,7 +653,7 @@ function v = choix(nom, v, admis)
     end
     if isempty(trouve)
         error('Simulink:Config:InvalidValue', ...
-              'Le reglage %s vaut l''une de ces valeurs : %s ; pas %s.', ...
+              '%s must be one of these values: %s; not %s.', ...
               nom, strjoin(admis, ', '), decrire(v));
     end
     v = admis{trouve};
@@ -668,7 +668,7 @@ function t = decrire(v)
     elseif (isnumeric(v) || islogical(v)) && ndims(v) <= 2 && numel(v) <= 16
         t = mat2str(v);
     else
-        t = sprintf('une valeur de classe %s', class(v));
+        t = sprintf('a value of class %s', class(v));
     end
 end
 
@@ -681,10 +681,10 @@ function v = entier(nom, v, bas, haut)
        v < bas || v > haut
         if isinf(haut)
             error('Simulink:Config:InvalidValue', ...
-                  'Le reglage %s est un entier au moins egal a %d.', nom, bas);
+                  '%s must be an integer greater than or equal to %d.', nom, bas);
         end
         error('Simulink:Config:InvalidValue', ...
-              'Le reglage %s est un entier de %d a %d.', nom, bas, haut);
+              '%s must be an integer from %d to %d.', nom, bas, haut);
     end
     v = double(v);
 end
@@ -707,7 +707,7 @@ function v = nombre(nom, v, autoPermis)
     end
     if ~(isnumeric(v) && isscalar(v) && isreal(v)) || isnan(v)
         error('Simulink:Config:InvalidValue', ...
-              'Le reglage %s est un nombre reel.', nom);
+              '%s must be a real number.', nom);
     end
     v = double(v);
 end

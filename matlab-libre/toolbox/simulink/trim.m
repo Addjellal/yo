@@ -52,15 +52,15 @@ function [x, u, y, dx] = trim(modele, x0, u0, y0, ix, iu, iy)
     ix = ix(:)'; iu = iu(:)'; iy = iy(:)';
     if numel(x0) ~= nEtats
         error('Simulink:Commands:TrimEtat', ...
-              'Le modele porte %d etats continus ; X0 en donne %d.', nEtats, numel(x0));
+              'The model has %d continuous states; X0 has %d.', nEtats, numel(x0));
     end
     if numel(u0) ~= nEntrees
         error('Simulink:Commands:TrimEntree', ...
-              'Le modele porte %d entrees ; U0 en donne %d.', nEntrees, numel(u0));
+              'The model has %d inputs; U0 has %d.', nEntrees, numel(u0));
     end
     if ~isempty(iy) && numel(y0) < max(iy)
         error('Simulink:Commands:TrimSortie', ...
-              'Y0 ne porte pas la composante %d que IY impose.', max(iy));
+              'Y0 does not have component %d that IY requires.', max(iy));
     end
 
     libresX = setdiff(1:nEtats, ix);
@@ -116,8 +116,8 @@ function [x, u, y, dx] = trim(modele, x0, u0, y0, ix, iu, iy)
     [dx, y] = matlibre_sl_derivee(modele, x, u, pas);
     if norm(r) > 1e-6
         warning('Simulink:Commands:TrimNonConverge', ...
-                ['TRIM n''a pas annule les derivees : residu %g. Le point rendu ' ...
-                 'est le meilleur trouve, non un equilibre.'], norm(r));
+                ['TRIM did not zero the derivatives: residual %g. The returned point ' ...
+                 'is the best found, not an equilibrium.'], norm(r));
     end
     if nSorties == 0
         y = zeros(0, 1);

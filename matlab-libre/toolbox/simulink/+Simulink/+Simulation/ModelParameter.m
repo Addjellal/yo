@@ -21,12 +21,12 @@ classdef ModelParameter
             end
             if nargin < 2
                 error('Simulink:Simulation:InvalidNumberOfArguments', ...
-                      'Un reglage de modele se donne par un nom et une valeur.');
+                      'A model parameter requires a name and a value.');
             end
             if ~((ischar(nom) && isrow(nom)) || (isstring(nom) && isscalar(nom))) || ...
                strlength(string(nom)) == 0
                 error('Simulink:Simulation:InvalidModelParameter', ...
-                      'Le nom d''un reglage de modele est un texte non vide.');
+                      'The model parameter name must be nonempty text.');
             end
             obj.Name = char(nom);
             obj.Value = valeur;

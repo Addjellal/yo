@@ -56,7 +56,7 @@ classdef FindOptions
         function obj = FindOptions(varargin)
             if mod(numel(varargin), 2) ~= 0
                 error('Simulink:FindOptions:Pairs', ...
-                      'Simulink.FindOptions : les options vont par paires, un nom et une valeur.');
+                      'Simulink.FindOptions options must be name-value pairs.');
             end
             noms = [properties(obj); {'FollowLinks'; 'LookUnderMasks'; ...
                                      'LookInsideSubsystemReference'}];
@@ -64,7 +64,7 @@ classdef FindOptions
                 i = find(strcmpi(char(varargin{k}), noms), 1);
                 if isempty(i)
                     error('Simulink:FindOptions:UnknownOption', ...
-                          'Simulink.FindOptions n''a pas d''option ''%s''. Ses options : %s.', ...
+                          'Simulink.FindOptions has no option ''%s''. Valid options: %s.', ...
                           char(varargin{k}), strjoin(properties(obj).', ', '));
                 end
                 obj.(noms{i}) = varargin{k + 1};
@@ -95,8 +95,8 @@ classdef FindOptions
         function obj = set.SearchInsideModelReferences(obj, v)
             if logique(v)
                 error('Simulink:FindOptions:NotSupported', ...
-                      ['SearchInsideModelReferences : MatLibre ne parcourt pas les modeles ' ...
-                       'references. Cherchez dans le modele reference lui-meme.']);
+                      ['SearchInsideModelReferences: MatLibre does not search referenced ' ...
+                       'models. Search the referenced model itself.']);
             end
             obj.SearchInsideModelReferences = false;
         end
@@ -105,15 +105,16 @@ classdef FindOptions
                 {'AllVariants', 'ActiveVariants', 'ActivePlusCodeVariants'});
             if ~strcmp(v, 'AllVariants')
                 error('Simulink:FindOptions:NotSupported', ...
-                      ['Variants : MatLibre parcourt toutes les variantes ; ''%s'' n''est ' ...
-                       'pas traite.'], v);
+                      ['Variants: MatLibre searches all variants; ''%s'' is ' ...
+                       'not supported.'], v);
             end
             obj.Variants = v;
         end
         function obj = set.MatchFilter(obj, f)
             if ~(isempty(f) || isa(f, 'function_handle'))
                 error('Simulink:FindOptions:InvalidMatchFilter', ...
-                      'MatchFilter est une fonction, qui recoit une poignee et rend vrai ou faux.');
+                      ['MatchFilter must be a function that takes a handle and returns true or ' ...
+                       'false.']);
             end
             obj.MatchFilter = f;
         end

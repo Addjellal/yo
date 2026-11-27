@@ -38,8 +38,8 @@ function modele = add_param(modele, varargin)
         nom = char(varargin{k});
         if isfield(modele.parametres, nom)
             error('Simulink:Commands:AddParamExiste', ...
-                  ['Le modele porte deja un reglage ''%s'' : employez SET_PARAM ' ...
-                   'pour le changer.'], nom);
+                  ['The model already has a parameter ''%s'': use SET_PARAM ' ...
+                   'to change it.'], nom);
         end
         % Un réglage de la boîte de configuration est vérifié comme par
         % SET_PARAM, et rangé sous son écriture canonique.
@@ -47,8 +47,8 @@ function modele = add_param(modele, varargin)
         if ~isempty(canon)
             if isfield(modele.parametres, canon)
                 error('Simulink:Commands:AddParamExiste', ...
-                      ['Le modele porte deja un reglage ''%s'' : employez SET_PARAM ' ...
-                       'pour le changer.'], canon);
+                      ['The model already has a parameter ''%s'': use SET_PARAM ' ...
+                       'to change it.'], canon);
             end
             modele.parametres.(canon) = matlibre_sl_config('valider', canon, varargin{k + 1});
             continue

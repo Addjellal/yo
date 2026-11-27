@@ -23,7 +23,7 @@ function modele = attachConfigSet(modele, cs, renommer)
     end
     if ~isa(cs, 'Simulink.ConfigSet')
         error('Simulink:ConfigSet:InvalidConfigSet', ...
-              'ATTACHCONFIGSET(MODELE,CS) : CS est un Simulink.ConfigSet.');
+              'ATTACHCONFIGSET(MODEL,CS): CS must be a Simulink.ConfigSet.');
     end
     parNom = ~isstruct(modele);
     if parNom
@@ -31,8 +31,9 @@ function modele = attachConfigSet(modele, cs, renommer)
     end
     if parNom && ~isempty(cs.getModel())
         error('Simulink:ConfigSet:ConfigSetAlreadyAttached', ...
-              ['Le jeu ''%s'' est deja attache au modele ''%s'' : ATTACHCONFIGSETCOPY ' ...
-               'en attache une copie.'], cs.Name, cs.getModel());
+              ['Configuration set ''%s'' is already attached to model ''%s'': ' ...
+               'ATTACHCONFIGSETCOPY ' ...
+               'attaches a copy.'], cs.Name, cs.getModel());
     end
     [modele, nom] = matlibre_sl_jeux('attacher', modele, cs.structure(), ...
                                      isequal(renommer, true) || isequal(renommer, 1));

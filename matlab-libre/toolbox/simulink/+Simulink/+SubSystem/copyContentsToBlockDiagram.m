@@ -23,7 +23,7 @@ function copyContentsToBlockDiagram(sousSysteme, cible)
     [racine, chemin, genre] = matlibre_sl_nomme('systeme', sousSysteme);
     if ~strcmp(genre, 'bloc') || isempty(chemin)
         error('Simulink:SubSystem:NotASubsystem', ...
-              'copyContentsToBlockDiagram copie un sous-systeme, designe par son chemin.');
+              'copyContentsToBlockDiagram copies a subsystem, given by its path.');
     end
     barre = find(chemin == '/', 1, 'last');
     parent = '';
@@ -41,14 +41,14 @@ function copyContentsToBlockDiagram(sousSysteme, cible)
     [nomCible, cheminCible, genreCible] = matlibre_sl_nomme('systeme', cible);
     if ~strcmp(genreCible, 'modele') || ~isempty(cheminCible)
         error('Simulink:SubSystem:CopyContentsTargetNotBlockDiagram', ...
-              ['copyContentsToBlockDiagram copie dans un modele, designe par son nom sans ' ...
-               'chemin ni extension.']);
+              ['copyContentsToBlockDiagram copies into a model, given by its name without ' ...
+               'path or extension.']);
     end
     ctx = matlibre_sl_restructurer('ouvrir', nomCible, '');
     if ~isempty(ctx.systeme.blocs) || ~isempty(matlibre_sl_liens(ctx.systeme))
         error('Simulink:SubSystem:CopyContentsTargetNotEmpty', ...
-              ['Le modele ''%s'' contient deja des blocs ou des liens : on n''y copie qu''a ' ...
-               'vide. Simulink.BlockDiagram.deleteContents le vide.'], nomCible);
+              ['Model ''%s'' already contains blocks or lines: the target must be ' ...
+               'empty. Simulink.BlockDiagram.deleteContents empties it.'], nomCible);
     end
     systeme = ctx.systeme;
     systeme.blocs = c.blocs;

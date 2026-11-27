@@ -96,8 +96,8 @@ function v = choixAdmis(v, admis, chemin, nom)
         end
     end
     error('Simulink:Parameters:InvalidValue', ...
-          ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'' ; les valeurs admises ' ...
-           'sont : %s.'], nom, chemin, char(v), strjoin(admis, ', '));
+          ['Parameter ''%s'' of block ''%s'' is ''%s''; valid values ' ...
+           'are: %s.'], nom, chemin, char(v), strjoin(admis, ', '));
 end
 
 function oui = pidAvance(p)

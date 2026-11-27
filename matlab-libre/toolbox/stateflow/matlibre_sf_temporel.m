@@ -19,7 +19,7 @@ function vrai = matlibre_sf_temporel(contexte, operateur, n, unite)
             vrai = sfat(contexte, n, unite);
         otherwise
             if ~strcmp(unite, 'tick')
-                error('Stateflow:UniteTemporelle', 'every se compte en tick.');
+                error('Stateflow:UniteTemporelle', 'every counts in ticks.');
             end
             vrai = sfevery(contexte, n);
     end

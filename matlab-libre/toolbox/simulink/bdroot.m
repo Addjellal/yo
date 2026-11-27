@@ -27,7 +27,7 @@ function nom = bdroot(modele)
     end
     if ~isstruct(modele) || ~isfield(modele, 'nom')
         error('Simulink:Commands:InvalidModel', ...
-              'BDROOT attend un modele bati par NEW_SYSTEM.');
+              'BDROOT requires a model built by NEW_SYSTEM.');
     end
     nom = modele.nom;
 end

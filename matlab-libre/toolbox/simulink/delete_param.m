@@ -29,7 +29,7 @@ function modele = delete_param(modele, varargin)
         nom = char(varargin{k});
         if ~isfield(modele.parametres, nom)
             error('Simulink:Commands:DeleteParamAbsent', ...
-                  'Le modele ne porte pas de reglage ''%s''.', nom);
+                  'The model has no parameter ''%s''.', nom);
         end
         modele.parametres = rmfield(modele.parametres, nom);
     end

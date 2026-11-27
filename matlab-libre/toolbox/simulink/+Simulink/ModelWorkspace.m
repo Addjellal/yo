@@ -58,7 +58,7 @@ classdef ModelWorkspace < handle
             nom = char(nom);
             if ~isvarname(nom)
                 error('Simulink:Data:InvalidVariableName', ...
-                      '''%s'' n''est pas un nom de variable.', nom);
+                      '''%s'' is not a valid variable name.', nom);
             end
             obj.Donnees.(nom) = valeur;
         end
@@ -66,7 +66,7 @@ classdef ModelWorkspace < handle
             nom = char(nom);
             if ~isfield(obj.Donnees, nom)
                 error('Simulink:Data:VariableNotFound', ...
-                      'L''espace de travail du modele ''%s'' n''a pas de variable ''%s''.', ...
+                      'The model workspace of ''%s'' has no variable ''%s''.', ...
                       obj.ModelName, nom);
             end
             valeur = obj.Donnees.(nom);

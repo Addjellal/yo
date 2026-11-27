@@ -146,7 +146,7 @@ function couples = positionsDuModele(couples)
         end
         if ~(isnumeric(v) && isreal(v) && numel(v) == 4 && all(isfinite(v(:))))
             error('Simulink:Commands:InvalidPosition', ...
-                  'Position vaut [gauche haut droite bas], quatre nombres, en pixels.');
+                  'Position must be [left top right bottom], four numbers, in pixels.');
         end
         couples{k + 1} = double(v(:).') / 40;
     end
@@ -172,8 +172,8 @@ function modele = modeleNomme(nom)
     nom = char(nom);
     if ~matlibre_sl_ouverts('connu', nom)
         error('Simulink:Commands:InvSimulinkObjectName', ...
-              ['Invalid Simulink object name: ''%s''. Aucun modele de ce nom n''est ' ...
-               'ouvert : NEW_SYSTEM(''%s'') le cree, LOAD_SYSTEM le charge.'], nom, nom);
+              ['Invalid Simulink object name: ''%s''. No model with this name is ' ...
+               'open: NEW_SYSTEM(''%s'') creates it, LOAD_SYSTEM loads it.'], nom, nom);
     end
     modele = matlibre_sl_ouverts('lire', nom);
 end
@@ -187,7 +187,7 @@ function [racine, chemin, genre, port] = designer(objet)
         cle = matlibre_sl_signaux('cle', double(objet));
         if isempty(cle)
             error('Simulink:Commands:InvSimulinkObjectHandle', ...
-                  'Invalid Simulink object handle : %s n''est la poignee de rien.', ...
+                  'Invalid Simulink object handle: %s.', ...
                   num2str(double(objet), 10));
         end
         morceaux = strsplit(cle, '|');
@@ -199,8 +199,8 @@ function [racine, chemin, genre, port] = designer(objet)
     end
     if ~(ischar(objet) || (isstring(objet) && isscalar(objet)))
         error('Simulink:Commands:InvSimulinkObjectSpecifier', ...
-              ['Un objet Simulink se designe par son nom (''modele/bloc''), par sa ' ...
-               'poignee, ou par le modele que rend NEW_SYSTEM.']);
+              ['A Simulink object is given by its name (''model/block''), by its ' ...
+               'handle, or by the model NEW_SYSTEM returns.']);
     end
     texte = char(objet);
     barre = find(texte == '/', 1);
@@ -289,8 +289,8 @@ function h = ajouterBloc(source, destination, varargin)
     [racine, chemin] = designer(destination);
     if isempty(chemin)
         error('Simulink:Commands:AddBlockInvalidDest', ...
-              ['ADD_BLOCK(SOURCE,DESTINATION) : la destination ''%s'' doit dire le ' ...
-               'modele et le nom du bloc, ''modele/bloc''.'], char(destination));
+              ['ADD_BLOCK(SOURCE,DESTINATION): destination ''%s'' must give the ' ...
+               'model and the block name, ''model/block''.'], char(destination));
     end
     modele = modeleNomme(racine);
     [parent, feuille] = couper(chemin);
@@ -366,7 +366,7 @@ function texte = bout(extremite, racine, parent)
         if ~strcmp(r, racine) || ~strcmp(p, parent) || ...
            ~any(strcmp(genre, {'inport', 'outport'}))
             error('Simulink:Commands:InvalidPortHandle', ...
-                  ['La poignee %s n''est pas celle d''un port d''un bloc du systeme ' ...
+                  ['Handle %s is not the handle of a port of a block of system ' ...
                    '''%s''.'], num2str(double(extremite), 10), joindre(racine, parent));
         end
         texte = sprintf('%s/%d', feuille, port);
@@ -400,15 +400,15 @@ function h = ajouterLigne(systemeNomme, sources, destinations, varargin)
     end
     if nargin < 3
         error('Simulink:Commands:AddLinePoints', ...
-              ['ADD_LINE(SYSTEME,POINTS) trace un fil sans le brancher : MatLibre ne ' ...
-               'garde que les liens entre ports, ADD_LINE(SYSTEME,SORTIE,ENTREE).']);
+              ['ADD_LINE(SYSTEM,POINTS) draws an unconnected line: MatLibre ' ...
+               'keeps only lines between ports, ADD_LINE(SYSTEM,OUTPUT,INPUT).']);
     end
     if ~iscell(sources), sources = {sources}; end
     if ~iscell(destinations), destinations = {destinations}; end
     if isscalar(sources), sources = repmat(sources, size(destinations)); end
     if numel(sources) ~= numel(destinations)
         error('Simulink:Commands:AddLineMismatch', ...
-              'ADD_LINE : autant de sorties que d''entrees, ou une seule sortie.');
+              'ADD_LINE requires as many outputs as inputs, or a single output.');
     end
     modele = modeleNomme(racine);
     [modele, systeme] = systemeDe(modele, parent);
@@ -431,7 +431,7 @@ function retirerBloc(objets)
         [racine, chemin, genre] = designer(objets{k});
         if ~strcmp(genre, 'bloc')
             error('Simulink:Commands:InvSimulinkObjectName', ...
-                  'DELETE_BLOCK attend le chemin d''un bloc, ''modele/bloc'', ou sa poignee.' ...
+                  'DELETE_BLOCK requires a block path, ''model/block'', or a block handle.' ...
                   );
         end
         modele = modeleNomme(racine);
@@ -493,8 +493,9 @@ function rang = rangDemande(bloc, n, ou)
     rang = rangDe(bloc);
     if ~(isscalar(rang) && isfinite(rang) && rang == fix(rang) && rang >= 1 && rang <= n)
         error('Simulink:blocks:InvalidPortNumber', ...
-              ['Le rang (Port) du bloc ''%s/%s'' doit etre un entier de 1 a %d : le systeme a ' ...
-               '%d port(s) de ce genre.'], ou, char(bloc.nom), n, n);
+              ['The port number (Port) of block ''%s/%s'' must be an integer from 1 to %d: the ' ...
+               'system has ' ...
+               '%d port(s) of this kind.'], ou, char(bloc.nom), n, n);
     end
 end
 
@@ -524,7 +525,7 @@ function retirerLigne(objet, source, destination)
             [racine, chemin, genre, port] = designer(h);
             if ~strcmp(genre, 'ligne')
                 error('Simulink:Commands:InvalidLineHandle', ...
-                      '%s n''est pas la poignee d''une ligne.', num2str(h, 10));
+                      '%s is not a line handle.', num2str(h, 10));
             end
             modele = modeleNomme(racine);
             [parent, feuille] = couper(chemin);
@@ -555,7 +556,7 @@ function regler(objet, varargin)
     end
     if mod(numel(varargin), 2) ~= 0 || isempty(varargin)
         error('Simulink:Commands:SetParamArguments', ...
-              'SET_PARAM(OBJET,NOM,VALEUR,...) : les reglages vont par paires.');
+              'SET_PARAM(OBJECT,NAME,VALUE,...): parameters must be name-value pairs.');
     end
     [racine, chemin, genre, port] = designer(objet);
     modele = modeleNomme(racine);
@@ -567,8 +568,8 @@ function regler(objet, varargin)
             while k <= numel(varargin)
                 if strcmpi(char(varargin{k}), 'FileName')
                     error('Simulink:Commands:SetParamReadOnly', ...
-                          ['Le reglage FileName du modele ''%s'' se lit, mais ne se regle ' ...
-                           'pas : SAVE_SYSTEM(MODELE,FICHIER) l''enregistre ailleurs.'], racine);
+                          ['The FileName parameter of model ''%s'' is read-only: ' ...
+                           'SAVE_SYSTEM(MODEL,FILE) saves it elsewhere.'], racine);
                 elseif strcmpi(char(varargin{k}), 'Dirty')
                     info.Dirty = matlibre_sl_parametre('choix', varargin{k + 1}, 'Dirty', ...
                                                        {'off', 'on'});
@@ -843,7 +844,7 @@ function valeur = lireLigne(modele, racine, chemin, port, parametre)
     vers = find(liens(:, 1) == k & liens(:, 4) == port).';
     if isempty(vers)
         error('Simulink:Commands:InvalidLineHandle', ...
-              'La ligne qui partait du port %d de ''%s'' n''existe plus.', port, ...
+              'The line from port %d of ''%s'' no longer exists.', port, ...
               joindre(racine, chemin));
     end
     switch lower(parametre)
@@ -952,7 +953,8 @@ function trouves = chercher(varargin)
     sousMasques = options.LookUnderMasks;
     if ~(ischar(sousMasques) || isstring(sousMasques))
         error('Simulink:Commands:FindSystemInvalidOption', ...
-              'LookUnderMasks vaut ''graphical'', ''none'', ''functional'', ''all'', ''on'' ou ''off''.');
+              ['LookUnderMasks must be ''graphical'', ''none'', ''functional'', ''all'', ' ...
+               '''on'', or ''off''.']);
     end
     reglage = struct('profondeur', profondeur, ...
                      'masques', any(strcmpi(char(sousMasques), {'all', 'on', 'functional'})), ...
@@ -1111,8 +1113,8 @@ function fichier = enregistrer(nom, fichier, varargin)
     if ~strcmp(base, racine) && any(strcmpi(extension, {'.slx', '.mdl'}))
         if matlibre_sl_ouverts('connu', base)
             error('Simulink:Commands:SaveSysAlreadyOpen', ...
-                  ['Le modele ''%s'' ne s''enregistre pas sous le nom ''%s'' : un autre ' ...
-                   'modele ouvert porte deja ce nom.'], racine, base);
+                  ['Model ''%s'' cannot be saved as ''%s'': another ' ...
+                   'open model already has this name.'], racine, base);
         end
         figureDuModele = matlibre_sl_ouverts('figure', racine);
         matlibre_sl_ouverts('retirer', racine);

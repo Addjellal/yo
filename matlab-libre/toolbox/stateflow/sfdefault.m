@@ -16,7 +16,7 @@ function machine = sfdefault(machine, etat)
 %   Voir aussi SFSTATE, SFCHART, SFSTEP.
     etat = char(etat);
     if ~any(cellfun(@(e) strcmp(e.nom, etat), machine.etats))
-        error('Stateflow:EtatInconnu', 'La machine n''a pas d''etat ''%s''.', etat);
+        error('Stateflow:EtatInconnu', 'The chart has no state ''%s''.', etat);
     end
     if ~any(etat == '.')
         machine.initial = etat;

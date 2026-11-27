@@ -42,14 +42,14 @@ function ex = matlibre_sl_fautif(err, type, parametres, chemin)
     catch
     end
     if ~isempty(suspects)
-        quoi = sprintf('la valeur de %s', strjoin(suspects, ', '));
+        quoi = sprintf('the value of %s', strjoin(suspects, ', '));
     elseif ~isempty(donnes)
-        quoi = sprintf('l''un de ses parametres (%s)', strjoin(unique(donnes), ', '));
+        quoi = sprintf('one of its parameters (%s)', strjoin(unique(donnes), ', '));
     else
         quoi = 'ses parametres';
     end
     ex = MException('Simulink:Parameters:InvParamSetting', ...
-                    'Parametre invalide dans ''%s'' : le bloc ne sait pas employer %s. Detail : %s', ...
+                    'Invalid parameter in ''%s'': the block cannot use %s. Details: %s', ...
                     chemin, quoi, err.message);
 end
 
@@ -71,7 +71,7 @@ function t = apercu(v)
     elseif isnumeric(v) || islogical(v)
         t = mat2str(v, 6);
         if numel(t) > 40
-            t = sprintf('une matrice %dx%d', size(v, 1), size(v, 2));
+            t = sprintf('a %dx%d matrix', size(v, 1), size(v, 2));
         end
     else
         t = ['''' char(v) ''''];

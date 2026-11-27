@@ -44,16 +44,16 @@ function machine = sfstate(machine, nom, entree, pendant, sortie)
     if nargin < 3, entree = []; end
     if isfield(machine, 'jonctions') && any(strcmp(machine.jonctions, nom))
         error('Stateflow:EtatDouble', ...
-              'La machine ''%s'' a deja une jonction nommee ''%s''.', machine.nom, nom);
+              'Chart ''%s'' already has a junction named ''%s''.', machine.nom, nom);
     end
     point = find(nom == '.', 1, 'last');
     if ~isempty(point) && ~any(cellfun(@(e) strcmp(e.nom, nom(1:point - 1)), machine.etats))
         error('Stateflow:EtatParentAbsent', ...
-              'L''etat ''%s'' n''a pas de parent : declarez ''%s'' d''abord.', ...
+              'State ''%s'' has no parent: declare ''%s'' first.', ...
               nom, nom(1:point - 1));
     end
     if any(cellfun(@(e) strcmp(e.nom, nom), machine.etats))
-        error('Stateflow:EtatDouble', 'La machine a deja un etat ''%s''.', nom);
+        error('Stateflow:EtatDouble', 'The chart already has a state ''%s''.', nom);
     end
     if nargin < 4, pendant = []; end
     if nargin < 5, sortie = []; end

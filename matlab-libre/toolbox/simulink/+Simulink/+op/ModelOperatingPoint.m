@@ -54,7 +54,7 @@ classdef ModelOperatingPoint
         function op = set.description(op, texte)
             if ~(ischar(texte) || isstring(texte))
                 error('Simulink:SimInput:InvalidOperatingPoint', ...
-                      'La description d''un etat de fonctionnement est un texte.');
+                      'The description of an operating point must be text.');
             end
             op.description = char(texte);
         end

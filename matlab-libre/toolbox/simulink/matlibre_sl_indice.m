@@ -12,7 +12,7 @@ function k = matlibre_sl_indice(modele, nom)
 %
 %   Voir aussi ADD_LINE, DELETE_BLOCK, GET_PARAM.
     if ~ischar(nom) && ~isstring(nom)
-        error('Simulink:Commands:InvSimulinkObjectName', 'Un bloc se designe par son nom.');
+        error('Simulink:Commands:InvSimulinkObjectName', 'A block is referred to by its name.');
     end
     nom = char(nom);
     for i = 1:numel(modele.blocs)
@@ -21,6 +21,6 @@ function k = matlibre_sl_indice(modele, nom)
             return
         end
     end
-    error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
-          'aucun bloc ne s''appelle ''%s''.'], nom);
+    error('Simulink:Commands:InvSimulinkObjectName', ['Invalid Simulink object name: ' ...
+          'no block is named ''%s''.'], nom);
 end

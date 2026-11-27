@@ -81,7 +81,7 @@ function A = arbre(machine)
             p = find(strcmp(A.noms, A.noms{k}(1:point - 1)), 1);
             if isempty(p)
                 error('Stateflow:EtatParentAbsent', ...
-                      'L''etat ''%s'' n''a pas de parent : declarez ''%s'' d''abord.', ...
+                      'State ''%s'' has no parent: declare ''%s'' first.', ...
                       A.noms{k}, A.noms{k}(1:point - 1));
             end
             A.parent(k) = p;
@@ -130,7 +130,7 @@ function k = rang(A, nom)
     end
     k = find(strcmp(A.noms, nom), 1);
     if isempty(k)
-        error('Stateflow:EtatInconnu', 'La machine n''a pas d''etat ''%s''.', nom);
+        error('Stateflow:EtatInconnu', 'The chart has no state ''%s''.', nom);
     end
 end
 
@@ -233,8 +233,8 @@ function [parcours, contexte] = suivre(machine, tr, contexte, u, profondeur)
     parcours = {};
     if profondeur > 64
         error('Stateflow:BoucleDeJonctions', ...
-              ['Les jonctions de la machine ''%s'' bouclent : un chemin repasse sans fin ' ...
-               'par ''%s''.'], machine.nom, tr.vers);
+              ['The junctions of chart ''%s'' form a loop: a path goes endlessly ' ...
+               'through ''%s''.'], machine.nom, tr.vers);
     end
     [vrai, contexte] = garde(tr, contexte, u, machine);
     if ~vrai
@@ -371,8 +371,8 @@ function [R, contexte] = franchir(A, machine, s, c, parcours, R, contexte, t, u)
     end
     if A.parallele(commun + 1)
         error('Stateflow:TransitionEntreParalleles', ...
-              ['La transition de ''%s'' vers ''%s'' relie deux etats paralleles : ils ' ...
-               'sont actifs ensemble, on ne passe pas de l''un a l''autre.'], ...
+              ['The transition from ''%s'' to ''%s'' links two parallel states: they ' ...
+               'are active together, so one cannot go from one to the other.'], ...
               A.noms{s}, A.noms{c});
     end
     % l'enfant de COMMUN du côté de la source, actif, et tout ce qu'il porte

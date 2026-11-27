@@ -34,24 +34,24 @@ function expandSubsystem(sousSysteme, varargin)
 %   Voir aussi SIMULINK.BLOCKDIAGRAM.CREATESUBSYSTEM, FIND_SYSTEM.
     if mod(numel(varargin), 2) ~= 0
         error('Simulink:BlockDiagram:ExpandSubsystemArguments', ...
-              'Les options d''expandSubsystem vont par paires : un nom, une valeur.');
+              'expandSubsystem options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         if ~strcmpi(char(varargin{k}), 'CreateArea')
             error('Simulink:BlockDiagram:ExpandSubsystemArguments', ...
-                  'expandSubsystem n''a pas d''option ''%s'' : sa seule option est CreateArea.', ...
+                  'expandSubsystem has no option ''%s''. Its only option is CreateArea.', ...
                   char(varargin{k}));
         end
         v = varargin{k + 1};
         if ~((ischar(v) || (isstring(v) && isscalar(v))) && any(strcmpi(char(v), {'on', 'off'})))
             error('Simulink:BlockDiagram:ExpandSubsystemArguments', ...
-                  'CreateArea vaut ''on'' ou ''off''.');
+                  'CreateArea must be ''on'' or ''off''.');
         end
     end
     [racine, chemin, genre] = matlibre_sl_nomme('systeme', sousSysteme);
     if ~strcmp(genre, 'bloc') || isempty(chemin)
         error('Simulink:BlockDiagram:ExpandSubsystemNotSubsystem', ...
-              'expandSubsystem deplie un sous-systeme, designe par son chemin ou sa poignee.');
+              'expandSubsystem expands a subsystem, given by its path or handle.');
     end
     barre = find(chemin == '/', 1, 'last');
     parent = '';

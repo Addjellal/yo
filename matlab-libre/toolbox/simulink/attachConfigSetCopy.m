@@ -25,7 +25,7 @@ function varargout = attachConfigSetCopy(modele, cs, renommer)
     end
     if ~isa(cs, 'Simulink.ConfigSet')
         error('Simulink:ConfigSet:InvalidConfigSet', ...
-              'ATTACHCONFIGSETCOPY(MODELE,CS) : CS est un Simulink.ConfigSet.');
+              'ATTACHCONFIGSETCOPY(MODEL,CS): CS must be a Simulink.ConfigSet.');
     end
     copie = copy(cs);
     if isstruct(modele)

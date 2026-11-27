@@ -31,20 +31,20 @@ function copyContentsToSubsystem(source, sousSysteme)
         [nomSource, cheminSource, genre] = matlibre_sl_nomme('systeme', source);
         if ~strcmp(genre, 'modele') || ~isempty(cheminSource)
             error('Simulink:BlockDiagram:CopyContentsSourceNotBlockDiagram', ...
-                  ['copyContentsToSubsystem copie un modele, designe par son nom sans chemin ' ...
-                   'ni extension.']);
+                  ['copyContentsToSubsystem copies a model, given by its name without path ' ...
+                   'or extension.']);
         end
         source = matlibre_sl_nomme('modele', nomSource);
     end
     [racine, chemin, genre] = matlibre_sl_nomme('systeme', sousSysteme);
     if ~strcmp(genre, 'bloc') || isempty(chemin)
         error('Simulink:SubSystem:NotASubsystem', ...
-              'copyContentsToSubsystem copie dans un sous-systeme, designe par son chemin.');
+              'copyContentsToSubsystem copies into a subsystem, given by its path.');
     end
     if strcmp(racine, nomSource)
         error('Simulink:BlockDiagram:CopyContentsSourceContainsTarget', ...
-              ['Le modele ''%s'' contient le sous-systeme ''%s/%s'' : il ne se copie pas ' ...
-               'dedans.'], nomSource, racine, chemin);
+              ['Model ''%s'' contains subsystem ''%s/%s'': it cannot be copied ' ...
+               'into it.'], nomSource, racine, chemin);
     end
     barre = find(chemin == '/', 1, 'last');
     parent = '';

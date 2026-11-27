@@ -33,20 +33,21 @@ function modele = arrangeSystem(systeme, varargin)
 %   Voir aussi OPEN_SYSTEM, SET_PARAM, SIMULINK.BLOCKDIAGRAM.CREATESUBSYSTEM.
     if mod(numel(varargin), 2) ~= 0
         error('Simulink:BlockDiagram:ArrangeSystemArguments', ...
-              'Les options d''arrangeSystem vont par paires : un nom, une valeur.');
+              'arrangeSystem options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         nom = char(varargin{k});
         if ~any(strcmpi(nom, {'FullLayout', 'Animation'}))
             error('Simulink:BlockDiagram:ArrangeSystemArguments', ...
-                  'arrangeSystem n''a pas d''option ''%s'' : ses options sont FullLayout et Animation.', ...
+                  ['arrangeSystem has no option ''%s''. Valid options are FullLayout and ' ...
+                   'Animation.'], ...
                   nom);
         end
         v = varargin{k + 1};
         if ~(islogical(v) && isscalar(v)) && ...
            ~((ischar(v) || (isstring(v) && isscalar(v))) && any(strcmpi(char(v), {'true', 'false'})))
             error('Simulink:BlockDiagram:ArrangeSystemArguments', ...
-                  '%s vaut ''true'' ou ''false''.', nom);
+                  '%s must be ''true'' or ''false''.', nom);
         end
     end
     if isstruct(systeme)
@@ -56,7 +57,7 @@ function modele = arrangeSystem(systeme, varargin)
     [racine, chemin, genre] = matlibre_sl_nomme('systeme', systeme);
     if ~any(strcmp(genre, {'modele', 'bloc'}))
         error('Simulink:BlockDiagram:ArrangeSystemArguments', ...
-              'arrangeSystem range un modele ou un sous-systeme, non un port ou une ligne.');
+              'arrangeSystem arranges a model or a subsystem, not a port or a line.');
     end
     if isempty(chemin)
         ctx = matlibre_sl_restructurer('ouvrir', racine, '');

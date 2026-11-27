@@ -45,7 +45,8 @@ function modele = delete_line(modele, source, destination, entree, sortie)
                  (c(:, 1) == b & c(:, 2) == pb & c(:, 3) == a & c(:, 4) == pa);
         if ~any(trouve)
             error('Simulink:Commands:DeleteLineNoLine', ...
-                  'Aucune connexion ne relie ''%s'' a ''%s''.', char(source), char(destination));
+                  ['No connection exists between ''%s'' and ' ...
+                   '''%s''.'], char(source), char(destination));
         end
         modele.connexions(trouve, :) = [];
         return
@@ -70,7 +71,7 @@ function modele = delete_line(modele, source, destination, entree, sortie)
     end
     if isempty(candidats)
         error('Simulink:Commands:DeleteLineNoLine', ...
-              'Aucun lien ne va de ''%s'' a ''%s''.', char(source), char(destination));
+              'No line goes from ''%s'' to ''%s''.', char(source), char(destination));
     end
     liens(candidats, :) = [];
     modele.liens = liens;
@@ -80,8 +81,8 @@ function [k, port] = portPhysique(modele, texte)
     jetons = regexp(char(texte), '^(.*)/(LConn|RConn)(\d+)$', 'tokens', 'once', 'ignorecase');
     k = chercher(modele, jetons{1});
     if k == 0
-        error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
-              'aucun bloc ne s''appelle ''%s''.'], jetons{1});
+        error('Simulink:Commands:InvSimulinkObjectName', ['Invalid Simulink object name: ' ...
+              'no block is named ''%s''.'], jetons{1});
     end
     port = str2double(jetons{3});
     if strcmpi(jetons{2}, 'RConn')

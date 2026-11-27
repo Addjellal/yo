@@ -20,7 +20,7 @@ function machine = sfhistory(machine, parent)
 %   Voir aussi SFSTATE, SFDECOMPOSITION, SFSTEP.
     parent = char(parent);
     if ~isempty(parent) && ~any(cellfun(@(e) strcmp(e.nom, parent), machine.etats))
-        error('Stateflow:EtatInconnu', 'La machine n''a pas d''etat ''%s''.', parent);
+        error('Stateflow:EtatInconnu', 'The chart has no state ''%s''.', parent);
     end
     if ~isfield(machine, 'historiques')
         machine.historiques = {};

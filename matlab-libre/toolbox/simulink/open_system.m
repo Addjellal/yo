@@ -34,7 +34,7 @@ function h = open_system(modele)
 %
 %   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, CLOSE_SYSTEM, GCS, SIM.
     if nargin < 1
-        error('MATLAB:minrhs', 'OPEN_SYSTEM attend un modèle.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     if isnumeric(modele) && isscalar(modele) && ...
        ~isempty(matlibre_sl_signaux('cle', double(modele)))
@@ -55,8 +55,8 @@ function h = open_system(modele)
     end
     if ~isstruct(modele) || ~isfield(modele, 'blocs')
         error('Simulink:openSystem:Modele', ...
-              ['OPEN_SYSTEM attend le modèle que rend NEW_SYSTEM, son nom, ou un ' ...
-               'fichier .slx ou .mdl.']);
+              ['OPEN_SYSTEM requires the model returned by NEW_SYSTEM, its name, or a ' ...
+               '.slx or .mdl file.']);
     end
 
     % Une seule mise en place, partagée avec l'éditeur du bureau : c'est

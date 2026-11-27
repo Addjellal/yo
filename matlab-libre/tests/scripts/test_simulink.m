@@ -890,11 +890,11 @@ m = add_line(m, 'x', 'carre');
 m = add_line(m, 'carre', 'x');
 decalage = add_block(new_system('decalage'), 'zoh', 'h', 'SampleTime', [0.1 0.2]);
 casErreurs = {
-    @() sim(m, 'Solver', 'ode45', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'singularite'
+    @() sim(m, 'Solver', 'ode45', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'singularity'
     @() sim(m, 'Solver', 'VariableStepDiscrete'), 'Simulink:Engine:DiscreteSolverContinuousStates', 'explose/x'
     @() sim(decalage, 'Solver', 'ode45'), 'Simulink:SampleTime:InvalidOffset', 'decalage/h'
     @() sim(m, 'Solver', 'ode45', 'RelTol', -1), 'Simulink:Config:InvalidValue', 'RelTol'
-    @() sim(m, 'Solver', 'ode45', 'MinStep', 1, 'MaxStep', 0.1), 'Simulink:Config:InvalidValue', 'pas minimal'
+    @() sim(m, 'Solver', 'ode45', 'MinStep', 1, 'MaxStep', 0.1), 'Simulink:Config:InvalidValue', 'minimum step size'
     @() set_param(m, 'Solver', 'ode7'), 'Simulink:Commands:SolveurInconnu', 'ode15s'
     };
 for kE = 1:size(casErreurs, 1)
@@ -1669,7 +1669,7 @@ casErreurs = {
     @() sim(set_param(m2, 'choix', 'OutputSignals', 'mesures.absent')), ...
         'Simulink:Bus:SelectorElementNotFound', 'mesures.absent'
     @() sim(set_param(m2, 'choix', 'OutputSignals', 'onde.x')), ...
-        'Simulink:Bus:SelectorElementNotFound', 'n''est pas un bus'
+        'Simulink:Bus:SelectorElementNotFound', 'is not a bus'
     };
 for kE = 1:size(casErreurs, 1)
     vu = '';
@@ -1935,15 +1935,15 @@ explose = add_line(add_line(add_block(add_block(new_system('explose'), 'math', '
     'Operator', 'square'), 'integrator', 'x', 'InitialCondition', 1), 'x', 'carre'), ...
     'carre', 'x');
 casErreurs = {
-    @() set_param(m, 'MaxOrder', 6), 'Simulink:Config:InvalidValue', 'de 1 a 5'
+    @() set_param(m, 'MaxOrder', 6), 'Simulink:Config:InvalidValue', 'from 1 to 5'
     @() set_param(m, 'MaxOrder', 2.5), 'Simulink:Config:InvalidValue', 'MaxOrder'
-    @() set_param(m, 'ExtrapolationOrder', 0), 'Simulink:Config:InvalidValue', 'de 1 a 4'
-    @() set_param(m, 'NumberNewtonIterations', 0), 'Simulink:Config:InvalidValue', 'au moins'
+    @() set_param(m, 'ExtrapolationOrder', 0), 'Simulink:Config:InvalidValue', 'from 1 to 4'
+    @() set_param(m, 'NumberNewtonIterations', 0), 'Simulink:Config:InvalidValue', 'greater than or equal to 1'
     @() simset('MaxOrder', 9), 'Simulink:Config:InvalidValue', 'MaxOrder'
     @() set_param(m, 'Solver', 'ode6'), 'Simulink:Commands:SolveurInconnu', 'ode113'
     @() sim(decroissance, 'Solver', 'ode15s', 'MaxOrder', 0), 'Simulink:Config:InvalidValue', 'MaxOrder'
     @() sim(explose, 'Solver', 'ode15s', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'ode15s'
-    @() sim(explose, 'Solver', 'ode113', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'essayez ode15s'
+    @() sim(explose, 'Solver', 'ode113', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'try ode15s'
     @() sim(decroissance, 'Solver', 'VariableStepDiscrete'), 'Simulink:Engine:DiscreteSolverContinuousStates', 'ode15s'
     @() sim(decroissance, 'Solver', 'FixedStepDiscrete'), 'Simulink:Engine:DiscreteSolverContinuousStates', 'ode14x'
     };
@@ -2116,11 +2116,11 @@ largeurRemise = add_block(largeurRemise, 'integrator', 'x', 'ExternalReset', 'le
 largeurRemise = add_line(add_line(largeurRemise, 'u', 'x', 1), 'r', 'x', 2);
 casErreurs = {
     @() add_line(sansEtat, 'x/State', 'g'), 'Simulink:Commands:AddLineInvalidPort', 'ShowStatePort'
-    @() add_line(sansEtat, 'g/State', 'x'), 'Simulink:Commands:AddLineInvalidPort', 'port d''etat'
-    @() sim(largeurCI), 'Simulink:Engine:DimensionMismatch', 'condition initiale'
-    @() sim(largeurRemise), 'Simulink:Engine:DimensionMismatch', 'de remise'
+    @() add_line(sansEtat, 'g/State', 'x'), 'Simulink:Commands:AddLineInvalidPort', 'no state port'
+    @() sim(largeurCI), 'Simulink:Engine:DimensionMismatch', 'initial condition'
+    @() sim(largeurRemise), 'Simulink:Engine:DimensionMismatch', 'reset input'
     @() sim(set_param(balle, 'vitesse', 'ExternalReset', 'parfois')), 'Simulink:Parameters:InvalidValue', 'level hold'
-    @() add_line(balle, 'gravite', 'vitesse', 4), 'Simulink:Commands:AddLineInvalidPort', '3 port(s)'
+    @() add_line(balle, 'gravite', 'vitesse', 4), 'Simulink:Commands:AddLineInvalidPort', '3 input port(s)'
     @() matlibre_sl_programme(set_param(balle, 'Solver', 'ode1')), ...
         'Simulink:programme:BlocNonEcrit', 'balle/vitesse'
     };
@@ -2476,10 +2476,10 @@ largeurPrises = add_line(add_block(add_block(new_system('largeurPrises'), 'const
                          'Value', [1 2]), 'tappeddelay', 't', 'samptime', 0.1), 'c', 't');
 casErreurs = {
     @() sim(sansMemoire), 'Simulink:DataStores:DataStoreNotFound', 'sansMemoire/lit'
-    @() sim(deuxMemoires), 'Simulink:DataStores:DuplicateDataStore', 'deux fois'
+    @() sim(deuxMemoires), 'Simulink:DataStores:DuplicateDataStore', 'defined twice'
     @() sim(largeurMemoire), 'Simulink:DataStores:DataStoreWidthMismatch', 'largeurMemoire/w'
     @() sim(continuDiscret), 'Simulink:SampleTime:DiscreteBlockContinuous', 'continuDiscret/d'
-    @() sim(largeurPrises), 'Simulink:Engine:DimensionMismatch', 'scalaire'
+    @() sim(largeurPrises), 'Simulink:Engine:DimensionMismatch', 'scalar'
     @() sim(add_block(new_system('b'), 'bandlimitedwhitenoise', 'n', 'Ts', 0)), ...
         'Simulink:Parameters:InvalidValue', 'positive'
     @() sim(add_block(new_system('c'), 'counterfreerunning', 'n', 'NumBits', 0.5)), ...
@@ -2487,7 +2487,7 @@ casErreurs = {
     @() sim(add_block(new_system('g'), 'signalgenerator', 'g', 'WaveForm', 'triangle')), ...
         'Simulink:Parameters:InvalidValue', 'sawtooth'
     @() sim(add_block(new_system('z'), 'discretezeropole', 'z', 'Zeros', [1 2], 'Poles', 0.5)), ...
-        'Simulink:blocks:TransferFcnImproper', 'propre'
+        'Simulink:blocks:TransferFcnImproper', 'improper'
     @() matlibre_sl_programme(add_block(set_param(new_system('p'), 'Solver', 'ode1'), ...
                                         'chirp', 'c')), ...
         'Simulink:programme:BlocNonEcrit', 'p/c'
@@ -2816,14 +2816,14 @@ assert(isequal(r.signaux.direct.', [10 20 30 30 10]) && ...
 
 % Les erreurs, chacune avec son identifiant.
 casErreurs = {
-    @() sim(modeleExterne, [0 1], [], [0 1; 1 2]), 'Simulink:SimInput:NumPortsMismatch', 'colonne'
+    @() sim(modeleExterne, [0 1], [], [0 1; 1 2]), 'Simulink:SimInput:NumPortsMismatch', 'column'
     @() sim(modeleExterne, [0 1], [], 'pasUneVariable'), 'Simulink:SimInput:InvalidExpression', 'pasUneVariable'
-    @() sim(modeleExterne, [0 1], [], [1 0 0 0 0; 0 1 1 1 1]), 'Simulink:SimInput:TimeNotMonotonic', 'croitre'
+    @() sim(modeleExterne, [0 1], [], [1 0 0 0 0; 0 1 1 1 1]), 'Simulink:SimInput:TimeNotMonotonic', 'must increase'
     @() sim(add_block(new_system('r'), 'modelreference', 'm')), 'Simulink:modelReference:ModelNameEmpty', 'ModelName'
     @() sim(add_block(new_system('r'), 'modelreference', 'm', 'ModelName', 'modeleQuiNExistePas')), ...
         'Simulink:modelReference:ModelNotFound', 'modeleQuiNExistePas'
     @() sim(add_block(new_system('t'), 'lookup', 'l', 'NumberOfTableDimensions', 7)), ...
-        'Simulink:blocks:LookupNDDimensions', 'une a six'
+        'Simulink:blocks:LookupNDDimensions', 'one to six'
     @() set_param(new_system('c'), 'LoadExternalInput', 'parfois'), 'Simulink:Config:InvalidValue', 'LoadExternalInput'
     };
 for kE = 1:size(casErreurs, 1)
@@ -3107,7 +3107,7 @@ casErreurs = {
     @() sfdecomposition(sfchart('x'), '', 'melange'), 'Stateflow:DecompositionInconnue', 'melange'
     @() sfhistory(sfchart('x'), 'absent'), 'Stateflow:EtatInconnu', 'absent'
     @() sfrun(sftransition(sfdecomposition(sfstate(sfstate(sfchart('x'), 'a'), 'b'), '', ...
-        'parallel'), 'a', 'b', @(c, u) true), 1), 'Stateflow:TransitionEntreParalleles', 'paralleles'
+        'parallel'), 'a', 'b', @(c, u) true), 1), 'Stateflow:TransitionEntreParalleles', 'parallel states'
     @() sfafter(struct(), 1), 'Stateflow:TempsInconnu', 'sf_ticks'
     @() sfrun(mSec, 0), 'Stateflow:TempsInconnu', 'sf_t'
     @() sfafter(struct('sf_ticks', 1), 1, 'minute'), 'Stateflow:UniteTemporelle', 'minute'
@@ -3355,8 +3355,8 @@ casErreurs = {
     @() sim(add_line(add_block(add_block(new_system('zp'), 'constant', 'u', 'Value', [1; 2]), ...
         'discretezeropole', 'z', 'SampleTime', 1), 'u/1', 'z/1')), ...
         'Simulink:Engine:DimensionMismatch', 'zp/z'
-    @() add_block(new_system('m'), 'iterateur', 'i'), 'Simulink:Commands:InvalidBlockType', 'interne'
-    @() add_block(new_system('m'), 'garde', 'g'), 'Simulink:Commands:InvalidBlockType', 'interne'
+    @() add_block(new_system('m'), 'iterateur', 'i'), 'Simulink:Commands:InvalidBlockType', 'internal'
+    @() add_block(new_system('m'), 'garde', 'g'), 'Simulink:Commands:InvalidBlockType', 'internal'
     @() sim(add_block(new_system('vide'), 'subsystem', 's')), 'Simulink:Commands:SousSystemeVide', 'vide/s'
     @() sim(add_block(new_system('r'), 'modelreference', 'm')), ...
         'Simulink:modelReference:ModelNameEmpty', 'r/m'
@@ -3366,11 +3366,11 @@ casErreurs = {
     @() get_param(modeleVoisin, 'c', 'Absent'), 'Simulink:Commands:ParamUnknown', 'Absent'
     @() delete_line(modeleVoisin, 'c/1', 'c/1'), 'Simulink:Commands:DeleteLineNoLine', 'c'
     @() sim(modeleVoisin, 'StartTime', 2, 'StopTime', 1), ...
-        'Simulink:SolverConfig:StopTimeBeforeStartTime', 'duree'
+        'Simulink:SolverConfig:StopTimeBeforeStartTime', 'duration'
     @() sim(add_block(new_system('fw'), 'fromworkspace', 'f')), ...
         'Simulink:blocks:FromWorkspaceVariableNotFound', 'fw/f'
     @() sim(add_block(new_system('cplx'), 'saturation', 's', 'UpperLimit', 1 + 2i)), ...
-        'Simulink:Parameters:InvParamSetting', 'complexe'
+        'Simulink:Parameters:InvParamSetting', 'complex'
     @() sim(add_block(new_system('vide'), 'constant', 'c', 'Value', [])), ...
         'Simulink:Parameters:InvParamSetting', 'vide/c'
     @() sim(add_block(new_system('sg'), 'sum', 's', 'Signs', '+x')), ...
@@ -3380,7 +3380,7 @@ casErreurs = {
     @() sim(add_block(new_system('st'), 'constant', 'c', 'SampleTime', NaN)), ...
         'Simulink:SampleTime:InvalidSampleTime', 'st/c'
     @() sim(add_block(new_system('po'), 'inport', 'i', 'Port', 0)), ...
-        'Simulink:Parameters:InvParamSetting', 'entier positif'
+        'Simulink:Parameters:InvParamSetting', 'positive integer'
     @() sim(add_block(new_system('tf'), 'tofile', 'f', 'MatrixName', 'a b')), ...
         'Simulink:blocks:ToFileInvalidName', 'tf/f'
     @() sim(add_block(new_system('ssm'), 'subsystem', 's', 'Model', 42)), ...
@@ -3483,7 +3483,7 @@ casErreurs = {
     @() set_param(oscillateur, 'ODENIntegrationMethod', 'ode14x'), ...
         'Simulink:Config:InvalidValue', 'ode8'
     @() sim(oscillateur, 'Solver', 'daessc', 'MaxOrder', 6), 'Simulink:Config:InvalidValue', ...
-        'de 1 a 5'
+        'from 1 to 5'
     @() set_param(oscillateur, 'Solver', 'ode6'), 'Simulink:Commands:SolveurInconnu', 'daessc'
     };
 for kE = 1:size(casErreurs, 1)
@@ -3843,7 +3843,7 @@ casErreurs = {
         'msfInexistante'
     @() sim(niveau2Avec('msfGain', '')), 'Simulink:blocks:SFunctionParameterCount', 'mauvais/s'
     @() sim(niveau2Avec('msfGain', '1, 2')), 'Simulink:blocks:SFunctionParameterCount', ...
-        'attend 1'
+        'expects 1'
     @() sim(niveau2Avec('msfLarge', '')), 'Simulink:blocks:SFunctionOutputDimensions', ...
         'mauvais/s'
     @() sim(niveau2Avec('msfPanne', ''), 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 1), ...
@@ -4065,15 +4065,15 @@ boucle = sftransition(boucle, 'j1', 'j2', '');
 boucle = sftransition(boucle, 'j2', 'j1', '');
 table = sftruthtable(sfchart('t'), 'f', {'x'}, {'y'}, {'x > 0'}, 'TF', {'y = 1;', 'y = 2;'});
 casErreurs = {
-    @() sfrun(boucle, [0 0]), 'Stateflow:BoucleDeJonctions', 'bouclent'
+    @() sfrun(boucle, [0 0]), 'Stateflow:BoucleDeJonctions', 'form a loop'
     @() sfjunction(sfjunction(sfchart('x'), 'j'), 'j'), 'Stateflow:JonctionDouble', 'j'
     @() sfstate(sfjunction(sfchart('x'), 'j'), 'j'), 'Stateflow:EtatDouble', 'j'
-    @() sffunction(sfchart('x'), 'f', 3), 'Stateflow:FonctionInvalide', 'poignee'
+    @() sffunction(sfchart('x'), 'f', 3), 'Stateflow:FonctionInvalide', 'function handle'
     @() sftruthtable(sfchart('x'), 't', {'x'}, {'y'}, {'x > 0', 'x < 0'}, 'TF', {'y=1;', 'y=2;'}), ...
-        'Stateflow:TableDeVeriteInvalide', 'une par condition'
+        'Stateflow:TableDeVeriteInvalide', 'one per condition'
     @() sftruthtable(sfchart('x'), 't', {'x'}, {'y'}, {'x > 0'}, 'TX', {'y=1;', 'y=2;'}), ...
-        'Stateflow:TableDeVeriteInvalide', 'peu importe'
-    @() table.fonctions.f(1, 2), 'Stateflow:TableDeVeriteArguments', 'prend 1'
+        'Stateflow:TableDeVeriteInvalide', 'don''t care'
+    @() table.fonctions.f(1, 2), 'Stateflow:TableDeVeriteArguments', 'takes 1'
     };
 for kE = 1:size(casErreurs, 1)
     vu = '';
@@ -4161,8 +4161,8 @@ deuxEntrees = add_block(deuxEntrees, 'outport', 'o2');
 deuxEntrees = add_line(deuxEntrees, 'a/1', 'o1/1');
 deuxEntrees = add_line(deuxEntrees, 'b/1', 'o2/1');
 casErreurs = {
-    @() timeseries([1 2 3], [0 2 1]), 'MATLAB:timeseries:TimeNotMonotonic', 'croissants'
-    @() timeseries([1; 2; 3], [0 1]), 'MATLAB:timeseries:SizeMismatch', '2 instant'
+    @() timeseries([1 2 3], [0 2 1]), 'MATLAB:timeseries:TimeNotMonotonic', 'increasing'
+    @() timeseries([1; 2; 3], [0 1]), 'MATLAB:timeseries:SizeMismatch', '2 time'
     @() sim(m, 'SaveFormat', 'Tableau'), 'Simulink:Config:InvalidValue', 'Dataset'
     @() get(Simulink.SimulationData.Dataset, 'absent'), ...
         'Simulink:SimulationData:DatasetElementNotFound', 'absent'
@@ -4407,27 +4407,27 @@ casErreurs = {
     @() sim(set_param(t, 'c', 'Value', 'Hors'), 1), 'Simulink:Data:ParameterOutOfRange', ...
         'typeParametre/c'
     @() sim(set_param(t, 'c', 'Value', 'Debord'), 1), 'Simulink:Data:ParameterOverflow', ...
-        '-128 a 127'
+        '-128 to 127'
     @() sim(set_param(t, 'c', 'Value', 'Alias'), 1), 'Simulink:DataType:UnknownDataType', ...
         'MonAlias'
     @() sim(set_param(t, 'c', 'Value', 'BusFaux'), 1), ...
         'Simulink:Data:ParameterTypeMismatch', 'structure'
     @() sim(gMauvaise), 'Simulink:DataStores:InvalidInitialValue', '3 element'
     @() sim(set_param(h, 'LoadInitialState', 'on', 'InitialState', [1 2])), ...
-        'Simulink:SimInput:InitialStateDimensions', '2 valeur'
+        'Simulink:SimInput:InitialStateDimensions', '2 value'
     @() set_param(h, 'FinalStateName', '1x'), 'Simulink:Config:InvalidValue', 'FinalStateName'
     @() Simulink.SimulationInput(''), 'Simulink:Simulation:InvalidModelName', 'NEW_SYSTEM'
-    @() un.setVariable('1a', 3), 'Simulink:Simulation:InvalidVariableName', 'nom'
+    @() un.setVariable('1a', 3), 'Simulink:Simulation:InvalidVariableName', 'name'
     @() un.setBlockParameter('entree/g', 'Gain'), ...
         'Simulink:Simulation:InvalidNumberOfArguments', 'triplets'
     @() un.setModelParameter('StopTime'), 'Simulink:Simulation:InvalidNumberOfArguments', ...
-        'paires'
+        'pairs'
     @() un.getVariable('absente'), 'Simulink:Simulation:VariableNotFound', 'absente'
     @() un.setPreSimFcn(3), 'Simulink:Simulation:InvalidFunctionHandle', 'PreSimFcn'
     @() validate(un.setBlockParameter('entree/zz', 'Gain', '3')), ...
         'Simulink:Commands:InvSimulinkObjectName', 'entree/zz'
     @() validate(un.setBlockParameter('autre/g', 'Gain', '3')), ...
-        'Simulink:Commands:InvSimulinkObjectName', 'commence par'
+        'Simulink:Commands:InvSimulinkObjectName', 'starts with'
     @() sim(un, 'StopTime', '3'), 'Simulink:Commands:SimArguments', 'SETMODELPARAMETER'
     @() parsim(3), 'Simulink:parsim:InvalidInput', 'SimulationInput'
     @() parsim(lot, 'RunInBackground', 'on'), 'Simulink:parsim:RunInBackgroundUnsupported', ...
@@ -4598,26 +4598,26 @@ autre = add_block(new_system('autre'), 'gain', 'g');
 sansGain = delete_block(jr, 'g');
 casErreurs = {
     @() set_param(jr, pg.Outport(1), 'DataLogging', 'peut-etre'), ...
-        'Simulink:Commands:SetParamInvalidValue', '''off'' ou ''on'''
+        'Simulink:Commands:SetParamInvalidValue', '''off'' or ''on'''
     @() set_param(jr, pg.Outport(1), 'Couleur', 'rouge'), 'Simulink:Commands:ParamUnknown', ...
         'Couleur'
     @() set_param(jr, pg.Inport(1), 'DataLogging', 'on'), 'Simulink:Commands:ParamReadOnly', ...
-        'port de sortie'
+        'output port'
     @() set_param(jr, 12345.5, 'Name', 'x'), 'Simulink:Commands:InvalidPortHandle', ...
         'PortHandles'
     @() set_param(autre, pg.Outport(1), 'Name', 'x'), 'Simulink:Commands:InvalidPortHandle', ...
         'journalise'
     @() set_param(jr, pg.Outport(1), 'DataLoggingDecimation', 0), ...
-        'Simulink:Commands:SetParamInvalidValue', 'entier'
-    @() set_param(jr, pg.Outport(1), 'Name'), 'Simulink:Commands:SetParamArguments', 'paires'
+        'Simulink:Commands:SetParamInvalidValue', 'integer'
+    @() set_param(jr, pg.Outport(1), 'Name'), 'Simulink:Commands:SetParamArguments', 'pairs'
     @() set_param(jr, pg.Outport(1), 'DataLoggingNameMode', 'Auto'), ...
         'Simulink:Commands:SetParamInvalidValue', 'Custom'
-    @() get_param(jr, pg.Outport(1)), 'Simulink:Commands:GetParamArguments', 'reglage'
+    @() get_param(jr, pg.Outport(1)), 'Simulink:Commands:GetParamArguments', 'parameter'
     @() get_param(jr, pg.Outport(1), 'Couleur'), 'Simulink:Commands:ParamUnknown', 'Couleur'
     @() get_param(jr, 'absent', 'PortHandles'), 'Simulink:Commands:InvSimulinkObjectName', ...
         'absent'
     @() set_param(sansGain, pg.Outport(1), 'Name', 'x'), ...
-        'Simulink:Commands:InvSimulinkObjectName', 'plus de bloc'
+        'Simulink:Commands:InvSimulinkObjectName', 'no longer has a block'
     @() sim(jr, 'SignalLoggingName', '1x'), 'Simulink:Config:InvalidValue', 'SignalLoggingName'
     @() sim(jr, 'SignalLogging', 'parfois'), 'Simulink:Config:InvalidValue', 'SignalLogging'
     };
@@ -4841,21 +4841,21 @@ casErreurs = {
     @() sim(set_param(va, 'V/Double', 'VariantControl', 'ModeInconnu == 1'), 1), ...
         'Simulink:Variants:InvalidVariantControl', 'ModeInconnu'
     @() sim(set_param(va, 'V/Double', 'VariantControl', '[1 1]'), 1), ...
-        'Simulink:Variants:InvalidVariantControl', '2 valeurs'
+        'Simulink:Variants:InvalidVariantControl', '2 values'
     @() sim(set_param(va, 'V', 'VariantControlMode', 'label'), 1), ...
         'Simulink:Variants:NoActiveLabel', 'LabelModeActiveChoice'
     @() sim(set_param(va, 'V', 'VariantControlMode', 'label', 'LabelModeActiveChoice', 'x'), 1), ...
         'Simulink:Variants:InvalidLabel', '''x'''
     @() sim(set_param(set_param(va, 'V/Double', 'VariantControl', '(default)'), 'V/Triple', ...
                       'VariantControl', '(default)'), 1), 'Simulink:Variants:MultipleDefaults', ...
-        'par defaut'
+        'default'
     @() sim(set_param(va, 'V', 'Model', intrus), 1), ...
         'Simulink:Variants:InvalidBlockInVariant', '''g'''
     @() sim(set_param(va, 'V', 'Model', new_system('vide')), 1), ...
         'Simulink:Variants:NoVariantChoices', 'variantes/V'
     @() sim(set_param(va, 'V', 'Model', mauvaisPort), 1), 'Simulink:Variants:PortMismatch', ...
         'autre'
-    @() Simulink.Variant(3), 'Simulink:Variants:InvalidCondition', 'texte'
+    @() Simulink.Variant(3), 'Simulink:Variants:InvalidCondition', 'text'
     @() sim(set_param(vsrc, 'vs', 'VariantControls', {'Mode == 1', 'Mode == 1'}), 1), ...
         'Simulink:Variants:MultipleActiveVariants', 'sourceVariante/vs'
     };
@@ -5224,7 +5224,7 @@ casErreurs = {
     @() sim(set_param(cl, 'u', 'Value', [1 0 1]), 1), ...
         'Simulink:blocks:CombinatorialLogicRows', 'combinatoire/demi'
     @() sim(set_param(cl, 'demi', 'TruthTable', [0; 1; 1]), 1), ...
-        'Simulink:blocks:CombinatorialLogicRows', 'puissance de deux'
+        'Simulink:blocks:CombinatorialLogicRows', 'power of two'
     @() sim(set_param(sp, 'spec', 'Dimensions', 2), 1), ...
         'Simulink:blocks:SignalSpecificationDimensions', 'specification/spec'
     @() sim(set_param(sp, 'spec', 'OutDataTypeStr', 'int8'), 1), ...
@@ -5592,18 +5592,18 @@ dynLarge = add_line(delete_line(add_block(dynBas, 'constant', 'l3', 'Value', [1 
 dynLarge = set_param(dynLarge, 'sig', 'InitialOutput', [4 5]);
 reglage = {'Solver', 'ode1', 'FixedStep', 0.5, 'StopTime', 5};
 casVerif = {
-    @() sim(verif, reglage{:}), 'Simulink:blocks:AssertionAssert', 'verif/cs'' a t = 3'
+    @() sim(verif, reglage{:}), 'Simulink:blocks:AssertionAssert', 'verif/cs'' at time 3'
     @() sim(set_param(verif, 'cs', 'max_included', 'off', 'max', 2), reglage{:}), ...
-        'Simulink:blocks:AssertionAssert', 'verif/cs'' a t = 2'
+        'Simulink:blocks:AssertionAssert', 'verif/cs'' at time 2'
     @() sim(set_param(verif, 'cs', 'min', 3, 'max', 1), 1), ...
         'Simulink:blocks:CheckBoundsOrder', 'verif/cs'
-    @() sim(ecart, reglage{:}), 'Simulink:blocks:AssertionAssert', 'ecart/cg'' a t = 1.5'
-    @() sim(bornes, reglage{:}), 'Simulink:blocks:AssertionAssert', 'bornes/lo'' a t = 2.5'
-    @() sim(dyn, reglage{:}), 'Simulink:blocks:AssertionAssert', 'dyn/cr'' a t = 2.5'
-    @() sim(dynEcart, reglage{:}), 'Simulink:blocks:AssertionAssert', 'dyn/cr'' a t = 2'
+    @() sim(ecart, reglage{:}), 'Simulink:blocks:AssertionAssert', 'ecart/cg'' at time 1.5'
+    @() sim(bornes, reglage{:}), 'Simulink:blocks:AssertionAssert', 'bornes/lo'' at time 2.5'
+    @() sim(dyn, reglage{:}), 'Simulink:blocks:AssertionAssert', 'dyn/cr'' at time 2.5'
+    @() sim(dynEcart, reglage{:}), 'Simulink:blocks:AssertionAssert', 'dyn/cr'' at time 2'
     @() sim(dynBas, 'Solver', 'ode1', 'FixedStep', 0.25, 'StopTime', 5), ...
-        'Simulink:blocks:AssertionAssert', 'dynBas/cl'' a t = 1'
-    @() sim(dynLarge, 1), 'Simulink:Engine:DimensionMismatch', 'min est de dimension 3'
+        'Simulink:blocks:AssertionAssert', 'dynBas/cl'' at time 1'
+    @() sim(dynLarge, 1), 'Simulink:Engine:DimensionMismatch', 'min has dimensions 3'
     @() sim(set_param(bits, 'c', 'Value', 12), 1), ...
         'Simulink:DataType:BitOperationInputType', 'bits/bw'
     @() sim(set_param(bits, 'bs', 'iBit', 40), 1), 'Simulink:blocks:BitIndex', 'bits/bs'
@@ -7465,7 +7465,7 @@ delete(fichier52);
 flottant52 = delete_block(transfo, 'G2');
 flottant52 = add_line(add_line(flottant52, 'R/RConn1', 'T/RConn2'), 'V2/RConn1', 'T/RConn2');
 refus52 = {
-    @() sim(vitesse, 1), 'Simscape:Network:SingularNetwork', 'deriver sa commande'
+    @() sim(vitesse, 1), 'Simscape:Network:SingularNetwork', 'differentiated'
     @() sim(set_param(couple, 'T', 'k', 1), 1), 'Simulink:Parameters:InvParamSetting', ...
         'couple/T'
     @() sim(set_param(reducteur, 'R', 'ratio', 0), 1), ...
@@ -7673,7 +7673,7 @@ refus53 = {
     @() sim(set_param(table53, 'T', 'ExtrapolationMethod', 'Error'), 'Solver', 'ode45', ...
             'StopTime', 5), 'Simscape:Lookup:OutOfRange', 'table53/T'
     @() sim(set_param(table53, 'T', 'x', [0 2 1 3]), 1), ...
-        'Simulink:Parameters:InvParamSetting', 'croissant'
+        'Simulink:Parameters:InvParamSetting', 'increasing'
     @() sim(set_param(table2, 'T', 'f', [1 2 3; 4 5 6]), 1), ...
         'Simulink:Parameters:InvParamSetting', 'table2/T'
     };
@@ -9019,7 +9019,7 @@ catch err
     message63 = err.message;
 end
 assert(strcmp(vu63, 'Simulink:Engine:SolverConsecutiveZCNum') && ...
-       ~isempty(strfind(message63, '20 passages')), ...
+       ~isempty(strfind(message63, '20 consecutive zero crossings')), ...
        'MaxConsecutiveZCs 20 : l''arret, au vingt et unieme');
 lastwarn('');
 r63 = sim(m63, 'Solver', 'ode45', 'StopTime', 1.1, 'MaxConsecutiveZCs', 20, ...
@@ -9039,7 +9039,7 @@ lastwarn('');
 r63 = sim(m63, reglage63{:});
 [message63, id63] = lastwarn();
 assert(numel(r63.tout) == 5 && strcmp(id63, 'Simulink:Engine:SolverMinStepViolation') && ...
-       ~isempty(strfind(message63, '2 pas de suite')), ...
+       ~isempty(strfind(message63, '2 consecutive times')), ...
        'MinStep 0,05 tenu ; au deuxieme pas minimal de suite, l''avertissement');
 lastwarn('');
 sim(m63, reglage63{:}, 'MaxConsecutiveMinStep', 10);
@@ -11893,7 +11893,7 @@ catch err
     message91 = err.message;
 end
 assert(strcmp(vu91, 'Simulink:Engine:SolverConsecutiveZCNum') && ...
-       ~isempty(strfind(message91, '5 passages')), ...
+       ~isempty(strfind(message91, '5 consecutive zero crossings')), ...
        'une tolerance en temps large : les passages se suivent, le diagnostic tombe');
 vu91 = '';
 try
@@ -14102,13 +14102,13 @@ add_block('simulink/Ports & Subsystems/Subsystem', 'ref109/M', 'Mask', 'on', ...
 add_block('simulink/Ports & Subsystems/Subsystem', 'ref109/K', 'Commented', 'on');
 add_block('built-in/Gain', 'ref109/g');
 refus109 = {@() Simulink.BlockDiagram.expandSubsystem('ref109/E'), ...
-                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'conditionnel'; ...
+                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'conditional'; ...
             @() Simulink.BlockDiagram.expandSubsystem('ref109/A'), ...
-                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'atomique'; ...
+                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'atomic'; ...
             @() Simulink.BlockDiagram.expandSubsystem('ref109/M'), ...
-                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'masque'; ...
+                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'masked'; ...
             @() Simulink.BlockDiagram.expandSubsystem('ref109/K'), ...
-                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'commentaire'; ...
+                'Simulink:BlockDiagram:ExpandSubsystemNotAllowed', 'commented out'; ...
             @() Simulink.BlockDiagram.expandSubsystem('ref109/g'), ...
                 'Simulink:BlockDiagram:ExpandSubsystemNotSubsystem', 'ref109/g'; ...
             @() Simulink.BlockDiagram.createSubsystem([get_param('ref109/g', 'Handle'), ...

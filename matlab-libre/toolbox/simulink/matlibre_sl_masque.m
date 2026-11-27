@@ -72,9 +72,9 @@ function [noms, details] = variables(bloc)
         jetons = regexp(texte, '^([A-Za-z]\w*)\s*=\s*([@&])\s*(\d+)$', 'tokens', 'once');
         if isempty(jetons)
             error('Simulink:Masks:InvalidMaskVariables', ...
-                  ['La variable de masque ''%s'' du bloc ''%s'' ne se lit pas : on ' ...
-                   'ecrit « nom=@1; » pour une valeur evaluee, « nom=&1; » pour un ' ...
-                   'texte.'], texte, bloc.nom);
+                  ['Mask variable ''%s'' of block ''%s'' cannot be parsed: write ' ...
+                   '''name=@1;'' for an evaluated value, ''name=&1;'' for ' ...
+                   'text.'], texte, bloc.nom);
         end
         noms{end + 1} = jetons{1}; %#ok<AGROW>
         details(end + 1) = struct('rang', str2double(jetons{3}), ...
@@ -94,7 +94,7 @@ function v = lire(bloc, nom)
     rang = find(strcmp(noms, nom), 1);
     if isempty(rang)
         error('Simulink:Masks:UnknownParameter', ...
-              'Le masque du bloc ''%s'' n''a pas de variable ''%s''.', bloc.nom, nom);
+              'The mask of block ''%s'' has no variable ''%s''.', bloc.nom, nom);
     end
     valeurs = valeursDe(bloc);
     v = '';
@@ -108,7 +108,7 @@ function bloc = poser(bloc, nom, v)
     rang = find(strcmp(noms, nom), 1);
     if isempty(rang)
         error('Simulink:Masks:UnknownParameter', ...
-              'Le masque du bloc ''%s'' n''a pas de variable ''%s''.', bloc.nom, nom);
+              'The mask of block ''%s'' has no variable ''%s''.', bloc.nom, nom);
     end
     if isnumeric(v) || islogical(v)
         if isscalar(v)
@@ -120,7 +120,7 @@ function bloc = poser(bloc, nom, v)
     v = char(v);
     if any(v == '|')
         error('Simulink:Masks:InvalidValue', ...
-              'La valeur d''une variable de masque ne porte pas de « | », qui les separe.');
+              'A mask variable value cannot contain ''|'', which separates them.');
     end
     valeurs = valeursDe(bloc);
     valeurs(end + 1:details(rang).rang) = {''};
@@ -149,7 +149,7 @@ function W = espace(bloc, parent, chemin)
         end
         if isempty(texte)
             error('Simulink:Masks:EmptyValue', ...
-                  'La variable de masque ''%s'' du bloc ''%s'' n''a pas de valeur.', ...
+                  'Mask variable ''%s'' of block ''%s'' has no value.', ...
                   noms{k}, chemin);
         end
         W.(noms{k}) = evaluerBrut(texte, parent, chemin, noms{k});
@@ -160,8 +160,8 @@ function v = evaluer(texte, W, chemin, nom)
     v = evaluerBrut(char(texte), W, chemin, nom);
     if ~isnumeric(v) && ~islogical(v)
         error('Simulink:Commands:ParametreNonNumerique', ...
-              ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'', qui rend un %s : il ' ...
-               'faut un nombre.'], nom, chemin, texte, class(v));
+              ['Parameter ''%s'' of block ''%s'' is ''%s'', which gives a %s: a ' ...
+               'number is required.'], nom, chemin, texte, class(v));
     end
     v = double(v);
 end
@@ -212,8 +212,8 @@ function matlibre__v = evaluerBrut(matlibre__texte, matlibre__W, matlibre__chemi
         matlibre__v = eval(matlibre__texte);
     catch matlibre__err
         error('Simulink:Commands:ParametreNonEvalue', ...
-              ['Le parametre ''%s'' du bloc ''%s'' vaut ''%s'', et cette expression ne ' ...
-               's''evalue ni dans l''espace du masque ni dans l''espace de travail : %s'], ...
+              ['Parameter ''%s'' of block ''%s'' is ''%s'', and this expression cannot ' ...
+               'be evaluated in the mask workspace or in the base workspace: %s'], ...
               matlibre__nom, matlibre__chemin, matlibre__texte, matlibre__err.message);
     end
 end
