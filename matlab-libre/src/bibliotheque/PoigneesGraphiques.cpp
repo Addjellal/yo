@@ -427,7 +427,7 @@ bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
     if (s->genre == GenreTrace::Surface && (memeNom(nom, "ZData") || memeNom(nom, "CData"))) {
         std::vector<double> valeurs = versVecteur(v);
         if (valeurs.size() != s->x.size())
-            erreur("MATLAB:hg:InvalidData", "Les données doivent garder la forme de la grille.");
+            erreur("MATLAB:hg:InvalidData", "Data must keep the size of the grid.");
         if (memeNom(nom, "ZData")) s->z = valeurs;
         else s->valeursCouleurPoints = valeurs;
         return true;

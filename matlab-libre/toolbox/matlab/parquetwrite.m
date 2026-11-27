@@ -30,12 +30,12 @@ function parquetwrite(nomFichier, T, varargin)
 %
 %   Voir aussi PARQUETREAD, PARQUETINFO, WRITETABLE, TABLE.
     if nargin < 2
-        error('MATLAB:minrhs', 'PARQUETWRITE attend un nom de fichier et une table.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     nomFichier = char(nomFichier);
     if ~isa(T, 'table')
         error('MATLAB:parquet:TableAttendue', ...
-              'PARQUETWRITE écrit une table ; reçu %s.', class(T));
+              'PARQUETWRITE writes a table; got %s.', class(T));
     end
     noms = T.Properties.VariableNames;
     nbLignes = height(T);
@@ -54,7 +54,7 @@ function parquetwrite(nomFichier, T, varargin)
         colonne = T.(noms{k});
         if size(colonne, 2) > 1 && ~ischar(colonne) && ~iscell(colonne)
             error('MATLAB:parquet:ColonneMultiple', ...
-                  'La variable « %s » a plusieurs colonnes ; Parquet en attend une.', noms{k});
+                  'Variable ''%s'' has several columns; Parquet requires one.', noms{k});
         end
         [physique, converti] = matlibre_parquet_types(class(colonne));
 
@@ -116,7 +116,7 @@ function parquetwrite(nomFichier, T, varargin)
     identifiant = fopen(nomFichier, 'w');
     if identifiant < 0
         error('MATLAB:parquet:EcritureImpossible', ...
-              'Impossible d''écrire « %s ».', nomFichier);
+              'Unable to write file ''%s''.', nomFichier);
     end
     fwrite(identifiant, tout, 'uint8');
     fclose(identifiant);

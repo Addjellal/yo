@@ -707,8 +707,8 @@ FONCTION(fnBitget) {
                          if (k < 1 || k > largeur || k != rang)
                              throw ErreurMatlab(
                                  "MATLAB:bitget:InvalidBitIndex",
-                                 "Le rang du bit doit etre un entier entre 1 et la "
-                                 "largeur du type.");
+                                 "Bit position must be an integer between 1 and the "
+                                 "number of bits of the type.");
                          unsigned long long x = (unsigned long long)(long long)a;
                          return (double)((x >> (k - 1)) & 1ULL);
                      },
@@ -735,7 +735,7 @@ FONCTION(fnBitset) {
                                if (v != 0.0 && v != 1.0)
                                    throw ErreurMatlab(
                                        "MATLAB:bitset:InvalidBitValue",
-                                       "La valeur d'un bit vaut zero ou un.");
+                                       "Bit value must be 0 or 1.");
                                return rang * 2.0 + v;
                            },
                            Classe::Double);
@@ -747,8 +747,8 @@ FONCTION(fnBitset) {
                          if (k < 1 || k > largeur || k != rang)
                              throw ErreurMatlab(
                                  "MATLAB:bitset:InvalidBitIndex",
-                                 "Le rang du bit doit etre un entier entre 1 et la "
-                                 "largeur du type.");
+                                 "Bit position must be an integer between 1 and the "
+                                 "number of bits of the type.");
                          unsigned long long x = (unsigned long long)(long long)a;
                          unsigned long long masque = 1ULL << (k - 1);
                          if (v != 0.0)
@@ -899,7 +899,7 @@ FONCTION(fnPsi) {
     double kk = argScalaire(args, 0, "psi");
     if (kk < 0 || kk != std::floor(kk))
         throw ErreurMatlab("MATLAB:psi:kMustBeNonNegativeInteger",
-                           "psi : K doit etre un entier positif ou nul.");
+                           "K must be a nonnegative integer.");
     int k = (int)kk;
     return {appliquerReel(numerique(args[1]), [k](double x) { return polygammaFn(k, x); })};
 }

@@ -43,7 +43,7 @@ function H = stem3(varargin)
     y = Y(:)';
     z = Z(:)';
     if numel(x) ~= numel(z) || numel(y) ~= numel(z)
-        error('MATLAB:stem3:InvalidData', 'X, Y et Z doivent avoir le même nombre d''éléments.');
+        error('MATLAB:stem3:InvalidData', 'X, Y and Z must have the same number of elements.');
     end
     % Le style : la couleur et le trait des tiges, le marqueur des têtes.
     trait = '-';

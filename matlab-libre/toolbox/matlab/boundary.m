@@ -25,7 +25,7 @@ function [k, aire] = boundary(x, y, s)
 %
 %   Voir aussi ALPHASHAPE, CONVHULL, DELAUNAY, POLYAREA.
     if nargin < 2 || (nargin >= 2 && ~isscalar(y) && numel(y) ~= numel(x))
-        error('MATLAB:boundary:Arguments', 'BOUNDARY attend X et Y.');
+        error('MATLAB:boundary:Arguments', 'BOUNDARY requires X and Y.');
     end
     if nargin >= 2 && isscalar(y) && size(x, 2) == 2
         s = y;

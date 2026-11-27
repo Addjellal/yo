@@ -22,26 +22,26 @@ function [metadonnees, octets] = matlibre_parquet_pied(nomFichier)
     identifiant = fopen(nomFichier, 'r');
     if identifiant < 0
         error('MATLAB:parquet:FichierIntrouvable', ...
-              'Impossible d''ouvrir « %s ».', nomFichier);
+              'Unable to open file ''%s''.', nomFichier);
     end
     octets = uint8(fread(identifiant))';
     fclose(identifiant);
     n = numel(octets);
     if n < 12
         error('MATLAB:parquet:FichierInvalide', ...
-              '« %s » est trop court pour être un fichier Parquet.', nomFichier);
+              '''%s'' is too short to be a Parquet file.', nomFichier);
     end
     magiqueDebut = char(octets(1:4));
     magiqueFin = char(octets(end-3:end));
     if ~strcmp(magiqueDebut, 'PAR1') || ~strcmp(magiqueFin, 'PAR1')
         error('MATLAB:parquet:FichierInvalide', ...
-              '« %s » n''est pas un fichier Parquet : la marque PAR1 manque.', nomFichier);
+              '''%s'' is not a Parquet file: the PAR1 marker is missing.', nomFichier);
     end
     longueur = double(typecast(octets(end-7:end-4), 'uint32'));
     debut = n - 8 - longueur + 1;
     if debut < 5
         error('MATLAB:parquet:FichierInvalide', ...
-              'Le pied annoncé déborde du fichier « %s ».', nomFichier);
+              'The footer overruns file ''%s''.', nomFichier);
     end
     metadonnees = matlibre_thrift_lire(octets(debut:end-8), 1);
 end

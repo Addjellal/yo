@@ -29,7 +29,7 @@ function [b, nshifts] = shiftdim(x, n)
     end
     n = double(n);
     if n ~= fix(n)
-        error('shiftdim:Entier', 'Le décalage doit être un entier.');
+        error('shiftdim:Entier', 'The shift must be an integer.');
     end
     nshifts = n;
     if n == 0

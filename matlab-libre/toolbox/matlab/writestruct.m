@@ -33,12 +33,12 @@ function writestruct(s, nomFichier, varargin)
                      matlibre_structure_en_xml(s, char(options.StructNodeName), 0)];
         otherwise
             error('MATLAB:writestruct:type', ...
-                  'WRITESTRUCT écrit le XML et le JSON, pas « %s ».', type);
+                  'WRITESTRUCT writes XML and JSON, not ''%s''.', type);
     end
     identifiant = fopen(nomFichier, 'w');
     if identifiant < 0
         error('MATLAB:writestruct:ouverture', ...
-              'Impossible d''ouvrir %s en écriture.', nomFichier);
+              'Unable to open file %s for writing.', nomFichier);
     end
     fprintf(identifiant, '%s', texte);
     fclose(identifiant);

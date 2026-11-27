@@ -77,7 +77,7 @@ function separateurs = normaliserSeparateur(separateur, colonnes)
     end
     if numel(separateurs) ~= max(colonnes - 1, 0)
         error('MATLAB:join:Separateur', ...
-              ['Le séparateur doit être unique, ou en compter un de moins ' ...
-               'que les éléments à réunir.']);
+              ['The delimiter must be a single text, or have one element fewer ' ...
+               'than the elements to join.']);
     end
 end

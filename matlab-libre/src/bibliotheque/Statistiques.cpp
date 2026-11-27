@@ -446,7 +446,7 @@ FONCTION(fnHistcounts) {
             if (valeur.nelem() != 1 || !(valeur.scal() >= 1) ||
                 valeur.scal() != std::floor(valeur.scal()))
                 erreur("MATLAB:histcounts:InvalidNumBins",
-                       "NumBins est un entier positif.");
+                       "NumBins must be a positive integer.");
             nbClasses = (int)valeur.scal();
             classesNommees = true;
         } else if (nom == "binedges") {
@@ -459,7 +459,7 @@ FONCTION(fnHistcounts) {
             classesNommees = true;
         } else if (nom == "binlimits" || nom == "binwidth" || nom == "binmethod") {
             erreur("MATLAB:histcounts:NotSupported",
-                   "L'option '" + args[k].versTexte() + "' n'est pas encore traitee.");
+                   "Option '" + args[k].versTexte() + "' is not supported yet.");
         } else {
             erreur("MATLAB:histcounts:InvalidName",
                    "Option inconnue : '" + args[k].versTexte() + "'.");
@@ -469,7 +469,7 @@ FONCTION(fnHistcounts) {
     }
     if (classesNommees && finPositionnels > 1 && args.size() > 1)
         erreur("MATLAB:histcounts:BinsTwice",
-               "Les classes se donnent une fois : par position, ou par NumBins ou BinEdges.");
+               "Specify the bins only once: by position, or with NumBins or BinEdges.");
     static const char* normalisationsConnues[] = {"count",      "probability", "pdf",
                                                   "countdensity", "cumcount",  "cdf"};
     bool normalisationConnue = false;
@@ -800,7 +800,7 @@ std::vector<Valeur> glissante(Arguments args, const char* nom, Glisse g) {
     if (fenetre.nelem() == 1) {
         long k = (long)fenetre.scal();
         if (k < 1) erreur("MATLAB:movfun:badWindow",
-                          std::string(nom) + " : la fenetre doit valoir au moins 1.");
+                          std::string(nom) + ": window length must be at least 1.");
         // Fenetre impaire : centree. Fenetre paire : elle penche du cote
         // du passe, comme dans MATLAB.
         avant = k % 2 ? (k - 1) / 2 : k / 2;
@@ -810,10 +810,10 @@ std::vector<Valeur> glissante(Arguments args, const char* nom, Glisse g) {
         apres = (long)fenetre.re[1];
         if (avant < 0 || apres < 0)
             erreur("MATLAB:movfun:badWindow",
-                   std::string(nom) + " : les deux largeurs doivent etre positives.");
+                   std::string(nom) + ": both window lengths must be nonnegative.");
     } else {
         erreur("MATLAB:movfun:badWindow",
-               std::string(nom) + " : la fenetre est un scalaire ou deux largeurs.");
+               std::string(nom) + ": window must be a scalar or a two-element vector.");
     }
     int dimension = liste.size() > 2 ? (int)liste[2].scal() - 1 : dimensionParDefaut(v);
     exigerDimension(dimension);

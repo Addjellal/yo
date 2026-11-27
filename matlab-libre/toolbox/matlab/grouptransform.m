@@ -34,7 +34,7 @@ function y = grouptransform(x, classement, methode)
         transforme = f(x(dedans));
         if numel(transforme) ~= sum(dedans)
             error('MATLAB:grouptransform:SizeMismatch', ...
-                  'La transformation doit rendre autant de valeurs qu''elle en reçoit.');
+                  'The transformation must return as many values as it receives.');
         end
         y(dedans) = transforme(:);
     end

@@ -361,7 +361,7 @@ FONCTION(fnBar) {
     while (k < args.size() && args[k].estNumerique() && nombres.size() < 3)
         nombres.push_back(&args[k++]);
     if (nombres.empty())
-        erreur("MATLAB:bar:InvalidData", "bar attend des données numériques.");
+        erreur("MATLAB:bar:InvalidData", "Input arguments must be numeric.");
     double largeur = 0.8;
     Valeur X, Y;
     bool xDonne = false;
@@ -412,7 +412,7 @@ FONCTION(fnBar) {
             continue;
         }
         if (k + 1 >= args.size())
-            erreur("MATLAB:bar:InvalidArgument", "L'option " + nom + " attend une valeur.");
+            erreur("MATLAB:bar:InvalidArgument", "Option " + nom + " requires a value.");
         const Valeur& valeur = args[k + 1];
         if (bas == "facecolor") {
             std::string c = couleurDepuisValeur(valeur);
@@ -449,7 +449,7 @@ FONCTION(fnBar) {
         positions = valeursDe(X);
         if ((int)positions.size() != lignes)
             erreur("MATLAB:bar:XYSizeMismatch",
-                   "X doit avoir autant d'éléments que Y a de lignes.");
+                   "The length of X must match the number of rows of Y.");
     } else {
         for (int i = 0; i < lignes; ++i) positions.push_back((double)(i + 1));
     }
@@ -680,7 +680,7 @@ std::vector<Valeur> sansProprietes(Arguments args, const char* fonction) {
         for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
         if (!connues.count(nom))
             erreur("MATLAB:hg:InvalidProperty",
-                   formater("%s : la propriete '%s' est inconnue ici.", fonction,
+                   formater("%s: unrecognized property '%s'.", fonction,
                             args[fin - 2].versTexte().c_str()));
         fin -= 2;
     }
@@ -868,9 +868,9 @@ std::vector<Valeur> surface(Interpreteur& it, Arguments args, int nargout, bool 
         std::size_t attendu = enX ? (std::size_t)n : (std::size_t)m;
         if (V->nelem() != attendu)
             erreur("MATLAB:" + std::string(nom) + ":InvalidDimensions",
-                   std::string("Data dimensions must agree : ") + (enX ? "X" : "Y") +
-                       " doit avoir autant d'éléments que Z a de " +
-                       (enX ? "colonnes." : "lignes."));
+                   std::string("Data dimensions must agree: the length of ") +
+                       (enX ? "X" : "Y") + " must match the number of " +
+                       (enX ? "columns of Z." : "rows of Z."));
         for (int j = 0; j < n; ++j)
             for (int i = 0; i < m; ++i)
                 sortie[(std::size_t)i + (std::size_t)j * (std::size_t)m] =
@@ -881,7 +881,7 @@ std::vector<Valeur> surface(Interpreteur& it, Arguments args, int nargout, bool 
     if (C) {
         if (C->nlignes() != m || C->ncolonnes() != n)
             erreur("MATLAB:" + std::string(nom) + ":InvalidCData",
-                   "C doit avoir la forme de Z.");
+                   "C must be the same size as Z.");
         s.valeursCouleurPoints.assign(C->re.begin(), C->re.begin() + (std::ptrdiff_t)total);
     } else {
         s.valeursCouleurPoints = s.z;
@@ -893,7 +893,7 @@ std::vector<Valeur> surface(Interpreteur& it, Arguments args, int nargout, bool 
         std::string propriete = enMinuscules(args[k].versTexte());
         if (k + 1 >= args.size())
             erreur("MATLAB:" + std::string(nom) + ":InvalidArgument",
-                   "L'option " + args[k].versTexte() + " attend une valeur.");
+                   "Option " + args[k].versTexte() + " requires a value.");
         const Valeur& v = args[k + 1];
         auto mode = [&](const Valeur& valeur) {
             if (valeur.estTexte() || valeur.estChaine()) {
@@ -1320,12 +1320,12 @@ FONCTION(fnFigure) {
         // « figure(Position=[...]) »
         if (!args[k].estTexte() && !args[k].estChaine())
             erreur("MATLAB:hg:InvalidProperty",
-                   "FIGURE attend des couples nom-valeur.");
+                   "Invalid parameter/value pair arguments.");
         std::string nom = args[k].versTexte();
         for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
         if (k + 1 >= args.size())
             erreur("MATLAB:hg:PairedArgs",
-                   "La propriete '" + nom + "' est donnee sans valeur.");
+                   "Value missing for property '" + nom + "'.");
         const Valeur& v = args[k + 1];
         if (nom == "position" || nom == "outerposition") {
             if (v.re.size() != 4)
@@ -1343,8 +1343,8 @@ FONCTION(fnFigure) {
             for (auto& c : unite) c = (char)std::tolower((unsigned char)c);
             if (unite != "pixels")
                 erreur("MATLAB:hg:InvalidProperty",
-                       "MatLibre ne mesure une figure qu'en pixels : l'unite '" +
-                           v.versTexte() + "' n'aurait pas d'effet.");
+                       "MatLibre measures figures in pixels only: unit '" +
+                           v.versTexte() + "' would have no effect.");
         } else if (nom == "numbertitle" || nom == "visible" || nom == "menubar" ||
                    nom == "toolbar") {
             // Rien a faire : il n'y a ni fenetre, ni menu, ni barre. Les
@@ -1668,8 +1668,8 @@ FONCTION(fnLegend) {
             etiquettesDonnees = true;
         } else {
             erreur("MATLAB:legend:InvalidInput",
-                   "legend : les étiquettes sont des textes, une cellule ou un tableau "
-                   "de chaînes.");
+                   "Labels must be character vectors, a cell array, or a string "
+                   "array.");
         }
     }
     for (; k + 1 < args.size(); k += 2) {
@@ -1679,7 +1679,7 @@ FONCTION(fnLegend) {
             std::string position = enMinuscules(valeur.versTexte());
             if (!positionLegendeConnue(position))
                 erreur("MATLAB:legend:InvalidLocation",
-                       "'" + valeur.versTexte() + "' n'est pas une position de légende.");
+                       "'" + valeur.versTexte() + "' is not a valid legend location.");
             a->positionLegende =
                 (position == "layout" || position == "none") ? "northeast" : position;
         } else if (nom == "orientation") {
@@ -1699,7 +1699,7 @@ FONCTION(fnLegend) {
             etiquettesDonnees = true;
         } else if (!proprietes.count(nom)) {
             erreur("MATLAB:legend:UnknownParameter",
-                   "legend : propriété inconnue '" + args[k].versTexte() + "'.");
+                   "Unrecognized legend property '" + args[k].versTexte() + "'.");
         }
     }
     if (etiquettesDonnees || !designees.empty()) a->legende = etiquettes;
@@ -2093,7 +2093,7 @@ FONCTION(fnView) {
             a->elevation = std::atan2(v[2], r) * 180 / 3.14159265358979323846;
         } else {
             erreur("MATLAB:view:InvalidInput",
-                   "view attend 2, 3, [az el], az et el, ou une direction [x y z].");
+                   "View must be 2, 3, [az el], az and el, or a direction [x y z].");
         }
         if (nargout <= 0) return {};
     }
@@ -2264,7 +2264,7 @@ FONCTION(fnCoteAxe) {
     INUTILISE
     exigerArguments(args, 2, 2, "matlibre_cote_axe");
     if (!estPoigneeAxes(args[0]))
-        erreur("MATLAB:matlibre_cote_axe:InvalidAxes", "Le premier argument est un axe.");
+        erreur("MATLAB:matlibre_cote_axe:InvalidAxes", "First argument must be an axes.");
     Valeur p = args[0];
     p.poserChamp("Cote", Valeur::scalaire(args[1].scal() != 0 ? 1.0 : 0.0));
     return {p};
@@ -2528,7 +2528,8 @@ FONCTION(fnColorbar) {
     };
     for (; k < args.size(); ++k) {
         if (!(args[k].estTexte() || args[k].estChaine()))
-            erreur("MATLAB:colorbar:InvalidInput", "colorbar : une position, 'off' ou des options.");
+            erreur("MATLAB:colorbar:InvalidInput",
+                   "Expected a location, 'off', or name-value arguments.");
         std::string mot = enMinuscules(args[k].versTexte());
         if (mot == "off" || mot == "delete" || mot == "hide") {
             visible = false;
@@ -2538,7 +2539,7 @@ FONCTION(fnColorbar) {
                    mot == "fontsize") {
             if (k + 1 >= args.size())
                 erreur("MATLAB:colorbar:InvalidInput",
-                       "colorbar : '" + args[k].versTexte() + "' attend une valeur.");
+                       "Value missing for colorbar property '" + args[k].versTexte() + "'.");
             const Valeur& v = args[++k];
             if (mot == "location") {
                 position(enMinuscules(v.versTexte()));
@@ -2598,24 +2599,24 @@ std::vector<Valeur> nuage(Interpreteur& it, Arguments args, int nargout, bool es
         s.z = valeursDe(*nombres[2]);
         if (s.z.size() != s.x.size())
             erreur("MATLAB:scatter3:InvalidData",
-                   "X, Y et Z doivent avoir le même nombre d'éléments.");
+                   "X, Y and Z must be vectors of the same length.");
         // Les tailles et les couleurs suivent Z.
         nombres.erase(nombres.begin() + 2);
     }
     if (s.x.size() != s.y.size())
         erreur("MATLAB:scatter:InvalidXYData",
-               "X et Y doivent avoir le même nombre d'éléments.");
+               "X and Y must be vectors of the same length.");
     const std::size_t n = s.x.size();
     auto lireAires = [&](const Valeur& v) {
         if (v.estVide()) return;
         std::vector<double> aires = valeursDe(v);
         if (aires.size() != 1 && aires.size() != n)
             erreur("MATLAB:scatter:InvalidSizeData",
-                   "La taille des marqueurs est un nombre, ou un par point.");
+                   "S must be a scalar or a vector of the same length as X.");
         for (double a : aires)
             if (!(a > 0))
                 erreur("MATLAB:scatter:InvalidSizeData",
-                       "La taille des marqueurs doit être positive.");
+                       "Marker sizes must be positive.");
         s.airesPoints = aires;
     };
     auto lireCouleurs = [&](const Valeur& c) {
@@ -2649,8 +2650,8 @@ std::vector<Valeur> nuage(Interpreteur& it, Arguments args, int nargout, bool es
             return;
         }
         erreur("MATLAB:scatter:InvalidCData",
-               "La couleur est un nom, un triplet RVB, une valeur par point ou une ligne RVB "
-               "par point.");
+               "Color must be a name, one RGB triplet, one value per point, or one RGB "
+               "triplet per point.");
     };
     if (nombres.size() >= 3) lireAires(*nombres[2]);
     if (nombres.size() >= 4) lireCouleurs(*nombres[3]);
@@ -2677,7 +2678,7 @@ std::vector<Valeur> nuage(Interpreteur& it, Arguments args, int nargout, bool es
             continue;
         }
         if (k + 1 >= args.size())
-            erreur("MATLAB:scatter:InvalidArgument", "L'option " + mot + " attend une valeur.");
+            erreur("MATLAB:scatter:InvalidArgument", "Option " + mot + " requires a value.");
         const Valeur& v = args[k + 1];
         if (bas == "markeredgecolor") s.couleurBordMarqueur = couleurMarqueurDepuis(v);
         else if (bas == "markerfacecolor") s.couleurFaceMarqueur = couleurMarqueurDepuis(v);
@@ -2746,7 +2747,7 @@ std::vector<Valeur> faces(Interpreteur& it, Arguments args, int nargout, bool ha
     const std::size_t nbFaces = vecteur ? 1 : (std::size_t)X.ncolonnes();
     if (Y.nelem() != X.nelem() || (avecZ && Z.nelem() != X.nelem()))
         erreur("MATLAB:" + std::string(nom) + ":InvalidDimensions",
-               "X, Y et Z doivent avoir la même forme.");
+               "X, Y and Z must be the same size.");
     Serie s;
     s.genre = GenreTrace::Polygone;
     s.couleur.clear();
@@ -2812,8 +2813,8 @@ std::vector<Valeur> faces(Interpreteur& it, Arguments args, int nargout, bool ha
             return;
         }
         erreur("MATLAB:" + std::string(nom) + ":InvalidColor",
-               "La couleur est une couleur, une valeur ou un triplet par face, ou une valeur "
-               "par sommet.");
+               "Color must be a color, one value or RGB triplet per face, or one value "
+               "per vertex.");
     };
     if (couleurTexte) lireCouleur(*couleurTexte);
     else if (nombres.size() == 4) lireCouleur(*nombres[3]);

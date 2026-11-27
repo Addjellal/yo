@@ -48,22 +48,22 @@ function sol = pdepe(m, pdefun, icfun, bcfun, xmesh, tspan, options)
     % M ne prend que trois valeurs : elles nomment les trois geometries a
     % symetrie, et il n'y en a pas d'autre en dimension un.
     if ~isscalar(m) || ~any(m == [0 1 2])
-        error('MATLAB:pdepe:InvalidM', 'M doit valoir 0, 1 ou 2.');
+        error('MATLAB:pdepe:InvalidM', 'M must be 0, 1, or 2.');
     end
     if N < 3
-        error('MATLAB:pdepe:InvalidXMesh', 'XMESH doit compter au moins trois points.');
+        error('MATLAB:pdepe:InvalidXMesh', 'XMESH must have at least three points.');
     end
     if numel(t) < 3
-        error('MATLAB:pdepe:InvalidTSpan', 'TSPAN doit compter au moins trois instants.');
+        error('MATLAB:pdepe:InvalidTSpan', 'TSPAN must have at least three entries.');
     end
     if any(diff(x) <= 0)
-        error('MATLAB:pdepe:InvalidXMesh', 'XMESH doit etre strictement croissant.');
+        error('MATLAB:pdepe:InvalidXMesh', 'XMESH must be strictly increasing.');
     end
     % En cylindrique et en spherique, x est un rayon : il ne peut pas etre
     % negatif, et le facteur x^m n'aurait pas de sens s'il l'etait.
     if m > 0 && x(1) < 0
         error('MATLAB:pdepe:InvalidXMesh', ...
-              'XMESH(1) doit etre positif ou nul quand M vaut 1 ou 2.');
+              'XMESH(1) must be nonnegative when M is 1 or 2.');
     end
     u0 = double(icfun(x(1)));
     nu = numel(u0);

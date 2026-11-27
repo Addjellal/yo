@@ -55,6 +55,6 @@ function valeurs = matlibre_parquet_decoder(octets, physique, nombre, classe)
             end
         otherwise
             error('MATLAB:parquet:TypeNonSupporte', ...
-                  'Décodage PLAIN inconnu pour le type physique %d.', physique);
+                  'Unsupported PLAIN decoding for physical type %d.', physique);
     end
 end

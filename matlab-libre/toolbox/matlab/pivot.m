@@ -43,7 +43,7 @@ function p = pivot(t, varargin)
         k = k + 2;
     end
     if isempty(lignes)
-        error('MATLAB:pivot:NoRows', 'pivot attend au moins ''Rows''.');
+        error('MATLAB:pivot:NoRows', 'PIVOT requires at least ''Rows''.');
     end
     valeursLignes = t.(lignes);
     if isempty(colonnes)
@@ -135,7 +135,7 @@ function r = agreger(v, methode)
         case 'max',    r = max(v);
         case 'min',    r = min(v);
         otherwise
-            error('MATLAB:pivot:Method', 'Méthode inconnue : %s.', char(methode));
+            error('MATLAB:pivot:Method', 'Unknown method: %s.', char(methode));
     end
 end
 

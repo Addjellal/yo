@@ -289,7 +289,8 @@ static Valeur etatGenerateur(const GenerateurMatlab& g) {
 
 static void restaurerGenerateur(GenerateurMatlab& g, const Valeur& etat) {
     if (etat.nelem() != 625)
-        erreur("MATLAB:rng:badState", "rng : l'état du générateur 'twister' a 625 entiers.");
+        erreur("MATLAB:rng:badState",
+               "The state of the 'twister' generator must have 625 elements.");
     std::array<std::uint32_t, 625> e{};
     for (std::size_t k = 0; k < 625; ++k) e[k] = (std::uint32_t)etat.re[k];
     g.restaurer(e);
@@ -325,7 +326,7 @@ FONCTION(fnRng) {
         if (!args[0].st) erreur("MATLAB:rng:badState", "rng : structure vide.");
         auto etat = args[0].st->champs.find("State");
         if (etat == args[0].st->champs.end() || etat->second.empty())
-            erreur("MATLAB:rng:badState", "rng : la structure doit porter un champ State.");
+            erreur("MATLAB:rng:badState", "The settings structure must have a State field.");
         restaurerGenerateur(it.generateur, etat->second[0]);
         auto germe = args[0].st->champs.find("Seed");
         if (germe != args[0].st->champs.end() && !germe->second.empty() &&
@@ -346,7 +347,7 @@ FONCTION(fnRng) {
             dernierGerme = germe;
         } else {
             erreur("MATLAB:rng:badFirstOpt",
-                   "rng attend une graine, 'default', 'shuffle' ou un état.");
+                   "First input must be a seed, 'default', 'shuffle', or a settings structure.");
         }
     } else {
         double germe = args[0].scal();

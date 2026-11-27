@@ -28,7 +28,7 @@ function H = hadamard(n)
     n = double(n);
     if ~isscalar(n) || n < 1 || n ~= round(n)
         error('MATLAB:hadamard:Ordre', ...
-              'N doit etre un entier positif.');
+              'N must be a positive integer.');
     end
     if n == 1
         H = 1;
@@ -48,6 +48,6 @@ function H = hadamard(n)
         end
     end
     error('MATLAB:hadamard:OrdreImpossible', ...
-          ['HADAMARD ne construit que les ordres 1, 2, 12 et 20 multiplies ' ...
-           'par une puissance de deux ; %d n''en est pas.'], n);
+          ['N must be 1, 2, 12, or 20 times ' ...
+           'a power of two; %d is not.'], n);
 end

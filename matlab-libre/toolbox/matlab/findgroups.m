@@ -14,7 +14,7 @@ function [g, varargout] = findgroups(varargin)
 %
 %   Voir aussi SPLITAPPLY, UNIQUE, ACCUMARRAY, GROUPSUMMARY.
     if isempty(varargin)
-        error('findgroups:Arguments', 'findgroups attend au moins un tableau.');
+        error('findgroups:Arguments', 'Not enough input arguments.');
     end
     n = numel(varargin{1});
     cles = cell(n, 1);

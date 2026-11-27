@@ -22,19 +22,19 @@ function pp = mkpp(breaks, coefs, d)
     L = numel(breaks) - 1;
     if L < 1 || any(diff(breaks) < 0)
         error('MATLAB:mkpp:BreaksAreNotMonotonic', ...
-              'Il faut au moins deux points de rupture, croissants.');
+              'The breaks must be at least two increasing values.');
     end
     dimension = prod(d);
     if ndims(coefs) == 3
         if size(coefs, 1) ~= dimension || size(coefs, 2) ~= L
             error('MATLAB:mkpp:PPNumberMismatchCoeffs', ...
-                  'Un tableau de coefficients D x L x K : ici %d x %d x K.', dimension, L);
+                  'Coefficients must be a D-by-L-by-K array: here %d-by-%d-by-K.', dimension, L);
         end
         coefs = reshape(coefs, dimension * L, size(coefs, 3));
     end
     if mod(numel(coefs), dimension * L) ~= 0
         error('MATLAB:mkpp:PPNumberMismatchCoeffs', ...
-              'Le nombre de coefficients n''est pas un multiple de D x L = %d.', dimension * L);
+              'The number of coefficients is not a multiple of D*L = %d.', dimension * L);
     end
     k = numel(coefs) / (dimension * L);
     coefs = reshape(coefs, dimension * L, k);

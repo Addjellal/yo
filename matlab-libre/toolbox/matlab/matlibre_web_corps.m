@@ -48,7 +48,7 @@ function [corps, typeMedia] = matlibre_web_corps(donnees, reglages)
 
     if mod(numel(donnees), 2) ~= 0
         error('MATLAB:webservices:ArgumentPairs', ...
-              'WEBWRITE attend des couples nom/valeur, ou une seule donnée.');
+              'WEBWRITE requires name-value pairs, or a single data argument.');
     end
     if versJson
         objet = struct();

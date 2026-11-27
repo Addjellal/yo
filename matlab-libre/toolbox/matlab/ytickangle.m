@@ -24,7 +24,7 @@ function angle = ytickangle(varargin)
         return
     end
     if numel(reste) > 1 || ~isnumeric(reste{1}) || ~isscalar(reste{1}) || ~isfinite(reste{1})
-        error('MATLAB:ytickangle:InvalidAngle', 'L''angle doit être un nombre fini.');
+        error('MATLAB:ytickangle:InvalidAngle', 'Angle must be a finite number.');
     end
     set(ax, 'YTickLabelRotation', double(reste{1}));
     if nargout == 0

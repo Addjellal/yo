@@ -181,5 +181,11 @@ bonne partie de l'interpréteur tourne aussi.
 - Un commentaire dit pourquoi, pas quoi. Les commentaires qui paraphrasent
   la ligne suivante sont retirés en revue.
 - Les messages d'erreur reprennent l'identifiant et le texte de MATLAB :
-  c'est ce qui permet à un `try/catch` existant de fonctionner.
+  c'est ce qui permet à un `try/catch` existant de fonctionner. Toute
+  erreur ou tout avertissement d'une fonction de MATLAB ou d'une toolbox
+  s'écrit donc en anglais, même quand MATLAB n'a pas d'équivalent exact
+  (une limite de MatLibre se dit aussi en anglais) ; restent en français
+  l'aide, l'interface du bureau et les identifiants `MatLibre:`. Un test
+  qui vérifie un message cherche un fragment de ce texte anglais, ou
+  mieux, l'identifiant.
 - Quatre espaces d'indentation, lignes de 90 colonnes au plus.

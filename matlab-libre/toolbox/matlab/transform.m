@@ -16,7 +16,7 @@ function ds = transform(magasin, fonction, varargin)
 %   Voir aussi COMBINE, DATASTORE, READ, CELLFUN.
     if ~isa(fonction, 'function_handle')
         error('MATLAB:transform:Arguments', ...
-              'TRANSFORM attend un magasin et une poignee de fonction.');
+              'TRANSFORM requires a datastore and a function handle.');
     end
     ds = matlibre_magasin_transforme(magasin, fonction);
 end

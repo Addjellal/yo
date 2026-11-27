@@ -17,7 +17,7 @@ function Y = filter2(H, X, forme)
         forme = 'same';
     end
     if ~any(strcmpi(forme, {'same', 'valid', 'full'}))
-        error('MATLAB:filter2:BadShape', 'FORME vaut ''same'', ''valid'' ou ''full''.');
+        error('MATLAB:filter2:BadShape', 'SHAPE must be ''same'', ''valid'', or ''full''.');
     end
     Y = conv2(X, rot90(H, 2), lower(char(forme)));
 end

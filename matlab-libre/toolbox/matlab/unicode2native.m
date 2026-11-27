@@ -17,7 +17,7 @@ function octets = unicode2native(texte, encodage)
 %
 %   Voir aussi NATIVE2UNICODE, CHAR, DOUBLE, FWRITE.
     if nargin < 1
-        error('MATLAB:minrhs', 'UNICODE2NATIVE attend du texte.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     if nargin < 2
         encodage = 'UTF-8';

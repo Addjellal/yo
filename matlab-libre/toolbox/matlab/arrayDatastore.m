@@ -50,7 +50,7 @@ classdef arrayDatastore < handle
         %READ Le morceau suivant.
             if ~hasdata(ds)
                 error('MATLAB:datastore:NoMoreData', ...
-                      'Il n''y a plus rien a lire. Employez HASDATA ou RESET.');
+                      'No more data to read. Use the HASDATA or RESET methods.');
             end
             dernier = min(ds.Position + ds.ReadSize - 1, matlibre_longueur(ds));
             if ds.IterationDimension == 1

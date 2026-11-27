@@ -395,7 +395,7 @@ FONCTION(fnSystem) {
 #endif
     if (!tube)
         erreur("MATLAB:system:CannotRun",
-               "La commande n'a pas pu etre lancee : " + args[0].versTexte());
+               "Unable to run the command: " + args[0].versTexte());
     std::string sortie;
     char morceau[4096];
     std::size_t lus;
@@ -711,12 +711,12 @@ FONCTION(fnPersistantes) {
     const Valeur& liste = args[1];
     if (liste.classe != Classe::Cellule || (!liste.estVide() && liste.nlignes() != 2))
         erreur("MATLAB:matlibre_persistantes:InvalidInput",
-               "Le second argument est une cellule 2 x n : les cles, puis les valeurs.");
+               "Second input must be a 2-by-n cell array: the names, then the values.");
     for (int k = 0; k < (liste.estVide() ? 0 : liste.ncolonnes()); ++k)
         if (!siens(liste.cellules[2 * (std::size_t)k].versTexte()))
             erreur("MATLAB:matlibre_persistantes:InvalidInput",
-                   "La cle '" + liste.cellules[2 * (std::size_t)k].versTexte() +
-                       "' n'est pas une variable persistante de '" + nom + "'.");
+                   "'" + liste.cellules[2 * (std::size_t)k].versTexte() +
+                       "' is not a persistent variable of '" + nom + "'.");
     for (auto p = it.persistantes.begin(); p != it.persistantes.end();) {
         if (siens(p->first))
             p = it.persistantes.erase(p);

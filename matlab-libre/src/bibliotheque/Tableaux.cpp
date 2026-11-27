@@ -762,7 +762,7 @@ static OptionsEnsemble lireOptionsEnsemble(const std::vector<Valeur>& args, std:
         else if (t == "sorted") o.stable = false;
         else if (t == "legacy")
             erreur(formater("MATLAB:%s:LegacyNotSupported", nom),
-                   formater("%s : MatLibre ne reproduit pas le comportement 'legacy'.", nom));
+                   std::string("The 'legacy' flag is not supported."));
         else
             erreur(formater("MATLAB:%s:UnknownFlag", nom),
                    formater("Unknown flag '%s' to %s.", t.c_str(), nom));
@@ -851,7 +851,7 @@ FONCTION(fnIsmember) {
     OptionsEnsemble options = lireOptionsEnsemble(args, 2, "ismember");
     if (a.estComplexe() || b.estComplexe())
         erreur("MATLAB:ismember:ComplexNotSupported",
-               "ismember : MatLibre ne compare pas encore des complexes.");
+               "Complex inputs are not supported yet.");
     if (options.lignes) {
         // Une ligne de A est membre si elle est une ligne de B ; LOCB est
         // le plus petit rang de cette ligne dans B.
@@ -917,7 +917,7 @@ std::vector<Valeur> operationEnsemble(std::vector<Valeur>& args, int nargout, in
                "vectors, or both numeric.");
     if (a.estComplexe() || b.estComplexe())
         erreur(formater("MATLAB:%s:ComplexNotSupported", nom),
-               formater("%s : MatLibre ne compare pas encore des ensembles de complexes.", nom));
+               std::string("Complex inputs are not supported yet."));
     if (options.lignes) {
         if (a.classe == Classe::Cellule || b.classe == Classe::Cellule)
             erreur(formater("MATLAB:%s:RowsFlagAndCell", nom),
@@ -1265,7 +1265,7 @@ static void demelerTrapz(Arguments& args, const char* nom, Valeur& y,
             for (std::size_t k = 0; k < taille; ++k) x.push_back(a.re[k]);
         else
             erreur("MATLAB:trapz:LengthXmismatchY",
-                   "X doit avoir autant de points que la dimension integree.");
+                   "LENGTH(X) must equal the length of Y along the integration dimension.");
     } else {
         for (std::size_t k = 0; k < taille; ++k) x.push_back((double)(k + 1));
     }

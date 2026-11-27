@@ -19,7 +19,7 @@ function indices = matlibre_graphe_indices(g, noeuds)
     for k = 1:numel(liste)
         j = find(strcmp(g.Noms, liste{k}), 1);
         if isempty(j)
-            error('MATLAB:graph:UnknownNode', 'Nœud inconnu : %s.', liste{k});
+            error('MATLAB:graph:UnknownNode', 'Unknown node: %s.', liste{k});
         end
         indices(k) = j;
     end

@@ -25,7 +25,7 @@ classdef matfile
     methods
         function m = matfile(nomFichier, varargin)
             if nargin < 1
-                error('MATLAB:matfile:NoFile', 'matfile attend un nom de fichier.');
+                error('MATLAB:matfile:NoFile', 'A file name is required.');
             end
             nom = char(nomFichier);
             [~, ~, ext] = fileparts(nom);
@@ -52,17 +52,17 @@ classdef matfile
             end
             if ~strcmp(s(1).type, '.')
                 error('MATLAB:matfile:BadSubscript', ...
-                      'Un objet matfile s''indexe par le nom d''une variable.');
+                      'A matfile object is indexed by a variable name.');
             end
             nom = s(1).subs;
             fichier = m.Properties.Source;
             if ~isfile(fichier)
-                error('MATLAB:matfile:NoFile', 'Fichier introuvable : %s.', fichier);
+                error('MATLAB:matfile:NoFile', 'Unable to find file %s.', fichier);
             end
             contenu = load(fichier, nom);
             if ~isfield(contenu, nom)
                 error('MATLAB:matfile:NoVariable', ...
-                      'La variable « %s » n''est pas dans %s.', nom, fichier);
+                      'Variable ''%s'' not found in %s.', nom, fichier);
             end
             r = contenu.(nom);
             if numel(s) > 1
@@ -74,7 +74,7 @@ classdef matfile
         function m = subsasgn(m, s, valeur)
             if ~strcmp(s(1).type, '.')
                 error('MATLAB:matfile:BadSubscript', ...
-                      'Un objet matfile s''indexe par le nom d''une variable.');
+                      'A matfile object is indexed by a variable name.');
             end
             if strcmp(s(1).subs, 'Properties')
                 m.Properties = subsasgn(m.Properties, s(2:end), valeur);
@@ -82,7 +82,7 @@ classdef matfile
             end
             if ~m.Properties.Writable
                 error('MATLAB:matfile:NotWritable', ...
-                      'Le fichier est ouvert en lecture seule ; ouvrez-le avec ''Writable'',true.');
+                      'The file is open read-only; open it with ''Writable'',true.');
             end
             nom = s(1).subs;
             fichier = m.Properties.Source;

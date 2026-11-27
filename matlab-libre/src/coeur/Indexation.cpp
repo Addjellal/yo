@@ -668,8 +668,8 @@ Valeur Interpreteur::affecterIndex(Valeur base, const std::vector<ElementAcces>&
     if (k >= chaine.size()) return v;
     if (chaine[k].nomValeur)
         erreur("MATLAB:index:nameValueSyntax",
-               "La forme nom=valeur ne s'emploie que dans un appel de fonction : "
-               "ici les parentheses designent ou ecrire.");
+               "Name=value syntax is only valid in function calls; here the "
+               "parentheses index an assignment target.");
 
     // Une classe qui definit « subsasgn » decide elle-meme de ce que veut
     // dire une affectation indexee. La regle vaut aussi quand l'objet est

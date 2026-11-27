@@ -14,7 +14,7 @@ function varargout = splitapply(f, varargin)
 %   Voir aussi FINDGROUPS, ACCUMARRAY, ARRAYFUN, GROUPSUMMARY.
     if numel(varargin) < 2
         error('splitapply:Arguments', ...
-              'splitapply attend au moins un tableau et les groupes.');
+              'Not enough input arguments.');
     end
     g = varargin{end};
     donnees = varargin(1:end-1);

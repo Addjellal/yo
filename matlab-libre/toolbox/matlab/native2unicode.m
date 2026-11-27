@@ -13,7 +13,7 @@ function texte = native2unicode(octets, encodage)
 %
 %   Voir aussi UNICODE2NATIVE, CHAR, FREAD.
     if nargin < 1
-        error('MATLAB:minrhs', 'NATIVE2UNICODE attend des octets.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     if nargin < 2
         encodage = 'UTF-8';
@@ -32,7 +32,7 @@ function texte = native2unicode(octets, encodage)
     end
     if strcmp(nom, 'US-ASCII') && any(valeurs >= 128)
         error('MATLAB:unicode:HorsAscii', ...
-              'Un octet supérieur à 127 n''est pas de l''US-ASCII.');
+              'A byte above 127 is not US-ASCII.');
     end
     texte = char(matlibre_points_utf8(valeurs));
 end

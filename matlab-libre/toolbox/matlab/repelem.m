@@ -15,13 +15,13 @@ function b = repelem(a, varargin)
 %
 %   Voir aussi REPMAT, KRON, RESHAPE.
     if isempty(varargin)
-        error('repelem:Arguments', 'repelem exige au moins deux arguments.');
+        error('repelem:Arguments', 'Not enough input arguments.');
     end
     if numel(varargin) == 1
         n = varargin{1};
         if ~isvector(a) && ~isempty(a)
             error('repelem:Vecteur', ...
-                  'Avec un seul compte, repelem attend un vecteur.');
+                  'With a single replication factor, the input must be a vector.');
         end
         compte = etaler(n, numel(a), 'repelem');
         indices = repeter(compte);
@@ -41,7 +41,7 @@ function b = repelem(a, varargin)
     for k = 3:numel(varargin)
         if any(varargin{k} ~= 1)
             error('repelem:Dimensions', ...
-                  'repelem ne répète que suivant deux dimensions.');
+                  'REPELEM replicates along two dimensions only.');
         end
     end
 end

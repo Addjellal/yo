@@ -18,7 +18,7 @@ function c = pagemtimes(a, ta, b, tb)
         tb = 'none';
     elseif nargin ~= 4
         error('pagemtimes:Arguments', ...
-              'pagemtimes attend deux ou quatre arguments.');
+              'PAGEMTIMES requires two or four input arguments.');
     end
     a = transposerPages(a, ta);
     b = transposerPages(b, tb);
@@ -28,7 +28,7 @@ function c = pagemtimes(a, ta, b, tb)
     pagesB = prod(tb(3:end));
     if pagesA ~= pagesB && pagesA ~= 1 && pagesB ~= 1
         error('pagemtimes:Pages', ...
-              'Les nombres de pages (%d et %d) ne s''accordent pas.', ...
+              'The numbers of pages (%d and %d) are not compatible.', ...
               pagesA, pagesB);
     end
     npages = max(pagesA, pagesB);

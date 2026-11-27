@@ -33,7 +33,7 @@ function f = matlibre_groupe_fonction(methode)
         case 'meanfill', f = @(v) remplirParMoyenne(v);
         otherwise
             error('MATLAB:groupe:UnknownMethod', ...
-                  'Méthode inconnue : %s.', char(methode));
+                  'Unknown method: %s.', char(methode));
     end
 end
 

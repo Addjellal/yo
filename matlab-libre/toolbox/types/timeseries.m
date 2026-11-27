@@ -56,7 +56,7 @@ classdef timeseries
             for k = 1:2:numel(arguments_)
                 if k + 1 > numel(arguments_) || ~strcmpi(arguments_{k}, 'Name')
                     error('MATLAB:timeseries:InvalidOption', ...
-                          'timeseries prend ses options par paires, dont ''Name''.');
+                          'timeseries options must be name-value pairs, such as ''Name''.');
                 end
                 ts.Name = char(arguments_{k + 1});
             end
@@ -73,7 +73,7 @@ classdef timeseries
             temps = double(temps(:));
             if any(diff(temps) < 0)
                 error('MATLAB:timeseries:TimeNotMonotonic', ...
-                      'Les instants d''une timeseries doivent etre croissants.');
+                      'Time vector must be increasing.');
             end
             if size(data, 1) == numel(temps)
                 ts.IsTimeFirst = true;
@@ -81,8 +81,8 @@ classdef timeseries
                 ts.IsTimeFirst = false;
             else
                 error('MATLAB:timeseries:SizeMismatch', ...
-                      ['La timeseries a %d instant(s), et ses donnees ne portent pas autant ' ...
-                       'd''echantillons.'], numel(temps));
+                      ['The timeseries has %d time(s), but its data does not have as many ' ...
+                       'samples.'], numel(temps));
             end
             ts.Data = data;
             ts.Time = temps;
@@ -110,7 +110,7 @@ classdef timeseries
             t = double(t(:));
             if ~ts.IsTimeFirst
                 error('MATLAB:timeseries:Resample', ...
-                      'RESAMPLE ne sait reechantillonner que des echantillons en lignes.');
+                      'RESAMPLE supports samples stored in rows only.');
             end
             donnees = double(ts.Data);
             if ts.Length == 1

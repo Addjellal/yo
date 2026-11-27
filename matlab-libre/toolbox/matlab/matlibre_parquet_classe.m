@@ -35,6 +35,6 @@ function classe = matlibre_parquet_classe(physique, converti)
         case 6, classe = 'string';
         otherwise
             error('MATLAB:parquet:TypeNonSupporte', ...
-                  'Type physique Parquet non pris en charge : %d.', physique);
+                  'Unsupported Parquet physical type: %d.', physique);
     end
 end

@@ -25,7 +25,7 @@ function angle = ztickangle(varargin)
         return
     end
     if numel(reste) > 1 || ~isnumeric(reste{1}) || ~isscalar(reste{1}) || ~isfinite(reste{1})
-        error('MATLAB:ztickangle:InvalidAngle', 'L''angle doit être un nombre fini.');
+        error('MATLAB:ztickangle:InvalidAngle', 'Angle must be a finite number.');
     end
     set(ax, 'ZTickLabelRotation', double(reste{1}));
     if nargout == 0

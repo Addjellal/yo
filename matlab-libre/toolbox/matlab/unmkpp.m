@@ -9,7 +9,7 @@ function [breaks, coefs, l, k, d] = unmkpp(pp)
 %
 %   Voir aussi MKPP, PPVAL, SPLINE.
     if ~isstruct(pp) || ~isfield(pp, 'form') || ~strcmp(pp.form, 'pp')
-        error('MATLAB:unmkpp:NotPP', 'L''argument est un polynôme par morceaux, de MKPP.');
+        error('MATLAB:unmkpp:NotPP', 'Input must be a piecewise polynomial from MKPP.');
     end
     breaks = pp.breaks;
     coefs = pp.coefs;

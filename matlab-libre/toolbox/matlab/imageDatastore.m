@@ -41,7 +41,7 @@ classdef imageDatastore < handle
                 {'.pgm', '.ppm', '.png', '.jpg', '.jpeg', '.bmp'});
             if isempty(ds.Files)
                 error('MATLAB:datastore:FileNotFound', ...
-                      'Aucune image a « %s ».', char(string(chemin)));
+                      'Cannot find image files at ''%s''.', char(string(chemin)));
             end
             options = matlibre_lire_options(varargin, ...
                 struct('Labels', [], 'ReadSize', 1));
@@ -58,7 +58,7 @@ classdef imageDatastore < handle
         %READ L'image suivante, et d'où elle vient.
             if ~hasdata(ds)
                 error('MATLAB:datastore:NoMoreData', ...
-                      'Il n''y a plus d''image. Employez HASDATA ou RESET.');
+                      'No more data to read. Use the HASDATA or RESET methods.');
             end
             nomFichier = ds.Files{ds.Position};
             image = imread(nomFichier);

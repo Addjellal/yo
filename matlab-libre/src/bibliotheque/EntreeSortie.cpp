@@ -1028,7 +1028,7 @@ FONCTION(fnFseek) {
         else if (origine == "eof" || origine == "1") depuis = std::ios::end;
         else
             throw ErreurMatlab("MATLAB:fseek:invalidOrigin",
-                               "fseek : l'origine est « bof », « cof » ou « eof ».");
+                               "Invalid origin. Origin must be 'bof', 'cof', or 'eof'.");
     }
     f.clear();
     f.seekg(decalage, depuis);
@@ -1137,8 +1137,7 @@ static PrecisionES lirePrecision(std::string nom, const char* fonction) {
     Classe classeSource = Classe::Double;
     if (!typeDePrecision(source, p.octets, p.flottant, p.signe, classeSource))
         throw ErreurMatlab(std::string("MATLAB:") + fonction + ":unsupportedPrecision",
-                           std::string(fonction) + " : précision « " + nom +
-                           " » non prise en charge.");
+                           "Unsupported precision '" + nom + "'.");
     p.classe = Classe::Double;
     if (garder) {
         int o; bool fl, si; Classe classeCible;

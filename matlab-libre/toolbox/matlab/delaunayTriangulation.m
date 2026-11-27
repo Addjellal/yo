@@ -43,7 +43,7 @@ classdef delaunayTriangulation < triangulation
             P = double(P);
             if size(P, 2) ~= 2
                 error('MATLAB:delaunayTriangulation:Dimension', ...
-                      'DELAUNAYTRIANGULATION ne traite que le plan.');
+                      'DELAUNAYTRIANGULATION supports two-dimensional points only.');
             end
             T = delaunay(P(:, 1), P(:, 2));
             dt@triangulation(T, P);

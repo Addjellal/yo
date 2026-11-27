@@ -17,7 +17,7 @@ function info = parquetinfo(nomFichier)
 %
 %   Voir aussi PARQUETREAD, PARQUETWRITE.
     if nargin < 1
-        error('MATLAB:minrhs', 'PARQUETINFO attend un nom de fichier.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     nomFichier = char(nomFichier);
     metadonnees = matlibre_parquet_pied(nomFichier);

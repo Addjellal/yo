@@ -10,7 +10,7 @@ function t = istall(x)
 %
 %   Voir aussi TALL, GATHER.
     if nargin < 1
-        error('MATLAB:minrhs', 'ISTALL attend une valeur.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     t = isa(x, 'tall');
 end

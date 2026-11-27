@@ -17,8 +17,8 @@ function h = matlibre_graphe_reduction(g)
 %   Voir aussi TRANSREDUCTION, TRANSCLOSURE, ISDAG.
     if ~matlibre_graphe_acyclique(g)
         error('MATLAB:digraph:CycleDetected', ...
-              ['La réduction transitive n''est unique que sur un graphe sans ' ...
-               'circuit ; celui-ci en a un.']);
+              ['The transitive reduction is unique only for a graph without ' ...
+               'cycles; this one has a cycle.']);
     end
     n = g.Nombre;
     arcs = unique(g.Arcs, 'rows');

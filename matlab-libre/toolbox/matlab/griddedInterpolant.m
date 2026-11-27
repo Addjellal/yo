@@ -46,7 +46,7 @@ classdef griddedInterpolant
             if numel(textes) > 1, F.ExtrapolationMethod = lower(textes{2}); end
             if numel(varargin) < 2
                 error('MATLAB:griddedInterpolant:Arguments', ...
-                      'Il faut la grille et les valeurs.');
+                      'The grid and the values are required.');
             end
             F.Values = double(varargin{end});
             grille = varargin(1:end-1);
@@ -59,17 +59,17 @@ classdef griddedInterpolant
                 F.Values = F.Values(:);
                 if numel(F.Values) ~= numel(F.GridVectors{1})
                     error('MATLAB:griddedInterpolant:Tailles', ...
-                          'Il faut autant de valeurs que de points de grille.');
+                          'The number of values must match the number of grid points.');
                 end
             elseif numel(F.GridVectors) == 2
                 attendu = [numel(F.GridVectors{1}), numel(F.GridVectors{2})];
                 if ~isequal(size(F.Values), attendu)
                     error('MATLAB:griddedInterpolant:Tailles', ...
-                          'V doit être de taille NUMEL(X) par NUMEL(Y).');
+                          'V must be NUMEL(X)-by-NUMEL(Y).');
                 end
             else
                 error('MATLAB:griddedInterpolant:Dimension', ...
-                      'GRIDDEDINTERPOLANT traite une et deux dimensions.');
+                      'GRIDDEDINTERPOLANT supports one and two dimensions.');
             end
         end
 
@@ -99,7 +99,7 @@ classdef griddedInterpolant
                     varargout{1} = r;
                 otherwise
                     error('MATLAB:griddedInterpolant:badSubscript', ...
-                          'Un interpolant s''évalue par parenthèses.');
+                          'An interpolant is evaluated with parentheses.');
             end
         end
 

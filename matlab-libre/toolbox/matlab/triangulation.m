@@ -40,16 +40,16 @@ classdef triangulation
                 end
             else
                 error('MATLAB:triangulation:Arguments', ...
-                      'TRIANGULATION attend une connectivité et des points.');
+                      'TRIANGULATION requires a connectivity list and points.');
             end
             T = double(T);
             if isempty(T) || size(T, 2) < 3
                 error('MATLAB:triangulation:Connectivite', ...
-                      'La connectivité doit avoir au moins trois colonnes.');
+                      'The connectivity list must have at least three columns.');
             end
             if any(T(:) < 1) || any(T(:) > size(P, 1)) || any(T(:) ~= round(T(:)))
                 error('MATLAB:triangulation:Indices', ...
-                      'La connectivité doit indexer les points.');
+                      'The connectivity list must index the points.');
             end
             tr.ConnectivityList = T;
             tr.Points = P;
@@ -184,7 +184,7 @@ classdef triangulation
         %FACENORMAL Normale unitaire de chaque triangle, en trois dimensions.
             if size(tr.Points, 2) ~= 3
                 error('MATLAB:triangulation:Dimension', ...
-                      'FACENORMAL demande des points en trois dimensions.');
+                      'FACENORMAL requires three-dimensional points.');
             end
             if nargin < 2, elements = (1:size(tr.ConnectivityList, 1))'; end
             elements = elements(:);

@@ -48,7 +48,7 @@ function [marque, seuilBas, seuilHaut, centre] = matlibre_aberrantes(v, methode,
             seuilBas = bornes(1);
             seuilHaut = bornes(2);
         otherwise
-            error('MATLAB:isoutlier:Methode', 'Méthode inconnue : %s.', methode);
+            error('MATLAB:isoutlier:Methode', 'Unknown method: %s.', methode);
     end
     marque = v < seuilBas | v > seuilHaut;
     marque(isnan(v)) = false;

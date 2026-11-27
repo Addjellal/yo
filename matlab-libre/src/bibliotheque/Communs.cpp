@@ -481,7 +481,7 @@ Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>
     if (def->estEnumeration() && !it.enConstructionEnumeration) {
         if (args.size() != 1)
             erreur("MATLAB:class:EnumerationConstructor",
-                   "L'enumeration '" + def->nom + "' se convertit d'une valeur ou d'un nom : " +
+                   "Enumeration '" + def->nom + "' converts a value or a name: " +
                        def->nom + "(2), " + def->nom + "('" + def->enumerations[0] + "').");
         return it.convertirEnEnumeration(def, args[0]);
     }

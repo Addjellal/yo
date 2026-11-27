@@ -88,7 +88,7 @@ classdef inputParser < handle
                 nom = p.Obligatoires{j}{1};
                 if k > numel(entrees)
                     error('MATLAB:InputParser:notEnoughInputs', ...
-                          '%sIl manque l''argument « %s ».', p.prefixe(), nom);
+                          '%sNot enough input arguments: ''%s'' is missing.', p.prefixe(), nom);
                 end
                 p.valider(nom, entrees{k}, p.Obligatoires{j}{2});
                 resultats.(nom) = entrees{k};
@@ -131,13 +131,14 @@ classdef inputParser < handle
                 end
                 if ~(ischar(courant) || isstring(courant))
                     error('MATLAB:InputParser:paramMustBeChar', ...
-                          '%sUn nom de paramètre était attendu.', p.prefixe());
+                          '%sExpected a parameter name.', p.prefixe());
                 end
                 nom = p.reconnaitre(char(courant));
                 if isempty(nom)
                     if ~p.KeepUnmatched
                         error('MATLAB:InputParser:UnmatchedParameter', ...
-                              '%sParamètre inconnu : « %s ».', p.prefixe(), char(courant));
+                              '%s''%s'' does not match any valid parameter.', p.prefixe(), ...
+                              char(courant));
                     end
                     if k + 1 <= numel(entrees)
                         nonReconnus.(genvarname(char(courant))) = entrees{k+1};
@@ -156,7 +157,7 @@ classdef inputParser < handle
                 end
                 if k + 1 > numel(entrees)
                     error('MATLAB:InputParser:missingValue', ...
-                          '%sLe paramètre « %s » attend une valeur.', p.prefixe(), nom);
+                          '%sNo value was given for ''%s''.', p.prefixe(), nom);
                 end
                 p.valider(nom, entrees{k+1}, p.validateurDe(nom));
                 resultats.(nom) = entrees{k+1};
@@ -182,7 +183,7 @@ classdef inputParser < handle
             if isempty(p.FunctionName)
                 t = '';
             else
-                t = [p.FunctionName ' : '];
+                t = [p.FunctionName ': '];
             end
         end
 
@@ -264,11 +265,11 @@ classdef inputParser < handle
                 r = validateur(valeur);
             catch e
                 error('MATLAB:InputParser:ArgumentFailedValidation', ...
-                      '%s« %s » n''est pas accepté : %s', p.prefixe(), nom, e.message);
+                      '%sThe value of ''%s'' is invalid. %s', p.prefixe(), nom, e.message);
             end
             if islogical(r) && ~all(r(:))
                 error('MATLAB:InputParser:ArgumentFailedValidation', ...
-                      '%s« %s » n''est pas accepté.', p.prefixe(), nom);
+                      '%sThe value of ''%s'' is invalid.', p.prefixe(), nom);
             end
         end
     end

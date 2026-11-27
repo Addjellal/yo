@@ -629,7 +629,7 @@ static std::vector<Valeur> hermitePublique(Arguments args, const char* nom,
     std::vector<double> x(args[0].re.begin(), args[0].re.end());
     std::vector<double> y(args[1].re.begin(), args[1].re.end());
     if (x.size() != y.size())
-        erreur("MATLAB:pchip:Tailles", "Il faut autant d'ordonnees que d'abscisses.");
+        erreur("MATLAB:pchip:Tailles", "The number of values must match the number of data sites.");
     if (x.size() < 2)
         erreur("MATLAB:pchip:Points", "Il faut au moins deux points.");
     std::vector<double> d = akima ? pentesAkima(x, y, modifie) : pentesPchip(x, y);
@@ -738,7 +738,7 @@ FONCTION(fnSpline) {
         double pivot = diag[i] - sousDiag[i] * gamma[i - 1];
         if (pivot == 0.0)
             throw ErreurMatlab("MATLAB:spline:PointsConfondus",
-                               "spline : les abscisses doivent etre distinctes et croissantes.");
+                               "The data sites should be distinct and increasing.");
         gamma[i] = surDiag[i] / pivot;
         delta[i] = (second[i] - sousDiag[i] * delta[i - 1]) / pivot;
     }
@@ -793,14 +793,14 @@ FONCTION(fnPpval) {
     const Valeur& pp = args[0];
     if (!pp.estStructure() || !pp.aChamp("breaks") || !pp.aChamp("coefs"))
         throw ErreurMatlab("MATLAB:ppval:Forme",
-                           "ppval : le premier argument est un polynome par morceaux, de MKPP, "
-                           "SPLINE ou PCHIP.");
+                           "First input must be a piecewise polynomial from MKPP, SPLINE, "
+                           "or PCHIP.");
     Valeur b = versDouble(pp.champ("breaks"));
     std::vector<double> ruptures(b.re.begin(), b.re.end());
     Valeur coefs = versDouble(pp.champ("coefs"));
     if (coefs.ndims() > 2)
         throw ErreurMatlab("MATLAB:ppval:Coefficients",
-                           "ppval : les coefficients forment une matrice (d*L) x k.");
+                           "The coefficients must form a (d*L)-by-k matrix.");
     int dim = 1;
     if (pp.aChamp("dim")) {
         Valeur d = versDouble(pp.champ("dim"));
@@ -812,13 +812,13 @@ FONCTION(fnPpval) {
     if (dim < 1 || lignes % dim != 0 || ruptures.size() != (std::size_t)(lignes / dim) + 1 ||
         lignes == 0)
         throw ErreurMatlab("MATLAB:ppval:Coherence",
-                           "ppval : il faut une ligne de coefficients par morceau et par "
-                           "composante, et un point de rupture de plus que de morceaux.");
+                           "The piecewise polynomial needs one row of coefficients per piece and "
+                           "component, and one more break than pieces.");
     int morceaux = lignes / dim;
     const Valeur& cible = versDouble(args[1]);
     if (cible.estComplexe())
         throw ErreurMatlab("MATLAB:ppval:Abscisses",
-                           "ppval : les abscisses sont reelles.");
+                           "Query points must be real.");
     std::size_t n = cible.nelem();
     Valeur r;
     if (dim == 1) {

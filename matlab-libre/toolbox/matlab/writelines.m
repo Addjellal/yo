@@ -37,7 +37,7 @@ function writelines(lignes, nomFichier, varargin)
     end
     if identifiant < 0
         error('MATLAB:writelines:ouverture', ...
-              'Impossible d''ouvrir %s en écriture.', nomFichier);
+              'Unable to open file %s for writing.', nomFichier);
     end
     fprintf(identifiant, '%s', texte);
     fclose(identifiant);

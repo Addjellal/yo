@@ -15,7 +15,7 @@ function u = matlibre_web_requete(u, paires)
     end
     if mod(numel(paires), 2) ~= 0
         error('MATLAB:webservices:ArgumentPairs', ...
-              'Les paramètres d''une requête vont par couples nom/valeur.');
+              'Query parameters must be name-value pairs.');
     end
     morceaux = cell(1, numel(paires) / 2);
     for k = 1:2:numel(paires) - 1

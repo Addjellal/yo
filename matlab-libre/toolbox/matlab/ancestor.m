@@ -18,7 +18,7 @@ function p = ancestor(h, genre, varargin)
 %   Voir aussi GCA, GCF, FINDOBJ, GET.
     p = [];
     if nargin < 2
-        error('MATLAB:minrhs', 'ANCESTOR attend un objet et un type.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     genres = cellstr(string(genre));
     courant = h;

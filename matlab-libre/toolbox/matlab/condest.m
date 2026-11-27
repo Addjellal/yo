@@ -23,7 +23,7 @@ function [c, v] = condest(A, t)
     if nargin < 2, t = 2; end   %#ok<NASGU>  le nombre de colonnes d'essai
     A = double(A);
     if size(A, 1) ~= size(A, 2)
-        error('MATLAB:condest:NotSquare', 'La matrice doit être carrée.');
+        error('MATLAB:condest:NotSquare', 'Matrix must be square.');
     end
     n = size(A, 1);
     if n == 0

@@ -33,7 +33,7 @@ function reponse = webwrite(url, varargin)
     identifiant = fopen(fichierCorps, 'w');
     if identifiant < 0
         error('MATLAB:webservices:CannotWriteBody', ...
-              'Impossible d''écrire le corps de la requête.');
+              'Unable to write the request body.');
     end
     fwrite(identifiant, corps, 'char');
     fclose(identifiant);

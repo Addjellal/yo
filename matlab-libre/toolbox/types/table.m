@@ -596,8 +596,8 @@ classdef table
                         colonne(k) = feval(agregation, donnees(lignes));
                     else
                         error('MATLAB:unstack:MultipleRows', ...
-                              ['Plusieurs lignes tombent dans la même case ; ' ...
-                               'donnez une fonction d''agrégation.']);
+                              ['Several rows fall into the same cell; ' ...
+                               'specify an aggregation function.']);
                     end
                 end
                 colonnes{end+1} = colonne;                               %#ok<AGROW>

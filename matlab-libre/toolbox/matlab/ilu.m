@@ -27,19 +27,19 @@ function [L, U, P] = ilu(A, options)
     A = full(double(A));
     n = size(A, 1);
     if size(A, 2) ~= n
-        error('MATLAB:ilu:NotSquare', 'La matrice doit être carrée.');
+        error('MATLAB:ilu:NotSquare', 'Matrix must be square.');
     end
     if nargin >= 2 && isstruct(options) && isfield(options, 'type') && ...
        ~strcmpi(char(options.type), 'nofill')
         error('MATLAB:ilu:UnsupportedType', ...
-              'Seul le type « nofill » est traité.');
+              'Only the ''nofill'' type is supported.');
     end
     motif = A ~= 0;
     M = A;
     for k = 1:n-1
         if M(k, k) == 0
             error('MATLAB:ilu:ZeroPivot', ...
-                  'Pivot nul en position %d : sans permutation, rien ne le sauve.', k);
+                  'Zero pivot encountered at position %d.', k);
         end
         for i = k+1:n
             if ~motif(i, k)

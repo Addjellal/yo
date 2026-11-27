@@ -31,7 +31,7 @@ function contours = matlibre_poly_entree(arguments)
         P = double(premier);
         if size(P, 2) ~= 2
             error('MATLAB:polyshape:forme', ...
-                  'Les sommets s''écrivent en deux colonnes.');
+                  'Vertices must be a two-column matrix.');
         end
     end
     contours = matlibre_poly_separer(P);

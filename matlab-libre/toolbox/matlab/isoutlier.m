@@ -36,7 +36,7 @@ function [marque, seuilBas, seuilHaut, centre] = isoutlier(a, methode, varargin)
     if strcmp(methode, 'percentiles')
         if isempty(varargin)
             error('MATLAB:isoutlier:Centiles', ...
-                  'La méthode ''percentiles'' demande les deux centiles.');
+                  'The ''percentiles'' method requires two percentiles.');
         end
         centiles = double(varargin{1});
         varargin(1) = [];

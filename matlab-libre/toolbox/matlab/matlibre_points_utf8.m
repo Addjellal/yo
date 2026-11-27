@@ -15,7 +15,7 @@ function octets = matlibre_points_utf8(points)
         p = points(k);
         if p < 0 || p > 1114111 || p ~= floor(p)
             error('MATLAB:unicode:PointInvalide', ...
-                  '%g n''est pas un point de code Unicode.', p);
+                  '%g is not a Unicode code point.', p);
         end
         if p < 128
             octets = [octets, p];   %#ok<AGROW>

@@ -387,9 +387,9 @@ Valeur Interpreteur::membreEnumeration(const std::shared_ptr<DefinitionClasse>& 
         if (args.size() != 1 || args[0].nelem() != 1 || !(args[0].estNumerique() ||
                                                            args[0].classe == Classe::Logique))
             erreur("MATLAB:class:InvalidEnumerationValue",
-                   "Le membre '" + nom + "' de l'enumeration '" + def->nom +
-                       "' doit porter une valeur numerique, entre parentheses : la classe "
-                       "derive de " + nomClasse(base) + ".");
+                   "Enumeration member '" + nom + "' of '" + def->nom +
+                       "' needs a numeric value in parentheses: the class "
+                       "derives from " + nomClasse(base) + ".");
         membre = Valeur::structureVide();
         membre.classe = Classe::Objet;
         membre.nomObjet = def->nom;
@@ -496,7 +496,7 @@ Valeur Interpreteur::convertirEnEnumeration(const std::shared_ptr<DefinitionClas
             for (const auto& m : def->enumerations) connu = connu || m == nom;
             if (!connu)
                 erreur("MATLAB:class:CannotConvert",
-                       "'" + nom + "' n'est pas un membre de l'enumeration '" + def->nom + "'.");
+                       "'" + nom + "' is not a member of enumeration '" + def->nom + "'.");
             membres.push_back(membreEnumeration(def, nom));
         }
     } else if (entiere && (v.estNumerique() || v.classe == Classe::Logique)) {
@@ -513,13 +513,13 @@ Valeur Interpreteur::convertirEnEnumeration(const std::shared_ptr<DefinitionClas
             }
             if (!trouve)
                 erreur("MATLAB:class:CannotConvert",
-                       formater("Aucun membre de l'enumeration '%s' ne vaut %g.",
+                       formater("No member of enumeration '%s' has the value %g.",
                                 def->nom.c_str(), x));
         }
     } else {
         erreur("MATLAB:class:CannotConvert",
-               "Une valeur de classe '" + v.classeNom() +
-                   "' ne se convertit pas en membre de l'enumeration '" + def->nom + "'.");
+               "Cannot convert a value of class '" + v.classeNom() +
+                   "' to a member of enumeration '" + def->nom + "'.");
     }
     if (membres.empty()) return valeurVideDeClasse(def->nom, d);
     Valeur r = concatener(membres, 1);

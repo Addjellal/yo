@@ -21,7 +21,7 @@ function y = swapbytes(x)
             largeur = 8;
         otherwise
             error('swapbytes:Classe', ...
-                  'swapbytes ne sait pas traiter la classe %s.', cl);
+                  'SWAPBYTES does not support class %s.', cl);
     end
     forme = size(x);
     octets = typecast(x(:), 'uint8');

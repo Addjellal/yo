@@ -29,7 +29,7 @@ function [K, volume] = convhulln(P, options)
     [n, d] = size(P);
     if n <= d
         error('MATLAB:convhulln:Points', ...
-              'Il faut au moins %d points en dimension %d.', d + 1, d);
+              'At least %d points are needed in dimension %d.', d + 1, d);
     end
     if d == 2
         contour = convhull(P(:, 1), P(:, 2));
@@ -42,7 +42,7 @@ function [K, volume] = convhulln(P, options)
     end
     if d ~= 3
         error('MATLAB:convhulln:Dimension', ...
-              'CONVHULLN traite les dimensions deux et trois.');
+              'CONVHULLN supports two and three dimensions only.');
     end
     K = matlibre_enveloppe3d(P);
     if nargout > 1

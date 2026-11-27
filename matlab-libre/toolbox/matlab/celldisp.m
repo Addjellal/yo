@@ -8,7 +8,7 @@ function celldisp(c, nom)
 %
 %   Voir aussi DISP, CELL.
     if ~iscell(c)
-        error('celldisp:Cellule', 'celldisp attend un tableau de cellules.');
+        error('celldisp:Cellule', 'Input must be a cell array.');
     end
     if nargin < 2
         nom = inputname(1);

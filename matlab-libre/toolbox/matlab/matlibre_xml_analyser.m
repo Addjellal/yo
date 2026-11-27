@@ -37,7 +37,7 @@ function noeud = matlibre_xml_analyser(texte)
         end
         fin = strfind(texte(debut:end), '>');
         if isempty(fin)
-            error('MATLAB:xml:balise', 'Balise non fermée à la position %d.', debut);
+            error('MATLAB:xml:balise', 'Unterminated tag at position %d.', debut);
         end
         fin = debut + fin(1) - 1;
         balise = texte(debut+1:fin-1);
@@ -53,12 +53,12 @@ function noeud = matlibre_xml_analyser(texte)
             nom = strtrim(balise(2:end));
             if isempty(pile)
                 error('MATLAB:xml:fermeture', ...
-                      'Fermeture de « %s » sans ouverture.', nom);
+                      'Closing tag ''%s'' has no opening tag.', nom);
             end
             ferme = pile{end};
             if ~strcmp(ferme.Name, nom)
                 error('MATLAB:xml:concordance', ...
-                      'Fermeture de « %s » alors que « %s » est ouvert.', ...
+                      'Closing tag ''%s'' does not match open element ''%s''.', ...
                       nom, ferme.Name);
             end
             pile(end) = [];
@@ -88,10 +88,10 @@ function noeud = matlibre_xml_analyser(texte)
     end
     if ~isempty(pile)
         error('MATLAB:xml:ouvert', ...
-              'L''élément « %s » n''est pas fermé.', pile{end}.Name);
+              'Element ''%s'' is not closed.', pile{end}.Name);
     end
     if isempty(racine)
-        error('MATLAB:xml:vide', 'Le document ne porte aucun élément.');
+        error('MATLAB:xml:vide', 'The document has no root element.');
     end
     noeud = racine;
 end

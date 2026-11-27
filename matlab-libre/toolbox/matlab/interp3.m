@@ -40,7 +40,7 @@ function Vq = interp3(varargin)
         z = 1:size(V, 3);
     else
         error('MATLAB:interp3:NotEnoughInputs', ...
-              'INTERP3(X,Y,Z,V,XQ,YQ,ZQ) ou INTERP3(V,XQ,YQ,ZQ).');
+              'Expected INTERP3(X,Y,Z,V,XQ,YQ,ZQ) or INTERP3(V,XQ,YQ,ZQ).');
     end
     tousVecteurs = all(cellfun(@isvector, questions));
     memeTaille = all(cellfun(@(q) isequal(size(q), size(questions{1})), questions));

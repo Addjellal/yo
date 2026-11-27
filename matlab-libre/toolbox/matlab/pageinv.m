@@ -27,7 +27,7 @@ function b = pageinv(a)
         return
     end
     if formes(1) ~= formes(2)
-        error('MATLAB:pageinv:NotSquare', 'Chaque page doit être carrée.');
+        error('MATLAB:pageinv:NotSquare', 'Each page must be square.');
     end
     pages = prod(formes(3:end));
     b = zeros(formes);

@@ -18,7 +18,7 @@ function options = matlibre_lire_options(arguments, defauts)
     noms = fieldnames(defauts);
     if mod(numel(arguments), 2) ~= 0
         error('MATLAB:options:couples', ...
-              'Les options vont par couples nom-valeur.');
+              'Options must be name-value pairs.');
     end
     for k = 1:2:numel(arguments)
         nom = char(arguments{k});

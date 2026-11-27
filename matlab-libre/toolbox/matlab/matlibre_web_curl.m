@@ -62,7 +62,7 @@ function matlibre_web_curl(url, fichierSortie, reglages, methode, fichierCorps, 
     [etat, sortie] = system(strjoin(morceaux, ' '));
     if etat ~= 0
         error('MATLAB:webservices:CopyContentToDataStreamError', ...
-              'La requête vers %s a échoué : %s', char(url), strtrim(sortie));
+              'The request to %s failed: %s', char(url), strtrim(sortie));
     end
 end
 

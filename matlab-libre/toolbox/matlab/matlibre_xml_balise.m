@@ -42,7 +42,7 @@ function [nom, attributs] = matlibre_xml_balise(balise)
         ferme = find(reste(2:end) == delimiteur, 1);
         if isempty(ferme)
             error('MATLAB:xml:attribut', ...
-                  'Valeur d''attribut non fermée dans « %s ».', nom);
+                  'Unterminated attribute value in ''%s''.', nom);
         end
         valeur = reste(2:ferme);
         reste = strtrim(reste(ferme+2:end));

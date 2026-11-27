@@ -55,7 +55,7 @@ function octets = matlibre_parquet_encoder(colonne, physique)
             octets = uint8([morceaux{:}]);
         otherwise
             error('MATLAB:parquet:TypeNonSupporte', ...
-                  'Encodage PLAIN inconnu pour le type physique %d.', physique);
+                  'Unsupported PLAIN encoding for physical type %d.', physique);
     end
     octets = uint8(octets);
 end

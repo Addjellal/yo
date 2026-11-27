@@ -20,7 +20,7 @@ function texte = xmlwrite(varargin)
     end
     if numel(varargin) ~= 2
         error('MATLAB:xmlwrite:Arguments', ...
-              'XMLWRITE attend un nœud, ou un fichier et un nœud.');
+              'XMLWRITE requires a node, or a file name and a node.');
     end
     nomFichier = varargin{1};
     contenu = ['<?xml version="1.0" encoding="UTF-8"?>' sprintf('\n') ...
@@ -28,7 +28,7 @@ function texte = xmlwrite(varargin)
     identifiant = fopen(nomFichier, 'w');
     if identifiant < 0
         error('MATLAB:xmlwrite:ouverture', ...
-              'Impossible d''ouvrir %s en écriture.', nomFichier);
+              'Unable to open file %s for writing.', nomFichier);
     end
     fprintf(identifiant, '%s', contenu);
     fclose(identifiant);

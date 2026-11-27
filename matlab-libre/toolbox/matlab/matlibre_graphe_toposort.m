@@ -37,7 +37,7 @@ function ordre = matlibre_graphe_toposort(g)
     end
     if numel(ordre) < n
         error('MATLAB:digraph:CycleDetected', ...
-              'Un graphe cyclique n''admet pas de tri topologique.');
+              'Graph must be acyclic for a topological sort.');
     end
     % MATLAB rend une ligne : c'est un ordre de visite, qui se lit de
     % gauche a droite, et non une colonne de valeurs par noeud comme en

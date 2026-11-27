@@ -10,7 +10,7 @@ function t = isjava(a)
 %
 %   Voir aussi USEJAVA, ISOBJECT, CLASS, ISA.
     if nargin < 1
-        error('MATLAB:minrhs', 'ISJAVA attend une valeur.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     t = false(size(a));
     if isempty(a)

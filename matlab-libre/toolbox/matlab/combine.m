@@ -20,7 +20,7 @@ function ds = combine(varargin)
 %
 %   Voir aussi DATASTORE, TRANSFORM, READ, HASDATA.
     if numel(varargin) < 2
-        error('MATLAB:combine:Arguments', 'COMBINE attend au moins deux magasins.');
+        error('MATLAB:combine:Arguments', 'COMBINE requires at least two datastores.');
     end
     ds = matlibre_magasin_combine(varargin);
 end

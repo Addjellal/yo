@@ -249,7 +249,7 @@ FONCTION(fnProperties) {
         auto def = it.classeDefinie(cible.versTexte());
         if (!def)
             erreur("MATLAB:class:InvalidArgument",
-                   "'" + cible.versTexte() + "' n'est pas une classe connue.");
+                   "'" + cible.versTexte() + "' is not a known class.");
         std::vector<std::string> noms = def->ordreProprietes;
         for (const auto& nom : def->dependantes) {
             bool deja = false;
@@ -342,8 +342,8 @@ static std::vector<Valeur> indicesDe(const Valeur& cellule) {
 static std::string nomDeChamp(const Valeur& v, const char* fonction) {
     if (!v.estTexte() && !(v.estChaine() && v.estScalaire()))
         erreur("MATLAB:" + std::string(fonction) + ":InvalidFieldName",
-               formater("%s : un nom de champ est un texte, ou une cellule d'indices.",
-                        fonction));
+               std::string("Field names must be character vectors or strings, or a cell "
+                           "array of indices."));
     return v.versTexte();
 }
 
@@ -351,14 +351,14 @@ static Valeur lireChampDe(Interpreteur& it, const Valeur& base, const std::strin
     if (base.classe == Classe::Objet) return it.lireProprieteObjet(base, nom);
     if (base.classe != Classe::Structure)
         erreur("MATLAB:getfield:InvalidType",
-               formater("getfield : on lit le champ '%s' d'une structure, pas d'un %s.",
+               formater("Cannot read field '%s' of a value of class %s: it is not a structure.",
                         nom.c_str(), base.classeNom().c_str()));
     if (!base.aChamp(nom))
         erreur("MATLAB:nonExistentField",
                formater("Reference to non-existent field '%s'.", nom.c_str()));
     if (base.nelem() == 0)
         erreur("MATLAB:index:expected_one_output",
-               "getfield : la structure est vide, son champ n'a pas de valeur.");
+               "The structure is empty: the field has no value.");
     return base.champ(nom, 0);
 }
 
@@ -391,8 +391,8 @@ static Valeur poserEnProfondeur(Interpreteur& it, Valeur base, Arguments args, s
     if (base.classe != Classe::Structure) {
         if (!base.estVide())
             erreur("MATLAB:setfield:InvalidType",
-                   formater("setfield : on pose le champ '%s' dans une structure, pas dans "
-                            "un %s.", nom.c_str(), base.classeNom().c_str()));
+                   formater("Cannot set field '%s' of a value of class %s: it is not a "
+                            "structure.", nom.c_str(), base.classeNom().c_str()));
         base = Valeur::structureVide();
     }
     if (base.nelem() == 0) {
@@ -438,7 +438,7 @@ FONCTION(fnOrderfields) {
     Valeur s = args[0];
     if (s.classe != Classe::Structure)
         erreur("MATLAB:orderfields:InvalidInput",
-               "orderfields : le premier argument est une structure.");
+               "First input argument must be a structure.");
     s.detacherStructure();
     const std::vector<std::string> avant = s.st->ordre;
     std::vector<std::string> ordre;
@@ -458,21 +458,21 @@ FONCTION(fnOrderfields) {
                 double r = modele.re[k];
                 if (r != std::floor(r) || r < 1 || r > (double)avant.size())
                     erreur("MATLAB:orderfields:InvalidPermutation",
-                           "orderfields : la permutation porte les rangs 1 a N des champs.");
+                           "The permutation must hold the field positions 1 to N.");
                 ordre.push_back(avant[(std::size_t)r - 1]);
             }
         } else {
             erreur("MATLAB:orderfields:InvalidInput",
-                   "orderfields : l'ordre se donne par une structure, une cellule de noms "
-                   "ou une permutation.");
+                   "The order must be a structure, a cell array of field names, "
+                   "or a permutation vector.");
         }
         std::vector<std::string> a = avant, b = ordre;
         std::sort(a.begin(), a.end());
         std::sort(b.begin(), b.end());
         if (a != b)
             erreur("MATLAB:orderfields:InvalidFieldNames",
-                   "orderfields : le nouvel ordre doit nommer chaque champ une fois, et "
-                   "seulement eux.");
+                   "The new order must name each field exactly once, and no "
+                   "other.");
     }
     s.st->ordre = ordre;
     std::vector<Valeur> sorties = {s};
@@ -536,7 +536,7 @@ FONCTION(fnNum2cell) {
         double d = args[1].re[k];
         if (d < 1 || d != std::floor(d))
             erreur("MATLAB:num2cell:InvalidDimension",
-                   "num2cell : les dimensions sont des entiers positifs.");
+                   "Dimensions must be positive integers.");
         if ((std::size_t)d > reunie.size()) reunie.resize((std::size_t)d, false);
         reunie[(std::size_t)d - 1] = true;
     }

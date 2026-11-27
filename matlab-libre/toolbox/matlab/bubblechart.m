@@ -27,7 +27,7 @@ function H = bubblechart(varargin)
     end
     if numel(entrees) < 3
         error('MATLAB:bubblechart:Arguments', ...
-              'BUBBLECHART attend X, Y et les tailles.');
+              'BUBBLECHART requires X, Y and the sizes.');
     end
     x = double(entrees{1}(:));
     y = double(entrees{2}(:));

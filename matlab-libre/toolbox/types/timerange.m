@@ -26,13 +26,14 @@ classdef timerange
         function r = timerange(debut, fin, type)
             if nargin < 2
                 error('MATLAB:timerange:NotEnoughInputs', ...
-                      'Il faut un début et une fin.');
+                      'A start time and an end time are required.');
             end
             if nargin >= 3 && ~isempty(type)
                 type = lower(char(type));
                 if ~any(strcmp(type, {'openright', 'openleft', 'open', 'closed'}))
                     error('MATLAB:timerange:BadType', ...
-                          'Le type doit être ''openright'', ''openleft'', ''open'' ou ''closed''.');
+                          ['Interval type must be ''openright'', ''openleft'', ''open'', ' ...
+                           'or ''closed''.']);
                 end
                 r.Type = type;
             end

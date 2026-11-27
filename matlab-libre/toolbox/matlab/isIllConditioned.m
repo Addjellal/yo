@@ -15,7 +15,7 @@ function tf = isIllConditioned(d)
 %   Voir aussi DECOMPOSITION, COND, CONDEST, RCOND.
     if ~isa(d, 'decomposition')
         error('MATLAB:isIllConditioned:NotDecomposition', ...
-              'ISILLCONDITIONED attend un objet DECOMPOSITION.');
+              'Input must be a decomposition object.');
     end
     tf = d.Facteurs.malConditionne;
 end

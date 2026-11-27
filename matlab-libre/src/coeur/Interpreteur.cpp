@@ -2111,8 +2111,8 @@ std::size_t Interpreteur::lireSansCopie(const std::string& nom, const NoeudPtr& 
     }
     if (e.nomValeur)
         erreur("MATLAB:index:nameValueSyntax",
-               "La forme nom=valeur ne s'emploie que dans un appel de fonction : "
-               "ici les parentheses indexent une valeur.");
+               "Name=value syntax is only valid in function calls; here the "
+               "parentheses index a value.");
     auto idx = evaluerIndices(e.args, cur, 0, (int)e.args.size());
     if (k == 0) {
         cur = trouverVariable(nom);
@@ -2380,8 +2380,8 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                         if (nb.empty() || nb[0].nelem() != 1 || !(nb[0].scal() >= 0) ||
                             nb[0].scal() != std::floor(nb[0].scal()))
                             erreur("MATLAB:index:numArgumentsFromSubscript",
-                                   "numArgumentsFromSubscript de la classe '" + base.nomObjet +
-                                   "' doit rendre un entier positif ou nul.");
+                                   "numArgumentsFromSubscript of class '" + base.nomObjet +
+                                   "' must return a nonnegative integer.");
                         voulues = (int)nb[0].scal();
                     }
                     auto r = appelerMethode(base, "subsref", {s}, voulues);
@@ -2402,8 +2402,8 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                 }
                 if (e.nomValeur)
                     erreur("MATLAB:index:nameValueSyntax",
-                           "La forme nom=valeur ne s'emploie que dans un appel de fonction : "
-                           "ici les parentheses indexent une valeur.");
+                           "Name=value syntax is only valid in function calls; here the "
+                           "parentheses index a value.");
                 auto idx = evaluerIndices(e.args, &base, 0, (int)e.args.size());
                 suivant.push_back(indexer(base, idx, '('));
             } else if (e.genre == '{') {

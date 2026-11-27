@@ -36,7 +36,7 @@ function [b, marque] = fillmissing(a, methode, varargin)
 %
 %   Voir aussi ISMISSING, RMMISSING, STANDARDIZEMISSING, INTERP1.
     if nargin < 2
-        error('MATLAB:fillmissing:Methode', 'FILLMISSING demande une méthode.');
+        error('MATLAB:fillmissing:Methode', 'FILLMISSING requires a fill method.');
     end
     methode = lower(char(methode));
     parametre = [];
@@ -142,7 +142,7 @@ function v = comblerVecteur(v, methode, parametre, bouts)
         case 'constant'
             if isempty(parametre)
                 error('MATLAB:fillmissing:Constante', ...
-                      'La méthode ''constant'' demande une valeur.');
+                      'The ''constant'' method requires a fill value.');
             end
             v(manquants) = parametre;
             v = reshape(v, forme);
@@ -159,7 +159,7 @@ function v = comblerVecteur(v, methode, parametre, bouts)
         case {'movmean', 'movmedian'}
             if isempty(parametre)
                 error('MATLAB:fillmissing:Fenetre', ...
-                      'Les méthodes mobiles demandent une largeur de fenêtre.');
+                      'Moving methods require a window length.');
             end
             largeur = round(double(parametre));
             demi = floor(largeur / 2);
@@ -180,7 +180,7 @@ function v = comblerVecteur(v, methode, parametre, bouts)
             v = reshape(v, forme);
             return
         otherwise
-            error('MATLAB:fillmissing:Methode', 'Méthode inconnue : %s.', methode);
+            error('MATLAB:fillmissing:Methode', 'Unknown method: %s.', methode);
     end
     % Les bouts : ce que l'interpolation n'a pas pu encadrer.
     restants = isnan(v);
@@ -194,7 +194,7 @@ function v = comblerVecteur(v, methode, parametre, bouts)
                     % Laissés tels quels : c'est ce qu'on demande.
                 otherwise
                     error('MATLAB:fillmissing:Bouts', ...
-                          'EndValues vaut ''extrap'', ''none'' ou une constante.');
+                          'EndValues must be ''extrap'', ''none'', or a constant.');
             end
         else
             v(restants) = bouts;

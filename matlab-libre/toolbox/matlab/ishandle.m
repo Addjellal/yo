@@ -12,7 +12,7 @@ function t = ishandle(h)
 %
 %   Voir aussi ISGRAPHICS, GCA, GCF, DELETE.
     if nargin < 1
-        error('MATLAB:minrhs', 'ISHANDLE attend une valeur.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     t = false(size(h));
     for k = 1:numel(h)
