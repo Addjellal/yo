@@ -861,9 +861,9 @@ votre accord (dépendance, comportement visible, gros fichier remanié).
 |---|---|---|---|---|---|---|
 | P2 | **Fait.** Corriger les ~30 fiches dont la valeur annoncée est fausse ou trop arrondie, regarder `biorwavf`, `risetime`, `disparityBM`, puis faire tourner `verifierValeurs.m` dans la batterie | fidélité, doc | ●●● | S | faible | |
 | P4 | **Fait.** « Did you mean: plot? » sur une faute de frappe : distance d'édition sur les fonctions connues et les variables, comme MATLAB | ergonomie | ●●● | S | faible | message visible |
-| P6 | Intégration continue à la racine du dépôt : rapide à chaque poussée, complète chaque nuit (ASan sur la sélection, couverture, `verifierValeurs`) ; retirer le fichier inerte | distribution | ●●● | S | faible | minutes d'Actions |
-| P7 | Un guide « Venir de MATLAB » : ce qui diffère (affichage, forme par valeur des modèles, formats d'image, palette), ce qui manque, où chercher | doc | ●●● | S | nul | |
-| P3 | Édition de ligne dans la console : flèches, historique rappelable et enregistré, complétion (écrite à la main sur termios et la console Windows, ou linenoise, un fichier sous licence BSD) | ergonomie | ●●● | M | faible | dépendance si linenoise |
+| P6 | **Fait.** Intégration continue à la racine du dépôt : rapide à chaque poussée (construction sans avertissement, `ctest -LE lent`), complète chaque nuit (batterie, sans Qt et installation, ASan et UBSan sur toute la batterie hors bureau, TSan, couverture, macOS, Windows) ; le fichier inerte retiré | distribution | ●●● | S | faible | minutes d'Actions (dépôt public : gratuites) |
+| P7 | **Fait.** Un guide « Venir de MATLAB » (`venir-de-matlab.md`) : ce qui diffère (affichage, forme par valeur des modèles, formats d'image, palette), ce qui manque, où chercher | doc | ●●● | S | nul | |
+| P3 | **Fait**, écrite à la main (termios, séquences VT de la console Windows), sans dépendance. Édition de ligne dans la console : flèches, historique rappelable et enregistré, complétion | ergonomie | ●●● | M | faible | dépendance si linenoise |
 | P9 | Découper `test_simulink.m` (quatre fichiers) et `test_aide.m` (deux) : la batterie passerait de 25 à une douzaine de minutes sur quatre cœurs | maintenance | ●●● | M | faible | gros fichier de test |
 | P5 | LAPACK et BLAS facultatifs pour `eig`, `svd`, `A\b`, `*` sur les grandes matrices denses, les algorithmes écrits à la main restant le repli | performance | ●●● | L | moyen (Windows, résultats au dernier chiffre) | dépendance |
 | P10 | Écrire et lire le PNG sans dépendance : le DEFLATE existe déjà pour les `.mat`, un PNG en blocs non compressés suffit à écrire | fonction | ●● | M | faible | |
@@ -895,3 +895,26 @@ votre accord (dépendance, comportement visible, gros fichier remanié).
 | P1 | Un pool de travailleurs persistant pour `parfor` (`parpool`, `gcp`) : le coût fixe est tombé à 0,012 s (section 5) ; reste l'intérêt d'une table des fichiers et d'un état propres à chaque travailleur | performance | ● | L | moyen | |
 | P37 | Compiler l'interpréteur en bytecode | performance | ● | XL | élevé | |
 | — | Les suites de `reprise.md` §6 non reprises ici : SQL (`sqlite`, dépendance), `get(h,'Color')` en triplet (visible), l'API d'acquisition de MATLAB, les limites du rendu (éclairage, `shading interp`, LaTeX), `uicontrol`/`uifigure` | divers | ●●–● | L–XL | variable | selon le cas |
+
+### La reprise du 27 novembre 2026
+
+P6, P7 et P3 sont faits (`reprise.md`, section 3, donne les commits) ;
+viennent ensuite, dans l'ordre du tableau, P9 (découper `test_simulink.m`
+et `test_aide.m`, un remaniement de gros fichiers de test) et P5 (LAPACK,
+une dépendance), qui demandent tous deux votre accord. Les cinq
+avertissements de compilation anciens sont levés, si bien que
+l'intégration continue refuse désormais tout avertissement.
+
+Vérifier chaque écart du guide P7 sur l'interpréteur, et le test de bout
+en bout de P3, ont fait trouver ce qui suit. Ce qui n'est que
+documentation a été corrigé ; le reste change un comportement visible et
+attend votre accord.
+
+| # | constat | preuve | gravité | suite |
+|---|---|---|---|---|
+| P40 | Une poignée de fonction sauvée dans un `.mat` est écrite comme un `double`, sans avertissement : `load` rend un nombre | `f = @(x) x+1; save('p.mat','f'); t = load('p.mat'); class(t.f)` → `double` ; `classeMx` range `Classe::Fonction` dans le cas par défaut, `mxDOUBLE` | haute (perte silencieuse) | proposé : laisser la variable de côté avec un avertissement (`MatLibre:save:...`), une variable qui porte une poignée dans une cellule ou une structure aussi ; coût S. Le guide le dit tel qu'il est |
+| P41 | D3 n'est pas entièrement appliquée : des erreurs de fonctions de MATLAB restent en français | `imwrite(I,'a.png')` → « IMWRITE n'écrit que les formats PGM et PPM… », `print('-dpng',…)` → « MatLibre n'enregistre les figures qu'en SVG… » ; un balayage des appels à `error` et `erreur` en relève environ soixante-dix (gestion des risques 19, bio-informatique, radar et communications sans fil 7 chacun, 5 dans le C++), davantage en comptant les messages assemblés sur plusieurs lignes | basse | proposé : les passer en anglais, en reprenant les tests qui cherchent un fragment français ; coût M |
+| P42 | `dbstop in f at 3`, la forme de la fiche, pose le point d'arrêt à la ligne 51 — le code du caractère « 3 » — et l'exécution ne s'y arrête pas | `dbstop in fdbg at 3; dbstatus` → « Breakpoint for fdbg is on line 51. » ; `dbstop('in','fdbg','at',3)` marche | moyenne (le débogueur de la console, sous la forme documentée) | proposé : lire le numéro de ligne en texte comme en nombre ; coût S |
+| P43 | `int64` et `uint64` sont rangés en `double` : au-delà de 2^53 le dernier chiffre se perd, et l'affichage prend un facteur d'échelle | `intmax('int64')` → `1.0e+18 * 9.2234` (MATLAB : `9223372036854775807`) ; jusqu'ici dit seulement pour Coder | moyenne | dit dans le guide ; un vrai stockage entier sur 64 bits toucherait `Valeur` (gros fichier, coût L) |
+| — | La fiche de `new_system` et `couverture.md` disaient que le modèle par valeur part en `ode1` au pas de 0,01, ce que D1 a changé ; `hors-fonctions.md` tenait pour absents l'héritage, les paquets `+dossier` et la lecture des `.slx`, qui marchent ; `architecture.md` donnait 8 µs par instruction scalaire | vérifié sur l'interpréteur | basse | corrigé (P7 et la mise à jour des documents) |
+

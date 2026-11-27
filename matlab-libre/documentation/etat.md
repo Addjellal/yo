@@ -10,11 +10,15 @@ propositions —, `documentation/audit-reprise.md`. Ses quatre décisions
 sont appliquées : un modèle Simulink neuf part en `VariableStepAuto`,
 l'affichage démarre en `format short`, les erreurs des fonctions de
 MATLAB et des toolboxes sont en anglais, et la console n'écrit ni invite
-ni bannière quand son entrée n'est pas un terminal. Deux de ses
+ni bannière quand son entrée n'est pas un terminal. Cinq de ses
 propositions sont faites aussi : les valeurs qu'annoncent les fiches
-d'aide sont vérifiées dans la batterie (P2), et une faute de frappe dans
+d'aide sont vérifiées dans la batterie (P2) ; une faute de frappe dans
 une commande fait proposer la commande corrigée, « Did you mean: »
-(P4).
+(P4) ; l'intégration continue tourne à la racine du dépôt, à chaque
+poussée et chaque nuit (P6) ; un guide dit à qui vient de MATLAB ce qui
+diffère et ce qui manque (`venir-de-matlab.md`, P7) ; la console édite
+sa ligne de commande — flèches, historique filtré et gardé, complétion
+(P3).
 
 ## 1. Ce que MatLibre est aujourd'hui
 
@@ -25,12 +29,14 @@ documentation publique et vérifiée sur la propriété qui la définit.
 
 | partie | contenu | lignes |
 |---|---|---:|
-| `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 087 |
-| `src/bibliotheque` | 690 fonctions natives, en C++ | 20 223 |
-| `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 902 |
-| `toolbox` | 2 992 fichiers `.m`, dont 2 233 fonctions publiques recensées par `outils/audit.m` | 137 158 |
-| `tests` | 44 scripts `.m` et 2 fichiers C++ | 24 030 |
-| `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
+| `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire, édition de ligne | 13 109 |
+| `src/bibliotheque` | 690 fonctions natives, en C++ | 23 851 |
+| `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 11 575 |
+| `toolbox` | 3 239 fichiers `.m`, dont 2 233 fonctions publiques recensées par `outils/audit.m` | 188 769 |
+| `tests` | 47 scripts de test `.m` (et leurs classes et fonctions d'essai), 3 fichiers C++ | 47 139 |
+| `exemples` | 53 programmes d'école, un par boîte à outils | 9 389 |
+
+(Lignes comptées le 27 novembre 2026, commentaires compris.)
 
 La couverture par rapport à la liste de référence tirée de la
 documentation MathWorks est complète : `outils/manques.m` compte **2 407
@@ -81,6 +87,12 @@ portent un exemple, et celles qu'un test ou un exemple nomme. Il écrit
 - `tests/scripts/test_exemples.m` exécute les 53 programmes d'école, qui
   ne se contentent pas d'appeler les fonctions : chacun vérifie ce que la
   théorie prédit.
+- **L'intégration continue** (`installation.md`) refait ces contrôles
+  sans qu'on y pense : à chaque poussée, une construction qui doit être
+  sans avertissement et tous les tests de moins d'une minute ; chaque
+  nuit, la batterie entière, puis sous ASan et UBSan, en couverture
+  (`outils/couverture.sh`), sans Qt avec l'installation, et sur macOS et
+  Windows.
 
 La règle de vérification est la même partout : **on vérifie la propriété
 qui définit la fonction, jamais une constante recopiée**. Le tableau
@@ -268,7 +280,7 @@ programme d'école qui montre à quoi il sert.
 | Graphes | `graph` et `digraph` portent les parcours, les plus courts chemins, les composantes, l'arbre couvrant, le flot maximal, la centralité, et désormais l'énumération des cycles et des chemins simples, la base de cycles, la fermeture et la réduction transitives, la condensation, la renumérotation et l'isomorphisme | la réduction transitive d'un graphe à circuits, refusée parce qu'elle n'y est pas unique ; les composantes biconnexes |
 | Boîtes esquissées | 30 boîtes de 2 à 9 fonctions | les compléter domaine par domaine, en gardant la règle : rien sans test |
 | Performance | l'interpréteur est un parcours d'arbre, une instruction scalaire coûte 0,5 µs dont un quart en allocations ; la console démarre en 0,03 s (0,3 avant l'audit) ; `eig` et `svd` sont écrits sans LAPACK, `jsondecode` en langage MATLAB, Simulink interprété bloc par bloc | un scalaire sans allocation, LAPACK facultatif, `jsondecode` natif, Simulink par son programme engendré (P13, P5, P11, P38 de l'audit), puis du bytecode |
-| Durée des tests | cinquante-deux tests — les quarante-sept scripts, les vérifications C++, le bureau, la ligne de commande — en 25 minutes avec `ctest -j3` ; `make test` les fait tourner de front, `make test SERIE=1` en file | elle ne peut descendre sous son plus long script, `test_simulink` (25 minutes) ; le découper en quatre et `test_aide` en deux la ramènerait à une douzaine de minutes (P9 de l'audit) |
+| Durée des tests | cinquante-six tests — les quarante-sept scripts, les vérifications C++, le bureau, la ligne de commande sous tube et sous pseudo-terminal, les valeurs des fiches, les doublons de noms — en 25 minutes avec `ctest -j3` ; `ctest -LE lent` laisse les six scripts de plus d'une minute et tient en trois minutes, et c'est la passe de chaque poussée dans l'intégration continue | elle ne peut descendre sous son plus long script, `test_simulink` (25 minutes) ; le découper en quatre et `test_aide` en deux la ramènerait à une douzaine de minutes (P9 de l'audit, un remaniement de gros fichiers de test, à accorder) |
 
 Aucun de ces points n'est une régression : ce sont des limites connues,
 écrites dans l'aide des fonctions concernées, qui disent ce qu'elles ne

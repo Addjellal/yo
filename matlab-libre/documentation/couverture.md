@@ -193,9 +193,9 @@ totalité.
    `linearize` linéarisent entre des points d'analyse — entrée, sortie,
    coupure —, autour de l'état initial seulement, et en gardant tous les
    états du modèle ; un modèle créé dans la session part des réglages
-   d'un modèle neuf de Simulink (pas variable, sorties en Dataset), là
-   où le modèle par valeur garde ceux de MatLibre (ode1 au pas de 0,01,
-   sorties en tableau) ; Commented retire un bloc du calcul ou le fait
+   d'un modèle neuf de Simulink (pas variable, sorties en Dataset) ; le
+   modèle par valeur part du même solveur, mais garde ses sorties en
+   tableau ; Commented retire un bloc du calcul ou le fait
    traverser ; `Simulink.BlockDiagram.createSubsystem` et
    `expandSubsystem` regroupent et déplient des blocs en rebranchant
    leurs liens — un sous-système masqué, lié, commenté, atomique,
