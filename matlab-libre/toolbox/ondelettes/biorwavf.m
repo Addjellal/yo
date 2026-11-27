@@ -2,7 +2,8 @@ function [RF, DF] = biorwavf(nom)
 %BIORWAVF Filtres d'une ondelette biorthogonale spline.
 %   [RF,DF] = BIORWAVF('biorNr.Nd') rend le filtre d'échelle de synthèse
 %   RF et celui d'analyse DF, tous deux de somme un et complétés de zéros
-%   pour avoir la même longueur — c'est la convention de MATLAB.
+%   centrés pour avoir la même longueur — c'est la convention de MATLAB :
+%   bior2.2 rend RF = [0 1 2 1 0]/4.
 %
 %   La construction est celle de Cohen, Daubechies et Feauveau : le
 %   filtre de synthèse est le spline d'ordre Nr, c'est-à-dire le binôme

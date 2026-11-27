@@ -917,14 +917,19 @@ for k = 1:numel(famille)
     assert(max(abs(waverec(cBior, lBior, famille{k}) - signalLong)) < 1e-9, famille{k});
 end
 % Les filtres biorthogonaux sont symetriques ; aucun filtre orthogonal a
-% support compact ne l'est, sauf Haar. Les zeros de complement, eux, ne
-% sont pas repartis symetriquement : c'est l'alignement des deux filtres
-% qui commande leur place, non l'esthetique.
+% support compact ne l'est, sauf Haar. BIORWAVF les complete de zeros
+% centres, comme MATLAB : bior2.2 rend [0 1 2 1 0]/4, symetrique jusque
+% dans ses zeros. C'est BIORFILT qui les aligne pour la reconstruction,
+% en les completant a une meme longueur paire.
 utile = @(v) v(find(abs(v) > 1e-12, 1):find(abs(v) > 1e-12, 1, 'last'));
 [rfBior, dfBior] = biorwavf('bior2.2');
-assert(max(abs(utile(rfBior) - fliplr(utile(rfBior)))) < 1e-15);
-assert(max(abs(utile(dfBior) - fliplr(utile(dfBior)))) < 1e-15);
+assert(isequal(rfBior, [0 1 2 1 0] / 4));
+assert(max(abs(rfBior - fliplr(rfBior))) < 1e-15);
+assert(max(abs(dfBior - fliplr(dfBior))) < 1e-15);
 assert(numel(utile(rfBior)) == 3 && numel(utile(dfBior)) == 5);
+% Le banc reste celui de MATLAB : Lo_R = [0 1 2 1 0 0] sqrt(2)/4.
+[~, ~, loRBior] = wfilters('bior2.2');
+assert(max(abs(loRBior - [0 1 2 1 0 0] * sqrt(2) / 4)) < 1e-15);
 % bior4.4 est le couple 9/7 de JPEG 2000 : neuf et sept coefficients.
 [rf44, df44] = biorwavf('bior4.4');
 assert(sum(abs(rf44) > 1e-12) == 7 && sum(abs(df44) > 1e-12) == 9);
