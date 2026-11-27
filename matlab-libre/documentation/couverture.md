@@ -94,7 +94,7 @@ totalité.
    le navigateur d'aide. Ctrl+C interrompt le calcul — y compris
    l'affichage d'un tableau de dix millions d'éléments —, dans le bureau
    comme dans la console. Manquent encore : le concepteur d'applications,
-   l'éditeur de schémas-blocs, l'édition collaborative, les Live Scripts
+   l'édition collaborative, les Live Scripts
    (cellules exécutables mêlées au texte), la comparaison de fichiers, le
    repliement de code et la recherche multi-fichiers.
 2. **L'affichage est celui de MATLAB.** MatLibre démarre en

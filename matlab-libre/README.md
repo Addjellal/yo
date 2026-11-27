@@ -87,7 +87,10 @@ n'a pas d'annotations, et la bibliothèque qu'il propose au clic
 compte quarante blocs (les deux cent cinquante-cinq types se posent par
 `add_block`) ; pas d'App Designer, génération de code C restreinte aux scalaires et aux matrices de
 taille fixe, pas d'objets ni de poignées de fonction dans les fichiers
-MAT. La liste complète des écarts est dans
+MAT. Qui vient de MATLAB lira d'abord
+[`documentation/venir-de-matlab.md`](documentation/venir-de-matlab.md) :
+ce qui diffère, ce qui manque, où chercher, en une page. La liste
+complète des écarts est dans
 [`documentation/couverture.md`](documentation/couverture.md) — elle vaut
 d'être lue avant de s'appuyer sur ce projet.
 
@@ -176,6 +179,7 @@ propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
 
 | Fichier | Contenu |
 |---|---|
+| [`venir-de-matlab.md`](documentation/venir-de-matlab.md) | pour qui vient de MATLAB : ce qui se fait pareil, ce qui diffère, ce qui manque, où chercher |
 | [`langage.md`](documentation/langage.md) | ce que l'interpréteur comprend, type par type |
 | [`installation.md`](documentation/installation.md) | compiler, installer, empaqueter, gérer les toolboxes |
 | [`toolboxes.md`](documentation/toolboxes.md) | les 54 modules et leur correspondance MathWorks |

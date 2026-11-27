@@ -15,8 +15,10 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
   dit ce qu'il n'a pas su reconstruire, mais ne rebâtit pas l'objet.
 - **Figures `.fig`**. Ce sont des fichiers MAT portant le modèle d'objets
   graphiques de MathWorks, que MatLibre n'a pas.
-- **Modèles Simulink `.slx`**. `sim` existe pour les modèles écrits en
-  MatLibre ; le format de MathWorks, non.
+- **Modèles Simulink `.slx`**. `load_system` lit les `.slx` et les
+  `.mdl` de Simulink, et `save_system` écrit un `.slx` ; ce que MatLibre ne
+  connaît pas d'un modèle (annotations, masques au-delà des paramètres,
+  signaux de taille variable) est perdu à la lecture.
 - **Scripts vivants `.mlx`**. Le format est une archive OPC ; l'éditeur
   ne les ouvre pas.
 
@@ -33,14 +35,10 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
 
 - **Dossiers `private/`** : les fonctions privées d'un dossier ne sont pas
   reconnues comme telles.
-- **Dossiers de paquet `+nom/`** : la notation `paquet.fonction` marche
-  pour ce qui est enregistré sous ce nom, non par découverte de dossier.
 - **Événements et écouteurs** (`events`, `addlistener`, `notify`) : les
   `events` sont analysés, les écouteurs manquent. Les **classes poignées**
   (`classdef X < handle`), elles, partagent bien leur état : une méthode
   qui écrit dans l'objet se voit depuis toutes ses copies.
-- **Héritage** : `classdef X < Y` est analysé, mais seul `handle` a un
-  effet ; les méthodes et propriétés du parent ne sont pas héritées.
 - **`matlab.unittest`** : le cadre de tests à classes. Les tests de
   MatLibre sont des scripts à `assert`.
 - **Mots-clés de `classdef`** : `properties`, `methods`, `events` et
@@ -107,7 +105,9 @@ qu'ils ne font pas encore comme MATLAB.
   de MathWorks.
 - **Palette par défaut** : viridis, et non parula. Les valeurs de parula
   appartiennent à MathWorks ; comme GNU Octave, MatLibre prend viridis
-  (domaine public), et `colormap(parula)` le dit au lieu d'imiter.
+  (domaine public). `parula` n'existe pas : `colormap(parula)` lève
+  l'erreur ordinaire d'un nom inconnu, sans dire pourquoi (P30 de
+  l'audit de reprise).
   `colormap`, `clim`/`caxis`, `image` (indices directs), `imagesc` et
   `imshow` (gris sur la plage du type, couleurs vraies, images indexées)
   suivent MATLAB.

@@ -165,8 +165,10 @@ ce que `print` écrirait ; une nouveauté du dessin s'écrit une fois.
 
 ## Ce que coûte un interpréteur à parcours d'arbre
 
-Une instruction scalaire coûte de l'ordre de 8 µs, un appel de fonction
-une dizaine. Les opérations vectorisées, elles, tournent à la vitesse du
+Une instruction scalaire coûte de l'ordre d'une demi-microseconde
+(`s = s + k*0.5`, mesuré par l'audit de reprise), dont un quart en
+allocations : chaque scalaire est une `Valeur` qui alloue ses dimensions
+et son tampon. Les opérations vectorisées, elles, tournent à la vitesse du
 C++ : `sum(x)` sur un million d'éléments est une boucle native. La règle
 est donc celle de MATLAB — vectoriser plutôt que boucler — et elle est ici
 plus impérieuse encore.
