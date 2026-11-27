@@ -51,15 +51,19 @@ function sysc = d2c(sys, methode)
             % Le terme direct s'ôte avec le C discret, non le continu :
             % c'est lui qui apparaît dans la formule de C2D.
             D = s.D - s.C * B * Ts / 2;
-        otherwise
-            A = logm(s.A) / Ts;
-            if rank(A) == n
-                B = (expm(A * Ts) - I) \ A * s.B;
-            else
-                B = s.B / Ts;
-            end
+        case 'zoh'
+            % L'inverse exact de C2D : logm([Ad Bd; 0 I]) / Ts = [A B; 0 0],
+            % sans inverser A, qu'un intégrateur rend singulière.
+            m = size(s.B, 2);
+            L = logm([s.A, s.B; zeros(m, n), eye(m)]) / Ts;
+            A = L(1:n, 1:n);
+            B = L(1:n, n + 1:n + m);
             C = s.C;
             D = s.D;
+        otherwise
+            error('Control:transformation:D2CMethod', ...
+                  ['Unsupported conversion method ''%s''. Valid methods are ''zoh'' ' ...
+                   'and ''tustin''.'], char(methode));
     end
     % La discretisation ne touche qu'a la partie rationnelle : le retard
     % reste ce qu'il est, compte en secondes de part et d'autre. Le perdre
