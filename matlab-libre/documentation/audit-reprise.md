@@ -618,7 +618,9 @@ ne sort plus sur un manque de mémoire (section 4).
   `echo 'disp(1)' | matlibre -q` donne `>>      1` puis `>>` ; un journal
   s'en trouve sali (décision D4) ;
 - pas de « Did you mean: plot? » sur une faute de frappe (`plt(1:3)` →
-  « Unrecognized function or variable 'plt'. ») (P4) ;
+  « Unrecognized function or variable 'plt'. ») (P4 — **fait** : la
+  console et le bureau proposent la commande corrigée, le bureau la pose
+  dans la saisie, Entrée l'exécute) ;
 - le premier cadre d'une pile d'erreur ne montre pas sa ligne de code (le
   second, si) ; MATLAB les montre toutes (P24).
 
@@ -858,7 +860,7 @@ votre accord (dépendance, comportement visible, gros fichier remanié).
 | # | proposition | domaine | intérêt | coût | risque | accord |
 |---|---|---|---|---|---|---|
 | P2 | **Fait.** Corriger les ~30 fiches dont la valeur annoncée est fausse ou trop arrondie, regarder `biorwavf`, `risetime`, `disparityBM`, puis faire tourner `verifierValeurs.m` dans la batterie | fidélité, doc | ●●● | S | faible | |
-| P4 | « Did you mean: plot? » sur une faute de frappe : distance d'édition sur les fonctions connues et les variables, comme MATLAB | ergonomie | ●●● | S | faible | message visible |
+| P4 | **Fait.** « Did you mean: plot? » sur une faute de frappe : distance d'édition sur les fonctions connues et les variables, comme MATLAB | ergonomie | ●●● | S | faible | message visible |
 | P6 | Intégration continue à la racine du dépôt : rapide à chaque poussée, complète chaque nuit (ASan sur la sélection, couverture, `verifierValeurs`) ; retirer le fichier inerte | distribution | ●●● | S | faible | minutes d'Actions |
 | P7 | Un guide « Venir de MATLAB » : ce qui diffère (affichage, forme par valeur des modèles, formats d'image, palette), ce qui manque, où chercher | doc | ●●● | S | nul | |
 | P3 | Édition de ligne dans la console : flèches, historique rappelable et enregistré, complétion (écrite à la main sur termios et la console Windows, ou linenoise, un fichier sous licence BSD) | ergonomie | ●●● | M | faible | dépendance si linenoise |

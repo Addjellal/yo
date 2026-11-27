@@ -313,7 +313,7 @@ passe dans `analyseSeule` (analyse sans exécution).
       Simulink, ne rien perdre si l'application se ferme ;
     - **les messages** : une erreur dit-elle quoi, où, et comment s'en
       sortir ? MATLAB propose « Did you mean: plot? » pour une faute de
-      frappe (`plt(1:3)`) ; MatLibre ne le fait pas. Les messages de
+      frappe (`plt(1:3)`) ; MatLibre aussi, désormais. Les messages de
       MATLAB sont en anglais, ceux propres à MatLibre en français : le
       mélange se voit, et se discute ;
     - **la ligne de commande** : options, codes de retour, sortie lisible
@@ -377,12 +377,15 @@ code, corrigés (`c2d` et `d2c` faux dès qu'un modèle porte un
 intégrateur, les marges d'`allmargin` lues sur une grille, `biorwavf`
 qui ne centrait pas ses zéros) ; étendue aux tableaux annoncés, deux de
 plus (`normalize` ignorait ses options, `fillmissing` prolongeait les
-bouts par la valeur la plus proche quelle que soit la méthode). En
-tête de ce qui reste : « Did you mean » (P4), l'intégration continue à
-la racine du dépôt (P6), un guide pour qui vient de MATLAB (P7),
-l'édition de ligne dans la console (P3), une batterie de douze minutes
-(P9), LAPACK (P5) ; et P22, les détails de l'affichage en
-`format short`, que tout le monde voit depuis D2.
+bouts par la valeur la plus proche quelle que soit la méthode). P4 est
+faite : une faute de frappe dans une commande (`plott(x)`) fait
+proposer la commande corrigée (« Did you mean: »), que le bureau pose
+dans la saisie ; le message d'erreur, lui, reste celui de MATLAB. En
+tête de ce qui reste : l'intégration continue à la racine du dépôt
+(P6), un guide pour qui vient de MATLAB (P7), l'édition de ligne dans la
+console (P3), une batterie de douze minutes (P9), LAPACK (P5) ; et P22,
+les détails de l'affichage en `format short`, que tout le monde voit
+depuis D2.
 
 Les suites d'avant l'audit restent, avec ce qu'il en a appris :
 
@@ -440,9 +443,9 @@ Pour **la suite de l'audit**, coller ce message :
 > `audit-reprise.md`, `etat.md` et `architecture.md`.
 >
 > Les décisions D1 à D4 de l'audit sont appliquées (section 14
-> d'`audit-reprise.md`), ainsi que P2. Prends les propositions suivantes
-> du tableau de cette section dans l'ordre, en commençant par P4 (« Did
-> you mean » sur une faute de frappe). Un commit par
+> d'`audit-reprise.md`), ainsi que P2 et P4. Prends les propositions
+> suivantes du tableau de cette section dans l'ordre, en commençant par
+> P6 (l'intégration continue à la racine du dépôt). Un commit par
 > sujet, la batterie complète repassée avant de pousser ; demande-moi
 > avant d'ajouter une dépendance, de changer un comportement visible ou
 > de remanier un gros fichier. À la fin, mets à jour `reprise.md` et

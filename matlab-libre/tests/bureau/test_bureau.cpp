@@ -171,6 +171,16 @@ int main(int argc, char** argv) {
     envoyer(fenetre, QStringLiteral("undefinedThing(3)"));
     verifier(attendre([&] { return console->toPlainText().contains(QLatin1String("Error")); }),
              "une erreur s'affiche au lieu de tuer la fenetre");
+    // Une faute de frappe : comme MATLAB, la commande corrigee attend dans
+    // la saisie, et Entree l'executerait.
+    envoyer(fenetre, QStringLiteral("dispp(max(y))"));
+    verifier(attendre([&] {
+                 return console->toPlainText().contains(QLatin1String("Did you mean:"));
+             }),
+             "une faute de frappe appelle « Did you mean: »");
+    verifier(attendre([&] { return console->commandeEnCours() == QLatin1String("disp(max(y))"); }),
+             "la commande corrigee attend dans la saisie");
+    // La commande suivante remplace la proposition au lieu de s'y coller.
     envoyer(fenetre, QStringLiteral("apresErreur = 42;"));
     verifier(attendre([&] { return ligneDe(QStringLiteral("apresErreur")) >= 0; }),
              "l'interpreteur repond encore apres une erreur");

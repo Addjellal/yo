@@ -14,6 +14,12 @@ void erreur(const std::string& identifiant, const std::string& message) {
 
 void erreurSimple(const std::string& message) { throw ErreurMatlab("", message); }
 
+void erreurNomInconnu(const std::string& nom) {
+    ErreurMatlab e("MATLAB:UndefinedFunction", "Unrecognized function or variable '" + nom + "'.");
+    e.nomInconnu = nom;
+    throw e;
+}
+
 std::string formater(const char* format, ...) {
     va_list args;
     va_start(args, format);

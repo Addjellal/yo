@@ -28,6 +28,10 @@ public:
     void effacer();
 
     QString commandeEnCours() const;
+    // Met un texte dans la saisie, prêt à être validé par Entrée : c'est
+    // ainsi que MATLAB propose la commande corrigée après une faute de
+    // frappe (« Did you mean: »).
+    void proposerSaisie(const QString& texte);
     const QStringList& historique() const { return historique_; }
 
     // Ce que la tabulation propose. Le fournisseur rend les completions

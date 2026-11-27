@@ -175,6 +175,14 @@ int executerFluxInteractif(Interpreteur& it, bool silencieux) {
                 continue;
             }
             std::cerr << rapportErreur(e);
+            // Une faute de frappe dans la commande : la commande corrigée,
+            // comme MATLAB. Pas hors terminal, où personne ne la lirait
+            // pour la retaper (« matlab -batch » ne la propose pas non plus).
+            if (terminal) {
+                const std::string correction = it.correctionCommande(e, tampon);
+                if (!correction.empty())
+                    std::cerr << "\nDid you mean:\n    " << correction << "\n";
+            }
             tampon.clear();
         } catch (const DemandeSortie& s) {
             return s.code;

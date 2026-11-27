@@ -132,6 +132,8 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &Moteur::nomsConnus, this,
             [this](const QStringList& noms) { nomsConnus_ = noms; });
     connect(moteur_, &Moteur::commandeFinie, this, &FenetrePrincipale::surCommandeFinie);
+    connect(moteur_, &Moteur::correctionProposee, this,
+            [this](const QString& commande) { correctionEnAttente_ = commande; });
     connect(moteur_, &Moteur::effacementDemande, this,
             &FenetrePrincipale::effacerCommandes);
     connect(moteur_, &Moteur::arreteSur, this, &FenetrePrincipale::surArret);
@@ -969,7 +971,9 @@ void FenetrePrincipale::envoyer(const QString& commande) {
         return;
     }
     console_->poserInvite();
-    console_->insertPlainText(commande);
+    // La commande remplace la saisie : une correction proposée (« Did you
+    // mean: ») ou un début de frappe s'y colleraient sinon.
+    console_->proposerSaisie(commande);
     QKeyEvent entree(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
     QCoreApplication::sendEvent(console_, &entree);
 }
@@ -1010,6 +1014,10 @@ void FenetrePrincipale::poserOccupe(bool occupe) {
 void FenetrePrincipale::surCommandeFinie() {
     poserOccupe(false);
     console_->poserInvite();
+    if (!correctionEnAttente_.isEmpty()) {
+        console_->proposerSaisie(correctionEnAttente_);
+        correctionEnAttente_.clear();
+    }
 }
 
 void FenetrePrincipale::surEspaceTravail(const QVector<LigneEspaceTravail>& lignes) {

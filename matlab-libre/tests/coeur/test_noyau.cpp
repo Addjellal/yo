@@ -269,6 +269,54 @@ void testErreurs() {
     verifier(leve, "dimensions incompatibles : identifiant MATLAB:innerdim");
 }
 
+// « Did you mean: » : le nom connu le plus proche, et la commande
+// corrigée que la console propose.
+void testSuggestion() {
+    Interpreteur it;
+    it.installerBibliotheque();
+    std::ostringstream poubelle;
+    it.definirSortie(&poubelle);
+    it.executerTexte("maVariable = 3;", "<test>");
+    verifier(it.nomProche("plott") == "plot", "plott -> plot (une lettre de trop), non plot3");
+    verifier(it.nomProche("lenght") == "length", "lenght -> length (transposition)");
+    verifier(it.nomProche("dsip") == "disp", "dsip -> disp (transposition, nom court)");
+    verifier(it.nomProche("mavariable") == "maVariable", "la casse seule : distance nulle");
+    verifier(it.nomProche("maVariabel") == "maVariable", "une variable se propose aussi");
+    verifier(it.nomProche("zzqqxxww").empty(), "rien d'assez proche : aucune proposition");
+    verifier(it.nomProche("x").empty(), "un nom d'une lettre : aucune proposition");
+
+    // La commande corrigée remplace le nom fautif, et lui seul : ni le
+    // texte entre apostrophes, ni le champ qui porte le même nom.
+    auto correction = [&](const std::string& commande) {
+        try {
+            it.executerTexte(commande, "<console>");
+        } catch (const ErreurMatlab& e) {
+            return it.correctionCommande(e, commande + "\n");
+        }
+        return std::string("(pas d'erreur)");
+    };
+    verifier(correction("dispp('dispp')") == "disp('dispp')",
+             "le texte entre apostrophes est laissé");
+    verifier(correction("s.plott = 1; y = plott(2);") == "s.plott = 1; y = plot(2);",
+             "le champ homonyme est laissé");
+    verifier(correction("y = maVariabel + 1;") == "y = maVariable + 1;",
+             "une variable mal tapée est corrigée");
+    verifier(correction("eval('dispp(1)')").empty(),
+             "le nom fautif n'est pas dans la commande : rien à proposer");
+    verifier(correction("y = [1 2] * [3 4];").empty(),
+             "une erreur qui n'est pas un nom inconnu : rien à proposer");
+    verifier(correction("qqzzxxw(1)").empty(), "aucun nom proche : rien à proposer");
+
+    // Le message reste celui de MATLAB : la proposition n'y entre pas.
+    try {
+        it.executerTexte("plott(1)", "<console>");
+    } catch (const ErreurMatlab& e) {
+        verifier(e.message == "Unrecognized function or variable 'plott'.",
+                 "le message d'erreur ne porte pas la proposition");
+        verifier(e.nomInconnu == "plott", "l'erreur garde le nom inconnu");
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -283,6 +331,7 @@ int main() {
         {"fonctions", testFonctions},   {"algebre", testAlgebre},
         {"texte", testTexte},           {"affichage", testAffichage},
         {"signal", testSignal},         {"erreurs", testErreurs},
+        {"suggestion", testSuggestion},
     };
     for (const auto& c : cas) {
         std::cout << "[" << c.nom << "]\n";

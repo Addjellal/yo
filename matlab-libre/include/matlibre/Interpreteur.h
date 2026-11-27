@@ -181,6 +181,17 @@ public:
     // ni indexé : le faire d'abord coûterait un appel système à chaque
     // appel de fonction, ce qui se paierait sur tout le reste.
     std::string fichierDossierCourant(const std::string& nom) const;
+
+    // --- proposition sur une faute de frappe (Suggestion.cpp) ---
+    // Le nom connu le plus proche de NOM — variable visible, fonction
+    // native, fichier .m du chemin ou du dossier courant, classe —, vide
+    // s'il n'y en a aucun d'assez proche.
+    std::string nomProche(const std::string& nom) const;
+    // La commande corrigée que la console propose quand COMMANDE, tapée
+    // telle quelle, a échoué sur un nom inconnu (« Did you mean: ») ; vide
+    // s'il n'y a rien à proposer, ou si l'erreur est née plus loin, dans
+    // un fichier que la commande appelait.
+    std::string correctionCommande(const ErreurMatlab& e, const std::string& commande) const;
     // Inscrit une tache de nettoyage dans la portee courante.
     void inscrireNettoyage(const Valeur& tache);
     // Execute les taches d'ONCLEANUP d'une portee qui se ferme.

@@ -250,8 +250,7 @@ bool Interpreteur::existeVariable(const std::string& nom) const {
 Valeur Interpreteur::lireVariable(const std::string& nom) const {
     const Valeur* v = trouverVariable(nom);
     if (!v)
-        erreur("MATLAB:UndefinedFunction",
-               "Unrecognized function or variable '" + nom + "'.");
+        erreurNomInconnu(nom);
     return *v;
 }
 
@@ -878,7 +877,7 @@ std::shared_ptr<Fonction> Interpreteur::resoudrePoignee(const std::string& nom) 
         f->native = it->second.fonction;
         return f;
     }
-    erreur("MATLAB:UndefinedFunction", "Unrecognized function or variable '" + nom + "'.");
+    erreurNomInconnu(nom);
 }
 
 std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Valeur> args,
@@ -1042,8 +1041,7 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
                 return {membreEnumeration(defC, membre)};
         }
     }
-    erreur("MATLAB:UndefinedFunction",
-           "Unrecognized function or variable '" + nom + "'.");
+    erreurNomInconnu(nom);
 }
 
 std::vector<Valeur> Interpreteur::appelerValeur(const Valeur& poignee, std::vector<Valeur> args,
@@ -2117,8 +2115,7 @@ std::size_t Interpreteur::lireSansCopie(const std::string& nom, const NoeudPtr& 
     if (k == 0) {
         cur = trouverVariable(nom);
         if (!cur)
-            erreur("MATLAB:UndefinedFunction",
-                   "Unrecognized function or variable '" + nom + "'.");
+            erreurNomInconnu(nom);
         if (cur->classe == Classe::Objet || cur->classe == Classe::Fonction) {
             courant.push_back(*cur);
             return 0;

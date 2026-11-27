@@ -207,6 +207,9 @@ public slots:
 signals:
     void sortieProduite(const QString& texte);
     void commandeFinie();
+    // La commande corrigée à proposer après une faute de frappe : la
+    // fenêtre la pose dans la saisie, sous « Did you mean: ».
+    void correctionProposee(const QString& commande);
     // L'exécution s'est arrêtée : le fichier et la ligne, pour que
     // l'éditeur y amène le regard.
     void arreteSur(const QString& fichier, int ligne);

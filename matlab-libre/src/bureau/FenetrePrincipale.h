@@ -180,6 +180,8 @@ private:
     // moteur connait, et ceux des variables de l'espace de travail.
     QStringList nomsConnus_;
     QStringList nomsVariables_;
+    // La commande corrigée que la prochaine invite proposera.
+    QString correctionEnAttente_;
     QStringList completions(const QString& prefixe, bool fichiers) const;
     bool occupe_ = false;
     // « MatLibre est occupé » se dit une fois par calcul, pas a chaque

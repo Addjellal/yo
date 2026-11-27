@@ -22,6 +22,7 @@ des jetons, les jetons un arbre, l'arbre est parcouru.
        ├── Affichage.cpp       mise en forme des résultats
        ├── FichierMat.cpp      le format MAT, lecture et écriture
        ├── Compression.cpp     DEFLATE, pour les MAT compressés
+       ├── Suggestion.cpp      « Did you mean: » sur une faute de frappe
        └── bibliotheque/       690 fonctions natives, par domaine
 ```
 
@@ -118,6 +119,14 @@ Les fichiers `.m` sont indexés une fois par dossier du chemin de
 recherche ; la résolution d'un nom est alors une consultation de table.
 L'ordre est celui de MATLAB : variable, sous-fonction du fichier, méthode
 de classe, fichier du chemin, fonction native.
+
+Un nom qu'aucune de ces tables ne connaît lève
+`MATLAB:UndefinedFunction` en gardant le nom à part (`nomInconnu`). Si
+l'erreur est née dans la commande tapée elle-même, la console et le
+bureau cherchent le nom connu le plus proche (distance d'édition à
+transpositions, une lettre mise pour un chiffre comptant double) et
+proposent la commande corrigée, comme MATLAB. Le message que voient
+`try/catch` et `MException` n'en porte rien.
 
 ## Algèbre linéaire
 
