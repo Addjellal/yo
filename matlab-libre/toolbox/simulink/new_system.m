@@ -32,9 +32,8 @@ function modele = new_system(nom, genre)
 %   blocs par leur chemin « nom/bloc ». Un modèle de ce nom déjà ouvert
 %   est refusé ; BDCLOSE le ferme. Le modèle y part des réglages d'un
 %   modèle neuf de Simulink — le solveur automatique à pas variable
-%   (VariableStepAuto), les sorties en Dataset (SaveFormat) —, là où le
-%   modèle par valeur part de ceux de MatLibre : ode1 au pas de 0,01, et
-%   des sorties en tableau.
+%   (VariableStepAuto), les sorties en Dataset (SaveFormat). Le modèle par
+%   valeur part du même solveur, mais garde ses sorties en tableau.
 %
 %   Exemple :
 %      m = new_system('rampe');
