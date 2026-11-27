@@ -6,7 +6,11 @@ est écrit à la main ; `documentation/audit.md`, lui, est produit par
 d'une session à l'autre — règles du dépôt, commandes, derniers ajouts,
 la suite —, voir `documentation/reprise.md` ; pour l'audit de reprise des
 21 et 22 novembre 2026 — ses constats, ses preuves, les corrections et les
-propositions —, `documentation/audit-reprise.md`.
+propositions —, `documentation/audit-reprise.md`. Ses quatre décisions
+sont appliquées : un modèle Simulink neuf part en `VariableStepAuto`,
+l'affichage démarre en `format short`, les erreurs des fonctions de
+MATLAB et des toolboxes sont en anglais, et la console n'écrit ni invite
+ni bannière quand son entrée n'est pas un terminal.
 
 ## 1. Ce que MatLibre est aujourd'hui
 

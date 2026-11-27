@@ -261,12 +261,12 @@ passe dans `analyseSeule` (analyse sans exécution).
    - de noms : `outils/verifierDoublons.m` (doublons, masquages du
      natif), et les collisions de casse que `test_aide.m` refuse ;
    - de comportements : deux chemins qui devraient s'accorder et ne le
-     font pas. Un exemple connu : un modèle Simulink créé par
-     `m = new_system('m')` (la forme à sortie, propre à MatLibre) part
-     en `ode1` au pas de 0,01, quand `new_system('m')` part, comme
-     Simulink, en `VariableStepAuto` — d'où un intégrateur faux de 5e-3
-     sur un sinus, là où ode45 donne 3e-10. À trancher : décision D1 de
-     l'audit.
+     font pas. Un exemple, réglé depuis (décision D1) : un modèle
+     Simulink créé par `m = new_system('m')` partait en `ode1` au pas de
+     0,01, quand `new_system('m')` partait, comme Simulink, en
+     `VariableStepAuto` — d'où un intégrateur faux de 5e-3 sur un sinus,
+     là où ode45 donne 3e-10. Les deux partent désormais en
+     `VariableStepAuto`.
 7. **La fidélité à MATLAB sur du vrai code** : faire tourner des
    programmes MATLAB réels — les exemples de la documentation publique
    de MathWorks, des projets libres sous licence permissive — et relever
@@ -354,13 +354,15 @@ remanie un gros fichier se décide avec l'utilisateur. À la fin, mettre
 
 ## 6. Ce qui reste, par ordre d'intérêt
 
-**D'abord, les quatre décisions de l'audit** (`audit-reprise.md`,
-section 14), qui attendent l'utilisateur parce qu'elles changent ce qu'il
-voit : D1, le solveur de départ d'un modèle Simulink créé par valeur
-(`ode1` au pas de 0,01, cinq millions de fois moins précis que la forme
-par nom) ; D2, `format short` par défaut ; D3, la langue des messages
-d'erreur et des titres de tracés ; D4, pas d'invite quand l'entrée n'est
-pas un terminal.
+**Les quatre décisions de l'audit sont appliquées** (`audit-reprise.md`,
+section 14, dit ce qui a été fait) : D1, un modèle Simulink neuf part en
+`VariableStepAuto`, par valeur comme par nom ; D2, MatLibre démarre en
+`format short` ; D3, les erreurs et avertissements des fonctions de
+MATLAB et des toolboxes sont en anglais — l'aide, l'interface et les
+identifiants `MatLibre:` restent en français —, et les tracés de
+l'automatique portent les titres de MATLAB ; D4, ni invite ni bannière
+quand l'entrée n'est pas un terminal. Un test qui vérifie un message
+cherche un fragment de l'anglais, ou l'identifiant.
 
 **Puis les propositions de l'audit**, classées dans son tableau, en
 tête : corriger les trente fiches d'aide dont la valeur annoncée est
@@ -417,17 +419,16 @@ Les suites d'avant l'audit restent, avec ce qu'il en a appris :
 
 ## 7. Pour démarrer un nouveau chat
 
-Pour **la suite de l'audit**, coller ce message, après avoir tranché les
-décisions D1 à D4 :
+Pour **la suite de l'audit**, coller ce message :
 
 > Reprends le projet MatLibre (dépôt `addjellal/yo`, dossier
 > `matlab-libre`, branche `claude/matlab-libre-reprise-lgnad9`). Lis
 > d'abord `matlab-libre/documentation/reprise.md` en entier, puis
 > `audit-reprise.md`, `etat.md` et `architecture.md`.
 >
-> Décisions de l'audit : D1 … ; D2 … ; D3 … ; D4 … (écrire ici ce qui a
-> été tranché). Applique-les, puis prends les propositions du tableau de
-> la section 14 d'`audit-reprise.md` dans l'ordre, en commençant par P2
+> Les décisions D1 à D4 de l'audit sont appliquées (section 14
+> d'`audit-reprise.md`). Prends les propositions du tableau de cette
+> section dans l'ordre, en commençant par P2
 > (corriger les fiches dont la valeur annoncée est fausse, puis faire
 > tourner `outils/verifierValeurs.m` dans la batterie). Un commit par
 > sujet, la batterie complète repassée avant de pousser ; demande-moi
