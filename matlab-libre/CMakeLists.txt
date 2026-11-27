@@ -357,6 +357,13 @@ if(MATLIBRE_TESTS)
              COMMAND sh -c "echo 'disp(6*7)' | '$<TARGET_FILE:matlibre>'")
     set_tests_properties(console_tube PROPERTIES
       PASS_REGULAR_EXPRESSION "42" FAIL_REGULAR_EXPRESSION "MatLibre|>>")
+    # L'edition de ligne, sous un vrai terminal (un pseudo-terminal) :
+    # fleches, historique relu et ecrit, Tab, Ctrl-C, Ctrl-D.
+    add_executable(matlibre_tests_terminal
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/console/test_terminal.cpp)
+    add_test(NAME console_terminal
+             COMMAND matlibre_tests_terminal $<TARGET_FILE:matlibre>
+                     ${CMAKE_CURRENT_SOURCE_DIR}/toolbox)
   endif()
   # Les scripts qui passent la minute portent l'etiquette « lent » :
   # « ctest -LE lent » les laisse de cote — c'est la passe de chaque

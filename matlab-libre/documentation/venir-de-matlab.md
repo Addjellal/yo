@@ -23,7 +23,11 @@ ajoute un dossier dès le lancement. La console rend 0 en cas de succès,
 1 sur une erreur du script, 2 sur une option fautive : elle s'emploie
 dans un `Makefile` ou une intégration continue. Elle n'écrit ni invite
 ni bannière quand son entrée n'est pas un terminal (`echo 'disp(1)' |
-matlibre`).
+matlibre`). Au terminal, la ligne s'édite comme dans la fenêtre de
+commandes de MATLAB : ↑ rappelle les commandes qui commencent par ce
+qu'on a tapé, gardées d'une session à l'autre ; Tab complète variables,
+fonctions, champs et fichiers ; Échap efface la ligne (les touches sont
+dans [`langage.md`](langage.md)).
 
 `help nom` répond dans la console, `doc nom` (ou F1 sur un mot de
 l'éditeur) ouvre le navigateur d'aide du bureau. Les fiches sont en
