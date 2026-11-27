@@ -689,8 +689,12 @@ premier passage, 33 s, **1 417 valeurs comparées, 34 écarts** :
 | valeur annoncée trop arrondie | les maxima des fenêtres (`blackmanharris`, `flattopwin`, `nuttallwin` : « 1 »), `allmargin`, `dbm2w`, `directivity`, `fvfix`, `pvfix`, `lin2rgb`, `mel2hz`, `mpcsim`, `sigma`, `wpfun`, `poisscdf` |
 | commentaire mal lu par l'outil | `addVoltageSource` (« 0,01 A », virgule décimale), `surfnorm` |
 
-L'outil n'est pas encore dans la batterie : il faut d'abord corriger ces
-fiches (une session courte), puis l'y faire tourner — P2.
+**C'est fait (P2)** : les 34 fiches sont corrigées — trois écarts
+venaient du code, corrigés avec leur test (`c2d` et `d2c` faux dès que
+A est singulière, les marges d'`allmargin` interpolées sur une grille,
+les zéros de `biorwavf` non centrés) —, l'outil compare désormais 1 424
+valeurs, sans faux « exemple qui ne tourne pas », et tourne dans la
+batterie (test `aide_valeurs`, 22 s), qui échoue au premier écart.
 
 **Ce qui manque** : un guide de démarrage pour qui vient de MATLAB (ce
 qui diffère — l'affichage long par défaut, la forme par valeur des
@@ -835,7 +839,7 @@ votre accord (dépendance, comportement visible, gros fichier remanié).
 
 | # | proposition | domaine | intérêt | coût | risque | accord |
 |---|---|---|---|---|---|---|
-| P2 | Corriger les ~30 fiches dont la valeur annoncée est fausse ou trop arrondie, regarder `biorwavf`, `risetime`, `disparityBM`, puis faire tourner `verifierValeurs.m` dans `test_aide` | fidélité, doc | ●●● | S | faible | |
+| P2 | **Fait.** Corriger les ~30 fiches dont la valeur annoncée est fausse ou trop arrondie, regarder `biorwavf`, `risetime`, `disparityBM`, puis faire tourner `verifierValeurs.m` dans la batterie | fidélité, doc | ●●● | S | faible | |
 | P4 | « Did you mean: plot? » sur une faute de frappe : distance d'édition sur les fonctions connues et les variables, comme MATLAB | ergonomie | ●●● | S | faible | message visible |
 | P6 | Intégration continue à la racine du dépôt : rapide à chaque poussée, complète chaque nuit (ASan sur la sélection, couverture, `verifierValeurs`) ; retirer le fichier inerte | distribution | ●●● | S | faible | minutes d'Actions |
 | P7 | Un guide « Venir de MATLAB » : ce qui diffère (affichage, forme par valeur des modèles, formats d'image, palette), ce qui manque, où chercher | doc | ●●● | S | nul | |

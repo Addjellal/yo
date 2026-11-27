@@ -188,4 +188,9 @@ bonne partie de l'interpréteur tourne aussi.
   l'aide, l'interface du bureau et les identifiants `MatLibre:`. Un test
   qui vérifie un message cherche un fragment de ce texte anglais, ou
   mieux, l'identifiant.
+- Une valeur annoncée en commentaire d'un exemple d'aide
+  (`pi   % 3.1416`) est vérifiée par le test `aide_valeurs`
+  (`outils/verifierValeurs.m`) : un nombre à la précision où il est
+  écrit, un texte exactement, `true` ou `false`. Écrire la valeur que
+  rend la ligne, arrondie comme MATLAB l'afficherait.
 - Quatre espaces d'indentation, lignes de 90 colonnes au plus.

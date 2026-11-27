@@ -368,4 +368,13 @@ if(MATLIBRE_TESTS)
     set_tests_properties(langage_${nom} PROPERTIES
       ENVIRONMENT "MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
   endforeach()
+  # Les valeurs qu'annoncent les fiches d'aide en commentaire de leurs
+  # exemples (« pi % 3.1416 ») : test_aide execute les exemples sans lire
+  # ces commentaires, verifierValeurs les compare a ce que rend la ligne,
+  # et echoue au premier ecart.
+  add_test(NAME aide_valeurs
+           COMMAND matlibre --path ${CMAKE_CURRENT_SOURCE_DIR}/toolbox
+                   ${CMAKE_CURRENT_SOURCE_DIR}/outils/verifierValeurs.m)
+  set_tests_properties(aide_valeurs PROPERTIES
+    ENVIRONMENT "MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
 endif()

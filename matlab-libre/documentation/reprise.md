@@ -7,9 +7,9 @@ le rendu sont bâtis), `developpeur.md` (compiler, ajouter une fonction,
 conventions), `reference-matlab/hors-fonctions.md` (ce qui diffère de
 MATLAB, domaine par domaine).
 
-Dernière mise à jour : 22 novembre 2026, à la fin de l'audit de reprise
-(`audit-reprise.md`). La batterie complète passe, 52 tests sur 52, au
-dernier commit de code de l'audit.
+Dernière mise à jour : 27 novembre 2026, après les quatre décisions de
+l'audit de reprise (`audit-reprise.md`) et sa proposition P2. La batterie
+complète passe, 54 tests sur 54.
 
 ## 1. Les règles du dépôt
 
@@ -29,8 +29,12 @@ dernier commit de code de l'audit.
 - **Lignes de 100 colonnes au plus**, en C++ comme en `.m`.
 - **Chaque fiche d'aide** porte un bloc « Exemple : » ou « Exemples : »
   et une ligne « Voir aussi » : `tests/scripts/test_aide.m` exécute
-  **tous** les exemples et exige le « Voir aussi ». Les fonctions natives
-  ont leur fiche dans `toolbox/aide/*.txt`, sous `### nom`.
+  **tous** les exemples et exige le « Voir aussi ». Une valeur annoncée
+  en commentaire d'un exemple (`pi   % 3.1416`) doit être juste : le test
+  `aide_valeurs` (`outils/verifierValeurs.m`) la compare à ce que rend la
+  ligne — un nombre à la précision où il est écrit, un texte exactement,
+  `true` ou `false`. Les fonctions natives ont leur fiche dans
+  `toolbox/aide/*.txt`, sous `### nom`.
 - **Fonctions internes** préfixées `matlibre_` (elles n'existent pas dans
   MATLAB et le disent dans leur aide). Deux fichiers dont les noms ne
   diffèrent que par la casse (`addMF`/`addmf`) : l'un va dans le
@@ -64,8 +68,9 @@ cd build && ctest -j2 --timeout 7000 > log          # la batterie complète
 cd build && ctest -R bureau                          # l'application de bureau, hors écran
 ```
 
-- La batterie compte 52 tests (les 47 scripts, les vérifications C++, le
-  bureau, trois tests de la ligne de commande) et dure **25 minutes avec
+- La batterie compte 54 tests (les 47 scripts, les vérifications C++, le
+  bureau, quatre tests de la ligne de commande, les valeurs des fiches
+  d'aide) et dure **25 minutes avec
   `-j3`** : `test_simulink` à lui seul 25 minutes, `test_aide` 13,
   `test_exemples` 5. ctest lance d'abord les plus longs ; au-delà de trois
   cœurs, rien ne se gagne tant que `test_simulink` reste d'un bloc (P9 de
@@ -364,12 +369,16 @@ l'automatique portent les titres de MATLAB ; D4, ni invite ni bannière
 quand l'entrée n'est pas un terminal. Un test qui vérifie un message
 cherche un fragment de l'anglais, ou l'identifiant.
 
-**Puis les propositions de l'audit**, classées dans son tableau, en
-tête : corriger les trente fiches d'aide dont la valeur annoncée est
-fausse et faire tourner `outils/verifierValeurs.m` dans la batterie (P2),
-« Did you mean » (P4), l'intégration continue à la racine du dépôt (P6),
-un guide pour qui vient de MATLAB (P7), l'édition de ligne dans la
-console (P3), une batterie de douze minutes (P9), LAPACK (P5).
+**Puis les propositions de l'audit**, classées dans son tableau. P2 est
+faite : les fiches annoncent des valeurs justes, et la batterie le
+vérifie (test `aide_valeurs`) ; elle a fait trouver trois défauts du
+code, corrigés (`c2d` et `d2c` faux dès qu'un modèle porte un
+intégrateur, les marges d'`allmargin` lues sur une grille, `biorwavf`
+qui ne centrait pas ses zéros). En tête de ce qui reste : « Did you
+mean » (P4), l'intégration continue à la racine du dépôt (P6), un guide
+pour qui vient de MATLAB (P7), l'édition de ligne dans la console (P3),
+une batterie de douze minutes (P9), LAPACK (P5) ; et P22, les détails de
+l'affichage en `format short`, que tout le monde voit depuis D2.
 
 Les suites d'avant l'audit restent, avec ce qu'il en a appris :
 
@@ -427,10 +436,9 @@ Pour **la suite de l'audit**, coller ce message :
 > `audit-reprise.md`, `etat.md` et `architecture.md`.
 >
 > Les décisions D1 à D4 de l'audit sont appliquées (section 14
-> d'`audit-reprise.md`). Prends les propositions du tableau de cette
-> section dans l'ordre, en commençant par P2
-> (corriger les fiches dont la valeur annoncée est fausse, puis faire
-> tourner `outils/verifierValeurs.m` dans la batterie). Un commit par
+> d'`audit-reprise.md`), ainsi que P2. Prends les propositions suivantes
+> du tableau de cette section dans l'ordre, en commençant par P4 (« Did
+> you mean » sur une faute de frappe). Un commit par
 > sujet, la batterie complète repassée avant de pousser ; demande-moi
 > avant d'ajouter une dépendance, de changer un comportement visible ou
 > de remanier un gros fichier. À la fin, mets à jour `reprise.md` et

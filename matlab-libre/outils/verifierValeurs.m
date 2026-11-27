@@ -15,7 +15,9 @@ function verifierValeurs(varargin)
 %   la fonction rendait '3.142'. Cet outil le voit.
 %
 %   VERIFIERVALEURS('signal', 'num2str', ...) se limite à ces modules ou à
-%   ces fonctions.
+%   ces fonctions. S'il reste un écart, ou un exemple qui ne tourne pas,
+%   l'outil s'arrête sur une erreur : la batterie le fait tourner (test
+%   aide_valeurs de CMake).
 %
 %   Exemple :
 %      build/bin/matlibre --path toolbox outils/verifierValeurs.m
@@ -47,8 +49,9 @@ function verifierValeurs(varargin)
         [trouves, casse] = executer(bloc);
         cd(avant);
         close all force;
-        if casse
+        if ~isempty(casse)
             casses = casses + 1;
+            ecarts{end + 1} = sprintf('%s : l''exemple ne tourne pas (%s)', noms{k}, casse);   %#ok<AGROW>
             continue
         end
         comparees = comparees + n;
@@ -63,6 +66,12 @@ function verifierValeurs(varargin)
     end
     fprintf('\n  %d valeurs comparees, %d ecarts, %d exemples qui n''ont pas tourne\n', ...
             comparees, numel(ecarts), casses);
+    % Dans la batterie (test aide_valeurs), un écart fait échouer le test.
+    if ~isempty(ecarts)
+        error('MatLibre:verifierValeurs:Ecarts', ...
+              '%d fiche(s) annoncent une valeur que leur exemple ne rend pas.', ...
+              numel(ecarts));
+    end
 end
 
 function noms = nomsAVerifier(racine, demandes)
@@ -122,19 +131,21 @@ function tf = estAffectation(expr)
     tf = ~isempty(regexp(expr, '^\s*\[?[\w.,{}()\s~]*\]?\s*=(?!=)', 'once'));
 end
 
+% Une commande, ou une ligne de contrôle (« if isunix, ..., end % 42 »
+% annonce ce qu'affiche la ligne, non une valeur qu'elle rendrait).
 function tf = estCommande(expr)
-    tf = ~isempty(regexp(expr, '^\s*(hold|axis|grid|close|clear|format|figure|disp)\b', ...
-                         'once'));
+    tf = ~isempty(regexp(expr, ['^\s*(hold|axis|grid|close|clear|format|figure|disp|' ...
+                                'if|for|while|switch|try|parfor)\b'], 'once'));
 end
 
 function [ecarts, casse] = executer(bloc)
     ecarts = {};
-    casse = false;
+    casse = '';
     try
         evalc(bloc);
         ecarts = ecartsValeurs__; %#ok<NODEF>
-    catch
-        casse = true;
+    catch err
+        casse = err.message;
     end
 end
 
@@ -170,7 +181,12 @@ function ecarts = comparerValeur(ecarts, texte, annonce, obtenu)
         end
         tolerance = 0.5 * 10 ^ (-numel(partie{1})) * echelle * (1 + 1e-9);
     end
-    valeur = double(real(obtenu));
+    % Un objet numérique (fi, dlarray, gpuArray) se lit par double.
+    try
+        valeur = real(double(obtenu));
+    catch
+        return
+    end
     if ~(abs(valeur - attendu) <= tolerance) && ~(isnan(valeur) && isnan(attendu))
         ecarts{end + 1} = sprintf('%s rend %.10g, annonce %s', texte, valeur, annonce);
     end
