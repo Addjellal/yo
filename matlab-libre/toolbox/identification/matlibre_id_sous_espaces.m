@@ -29,7 +29,7 @@ function [A, C] = matlibre_id_sous_espaces(y, u, ordre, horizon)
         j = N - 2 * i + 1;
     end
     if j < ordre + 1
-        error('ident:n4sid:Donnees', 'Trop peu de données pour cet ordre.');
+        error('ident:n4sid:Donnees', 'Not enough data for this order.');
     end
     Up = matlibre_id_hankel(u, 1, i, j);
     Uf = matlibre_id_hankel(u, i + 1, i, j);

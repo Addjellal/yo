@@ -76,7 +76,7 @@ function [pValeur, valeurCritique] = matlibre_egci_table(statistique, creg, ...
                 ];
         otherwise
             error('econ:egciTable:Forme', ...
-                  'La forme du test vaut ''t1'' ou ''t2'', pas ''%s''.', forme);
+                  'Test must be ''t1'' or ''t2'', not ''%s''.', forme);
     end
     switch lower(creg)
         case 'nc',  table = quantilesNc;

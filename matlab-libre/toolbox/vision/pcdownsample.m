@@ -50,6 +50,6 @@ function nuage = pcdownsample(entree, methode, parametre, varargin)
             nuage = matlibre_nuage_grille(entree, points, sqrt(bas * haut));
         otherwise
             error('vision:pcdownsample:Methode', ...
-                  'La méthode vaut ''random'', ''gridAverage'' ou ''nonuniformGridSample''.');
+                  'Method must be ''random'', ''gridAverage'', or ''nonuniformGridSample''.');
     end
 end

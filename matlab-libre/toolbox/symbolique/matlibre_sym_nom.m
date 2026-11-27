@@ -5,7 +5,7 @@ function nom = matlibre_sym_nom(variable)
     arbre = matlibre_sym_arbre(variable);
     if ~strcmp(arbre{1}, 'var')
         error('symbolic:sym:Variable', ...
-              'Il faut nommer une variable, non une expression.');
+              'A variable name is required, not an expression.');
     end
     nom = arbre{2};
 end

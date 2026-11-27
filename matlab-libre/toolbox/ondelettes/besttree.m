@@ -22,7 +22,7 @@ function [arbre, entropies, entropiesInitiales] = besttree(arbre)
 %
 %   Voir aussi WENTROPY, WPDEC, WPDEC2, LEAVES, WPJOIN.
     if ~isfield(arbre, 'type') || ~strcmp(arbre.type, 'wptree')
-        error('wavelet:besttree:Arbre', 'BESTTREE attend un arbre de paquets.');
+        error('wavelet:besttree:Arbre', 'BESTTREE requires a wavelet packet tree.');
     end
     maximum = max(arbre.noeuds);
     entropiesInitiales = inf(1, maximum + 1);

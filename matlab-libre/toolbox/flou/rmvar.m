@@ -19,7 +19,7 @@ function fis = rmvar(fis, genre, indiceVariable)
     entree = estEntree(genre);
     variables = variablesDe(fis, entree);
     if indiceVariable < 1 || indiceVariable > numel(variables)
-        error('fuzzy:rmvar:BadVariable', 'Variable %d inexistante.', indiceVariable);
+        error('fuzzy:rmvar:BadVariable', 'Variable %d does not exist.', indiceVariable);
     end
     if entree
         colonne = indiceVariable;

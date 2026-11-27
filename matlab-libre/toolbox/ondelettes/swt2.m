@@ -21,7 +21,7 @@ function [swa, swh, swv, swd] = swt2(x, niveaux, nom)
     [lignes, colonnes] = size(x);
     if mod(lignes, 2 ^ niveaux) ~= 0 || mod(colonnes, 2 ^ niveaux) ~= 0
         error('wavelet:swt2:BadSize', ...
-              'Les deux dimensions doivent être des multiples de 2^N.');
+              'Both dimensions must be multiples of 2^N.');
     end
     [analyseBas, analyseHaut] = wfilters(nom, 'd');
     bas = analyseBas(end:-1:1);

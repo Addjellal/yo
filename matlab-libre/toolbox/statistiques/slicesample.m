@@ -42,7 +42,7 @@ function [echantillon, nEvaluations] = slicesample(depart, n, varargin)
     end
     if isempty(densite) && isempty(logDensite)
         error('stats:slicesample:Densite', ...
-              'Il faut donner « pdf » ou « logpdf ».');
+              'Either ''pdf'' or ''logpdf'' is required.');
     end
     if isempty(logDensite)
         logDensite = @(x) log(max(densite(x), realmin));

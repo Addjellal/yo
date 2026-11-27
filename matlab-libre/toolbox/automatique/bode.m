@@ -152,7 +152,7 @@ function tracerGrille(modeles, styles, w, reglage)
         autre = ss(modeles{k});
         if ~isequal(size(autre.D), size(reference.D))
             error('Control:analysis:MultipleModels', ...
-                  'Les modeles superposes doivent avoir les memes entrees et sorties.');
+                  'All models must have the same inputs and outputs.');
         end
         [modules{k}, phases{k}, grilles{k}] = reponseBode(modeles{k}, w);
     end
@@ -179,7 +179,7 @@ function tracerGrille(modeles, styles, w, reglage)
             axes(cases{2 * i - 1, j});
             semilogx(courbesModule{:});
             grid(reglage.grille);
-            title(sprintf('De %s vers %s', entrees{j}, sorties{i}));
+            title(sprintf('From: %s  To: %s', entrees{j}, sorties{i}));
             if j == 1, ylabel(reglage.nomGain); end
             axes(cases{2 * i, j});
             semilogx(courbesPhase{:});

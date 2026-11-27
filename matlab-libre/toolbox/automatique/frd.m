@@ -144,12 +144,12 @@ classdef frd
             if nargout == 0
                 subplot(2, 1, 1);
                 loglog(w, module);
-                ylabel('gain');
+                ylabel('Magnitude (abs)');
                 grid('on');
                 subplot(2, 1, 2);
                 semilogx(w, phase);
-                ylabel('phase (deg)');
-                xlabel('pulsation (rad/s)');
+                ylabel('Phase (deg)');
+                xlabel('Frequency (rad/s)');
                 grid('on');
                 clear module
             end

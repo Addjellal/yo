@@ -28,5 +28,5 @@ function valeur = getBlockValue(modele, nom)
         return;
     end
     error('control:getBlockValue:Bloc', ...
-          'Aucun bloc nommé « %s » dans ce modèle.', nom);
+          'No block named ''%s'' in this model.', nom);
 end

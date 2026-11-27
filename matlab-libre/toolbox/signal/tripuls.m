@@ -10,7 +10,7 @@ function y = tripuls(t, w, s)
     if nargin < 2 || isempty(w), w = 1; end
     if nargin < 3 || isempty(s), s = 0; end
     if s < -1 || s > 1
-        error('signal:tripuls:BadSkew', 'L''asymétrie doit être entre -1 et 1.');
+        error('signal:tripuls:BadSkew', 'The skew must be between -1 and 1.');
     end
     t = double(t);
     y = zeros(size(t));

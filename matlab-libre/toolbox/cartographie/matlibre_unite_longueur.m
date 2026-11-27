@@ -21,7 +21,7 @@ function sortie = matlibre_unite_longueur(unite, quoi)
         case {'nm', 'nautical mile', 'nauticalmile', 'nmi'}
             f = 1852; nom = 'nautical mile';
         otherwise
-            error('map:unite:Inconnue', 'Unité de longueur inconnue : %s.', char(unite));
+            error('map:unite:Inconnue', 'Unknown length unit: %s.', char(unite));
     end
     if nargin > 1 && strcmpi(quoi, 'nom')
         sortie = nom;

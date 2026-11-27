@@ -19,7 +19,7 @@ function [quotient, reste] = gfdeconv(a, b, p)
     a = mod(double(gftrunc(a(:).')), p);
     b = mod(double(gftrunc(b(:).')), p);
     if all(b == 0)
-        error('comm:gfdeconv:Nul', 'La division par le polynôme nul n''a pas de sens.');
+        error('comm:gfdeconv:Nul', 'Division by the zero polynomial is undefined.');
     end
     degreB = numel(b) - 1;
     reste = a;

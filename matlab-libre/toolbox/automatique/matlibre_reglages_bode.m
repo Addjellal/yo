@@ -11,9 +11,9 @@ function r = matlibre_reglages_bode(options)
 %
 %   Voir aussi BODE, BODEMAG, BODEOPTIONS.
     r = struct('diviseurW', 1, 'enDecibels', true, 'facteurPhase', 1, ...
-               'grille', 'on', 'nomPulsation', 'Pulsation (rad/s)', ...
-               'nomGain', 'Gain (dB)', 'nomPhase', 'Phase (deg)', ...
-               'titre', 'Diagramme de Bode', 'xlim', [], 'ylim', []);
+               'grille', 'on', 'nomPulsation', 'Frequency (rad/s)', ...
+               'nomGain', 'Magnitude (dB)', 'nomPhase', 'Phase (deg)', ...
+               'titre', 'Bode Diagram', 'xlim', [], 'ylim', []);
     if isempty(options) || ~isstruct(options)
         return;
     end
@@ -21,23 +21,23 @@ function r = matlibre_reglages_bode(options)
         switch lower(char(options.FreqUnits))
             case {'hz', 'cycles/timeunit'}
                 r.diviseurW = 2 * pi;
-                r.nomPulsation = 'Fréquence (Hz)';
+                r.nomPulsation = 'Frequency (Hz)';
             case 'khz'
                 r.diviseurW = 2 * pi * 1e3;
-                r.nomPulsation = 'Fréquence (kHz)';
+                r.nomPulsation = 'Frequency (kHz)';
             case 'mhz'
                 r.diviseurW = 2 * pi * 1e6;
-                r.nomPulsation = 'Fréquence (MHz)';
+                r.nomPulsation = 'Frequency (MHz)';
             case 'rpm'
                 r.diviseurW = 2 * pi / 60;
-                r.nomPulsation = 'Vitesse (tr/min)';
+                r.nomPulsation = 'Frequency (rpm)';
             otherwise
                 % 'rad/s' et 'rad/TimeUnit' : rien à changer.
         end
     end
     if champRempli(options, 'MagUnits') && strcmpi(char(options.MagUnits), 'abs')
         r.enDecibels = false;
-        r.nomGain = 'Gain';
+        r.nomGain = 'Magnitude (abs)';
     end
     if champRempli(options, 'PhaseUnits') && strncmpi(char(options.PhaseUnits), 'rad', 3)
         r.facteurPhase = pi / 180;

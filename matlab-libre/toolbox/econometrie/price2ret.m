@@ -27,21 +27,21 @@ function [rendements, instants] = price2ret(prix, dates, methode)
         prix = prix(:);
     end
     if size(prix, 1) < 2
-        error('econ:price2ret:Longueur', 'Il faut au moins deux prix.');
+        error('econ:price2ret:Longueur', 'At least two prices are required.');
     end
     methode = lower(char(methode));
     switch methode
         case {'continuous', 'continu'}
             if any(prix(:) <= 0)
                 error('econ:price2ret:Positifs', ...
-                      'Le rendement continu demande des prix strictement positifs.');
+                      'Continuous returns require strictly positive prices.');
             end
             rendements = diff(log(prix), 1, 1);
         case {'periodic', 'simple'}
             rendements = prix(2:end, :) ./ prix(1:end-1, :) - 1;
         otherwise
             error('econ:price2ret:Methode', ...
-                  'La méthode doit être ''Continuous'' ou ''Periodic''.');
+                  'Method must be ''Continuous'' or ''Periodic''.');
     end
     if ligne
         rendements = rendements.';

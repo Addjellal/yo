@@ -31,7 +31,7 @@ function [moyennes, covariance] = ewstats(rendements, facteur, fenetre)
     end
     if facteur <= 0 || facteur > 1
         error('finance:ewstats:Facteur', ...
-              'Le facteur de pondération doit rester dans ]0, 1].');
+              'The decay factor must be in (0, 1].');
     end
     poids = facteur .^ ((n - 1):-1:0).';
     poids = poids / sum(poids);

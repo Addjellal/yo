@@ -11,7 +11,7 @@ function valeur = physconst(nom)
 %
 %   Voir aussi RADAREQPOW, RADAREQRNG, RADAREQSNR, RANGE2TIME.
     if ~(ischar(nom) || (isstring(nom) && isscalar(nom)))
-        error('phased:physconst:Nom', 'Le nom de la constante est un texte.');
+        error('phased:physconst:Nom', 'The constant name must be text.');
     end
     switch lower(char(nom))
         case 'lightspeed'

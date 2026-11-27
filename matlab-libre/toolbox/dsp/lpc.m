@@ -32,7 +32,7 @@ function [a, e] = lpc(x, p)
     end
     if p >= n
         error('dsp:lpc:Ordre', ...
-              'L''ordre doit être inférieur au nombre d''échantillons.');
+              'The order must be less than the number of samples.');
     end
     r = zeros(1, p + 1);
     for k = 0:p

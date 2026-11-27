@@ -13,7 +13,7 @@ function prises = matlibre_id_prises_registre(ordre)
              [9 11], [6 8 11 12], [9 10 12 13], [4 8 13 14], [14 15], ...
              [4 13 15 16], [14 17], [11 18], [14 17 18 19], [17 20]};
     if ordre < 2 || ordre > numel(table) + 1
-        error('ident:prbs:Ordre', 'Ordre de registre non traité : %d.', ordre);
+        error('ident:prbs:Ordre', 'Unsupported register order: %d.', ordre);
     end
     prises = table{ordre - 1};
 end

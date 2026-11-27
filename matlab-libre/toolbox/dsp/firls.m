@@ -41,19 +41,19 @@ function b = firls(n, f, a, w, ftype)
     end
     ftype = lower(char(ftype));
     if ~isscalar(n) || n < 1 || n ~= fix(n)
-        error('signal:firls:Ordre', 'L''ordre N est un entier positif.');
+        error('signal:firls:Ordre', 'The order N must be a positive integer.');
     end
     f = double(f(:)).';
     a = double(a(:)).';
     if numel(f) ~= numel(a)
-        error('signal:firls:Gabarit', 'F et A doivent avoir la même longueur.');
+        error('signal:firls:Gabarit', 'F and A must have the same length.');
     end
     if mod(numel(f), 2) ~= 0 || isempty(f)
-        error('signal:firls:Bandes', 'F se donne par paires : une paire par bande.');
+        error('signal:firls:Bandes', 'F must be given in pairs, one pair per band.');
     end
     if any(f < 0) || any(f > 1) || any(diff(f) < 0)
         error('signal:firls:Frequences', ...
-              'F est croissant, entre 0 et 1 (un pour la moitié de la fréquence d''échantillonnage).');
+              'F must be increasing, between 0 and 1 (1 is half the sample rate).');
     end
     nBandes = numel(f) / 2;
     if isempty(w)
@@ -61,7 +61,7 @@ function b = firls(n, f, a, w, ftype)
     end
     w = double(w(:)).';
     if numel(w) ~= nBandes || any(w <= 0)
-        error('signal:firls:Poids', 'Il faut un poids positif par bande.');
+        error('signal:firls:Poids', 'One positive weight per band is required.');
     end
     switch ftype
         case ''
@@ -70,11 +70,11 @@ function b = firls(n, f, a, w, ftype)
             symetrique = false;
         case {'differentiator', 'd'}
             error('signal:firls:Derivateur', ...
-                  ['FIRLS ne pondère pas encore l''erreur en 1/f² des dérivateurs : ' ...
-                   'FIRPM(N,F,A,''differentiator'') les conçoit.']);
+                  ['FIRLS does not yet weight the error by 1/f^2 for differentiators: ' ...
+                   'FIRPM(N,F,A,''differentiator'') designs them.']);
         otherwise
             error('signal:firls:Type', ...
-                  'Le type est ''hilbert'' ou ''differentiator'', non ''%s''.', ftype);
+                  'Type must be ''hilbert'' or ''differentiator'', not ''%s''.', ftype);
     end
     pair = mod(n, 2) == 0;
     if symetrique && pair

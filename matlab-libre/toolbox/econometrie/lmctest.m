@@ -42,7 +42,7 @@ function [rejet, pValeur, statistique, valeurCritique] = lmctest(serie, varargin
     end
     if retards < 0 || retards >= n - 3
         error('econ:lmctest:Retards', ...
-              'Le nombre de retards doit rester entre zéro et %d.', n - 4);
+              'The number of lags must be between 0 and %d.', n - 4);
     end
     % Ajustement d'un ARIMA(p,1,1) : sous l'hypothèse nulle la série est
     % stationnaire, donc sa différence a une racine unitaire dans sa

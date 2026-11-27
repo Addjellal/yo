@@ -13,7 +13,7 @@ function [a, e] = armcov(x, p)
     x = double(x(:));
     n = numel(x);
     if p >= n
-        error('signal:armcov:OrderTooLarge', 'L''ordre dépasse la longueur.');
+        error('signal:armcov:OrderTooLarge', 'The order exceeds the signal length.');
     end
     lignes = n - p;
     M = zeros(2 * lignes, p);

@@ -13,7 +13,7 @@ function [valeurs, m, prim] = matlibre_gf_concat(morceaux, dimension)
                 prim = morceaux{k}.prim_poly;
             elseif morceaux{k}.m ~= m || morceaux{k}.prim_poly ~= prim
                 error('comm:gf:Corps', ...
-                      'Les morceaux ne sont pas du même corps de Galois.');
+                      'The pieces are not in the same Galois field.');
             end
         end
     end

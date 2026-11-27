@@ -26,7 +26,7 @@ function ang = espritdoa(R, nsig, varargin)
                                      {'ElementSpacing', 'RowWeighting'});
     if ~isequal(o.RowWeighting, 1)
         error('phased:espritdoa:RowWeighting', ...
-              'MatLibre ne pondère pas les lignes des sous-réseaux : RowWeighting vaut 1.');
+              'MatLibre does not weight subarray rows: RowWeighting must be 1.');
     end
     n = size(R, 1);
     [V, D] = eig(R);

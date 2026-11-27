@@ -151,14 +151,14 @@ classdef fi
         function r = mpower(a, n)
             if ~isscalar(a.Entiers)
                 error('fixed:fi:mpowerNotScalar', ...
-                      'A^N ne se calcule que pour un scalaire ; employez A.^N.');
+                      'A^N is supported for scalars only; use A.^N.');
             end
             r = matlibre_fixe_calcul('power', a, n);
         end
         function r = rdivide(~, ~)
             error('fixed:fi:divisionNotSupported', ...
-                  ['Diviser deux nombres a virgule fixe demande de dire le type du ' ...
-                   'quotient : employez divide(T, a, b).']);
+                  ['Dividing two fixed-point numbers requires the type of the ' ...
+                   'quotient: use divide(T, a, b).']);
         end
         function r = mrdivide(a, b),  r = rdivide(a, b);  end
         function r = abs(a),        r = matlibre_fixe_calcul('abs', a);       end

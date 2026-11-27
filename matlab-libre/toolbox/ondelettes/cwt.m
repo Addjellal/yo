@@ -48,7 +48,7 @@ function [coefficients, frequences] = cwt(x, echelles, nom, delta)
     for s = 1:numel(echelles)
         a = echelles(s);
         if a <= 0
-            error('wavelet:cwt:BadScale', 'Les échelles doivent être positives.');
+            error('wavelet:cwt:BadScale', 'Scales must be positive.');
         end
         m = max(1, ceil(portee * a));
         u = (-m:m) / a;

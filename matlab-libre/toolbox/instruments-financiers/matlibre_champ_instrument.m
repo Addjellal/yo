@@ -17,7 +17,7 @@ function valeur = matlibre_champ_instrument(brut, classe, nombre, nom)
             end
         else
             error('finstr:instrument:Champ', ...
-                  'Le champ %s attend du texte.', nom);
+                  'Field %s requires text.', nom);
         end
         return
     end
@@ -41,7 +41,7 @@ function valeur = matlibre_champ_instrument(brut, classe, nombre, nom)
         brut = reshape(brut, [], 1);
         if size(brut, 1) ~= nombre
             error('finstr:instrument:Taille', ...
-                  'Le champ %s n''a pas le bon nombre de lignes.', nom);
+                  'Field %s has the wrong number of rows.', nom);
         end
     end
     valeur = brut;

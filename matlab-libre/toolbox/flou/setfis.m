@@ -26,14 +26,14 @@ function fis = setfis(fis, varargin)
         variables = variablesDe(fis, entree);
         indice = varargin{2};
         if indice < 1 || indice > numel(variables)
-            error('fuzzy:setfis:BadVariable', 'Variable %d inexistante.', indice);
+            error('fuzzy:setfis:BadVariable', 'Variable %d does not exist.', indice);
         end
         v = variables{indice};
         sousChamp = lower(char(varargin{3}));
         if strcmp(sousChamp, 'mf')
             indiceMf = varargin{4};
             if indiceMf < 1 || indiceMf > numel(v.mf)
-                error('fuzzy:setfis:BadMf', 'Fonction %d inexistante.', indiceMf);
+                error('fuzzy:setfis:BadMf', 'Membership function %d does not exist.', indiceMf);
             end
             v.mf{indiceMf} = ecrireMf(v.mf{indiceMf}, varargin{5}, varargin{6});
         else

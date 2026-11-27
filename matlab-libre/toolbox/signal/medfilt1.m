@@ -50,7 +50,7 @@ function y = medfilt1(x, n, blocs, dimension, remplissage)
     remplissage = lower(char(remplissage));
     if ~any(strcmp(remplissage, {'zeropad', 'truncate'}))
         error('signal:medfilt1:Remplissage', ...
-              'Le traitement des bords est « zeropad » ou « truncate ».');
+              'Endpoint handling must be ''zeropad'' or ''truncate''.');
     end
 
     if isempty(dimension)

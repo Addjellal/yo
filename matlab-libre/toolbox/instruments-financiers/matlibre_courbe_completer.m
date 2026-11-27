@@ -13,7 +13,7 @@ function courbe = matlibre_courbe_completer(courbe)
     if isempty(debut)
         if isempty(courbe.ValuationDate)
             error('finstr:courbe:Dates', ...
-                  'Il faut une date de début ou une date de valorisation.');
+                  'A start date or a settle date is required.');
         end
         debut = repmat(courbe.ValuationDate(1), size(fin));
     elseif isscalar(debut)

@@ -51,7 +51,7 @@ function superieure = lireQueue(donnee, queue)
     end
     if ~(ischar(queue) || (isstring(queue) && isscalar(queue))) || ...
             ~any(strcmpi(char(queue), {'upper', 'lower'}))
-        error('stats:tcdf:BadTail', 'La queue vaut ''lower'' ou ''upper''.');
+        error('stats:tcdf:BadTail', 'Tail must be ''lower'' or ''upper''.');
     end
     superieure = strcmpi(char(queue), 'upper');
 end

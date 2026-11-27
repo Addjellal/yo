@@ -24,7 +24,7 @@ function [fonctions, xval] = wpfun(nom, numero, iterations)
     if nargin < 3 || isempty(iterations), iterations = 7; end
     numero = round(numero);
     if numero < 0
-        error('wavelet:wpfun:Numero', 'Le numéro doit être positif.');
+        error('wavelet:wpfun:Numero', 'The index must be positive.');
     end
     [~, ~, Lo_R, Hi_R] = wfilters(nom);
     longueur = numel(Lo_R);

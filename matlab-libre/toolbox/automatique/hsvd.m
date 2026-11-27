@@ -21,7 +21,7 @@ function g = hsvd(sys)
     end
     if ~isstable(s)
         error('control:hsvd:Unstable', ...
-              'Les grammiens ne convergent que pour un modèle stable.');
+              'The gramians converge only for a stable model.');
     end
     Wc = gram(s, 'c');
     Wo = gram(s, 'o');

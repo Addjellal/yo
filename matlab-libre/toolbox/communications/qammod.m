@@ -39,17 +39,18 @@ function y = qammod(x, M, varargin)
     if strcmpi(o.InputType, 'bit')
         if mod(size(x, 1), k) ~= 0 || any(x(:) ~= 0 & x(:) ~= 1)
             error('comm:qammod:Bits', ...
-                  'Des bits 0 ou 1, sur un nombre de lignes multiple de log2(M) = %d.', k);
+                  ['Input must be bits 0 or 1, with a number of rows that is a multiple of ' ...
+                   'log2(M) = %d.'], k);
         end
         poids = 2 .^ (k - 1:-1:0);
         nCol = size(x, 2);
         groupes = reshape(x, k, []);
         x = reshape(poids * groupes, [], nCol);
     elseif ~strcmpi(o.InputType, 'integer')
-        error('comm:qammod:InputType', 'InputType vaut ''integer'' ou ''bit''.');
+        error('comm:qammod:InputType', 'InputType must be ''integer'' or ''bit''.');
     end
     if any(x(:) < 0) || any(x(:) > M - 1) || any(x(:) ~= fix(x(:)))
-        error('comm:qammod:Symboles', 'Les symboles sont des entiers de 0 à M-1 = %d.', M - 1);
+        error('comm:qammod:Symboles', 'Symbols must be integers from 0 to M-1 = %d.', M - 1);
     end
     [colonne, ligne] = matlibre_qam_place(double(x), cote, ordre);
     y = (2 * colonne - cote + 1) + 1i * (cote - 1 - 2 * ligne);
@@ -60,7 +61,7 @@ function y = qammod(x, M, varargin)
         y = single(y);
     elseif ~strcmpi(o.OutputDataType, 'double')
         error('comm:qammod:OutputDataType', ...
-              'MatLibre produit des sorties ''double'' ou ''single'', non en virgule fixe.');
+              'MatLibre produces ''double'' or ''single'' outputs, not fixed-point.');
     end
     if o.PlotConstellation
         points = qammod(0:M - 1, M, ordre, 'UnitAveragePower', o.UnitAveragePower);

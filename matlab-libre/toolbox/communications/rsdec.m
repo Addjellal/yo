@@ -26,7 +26,7 @@ function [decode, nombreErreurs, motCorrige] = rsdec(code, n, k, varargin)
 %   Voir aussi RSENC, RSGENPOLY, BCHDEC, GF.
     if ~isa(code, 'gf')
         error('comm:rsdec:Corps', ...
-              'Le mot doit être un tableau de corps de Galois : gf(x, m).');
+              'The codeword must be a Galois field array: gf(x, m).');
     end
     m = code.m;
     prim = code.prim_poly;
@@ -35,7 +35,7 @@ function [decode, nombreErreurs, motCorrige] = rsdec(code, n, k, varargin)
         valeurs = valeurs(:).';
     end
     if size(valeurs, 2) ~= n
-        error('comm:rsdec:Longueur', 'Le mot doit compter %d colonnes.', n);
+        error('comm:rsdec:Longueur', 'The codeword must have %d columns.', n);
     end
     position = 'end';
     if numel(varargin) >= 2 && ~isempty(varargin{2})
@@ -54,7 +54,7 @@ function [decode, nombreErreurs, motCorrige] = rsdec(code, n, k, varargin)
         case 'beg', decode = motCorrige(:, (n - k + 1):n);
         otherwise
             error('comm:rsdec:Position', ...
-                  'La position doit être ''end'' ou ''beg''.');
+                  'Parity position must be ''end'' or ''beg''.');
     end
     decode = gf(decode, m, prim);
     motCorrige = gf(motCorrige, m, prim);

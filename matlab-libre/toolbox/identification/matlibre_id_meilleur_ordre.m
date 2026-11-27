@@ -24,7 +24,7 @@ function modele = matlibre_id_meilleur_ordre(donnees, fabrique)
         end
     end
     if isempty(meilleur)
-        error('ident:ordre:Aucun', 'Aucun ordre n''a pu être estimé.');
+        error('ident:ordre:Aucun', 'No order could be estimated.');
     end
     modele = meilleur;
 end

@@ -47,7 +47,7 @@ function lisse = smooth(varargin)
         case 'sgolay'
             lisse = matlibre_savitzky_golay(y, portee, degre);
         otherwise
-            error('curvefit:smooth:Methode', 'Méthode inconnue : %s.', methode);
+            error('curvefit:smooth:Methode', 'Unknown method: %s.', methode);
     end
     lisse = reshape(lisse, size(y));
 end

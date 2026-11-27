@@ -23,10 +23,10 @@ function facteur = modnorm(constellation, type, puissance)
             reference = max(abs(v) .^ 2);
         otherwise
             error('comm:modnorm:BadType', ...
-                  'Le type doit être ''avpow'' ou ''peakpow''.');
+                  'Type must be ''avpow'' or ''peakpow''.');
     end
     if reference <= 0
-        error('comm:modnorm:ZeroPower', 'La constellation est de puissance nulle.');
+        error('comm:modnorm:ZeroPower', 'The constellation has zero power.');
     end
     facteur = sqrt(puissance / reference);
 end

@@ -16,7 +16,7 @@ function arbre = scinderNoeud(arbre, indice)
     donnees = lireNoeud(arbre, indice);
     if isempty(donnees)
         error('wavelet:scinderNoeud:Absent', ...
-              'Le nœud %d n''est pas dans l''arbre.', indice);
+              'Node %d is not in the tree.', indice);
     end
     if arbre.dimension == 1
         [a, d] = dwt(donnees, arbre.nom);

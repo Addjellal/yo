@@ -41,7 +41,7 @@ classdef fimath
         function F = fimath(varargin)
             if mod(nargin, 2) ~= 0
                 error('fixed:fimath:invalidPVPairs', ...
-                      'Les proprietes de FIMATH se donnent par paires nom, valeur.');
+                      'FIMATH properties must be name-value pairs.');
             end
             for i = 1:2:nargin
                 F = poserRegle(F, char(varargin{i}), varargin{i + 1});
@@ -106,7 +106,7 @@ function F = poserRegle(F, nom, v)
     noms = properties(F);
     k = find(strcmpi(nom, noms), 1);
     if isempty(k)
-        error('fixed:fimath:invalidProperty', 'FIMATH n''a pas de propriete ''%s''.', nom);
+        error('fixed:fimath:invalidProperty', 'FIMATH has no property ''%s''.', nom);
     end
     F.(noms{k}) = v;
 end
@@ -114,7 +114,7 @@ end
 function v = choisirRegle(v, choix, nom)
     k = find(strcmpi(char(v), choix), 1);
     if isempty(k)
-        error('fixed:fimath:invalidValue', '%s vaut %s.', nom, strjoin(choix, ', '));
+        error('fixed:fimath:invalidValue', '%s must be %s.', nom, strjoin(choix, ', '));
     end
     v = choix{k};
 end

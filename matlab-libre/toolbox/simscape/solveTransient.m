@@ -40,7 +40,7 @@ function [temps, tensions] = solveTransient(c, tFinal, pas, varargin)
     end
     methode = 'trapezoidal';
     if mod(numel(varargin), 2) ~= 0
-        error('simscape:solveTransient:Options', 'Les options vont par paires nom, valeur.');
+        error('simscape:solveTransient:Options', 'Options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         if ~strcmpi(varargin{k}, 'Method')
@@ -49,7 +49,7 @@ function [temps, tensions] = solveTransient(c, tFinal, pas, varargin)
         methode = lower(char(varargin{k + 1}));
         if ~any(strcmp(methode, {'trapezoidal', 'euler'}))
             error('simscape:solveTransient:Methode', ...
-                  'Méthode ''trapezoidal'' ou ''euler'', non ''%s''.', methode);
+                  'Method must be ''trapezoidal'' or ''euler'', not ''%s''.', methode);
         end
     end
     trapezes = strcmp(methode, 'trapezoidal');

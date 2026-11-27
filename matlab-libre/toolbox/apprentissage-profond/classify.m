@@ -55,14 +55,14 @@ function varargout = classify(reseau, X, varargin)
     if isnumeric(reseau) || islogical(reseau)
         if nargin < 3
             error('stats:classify:TooFewInputs', ...
-                  'CLASSIFY(SAMPLE,TRAINING,GROUP) attend au moins trois arguments.');
+                  'CLASSIFY(SAMPLE,TRAINING,GROUP) requires at least three arguments.');
         end
         [varargout{1:max(nargout, 1)}] = matlibre_classify(reseau, X, varargin{:});
         return
     end
     if ~isempty(varargin)
         error('MATLAB:TooManyInputs', ...
-              'CLASSIFY(RESEAU,X) attend deux arguments.');
+              'Too many input arguments.');
     end
     scores = predict(reseau, X);
     [~, classes] = max(scores, [], 1);

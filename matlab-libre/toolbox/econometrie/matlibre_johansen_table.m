@@ -107,7 +107,7 @@ function [pValeur, valeurCritique] = matlibre_johansen_table(statistique, modele
 
         otherwise
             error('econ:johansenTable:Modele', ...
-                  'Modèle inconnu : %s.', modele);
+                  'Unknown model: %s.', modele);
     end
     if strcmpi(forme, 'maxeig')
         table = quantilesMax;
@@ -121,8 +121,8 @@ function [pValeur, valeurCritique] = matlibre_johansen_table(statistique, modele
     end
     if dimension > size(table, 1)
         error('econ:johansenTable:Dimension', ...
-              ['Les quantiles ne vont pas au-delà de %d séries ; ' ...
-               'il en faudrait %d.'], size(table, 1), dimension);
+              ['Critical values are tabulated for up to %d series; ' ...
+               '%d would be required.'], size(table, 1), dimension);
     end
     ligne = table(dimension, :);
     valeurCritique = interp1(niveaux, ligne, 1 - alpha, 'linear', 'extrap');

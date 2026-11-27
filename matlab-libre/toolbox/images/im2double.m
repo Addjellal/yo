@@ -27,7 +27,7 @@ function y = im2double(x)
         % la diviser par rien rendrait une image hors de [0,1] sans
         % qu'aucune valeur ne soit fausse pour autant.
         error('MATLAB:im2double:classe', ...
-              'IM2DOUBLE ne sait pas mettre la classe %s a l''echelle.', class(x));
+              'IM2DOUBLE cannot rescale class %s.', class(x));
     else
         y = double(x);
     end

@@ -52,7 +52,7 @@ function [u, v] = opticalFlowFarneback(I1, I2, varargin)
     B = enNiveaux(I2);
     if ~isequal(size(A), size(B))
         error('vision:opticalFlowFarneback:Taille', ...
-              'Les deux images doivent avoir la même taille.');
+              'The two images must be the same size.');
     end
     % La pyramide se construit du plus fin au plus grossier ; le calcul la
     % remonte ensuite dans l'autre sens.

@@ -17,6 +17,6 @@ function coefficients = wpcoef(arbre, noeud)
     coefficients = lireNoeud(arbre, indice);
     if isempty(coefficients)
         error('wavelet:wpcoef:Absent', ...
-              'Le nœud %d n''est pas dans l''arbre.', indice);
+              'Node %d is not in the tree.', indice);
     end
 end

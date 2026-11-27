@@ -31,7 +31,7 @@ function x = idwt(cA, cD, varargin)
     end
     if ~isempty(cA) && ~isempty(cD) && numel(cA) ~= numel(cD)
         error('Wavelet:FunctionInput:SizeMismatch', ...
-              'IDWT : CA et CD comptent autant de coefficients.');
+              'IDWT: CA and CD must have the same number of coefficients.');
     end
     reference = cA;
     if isempty(reference)

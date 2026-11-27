@@ -41,7 +41,7 @@ function [rate, count, indices] = zerocrossrate(x, varargin)
                'ZeroPositive', false);
     noms = fieldnames(o);
     if mod(numel(varargin), 2) ~= 0
-        error('signal:zerocrossrate:Options', 'Les options vont par paires nom, valeur.');
+        error('signal:zerocrossrate:Options', 'Options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         trouve = find(strcmpi(varargin{k}, noms), 1);
@@ -62,16 +62,16 @@ function [rate, count, indices] = zerocrossrate(x, varargin)
     recouvrement = o.OverlapLength;
     if L < 1 || L > n || L ~= fix(L) || recouvrement < 0 || recouvrement >= L
         error('signal:zerocrossrate:Fenetre', ...
-              'WindowLength est entre 1 et la longueur du signal, OverlapLength en dessous.');
+              'WindowLength must be between 1 and the signal length, and OverlapLength below it.');
     end
     methode = lower(char(o.Method));
     front = lower(char(o.TransitionEdge));
     if ~any(strcmp(methode, {'difference', 'comparison'}))
-        error('signal:zerocrossrate:Methode', 'Method vaut ''difference'' ou ''comparison''.');
+        error('signal:zerocrossrate:Methode', 'Method must be ''difference'' or ''comparison''.');
     end
     if ~any(strcmp(front, {'both', 'rising', 'falling'}))
         error('signal:zerocrossrate:Front', ...
-              'TransitionEdge vaut ''both'', ''rising'' ou ''falling''.');
+              'TransitionEdge must be ''both'', ''rising'', or ''falling''.');
     end
     initial = o.InitialState;
     if isscalar(initial)

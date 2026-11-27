@@ -22,7 +22,7 @@ function sortie = vpa(expression, chiffres)
     if nargin < 2 || isempty(chiffres), chiffres = 32; end
     chiffres = round(chiffres);
     if chiffres < 1
-        error('symbolic:vpa:Chiffres', 'Il faut au moins un chiffre.');
+        error('symbolic:vpa:Chiffres', 'At least one digit is required.');
     end
     valeur = matlibre_sym_valeur(expression);
     if chiffres < 16

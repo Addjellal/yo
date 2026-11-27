@@ -58,7 +58,7 @@ classdef sym
                 obj.arbre = {'num', double(valeur)};
             else
                 error('symbolic:sym:Valeur', ...
-                      'SYM prend un nom, un nombre ou un arbre d''expression.');
+                      'SYM requires a name, a number, or an expression tree.');
             end
         end
 
@@ -106,8 +106,8 @@ classdef sym
         function r = mrdivide(a, b)
             if ~isscalar(b)
                 error('symbolic:mrdivide:Matrice', ...
-                      ['La division à droite par une matrice SYM n''est pas faite ; ', ...
-                       'seule la division par un scalaire l''est.']);
+                      ['Right division by a SYM matrix is not supported; ', ...
+                       'only division by a scalar is.']);
             end
             r = rdivide(a, b);
         end
@@ -115,8 +115,8 @@ classdef sym
         function r = mpower(a, b)
             if ~isscalar(a) || ~isscalar(b)
                 error('symbolic:mpower:Matrice', ...
-                      ['La puissance matricielle d''un SYM n''est pas faite ; ', ...
-                       'employez .^ pour la puissance élément par élément.']);
+                      ['The matrix power of a SYM is not supported; ', ...
+                       'use .^ for the element-wise power.']);
             end
             r = power(a, b);
         end
@@ -468,7 +468,7 @@ classdef sym
             coefficients = matlibre_sym_coefficients(equation.arbre, nom);
             if numel(coefficients) < 2
                 error('symbolic:solve:Constante', ...
-                      'L''équation ne dépend pas de %s.', nom);
+                      'The equation does not depend on %s.', nom);
             end
             % Les racines rationnelles d'un polynôme entier sont trouvées
             % exactement — le théorème des racines rationnelles, comme pour
@@ -563,9 +563,9 @@ function verifierIntegrale(arbre, nom, bornes, resultat)
     warning(etat);
     if ~(abs(numerique - valeur) <= 1e-6 * max(1, abs(valeur)))
         error('symbolic:int:Verification', ...
-              ['INT : la primitive donne %.15g, l''intégration numérique %.15g. ', ...
-               'L''intégrande a sans doute une singularité sur l''intervalle, ', ...
-               'ou l''intégrale diverge.'], valeur, numerique);
+              ['INT: the antiderivative gives %.15g, numerical integration %.15g. ', ...
+               'The integrand probably has a singularity on the interval, ', ...
+               'or the integral diverges.'], valeur, numerique);
     end
 end
 

@@ -24,7 +24,7 @@ function [R, xp] = radon(I, theta)
         theta = 0:179;
     end
     if ndims(I) > 2 %#ok<ISMAT>
-        error('images:radon:invalidImage', 'L''image est une matrice à deux dimensions.');
+        error('images:radon:invalidImage', 'The image must be a two-dimensional matrix.');
     end
     I = double(I);
     [m, n] = size(I);

@@ -25,5 +25,5 @@ function [a, b] = alignerTermes(a, b)
         return
     end
     error('comm:gf:Tailles', ...
-          'Les deux tableaux doivent avoir la même taille, ou l''un être scalaire.');
+          'The two arrays must have the same size, or one of them must be scalar.');
 end

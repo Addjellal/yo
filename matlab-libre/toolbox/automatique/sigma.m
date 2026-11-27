@@ -48,9 +48,9 @@ function [valeurs, w] = sigma(varargin)
     end
     semilogx(courbes{:});
     grid on;
-    xlabel('Pulsation (rad/s)');
-    ylabel('Valeurs singulières (dB)');
-    title('Diagramme des valeurs singulières');
+    xlabel('Frequency (rad/s)');
+    ylabel('Singular Values (dB)');
+    title('Singular Values');
 end
 
 function [valeurs, w] = valeursSingulieres(sys, w)

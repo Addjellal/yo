@@ -59,7 +59,7 @@ classdef numerictype
             end
             if mod(numel(args), 2) ~= 0
                 error('fixed:numerictype:invalidPVPairs', ...
-                      'Les proprietes de NUMERICTYPE se donnent par paires nom, valeur.');
+                      'NUMERICTYPE properties must be name-value pairs.');
             end
             for i = 1:2:numel(args)
                 T = poser(T, char(args{i}), args{i + 1});
@@ -103,7 +103,7 @@ classdef numerictype
         end
         function T = set.Slope(T, pente)
             if ~(isnumeric(pente) && isscalar(pente) && pente > 0 && isfinite(pente))
-                error('fixed:numerictype:invalidSlope', 'La pente doit etre un nombre positif.');
+                error('fixed:numerictype:invalidSlope', 'The slope must be a positive number.');
             end
             exposant = floor(log2(pente));
             T.SlopeAdjustmentFactor = pente / 2 ^ exposant;
@@ -129,14 +129,14 @@ classdef numerictype
         function T = set.WordLength(T, w)
             if ~(isnumeric(w) && isscalar(w) && w >= 1 && w == round(w) && w <= 65535)
                 error('fixed:numerictype:invalidWordLength', ...
-                      'La taille des mots doit etre un entier de 1 a 65535.');
+                      'The word length must be an integer from 1 to 65535.');
             end
             T.WordLength = double(w);
         end
         function T = set.FractionLength(T, f)
             if ~(isnumeric(f) && isscalar(f) && f == round(f) && isfinite(f))
                 error('fixed:numerictype:invalidFractionLength', ...
-                      'Le nombre de bits apres la virgule doit etre un entier.');
+                      'The fraction length must be an integer.');
             end
             T.FractionLength = double(f);
             if strcmp(T.Scaling, 'Unspecified') %#ok<MCSUP>
@@ -190,7 +190,7 @@ function T = poser(T, nom, v)
     k = find(strcmpi(nom, noms), 1);
     if isempty(k)
         error('fixed:numerictype:invalidProperty', ...
-              'NUMERICTYPE n''a pas de propriete ''%s''.', nom);
+              'NUMERICTYPE has no property ''%s''.', nom);
     end
     switch noms{k}
         case 'Scaling'
@@ -198,7 +198,7 @@ function T = poser(T, nom, v)
         case 'SlopeAdjustmentFactor'
             if ~(isnumeric(v) && isscalar(v) && v >= 1 && v < 2)
                 error('fixed:numerictype:invalidSlopeAdjustmentFactor', ...
-                      'Le facteur d''ajustement de la pente va de 1 (compris) a 2 (exclu).');
+                      'The slope adjustment factor must be in [1, 2).');
             end
             T.SlopeAdjustmentFactor = double(v);
             if v ~= 1

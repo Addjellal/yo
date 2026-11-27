@@ -23,7 +23,7 @@ function [modele, dedans, dehors, erreurMoyenne] = pcfitplane(entree, distanceMa
     points = matlibre_nuage_points(entree);
     n = size(points, 1);
     if n < 3
-        error('vision:pcfitplane:Points', 'Il faut au moins trois points.');
+        error('vision:pcfitplane:Points', 'At least three points are required.');
     end
     if nargin < 3, vecteurReference = []; end
     if nargin < 4 || isempty(angleMax), angleMax = 5; end
@@ -55,7 +55,7 @@ function [modele, dedans, dehors, erreurMoyenne] = pcfitplane(entree, distanceMa
     end
     if isempty(meilleurModele)
         error('vision:pcfitplane:Aucun', ...
-              'Aucun plan ne respecte la direction demandée.');
+              'No plane satisfies the requested orientation.');
     end
     distances = abs(points * meilleurModele(1:3).' + meilleurModele(4));
     dedans = find(distances <= distanceMax);

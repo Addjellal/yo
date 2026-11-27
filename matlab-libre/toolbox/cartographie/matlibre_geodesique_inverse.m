@@ -79,8 +79,8 @@ function [s, az1, az2] = vincenty(p1, l1, p2, l2, a, e)
     end
     if ~converge
         error('map:geodesique:Convergence', ...
-              ['La méthode de Vincenty ne converge pas : les deux points sont presque ', ...
-               'antipodaux sur l''ellipsoïde.']);
+              ['Vincenty''s method does not converge: the two points are nearly ', ...
+               'antipodal on the ellipsoid.']);
     end
     u2 = cos2Alpha * (a ^ 2 - b ^ 2) / b ^ 2;
     A = 1 + u2 / 16384 * (4096 + u2 * (-768 + u2 * (320 - 175 * u2)));

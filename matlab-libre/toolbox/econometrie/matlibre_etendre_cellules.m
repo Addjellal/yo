@@ -8,6 +8,6 @@ function liste = matlibre_etendre_cellules(liste, nombre, quoi)
         liste = repmat(liste, 1, nombre);
     else
         error('econ:etendre:Nombre', ...
-              'Il faut une ou %d %s, pas %d.', nombre, quoi, numel(liste));
+              'One or %d %s are required, not %d.', nombre, quoi, numel(liste));
     end
 end

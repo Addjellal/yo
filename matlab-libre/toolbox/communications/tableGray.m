@@ -12,7 +12,7 @@ function correspondance = tableGray(modulation, M)
     modulation = lower(char(modulation));
     M = double(M);
     if M < 2 || abs(log2(M) - round(log2(M))) > 0
-        error('comm:tableGray:BadOrder', 'M doit être une puissance de deux.');
+        error('comm:tableGray:BadOrder', 'M must be a power of two.');
     end
     unidimensionnel = @(v) bitxor(v, floor(v / 2));
     switch modulation

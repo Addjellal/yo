@@ -35,12 +35,12 @@ function sv = steervec(pos, ang, nqbits)
         az = ang(1, :); el = ang(2, :);
     else
         error('phased:steervec:Angles', ...
-              'ANG est 1 x M (azimuts) ou 2 x M ([az ; el]), en degrés.');
+              'ANG must be 1-by-M (azimuth) or 2-by-M ([az; el]), in degrees.');
     end
     u = [cosd(el) .* cosd(az); cosd(el) .* sind(az); sind(el)];
     phase = 2 * pi * (P.' * u);
     if ~isscalar(nqbits) || nqbits < 0 || nqbits ~= fix(nqbits)
-        error('phased:steervec:Bits', 'NQBITS est un entier positif ou nul.');
+        error('phased:steervec:Bits', 'NQBITS must be a nonnegative integer.');
     end
     if nqbits > 0
         pas = 2 * pi / 2 ^ nqbits;

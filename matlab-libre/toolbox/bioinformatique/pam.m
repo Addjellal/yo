@@ -14,7 +14,7 @@ function [matrice, info] = pam(distance, varargin)
 %   Voir aussi BLOSUM, NUC44, NWALIGN.
     if ~isnumeric(distance) || ~isscalar(distance) || distance ~= 250
         error('bioinfo:pam:Distance', ...
-              'PAM %s n''est pas fournie : MatLibre n''a que PAM 250.', num2str(distance));
+              'PAM %s is not available: MatLibre has only PAM 250.', num2str(distance));
     end
     [matrice, info] = matlibre_info_matrice('PAM250', varargin, 'pam');
 end

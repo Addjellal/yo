@@ -77,7 +77,7 @@ classdef generalizedInverseKinematics < handle
             robot = obj.RigidBodyTree;
             if isempty(robot)
                 error('robotics:generalizedInverseKinematics:SansArbre', ...
-                      'Le solveur demande un RigidBodyTree.');
+                      'The solver requires a RigidBodyTree.');
             end
             contraintes = varargin;
             noms = matlibre_nomsLiaisons(robot);

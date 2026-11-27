@@ -22,7 +22,7 @@ function [varargout] = bilinear(varargin)
 %   Voir aussi IMPINVAR, BUTTER, BUTTAP, ZP2TF, FREQZ.
     if numel(varargin) < 3
         error('signal:bilinear:Arguments', ...
-              'bilinear attend au moins un filtre et une fréquence d''échantillonnage.');
+              'BILINEAR requires at least a filter and a sample rate.');
     end
     % La forme se lit au nombre de sorties, comme dans MATLAB : trois
     % pour zéros-pôles-gain, quatre pour l'état, deux pour les

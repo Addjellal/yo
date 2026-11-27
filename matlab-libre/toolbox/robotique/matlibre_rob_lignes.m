@@ -18,7 +18,7 @@ function [m, unique] = matlibre_rob_lignes(a, largeur, nom)
     end
     if size(m, 2) ~= largeur
         error('robotics:conversion:Largeur', ...
-              '%s doit avoir %d colonnes.', nom, largeur);
+              '%s must have %d columns.', nom, largeur);
     end
     unique = size(m, 1) == 1;
 end

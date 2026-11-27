@@ -23,24 +23,24 @@ function [classe, erreur, posterieure, logp, coeff] = ...
     genres = {'linear', 'diaglinear', 'quadratic', 'diagquadratic', 'mahalanobis'};
     if ~any(strcmp(genre, genres))
         error('stats:classify:BadType', ...
-              'Le genre d''analyse est ''%s'' : il faut l''un de %s.', ...
+              'Discriminant type is ''%s''; it must be one of %s.', ...
               genre, strjoin(genres, ', '));
     end
     if ~isnumeric(echantillon) || ~isnumeric(apprentissage)
         error('stats:classify:BadData', ...
-              'CLASSIFY attend des matrices numériques d''observations.');
+              'CLASSIFY requires numeric matrices of observations.');
     end
     echantillon = double(echantillon);
     apprentissage = double(apprentissage);
     if size(echantillon, 2) ~= size(apprentissage, 2)
         error('stats:classify:SampleTrainingSizeMismatch', ...
-              'SAMPLE et TRAINING doivent avoir le même nombre de colonnes.');
+              'SAMPLE and TRAINING must have the same number of columns.');
     end
 
     [indices, noms, niveaux] = groupesDe(groupe);
     if numel(indices) ~= size(apprentissage, 1)
         error('stats:classify:TrainingGroupSizeMismatch', ...
-              'GROUP compte une valeur par ligne de TRAINING.');
+              'GROUP must have one value per row of TRAINING.');
     end
     % Les lignes d'apprentissage incomplètes ne comptent pas.
     valides = ~isnan(indices) & ~any(isnan(apprentissage), 2);
@@ -60,7 +60,7 @@ function [classe, erreur, posterieure, logp, coeff] = ...
         G = numel(noms);
     end
     if G < 2
-        error('stats:classify:TooFewGroups', 'Il faut au moins deux groupes.');
+        error('stats:classify:TooFewGroups', 'At least two groups are required.');
     end
 
     if nargin < 5
@@ -81,19 +81,19 @@ function [classe, erreur, posterieure, logp, coeff] = ...
         case 'linear'
             if n <= G
                 error('stats:classify:NoDOF', ...
-                      'Trop peu d''observations pour estimer la covariance commune.');
+                      'Too few observations to estimate the pooled covariance.');
             end
             [~, R] = qr(centres, 0);
             R = R / sqrt(n - G);
             verifierRang(R, n, d, 'stats:classify:BadLinearVar', ...
-                         'La covariance commune n''est pas définie positive.');
+                         'The pooled covariance matrix of TRAINING must be positive definite.');
             [facteurs{:}] = deal(R);
             logDet(:) = 2 * sum(log(abs(diag(R))));
         case 'diaglinear'
             ecarts = sqrt(sum(centres .^ 2, 1) / (n - G));
             if any(ecarts == 0)
                 error('stats:classify:BadDiagLinearVar', ...
-                      'Une variable a une variance commune nulle.');
+                      'A variable has zero pooled variance.');
             end
             [facteurs{:}] = deal(diag(ecarts));
             logDet(:) = 2 * sum(log(ecarts));
@@ -101,13 +101,14 @@ function [classe, erreur, posterieure, logp, coeff] = ...
             for k = 1:G
                 if effectifs(k) < 2
                     error('stats:classify:GroupTooSmall', ...
-                          'Le groupe %s a moins de deux observations.', noms{k});
+                          'Group %s has fewer than two observations.', noms{k});
                 end
                 [~, R] = qr(centres(indices == k, :), 0);
                 R = R / sqrt(effectifs(k) - 1);
                 verifierRang(R, effectifs(k), d, 'stats:classify:BadQuadVar', ...
-                             sprintf(['La covariance du groupe %s n''est pas définie ' ...
-                                      'positive.'], noms{k}));
+                             sprintf(['The covariance matrix of each group in TRAINING must be ' ...
+                                      'positive ' ...
+                                      'definite (group %s).'], noms{k}));
                 facteurs{k} = R;
                 logDet(k) = 2 * sum(log(abs(diag(R))));
             end
@@ -115,12 +116,12 @@ function [classe, erreur, posterieure, logp, coeff] = ...
             for k = 1:G
                 if effectifs(k) < 2
                     error('stats:classify:GroupTooSmall', ...
-                          'Le groupe %s a moins de deux observations.', noms{k});
+                          'Group %s has fewer than two observations.', noms{k});
                 end
                 ecarts = sqrt(sum(centres(indices == k, :) .^ 2, 1) / (effectifs(k) - 1));
                 if any(ecarts == 0)
                     error('stats:classify:BadDiagQuadVar', ...
-                          'Une variable a une variance nulle dans le groupe %s.', noms{k});
+                          'A variable has zero variance in group %s.', noms{k});
                 end
                 facteurs{k} = diag(ecarts);
                 logDet(k) = 2 * sum(log(ecarts));
@@ -292,7 +293,7 @@ function apriori = lireApriori(valeur, effectifs, noms)
     if ischar(valeur) || isstring(valeur)
         if ~strcmpi(char(valeur), 'empirical')
             error('stats:classify:BadPrior', ...
-                  'PRIOR vaut ''empirical'', un vecteur ou une structure.');
+                  'PRIOR must be ''empirical'', a vector, or a structure.');
         end
         apriori = effectifs(:).' / sum(effectifs);
         return
@@ -300,7 +301,7 @@ function apriori = lireApriori(valeur, effectifs, noms)
     if isstruct(valeur)
         if ~isfield(valeur, 'prob') || ~isfield(valeur, 'group')
             error('stats:classify:BadPrior', ...
-                  'Une structure PRIOR porte les champs prob et group.');
+                  'A PRIOR structure must have fields prob and group.');
         end
         [~, nomsPrior] = groupesDeNoms(valeur.group);
         apriori = zeros(1, G);
@@ -308,7 +309,7 @@ function apriori = lireApriori(valeur, effectifs, noms)
             i = find(strcmp(nomsPrior, noms{k}), 1);
             if isempty(i)
                 error('stats:classify:BadPrior', ...
-                      'PRIOR ne donne pas la probabilité du groupe %s.', noms{k});
+                      'PRIOR does not give the probability of group %s.', noms{k});
             end
             apriori(k) = valeur.prob(i);
         end
@@ -316,11 +317,11 @@ function apriori = lireApriori(valeur, effectifs, noms)
         apriori = double(valeur(:)).';
         if numel(apriori) ~= G
             error('stats:classify:BadPrior', ...
-                  'PRIOR compte une probabilité par groupe (%d ici).', G);
+                  'PRIOR must have one probability per group (%d here).', G);
         end
     end
     if any(apriori < 0) || ~any(apriori > 0)
-        error('stats:classify:BadPrior', 'Les probabilités a priori sont positives.');
+        error('stats:classify:BadPrior', 'Prior probabilities must be positive.');
     end
     apriori = apriori / sum(apriori);
 end

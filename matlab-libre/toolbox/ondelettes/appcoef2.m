@@ -24,7 +24,7 @@ function a = appcoef2(C, S, varargin)
     end
     if ~(isscalar(niveau) && niveau >= 0 && niveau <= nmax && niveau == round(niveau))
         error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-              'APPCOEF2 : le niveau va de 0 à %d.', nmax);
+              'APPCOEF2: the level must be from 0 to %d.', nmax);
     end
     a = reshape(C(1:prod(S(1, :))), S(1, :));
     rm = rmax + 1;

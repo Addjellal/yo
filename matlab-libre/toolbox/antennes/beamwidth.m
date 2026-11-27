@@ -26,7 +26,7 @@ function largeur = beamwidth(theta, diagramme)
     droite = imax - 1 + find(p(imax:end) <= seuil, 1, 'first');
     if isempty(gauche) || isempty(droite)
         error('antenna:beamwidth:Domaine', ...
-              'Le diagramme ne descend pas à mi-puissance des deux côtés du maximum.');
+              'The pattern does not fall to half power on both sides of the maximum.');
     end
     largeur = croisement(theta, p, droite - 1, droite, seuil) ...
               - croisement(theta, p, gauche, gauche + 1, seuil);

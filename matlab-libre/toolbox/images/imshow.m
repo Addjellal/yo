@@ -50,12 +50,13 @@ function h = imshow(I, varargin)
             carte = second;
         else
             error('images:imshow:invalidInput', ...
-                  'IMSHOW : le second argument est une plage [BAS HAUT] ou une palette m x 3.');
+                  ['IMSHOW: the second argument must be a display range [LOW HIGH] or an m-by-3 ' ...
+                   'colormap.']);
         end
     end
     for k = 1:2:numel(reste)
         if k + 1 > numel(reste)
-            error('images:imshow:invalidInput', 'IMSHOW : les options vont par paires.');
+            error('images:imshow:invalidInput', 'IMSHOW: options must be name-value pairs.');
         end
         switch lower(char(reste{k}))
             case 'displayrange'
@@ -75,7 +76,7 @@ function h = imshow(I, varargin)
     rvb = ndims(I) == 3 && size(I, 3) == 3;
     if ~rvb && ~ismatrix(I)
         error('images:imshow:invalidImage', ...
-              'IMSHOW attend une image m x n, ou m x n x 3 en couleurs vraies.');
+              'IMSHOW requires an m-by-n image, or an m-by-n-by-3 truecolor image.');
     end
     if rvb
         poignee = image(I);

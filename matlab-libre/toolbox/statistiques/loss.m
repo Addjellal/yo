@@ -32,13 +32,13 @@ function L = loss(modele, X, Y, varargin)
 %   Voir aussi RESUBLOSS, RESUBPREDICT, PREDICT, CONFUSIONMAT.
     if ~isstruct(modele) || ~isfield(modele, 'type')
         error('stats:loss:BadModel', ...
-              'LOSS attend un classifieur ajusté par une fonction fitc….');
+              'LOSS requires a classifier fitted by a fitc... function.');
     end
     perte = 'classiferror';
     poids = [];
     if mod(numel(varargin), 2) ~= 0
         error('stats:loss:BadNameValue', ...
-              'LOSS : les options vont par paires, un nom et une valeur.');
+              'LOSS: options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         switch lower(char(varargin{k}))
@@ -48,18 +48,18 @@ function L = loss(modele, X, Y, varargin)
                     perte = lower(char(perte));
                     if ~any(strcmp(perte, {'classiferror', 'mincost'}))
                         error('stats:loss:NotSupported', ...
-                              ['LossFun ''%s'' n''est pas pris en charge par MatLibre : ' ...
-                               '''classiferror'', ''mincost'' ou une fonction.'], perte);
+                              ['LossFun ''%s'' is not supported by MatLibre: use ' ...
+                               '''classiferror'', ''mincost'', or a function.'], perte);
                     end
                 elseif ~isa(perte, 'function_handle')
                     error('stats:loss:BadLossFun', ...
-                          'LossFun est un nom de perte ou une fonction.');
+                          'LossFun must be a loss name or a function.');
                 end
             case 'weights'
                 poids = double(varargin{k + 1});
                 poids = poids(:);
             otherwise
-                error('stats:loss:BadNameValue', 'LOSS n''a pas d''option ''%s''.', ...
+                error('stats:loss:BadNameValue', 'LOSS has no option ''%s''.', ...
                       char(varargin{k}));
         end
     end
@@ -69,13 +69,13 @@ function L = loss(modele, X, Y, varargin)
     n = numel(Y);
     if size(X, 1) ~= n
         error('stats:loss:BadSizes', ...
-              'X et Y doivent avoir le même nombre d''observations.');
+              'X and Y must have the same number of observations.');
     end
     if isempty(poids)
         poids = ones(n, 1);
     elseif numel(poids) ~= n || any(poids < 0)
         error('stats:loss:BadWeights', ...
-              'Weights compte un poids positif par observation.');
+              'Weights must have one positive weight per observation.');
     end
     rangs = rangsDeClasse(Y, classes);
     connues = rangs > 0 & ~isnan(poids);
@@ -124,7 +124,7 @@ function classes = classesDuModele(modele)
     elseif isfield(modele, 'Y')
         classes = unique(modele.Y);
     else
-        error('stats:loss:BadModel', 'Le modèle ne dit pas quelles sont ses classes.');
+        error('stats:loss:BadModel', 'The model does not specify its classes.');
     end
     classes = classes(:);
 end

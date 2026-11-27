@@ -798,7 +798,26 @@ complète a été repassée avant chaque poussée (section 2). Par gravité :
 ### Les décisions à prendre
 
 Elles changent un comportement que l'utilisateur voit : rien n'a été
-fait sans accord.
+fait sans accord. **Les quatre ont été prises, chacune selon sa
+recommandation**, et mises en œuvre à la reprise suivante :
+
+- **D1** — `new_system('m')`, par valeur comme par nom, part en
+  `VariableStepAuto`. `sim(m, T, PAS)` et `simset('FixedStep', PAS)`, qui
+  demandent un pas, passent un modèle resté en automatique à son pendant à
+  pas fixe, `FixedStepAuto`. Le générateur de programme, comme Simulink
+  Coder, demande un pas fixe : les modèles qu'on traduit posent `ode1`.
+- **D2** — MatLibre démarre en `format short` ; `format` seul y revient.
+  L'option ne tient plus compte de la casse ni des blancs (`format LONG`,
+  `format long e`), comme dans MATLAB.
+- **D3** — Les erreurs et avertissements des fonctions de MATLAB et des
+  toolboxes sont en anglais : le cœur C++, toutes les toolboxes, Simulink
+  et Stateflow, messages construits hors de `error` compris (diagnostics
+  de simulation, code engendré, fragments insérés). Restent en français
+  l'aide, l'interface (bureau, avancement de `parsim`), les identifiants
+  `MatLibre:` et ceux qui ne sont pas de MathWorks (`risque:`). Les tracés
+  de l'automatique portent les titres et les axes de MATLAB (« Step
+  Response », « Bode Diagram », « Time (seconds) », « From: u1  To: y1 »).
+- **D4** — Ni invite ni bannière quand l'entrée n'est pas un terminal.
 
 | | question | recommandation |
 |---|---|---|

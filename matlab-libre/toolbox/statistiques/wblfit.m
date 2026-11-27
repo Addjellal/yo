@@ -15,7 +15,7 @@ function phat = wblfit(x)
 %   Voir aussi WBLPDF, WBLCDF, WBLINV, WBLRND, PDF, CDF.
     x = double(x(:));
     if any(x <= 0)
-        error('stats:wblfit:BadData', 'Les données doivent être strictement positives.');
+        error('stats:wblfit:BadData', 'Data must be strictly positive.');
     end
     n = numel(x);
     l = log(x);

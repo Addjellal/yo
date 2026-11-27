@@ -49,14 +49,14 @@ function varargout = wavemngr(action, varargin)
         case 'add'
             if numel(varargin) < 5
                 error('wavelet:wavemngr:Arguments', ...
-                      'AJOUTER demande nom, abrégé, type, ordres et fichier.');
+                      'ADD requires a name, a short name, a type, orders, and a file.');
             end
             registreOndelettes(ajouterFamille(registre, varargin));
             varargout = cell(1, nargout);
         case 'del'
             if isempty(varargin)
                 error('wavelet:wavemngr:Arguments', ...
-                      'SUPPRIMER demande le nom ou l''abrégé d''une famille.');
+                      'DELETE requires the name or the short name of a family.');
             end
             registreOndelettes(retirerFamille(registre, char(varargin{1})));
             varargout = cell(1, nargout);
@@ -135,12 +135,12 @@ function registre = ajouterFamille(registre, arguments)
     ordres = char(arguments{4});
     fichier = char(arguments{5});
     if ~any(type == 1:5)
-        error('wavelet:wavemngr:Type', 'Le type va de un à cinq.');
+        error('wavelet:wavemngr:Type', 'Type must be from 1 to 5.');
     end
     for k = 1:numel(registre)
         if strcmp(registre(k).abrege, abrege)
             error('wavelet:wavemngr:Doublon', ...
-                  'L''abrégé ''%s'' est déjà pris.', abrege);
+                  'Short name ''%s'' is already in use.', abrege);
         end
     end
     registre(end + 1) = poser(nom, abrege, type, ordres, fichier, true);
@@ -154,7 +154,7 @@ function registre = retirerFamille(registre, nom)
         if strcmpi(registre(k).abrege, nom) || strcmpi(registre(k).nom, nom)
             if ~registre(k).ajoutee
                 error('wavelet:wavemngr:Origine', ...
-                      'La famille ''%s'' est d''origine : elle ne se retire pas.', nom);
+                      'Family ''%s'' is built in: it cannot be removed.', nom);
             end
             garde(k) = false;
             trouve = true;

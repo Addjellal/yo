@@ -30,7 +30,7 @@ function motifs = randerr(m, n, erreurs, graine)
         poids = erreurs(2, :);
         if abs(sum(poids) - 1) > 1e-6
             error('comm:randerr:Probabilites', ...
-                  'Les probabilités doivent sommer à un.');
+                  'Probabilities must sum to one.');
         end
     else
         nombres = round(erreurs(:)).';
@@ -38,7 +38,7 @@ function motifs = randerr(m, n, erreurs, graine)
     end
     if any(nombres < 0) || any(nombres > n)
         error('comm:randerr:Nombre', ...
-              'Le nombre d''erreurs doit rester entre zéro et %d.', n);
+              'The number of errors must be between zero and %d.', n);
     end
     cumul = cumsum(poids);
     motifs = zeros(m, n);

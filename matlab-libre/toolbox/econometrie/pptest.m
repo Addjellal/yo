@@ -48,7 +48,7 @@ function [rejet, pValeur, statistique, valeurCritique] = pptest(serie, varargin)
         case 'ts',  X = [ones(m, 1), (1:m).', yRetarde];
         otherwise
             error('econ:pptest:Modele', ...
-                  'Le modèle doit être ''AR'', ''ARD'' ou ''TS''.');
+                  'Model must be ''AR'', ''ARD'', or ''TS''.');
     end
     coefficients = X \ y;
     residus = y - X * coefficients;

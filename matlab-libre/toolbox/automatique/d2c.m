@@ -33,7 +33,7 @@ function sysc = d2c(sys, methode)
     Ts = s.Ts;
     if Ts <= 0
         error('Control:d2c:ContinuDeja', ...
-              'D2C attend un modele echantillonne : son Ts doit etre positif.');
+              'D2C requires a discrete-time model: its Ts must be positive.');
     end
     n = size(s.A, 1);
     I = eye(n);

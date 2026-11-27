@@ -11,6 +11,6 @@ function [a, b] = matlibre_gf_etendre(a, b)
         b = repmat(b, size(a));
     else
         error('comm:gf:Tailles', ...
-              'Les deux tableaux doivent avoir la même taille.');
+              'The two arrays must have the same size.');
     end
 end

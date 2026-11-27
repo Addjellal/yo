@@ -42,7 +42,7 @@ function [Pxx, f] = pwelch(x, fenetre, recouvrement, nfft, fs)
     recouvrement = round(double(recouvrement));
     if recouvrement >= longueur
         error('signal:pwelch:Recouvrement', ...
-              'Le recouvrement doit être inférieur à la longueur du segment.');
+              'The overlap must be less than the segment length.');
     end
     pas = longueur - recouvrement;
     somme = [];

@@ -27,7 +27,7 @@ function a = appcoef(C, L, varargin)
     end
     if ~(isscalar(niveau) && niveau >= 0 && niveau <= nmax && niveau == round(niveau))
         error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-              'APPCOEF : le niveau va de 0 à %d.', nmax);
+              'APPCOEF: the level must be from 0 to %d.', nmax);
     end
     a = C(1:L(1));
     imax = rmax + 1;

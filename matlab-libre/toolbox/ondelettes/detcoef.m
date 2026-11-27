@@ -20,7 +20,7 @@ function varargout = detcoef(C, L, niveaux, option)
     enCellules = nargin >= 4 && any(strcmpi(char(option), {'cells', 'dcells'}));
     if any(niveaux < 1 | niveaux > nmax | niveaux ~= round(niveaux))
         error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-              'DETCOEF : le niveau va de 1 à %d.', nmax);
+              'DETCOEF: the level must be from 1 to %d.', nmax);
     end
     % Début de chaque bloc de détail : après l'approximation, du niveau
     % le plus grossier au plus fin.

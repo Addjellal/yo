@@ -25,7 +25,7 @@ function [rejet, pValeur, statistique, valeurCritique] = lratiotest(logLLibre, l
 %   Voir aussi WALDTEST, AICBIC, ARIMA, ESTIMATE.
     if nargin < 3
         error('econ:lratiotest:Arguments', ...
-              'Il faut les deux log-vraisemblances et le nombre de contraintes.');
+              'Both log-likelihoods and the number of restrictions are required.');
     end
     if nargin < 4 || isempty(alpha)
         alpha = 0.05;
@@ -38,12 +38,12 @@ function [rejet, pValeur, statistique, valeurCritique] = lratiotest(logLLibre, l
     [logLContraint, ddl] = matlibre_diffuser_paire(logLContraint, ddl);
     if any(ddl(:) < 1)
         error('econ:lratiotest:Contraintes', ...
-              'Le nombre de contraintes doit être au moins un.');
+              'The number of restrictions must be at least one.');
     end
     if any(logLContraint(:) > logLLibre(:) + 1e-8)
         warning('econ:lratiotest:Emboitement', ...
-                ['Le modèle contraint a une vraisemblance plus élevée que ' ...
-                 'le modèle libre : ils ne sont sans doute pas emboîtés.']);
+                ['The restricted model has a higher likelihood than ' ...
+                 'the unrestricted model: they are probably not nested.']);
     end
     statistique = 2 * (logLLibre - logLContraint);
     statistique = max(statistique, 0);

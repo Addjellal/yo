@@ -24,7 +24,7 @@ function [k, v] = tf2latc(b, a)
     b = double(b(:)).';
     a = double(a(:)).';
     if a(1) == 0
-        error('signal:tf2latc:NullLeading', 'A(1) ne peut pas être nul.');
+        error('signal:tf2latc:NullLeading', 'A(1) cannot be zero.');
     end
     b = b / a(1);
     a = a / a(1);
@@ -32,7 +32,7 @@ function [k, v] = tf2latc(b, a)
         % Treillis à réponse finie : les coefficients de réflexion du
         % polynôme du numérateur.
         if b(1) == 0
-            error('signal:tf2latc:NullLeading', 'B(1) ne peut pas être nul.');
+            error('signal:tf2latc:NullLeading', 'B(1) cannot be zero.');
         end
         k = poly2rc(b / b(1));
         k = k(:);

@@ -20,7 +20,7 @@ function M = matlibre_transformation_rigide(transformation)
     end
     if ~isequal(size(M), [4 4])
         error('vision:transformation:Taille', ...
-              'La transformation doit être 3x3 ou 4x4.');
+              'The transformation must be 3-by-3 or 4-by-4.');
     end
     if max(abs(M(1:3, 4))) < 1e-12 && abs(M(4, 4) - 1) < 1e-12
         % Dernière colonne nulle : c'est la convention des lignes.

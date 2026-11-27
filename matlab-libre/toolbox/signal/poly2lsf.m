@@ -14,12 +14,12 @@ function lsf = poly2lsf(a)
     a = double(a(:)).';
     if a(1) == 0
         error('signal:poly2lsf:ZeroLeading', ...
-              'Le premier coefficient doit être non nul.');
+              'The leading coefficient must be nonzero.');
     end
     a = a / a(1);
     if any(abs(roots(a)) >= 1)
         error('signal:poly2lsf:UnstablePolynomial', ...
-              'Le polynôme doit être à phase minimale.');
+              'The polynomial must have minimum phase.');
     end
     p = numel(a) - 1;
     miroir = fliplr(a);

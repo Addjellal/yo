@@ -18,7 +18,7 @@ function A = convmtx(h, n)
     m = numel(h);
     n = round(n);
     if n < 1
-        error('signal:convmtx:BadLength', 'N doit être au moins 1.');
+        error('signal:convmtx:BadLength', 'N must be at least 1.');
     end
     A = zeros(m + n - 1, n);
     for k = 1:n

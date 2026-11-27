@@ -24,7 +24,7 @@ function u = laplace2D(bordHaut, bordBas, bordGauche, bordDroite, nx, ny)
 %
 %   Voir aussi POISSON2D, HEAT1D, FEM1D.
     if nx < 2 || ny < 2
-        error('edp:laplace2D:Taille', 'Il faut au moins deux points par direction.');
+        error('edp:laplace2D:Taille', 'At least two points per direction are required.');
     end
     u = zeros(ny, nx);
     u(1, :) = bordHaut;

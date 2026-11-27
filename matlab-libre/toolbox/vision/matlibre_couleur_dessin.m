@@ -27,7 +27,7 @@ function rvb = matlibre_couleur_dessin(specification, nombre)
     else
         rvb = double(specification);
         if size(rvb, 2) ~= 3
-            error('vision:couleur:Forme', 'Une couleur a trois composantes.');
+            error('vision:couleur:Forme', 'A color must have three components.');
         end
         % Un triplet dont une composante dépasse 1 est donné sur 255 :
         % c'est la convention des images entières.

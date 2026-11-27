@@ -31,7 +31,7 @@ function d = editDistance(a, b, varargin)
     o = struct('InsertCost', 1, 'DeleteCost', 1, 'SubstituteCost', 1, 'SwapCost', inf);
     noms = fieldnames(o);
     if mod(numel(varargin), 2) ~= 0
-        error('textanalytics:editDistance:Options', 'Les options vont par paires nom, valeur.');
+        error('textanalytics:editDistance:Options', 'Options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         trouve = find(strcmpi(varargin{k}, noms), 1);

@@ -54,7 +54,7 @@ classdef symmatrix
                 if numel(dimensions) ~= 2 || any(dimensions < 0) || ...
                    any(dimensions ~= round(dimensions))
                     error('symbolic:symmatrix:Taille', ...
-                          'La taille d''une matrice symbolique est [M N], entiers positifs.');
+                          'The size of a symbolic matrix must be [M N], positive integers.');
                 end
                 obj.arbre = {'mat', char(valeur), dimensions};
                 return
@@ -67,7 +67,7 @@ classdef symmatrix
                 return
             end
             error('symbolic:symmatrix:Valeur', ...
-                  'SYMMATRIX prend un nom et une taille, ou une matrice.');
+                  'SYMMATRIX requires a name and a size, or a matrix.');
         end
 
         function r = plus(a, b),   r = composer('+', a, b);   end
@@ -109,7 +109,7 @@ classdef symmatrix
         function r = mpower(a, n)
             if ~isnumeric(n) || ~isscalar(n) || n ~= round(n)
                 error('symbolic:symmatrix:Puissance', ...
-                      'La puissance d''une matrice symbolique est un entier.');
+                      'The power of a symbolic matrix must be an integer.');
             end
             r = symmatrix({'pow', a.arbre, double(n)});
         end

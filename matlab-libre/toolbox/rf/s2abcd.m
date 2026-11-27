@@ -14,7 +14,7 @@ function ABCD = s2abcd(S, z0)
 %   Voir aussi ABCD2S, S2Z.
     if nargin < 2, z0 = 50; end
     if size(S, 1) ~= 2
-        error('rf:s2abcd:Taille', 'Les paramètres ABCD sont ceux d''un quadripôle (2 x 2).');
+        error('rf:s2abcd:Taille', 'ABCD parameters describe a two-port network (2-by-2).');
     end
     ABCD = matlibre_rf_matrices(S, @(s) [ ...
         ((1 + s(1,1)) * (1 - s(2,2)) + s(1,2) * s(2,1)) / (2 * s(2,1)), ...

@@ -52,7 +52,7 @@ function [X, R] = corrmtx(x, m, methode)
                 X(lignes + i, :) = conj(x(i:i + m)).';
             end
         otherwise
-            error('signal:corrmtx:UnknownMethod', 'Méthode inconnue : %s.', char(methode));
+            error('signal:corrmtx:UnknownMethod', 'Unknown method: %s.', char(methode));
     end
     % Normalisation : X'*X doit estimer l'autocorrélation, donc diviser
     % par le nombre de produits accumulés. Les méthodes fenêtrées

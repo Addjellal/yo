@@ -15,6 +15,6 @@ function indice = indiceDeNoeud(arbre, noeud)
         indice = noeud;
     else
         error('wavelet:indiceDeNoeud:Forme', ...
-              'Un nœud se donne par son indice ou par [profondeur position].');
+              'A node is given by its index or by [depth position].');
     end
 end

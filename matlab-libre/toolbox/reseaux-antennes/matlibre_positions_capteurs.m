@@ -19,6 +19,6 @@ function P = matlibre_positions_capteurs(pos)
             P = pos;
         otherwise
             error('phased:positions:Taille', ...
-                  'POS est 1 x N (y), 2 x N (y ; z) ou 3 x N (x ; y ; z), en longueurs d''onde.');
+                  'POS must be 1-by-N (y), 2-by-N (y; z), or 3-by-N (x; y; z), in wavelengths.');
     end
 end

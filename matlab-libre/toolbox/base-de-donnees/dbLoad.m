@@ -24,7 +24,7 @@ function t = dbLoad(nomFichier)
     texte = fileread(nomFichier);
     enregistrements = lireCsv(texte);
     if isempty(enregistrements)
-        error('database:dbLoad:Vide', 'Le fichier « %s » n''a pas d''en-tête.', nomFichier);
+        error('database:dbLoad:Vide', 'File ''%s'' has no header.', nomFichier);
     end
     entete = cellfun(@(c) c.texte, enregistrements{1}, 'UniformOutput', false);
     t = dbTable(entete);

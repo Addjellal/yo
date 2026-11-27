@@ -9,7 +9,7 @@ function valeur = matlibre_id_critere(modele, nom)
 %   Voir aussi FPE, AIC.
     if isempty(modele.Report) || ~isfield(modele.Report, 'Fit')
         error('ident:critere:Absent', ...
-              'Ce modèle ne porte pas de compte rendu d''estimation.');
+              'This model has no estimation report.');
     end
     ajustement = modele.Report.Fit;
     if ~isfield(ajustement, nom)

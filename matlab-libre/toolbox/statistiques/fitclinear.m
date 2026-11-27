@@ -27,7 +27,7 @@ function modele = fitclinear(X, y, varargin)
     classes = unique(y);
     if numel(classes) ~= 2
         error('stats:fitclinear:DeuxClasses', ...
-              'FITCLINEAR ne traite que deux classes ; voir FITCECOC.');
+              'FITCLINEAR supports two classes only; see FITCECOC.');
     end
     cible = ones(size(y));
     cible(y == classes(1)) = -1;

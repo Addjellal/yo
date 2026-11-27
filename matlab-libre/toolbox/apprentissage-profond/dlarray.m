@@ -126,7 +126,7 @@ classdef dlarray
                 y = rdivide(a, b);
             else
                 error('nnet:dlarray:Division', ...
-                      'La division matricielle n''est pas dérivée ; utilisez ./');
+                      'Matrix division is not differentiable here; use ./');
             end
         end
         function y = power(a, b)
@@ -139,7 +139,7 @@ classdef dlarray
                 y = power(a, b);
             else
                 error('nnet:dlarray:Puissance', ...
-                      'La puissance matricielle n''est pas dérivée ; utilisez .^');
+                      'Matrix power is not differentiable here; use .^');
             end
         end
 

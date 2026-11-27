@@ -40,11 +40,12 @@ function [x, valeurs, drapeau, sortie] = paretosearch(fonction, nVariables, A, b
     if nargin < 10, options = struct(); end
     if ~isempty(nonlin)
         error('globaloptim:paretosearch:NonLineaire', ...
-              'MatLibre ne prend pas encore les contraintes non linéaires de PARETOSEARCH.');
+              'MatLibre does not yet support nonlinear constraints in PARETOSEARCH.');
     end
     if ~isempty(A) || ~isempty(Aeq)
         error('globaloptim:paretosearch:Lineaire', ...
-              'MatLibre ne prend que des bornes dans PARETOSEARCH : GAMULTIOBJ prend les contraintes linéaires.');
+              ['MatLibre supports only bounds in PARETOSEARCH; GAMULTIOBJ supports linear ' ...
+               'constraints.']);
     end
     taille = champOptimisation(options, 'ParetoSetSize', 60);
     iterations = champOptimisation(options, 'MaxIterations', 100 * nVariables);

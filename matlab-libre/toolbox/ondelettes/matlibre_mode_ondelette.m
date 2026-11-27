@@ -4,7 +4,7 @@ function mode = matlibre_mode_ondelette(mode)
 %   'asymh', 'asymw', 'sp0', 'spd' ou 'sp1', 'ppd', 'per'.
     if ~(ischar(mode) || (isstring(mode) && isscalar(mode)))
         error('Wavelet:FunctionArgVal:Invalid_ExtMode', ...
-              'Le mode de prolongement est un texte, comme ''sym'' ou ''per''.');
+              'The extension mode must be text, such as ''sym'' or ''per''.');
     end
     mode = lower(char(mode));
     connus = {'zpd', 'sym', 'symh', 'symw', 'asym', 'asymh', 'asymw', ...

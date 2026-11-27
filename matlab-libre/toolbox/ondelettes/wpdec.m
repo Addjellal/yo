@@ -30,7 +30,7 @@ function arbre = wpdec(x, profondeur, nom, entropie, parametre)
     if nargin < 5, parametre = []; end
     profondeur = round(profondeur);
     if profondeur < 0
-        error('wavelet:wpdec:Profondeur', 'La profondeur doit être positive.');
+        error('wavelet:wpdec:Profondeur', 'The depth must be positive.');
     end
     estLigne = ~iscolumn(x);
     x = double(x(:)).';

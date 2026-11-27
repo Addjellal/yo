@@ -27,7 +27,7 @@ function [seq, etats] = hmmgenerate(l, tr, e, varargin)
     m = size(e, 2);
     if size(e, 1) ~= n
         error('stats:hmmgenerate:Tailles', ...
-              'Les deux matrices doivent avoir le même nombre d''états.');
+              'The two matrices must have the same number of states.');
     end
     l = round(l);
     seq = zeros(1, l);

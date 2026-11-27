@@ -52,9 +52,9 @@ function [racines, gains] = rlocus(varargin)
     end
     plot(courbes{:});
     grid on;
-    xlabel('Partie réelle');
-    ylabel('Partie imaginaire');
-    title('Lieu des racines');
+    xlabel('Real Axis (seconds^{-1})');
+    ylabel('Imaginary Axis (seconds^{-1})');
+    title('Root Locus');
 end
 
 function racines = lieu(sys, gains)

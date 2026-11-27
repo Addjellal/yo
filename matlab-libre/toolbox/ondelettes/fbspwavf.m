@@ -28,10 +28,10 @@ function [psi, xval] = fbspwavf(bas, haut, n, m, fb, fc)
     if nargin < 6 || isempty(fc), fc = 1; end
     m = round(m);
     if m < 1
-        error('wavelet:fbspwavf:Ordre', 'L''ordre M doit valoir au moins un.');
+        error('wavelet:fbspwavf:Ordre', 'The order M must be at least one.');
     end
     if fb <= 0 || fc <= 0
-        error('wavelet:fbspwavf:Parametres', 'FB et FC doivent être positifs.');
+        error('wavelet:fbspwavf:Parametres', 'FB and FC must be positive.');
     end
     xval = linspace(bas, haut, n);
     psi = sqrt(fb) * sinc(fb * xval / m) .^ m .* exp(2 * 1i * pi * fc * xval);

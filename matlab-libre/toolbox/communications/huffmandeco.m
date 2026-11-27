@@ -34,8 +34,8 @@ function signal = huffmandeco(code, dictionnaire)
         end
         if trouve == 0
             error('comm:huffmandeco:Incomplet', ...
-                  ['La suite ne se décompose pas en mots du dictionnaire, ' ...
-                   'à partir du chiffre %d.'], debut);
+                  ['The sequence cannot be split into dictionary codewords, ' ...
+                   'starting at digit %d.'], debut);
         end
         signal{end + 1} = dictionnaire{trouve, 1};   %#ok<AGROW>
         debut = debut + numel(dictionnaire{trouve, 2});

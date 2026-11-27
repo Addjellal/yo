@@ -15,7 +15,7 @@ function sysT = ss2ss(sys, T)
     s = ss(sys);
     if size(T, 1) ~= size(T, 2) || size(T, 1) ~= size(s.A, 1)
         error('control:ss2ss:BadSize', ...
-              'T doit être carrée, de la taille de A.');
+              'T must be square, of the same size as A.');
     end
     sysT = ss(T * s.A / T, T * s.B, s.C / T, s.D, s.Ts);
 end

@@ -14,7 +14,7 @@ function x = wprec(arbre)
 %   Voir aussi WPDEC, WPRCOEF, WPREC2, WPTHCOEF.
     if arbre.dimension ~= 1
         error('wavelet:wprec:Dimension', ...
-              'WPREC attend un arbre de signal ; employez WPREC2.');
+              'WPREC requires a one-dimensional tree; use WPREC2.');
     end
     x = remonter(arbre, 0);
     x = wkeep(x, arbre.longueur);
@@ -37,7 +37,7 @@ function donnees = remonter(arbre, indice)
         donnees = lireNoeud(arbre, indice);
         if isempty(donnees)
             error('wavelet:wprec:Absent', ...
-                  'Le nœud %d manque : l''arbre est incomplet.', indice);
+                  'Node %d is missing: the tree is incomplete.', indice);
         end
     end
 end

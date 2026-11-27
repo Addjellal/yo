@@ -20,12 +20,12 @@ function reponse = readline(v)
 %
 %   Voir aussi WRITELINE, WRITEREAD, VISADEV, STR2DOUBLE.
     if ~isa(v, 'visadev')
-        error('instrument:readline:Objet', 'READLINE attend une liaison VISADEV.');
+        error('instrument:readline:Objet', 'READLINE requires a VISADEV connection.');
     end
     if isempty(v.reponses)
         warning('instrument:readline:Delai', ...
-                ['Aucune réponse dans le délai (%g s) : la dernière commande n''interrogeait ' ...
-                 'pas, ou l''instrument ne l''a pas comprise (SYST:ERR? le dit).'], v.Timeout);
+                ['No response within the timeout (%g s): the last command was not ' ...
+                 'a query, or the instrument did not understand it (SYST:ERR? tells).'], v.Timeout);
         v.erreurs{end + 1} = '-420,"Query UNTERMINATED"';
         v.derniereReponse = '';
         reponse = "";

@@ -14,11 +14,11 @@ function [y, erreurs] = bsc(donnees, probabilite)
 %   Voir aussi AWGN, BITERR.
     donnees = double(donnees);
     if any(donnees(:) ~= 0 & donnees(:) ~= 1)
-        error('comm:bsc:BadInput', 'L''entrée doit être binaire.');
+        error('comm:bsc:BadInput', 'Input must be binary.');
     end
     if probabilite < 0 || probabilite > 1
         error('comm:bsc:BadProbability', ...
-              'La probabilité doit être comprise entre zéro et un.');
+              'The probability must be between zero and one.');
     end
     erreurs = double(rand(size(donnees)) < probabilite);
     y = mod(donnees + erreurs, 2);

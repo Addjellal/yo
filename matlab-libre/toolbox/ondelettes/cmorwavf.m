@@ -24,7 +24,7 @@ function [psi, xval] = cmorwavf(bas, haut, n, fb, fc)
     if nargin < 5 || isempty(fc), fc = 1; end
     if fb <= 0 || fc <= 0
         error('wavelet:cmorwavf:Parametres', ...
-              'FB et FC doivent être positifs.');
+              'FB and FC must be positive.');
     end
     xval = linspace(bas, haut, n);
     psi = ((pi * fb) ^ -0.5) * exp(2 * 1i * pi * fc * xval) .* exp(-xval .^ 2 / fb);

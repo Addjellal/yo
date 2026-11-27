@@ -53,7 +53,7 @@ function [p, z] = pzmap(varargin)
     end
     plot(courbes{:});
     grid on;
-    xlabel('Partie réelle');
-    ylabel('Partie imaginaire');
-    title('Carte des pôles et des zéros');
+    xlabel('Real Axis (seconds^{-1})');
+    ylabel('Imaginary Axis (seconds^{-1})');
+    title('Pole-Zero Map');
 end

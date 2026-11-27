@@ -41,7 +41,7 @@ function [x, q] = demod(y, fc, fs, methode, opt)
             x = filtfilt(b, a, x);
             q = filtfilt(b, a, q);
         otherwise
-            error('signal:demod:UnknownMethod', 'Méthode inconnue : %s.', char(methode));
+            error('signal:demod:UnknownMethod', 'Unknown method: %s.', char(methode));
     end
     if ~colonne
         x = x.';

@@ -12,13 +12,13 @@ function fis = removeRule(fis, indices)
 %
 %   Voir aussi ADDRULE, SHOWRULE, REMOVEMF, REMOVEINPUT.
     if isempty(fis.regles)
-        error('fuzzy:removeRule:Aucune', 'Le système n''a aucune règle.');
+        error('fuzzy:removeRule:Aucune', 'The system has no rules.');
     end
     indices = round(double(indices(:)))';
     nombre = size(fis.regles, 1);
     if any(indices < 1) || any(indices > nombre)
         error('fuzzy:removeRule:Rang', ...
-              'Le système n''a que %d règles.', nombre);
+              'The system has only %d rules.', nombre);
     end
     garder = true(1, nombre);
     garder(indices) = false;

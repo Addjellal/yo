@@ -40,14 +40,14 @@ function [T, a, P, rho, nu, mu] = atmosisa(altitude, varargin)
     etendu = true;
     for k = 1:2:numel(varargin)
         if k == numel(varargin)
-            error('aero:atmosisa:Options', 'Les options vont par paires nom-valeur.');
+            error('aero:atmosisa:Options', 'Options must be name-value pairs.');
         end
         switch lower(char(varargin{k}))
             case 'action'
                 action = lower(char(varargin{k + 1}));
                 if ~any(strcmp(action, {'none', 'warning', 'error'}))
                     error('aero:atmosisa:Action', ...
-                          'L''action vaut ''none'', ''warning'' ou ''error''.');
+                          'Action must be ''none'', ''warning'', or ''error''.');
                 end
             case 'extended'
                 etendu = logical(varargin{k + 1});
@@ -56,7 +56,7 @@ function [T, a, P, rho, nu, mu] = atmosisa(altitude, varargin)
         end
     end
     if ~isnumeric(altitude) || ~isreal(altitude)
-        error('aero:atmosisa:Altitude', 'L''altitude doit être un tableau de réels.');
+        error('aero:atmosisa:Altitude', 'Altitude must be an array of real numbers.');
     end
 
     g0 = 9.80665;
@@ -94,7 +94,8 @@ function [T, a, P, rho, nu, mu] = atmosisa(altitude, varargin)
         switch action
             case 'error'
                 error('aero:atmosisa:Domaine', ...
-                      'Altitude hors du domaine [%g, %g] m de l''atmosphère type.', bas, haut);
+                      ['Altitude is outside the range [%g, %g] m of the standard ' ...
+                       'atmosphere.'], bas, haut);
             case 'warning'
                 warning('aero:atmosisa:Domaine', '%s', texte);
         end

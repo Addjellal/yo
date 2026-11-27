@@ -31,7 +31,7 @@ function centroid = spectralCentroid(x, f, varargin)
     if isscalar(f)
         fs = f;
         if ~isreal(x)
-            error('audio:spectralCentroid:Complexe', 'Le signal temporel est réel.');
+            error('audio:spectralCentroid:Complexe', 'The time-domain signal must be real.');
         end
         if isvector(x)
             x = x(:);
@@ -40,7 +40,7 @@ function centroid = spectralCentroid(x, f, varargin)
                    'Range', [0, fs / 2], 'SpectrumType', 'power');
         noms = fieldnames(o);
         if mod(numel(varargin), 2) ~= 0
-            error('audio:spectralCentroid:Options', 'Les options vont par paires nom, valeur.');
+            error('audio:spectralCentroid:Options', 'Options must be name-value pairs.');
         end
         for k = 1:2:numel(varargin)
             trouve = find(strcmpi(varargin{k}, noms), 1);
@@ -59,8 +59,8 @@ function centroid = spectralCentroid(x, f, varargin)
         n = size(x, 1);
         if L < 1 || L > n || recouvrement < 0 || recouvrement >= L
             error('audio:spectralCentroid:Fenetre', ...
-                  ['La fenêtre a entre 1 et %d échantillons, plus que le recouvrement ' ...
-                   '(%d) : le signal est-il assez long ?'], n, recouvrement);
+                  ['The window must have between 1 and %d samples, more than the overlap ' ...
+                   '(%d): is the signal long enough?'], n, recouvrement);
         end
         nfft = o.FFTLength;
         pas = L - recouvrement;
@@ -71,7 +71,7 @@ function centroid = spectralCentroid(x, f, varargin)
         puissance = strcmpi(o.SpectrumType, 'power');
         if ~puissance && ~strcmpi(o.SpectrumType, 'magnitude')
             error('audio:spectralCentroid:Spectre', ...
-                  'SpectrumType vaut ''power'' ou ''magnitude''.');
+                  'SpectrumType must be ''power'' or ''magnitude''.');
         end
         centroid = zeros(nTrames, size(x, 2));
         for v = 1:size(x, 2)
@@ -97,7 +97,7 @@ function centroid = spectralCentroid(x, f, varargin)
         fk = f(:);
         if size(x, 1) ~= numel(fk)
             error('audio:spectralCentroid:Taille', ...
-                  'Le spectre a autant de lignes que F a de fréquences.');
+                  'The spectrum must have as many rows as F has frequencies.');
         end
         taille = size(x);
         S = reshape(x, taille(1), []);

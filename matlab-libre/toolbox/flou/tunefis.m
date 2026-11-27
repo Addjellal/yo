@@ -37,7 +37,7 @@ function [fis, info] = tunefis(fis, reglages, X, Y, options)
     Y = Y(:);
     if size(X, 1) ~= numel(Y)
         error('fuzzy:tunefis:Donnees', ...
-              'Il faut autant de lignes d''entrées que de sorties.');
+              'Input and output data must have the same number of rows.');
     end
     depart = getTunableValues(fis, reglages);
     erreurInitiale = ecart(fis, reglages, depart, X, Y);

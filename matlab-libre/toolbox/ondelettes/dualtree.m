@@ -29,7 +29,7 @@ function [a, d] = dualtree(x, varargin)
     n = size(x, 1);
     if mod(n, 2 ^ J) ~= 0
         error('wavelet:dualtree:Longueur', ...
-              'La longueur du signal doit être divisible par %d.', 2 ^ J);
+              'The signal length must be divisible by %d.', 2 ^ J);
     end
     premier = dtfilters('fsfarras');
     suivant = dtfilters(sprintf('qshift%d', find([10 14 16 18] == longueur)));
@@ -92,7 +92,7 @@ function [x, colonne, J, longueur] = lireArgumentsDualtree(x, arguments)
     n = size(x, 1);
     if mod(n, 2) ~= 0 || n < 4
         error('wavelet:dualtree:Parite', ...
-              'La longueur du signal doit être paire et valoir au moins quatre.');
+              'The signal length must be even and at least 4.');
     end
     J = [];
     longueur = 10;
@@ -104,7 +104,7 @@ function [x, colonne, J, longueur] = lireArgumentsDualtree(x, arguments)
                 longueur = round(double(arguments{k + 1}));
                 if ~any(longueur == [10 14 16 18])
                     error('wavelet:dualtree:Filtre', ...
-                          'FilterLength vaut 10, 14, 16 ou 18.');
+                          'FilterLength must be 10, 14, 16, or 18.');
                 end
             otherwise
                 error('wavelet:dualtree:Option', 'Option inconnue : %s.', ...
@@ -115,6 +115,6 @@ function [x, colonne, J, longueur] = lireArgumentsDualtree(x, arguments)
         J = max(1, floor(log2(n)) - 3);
     end
     if J < 1
-        error('wavelet:dualtree:Niveau', 'Level doit valoir au moins un.');
+        error('wavelet:dualtree:Niveau', 'Level must be at least one.');
     end
 end

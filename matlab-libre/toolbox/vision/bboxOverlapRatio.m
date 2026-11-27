@@ -19,10 +19,10 @@ function r = bboxOverlapRatio(a, b, ratioType)
     end
     parUnion = strcmpi(ratioType, 'Union');
     if ~parUnion && ~strcmpi(ratioType, 'Min')
-        error('vision:bboxOverlapRatio:Type', 'RATIOTYPE vaut ''Union'' ou ''Min''.');
+        error('vision:bboxOverlapRatio:Type', 'RATIOTYPE must be ''Union'' or ''Min''.');
     end
     if size(a, 2) ~= 4 || size(b, 2) ~= 4
-        error('vision:bboxOverlapRatio:Taille', 'Les boîtes sont des lignes [x y largeur hauteur].');
+        error('vision:bboxOverlapRatio:Taille', 'Boxes must be rows [x y width height].');
     end
     a = double(a);
     b = double(b);

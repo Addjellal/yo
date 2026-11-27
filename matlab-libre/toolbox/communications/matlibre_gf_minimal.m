@@ -23,7 +23,7 @@ function coefficients = matlibre_gf_minimal(classe, m, prim, journal, exponentie
     end
     if any(coefficients > 1)
         error('comm:bch:NonBinaire', ...
-              'Le polynôme minimal n''est pas à coefficients binaires.');
+              'The minimal polynomial does not have binary coefficients.');
     end
     journal = journal;   %#ok<ASGSL,NASGU>
 end

@@ -24,7 +24,7 @@ function [psi, xval] = cgauwavf(bas, haut, n, ordre)
     if nargin < 4 || isempty(ordre), ordre = 1; end
     ordre = round(ordre);
     if ordre < 1 || ordre > 8
-        error('wavelet:cgauwavf:BadOrder', 'L''ordre doit aller de 1 à 8.');
+        error('wavelet:cgauwavf:BadOrder', 'The order must be from 1 to 8.');
     end
     xval = linspace(bas, haut, n);
     constante = normalisation(@(t) gaussienneComplexe(t, ordre));

@@ -14,7 +14,7 @@ function [z, p, k] = buttap(n)
 %   Voir aussi BUTTER, CHEB1AP, CHEB2AP, ELLIPAP, BESSELAP, ZP2TF.
     n = round(n);
     if n < 1
-        error('signal:buttap:BadOrder', 'L''ordre doit être au moins 1.');
+        error('signal:buttap:BadOrder', 'The order must be at least 1.');
     end
     z = zeros(0, 1);
     indices = 1:n;

@@ -27,7 +27,7 @@ function sysr = modred(sys, elimines, methode)
     end
     elimines = unique(round(double(elimines(:)')));
     if any(elimines < 1) || any(elimines > n)
-        error('control:modred:BadIndex', 'Indice d''état hors bornes.');
+        error('control:modred:BadIndex', 'State index out of range.');
     end
     gardes = setdiff(1:n, elimines);
     A11 = s.A(gardes, gardes);
@@ -60,6 +60,6 @@ function sysr = modred(sys, elimines, methode)
                       C1 + C2 * Xa, s.D + C2 * Xb, s.Ts);
         otherwise
             error('control:modred:BadMethod', ...
-                  'La méthode doit être ''mdc'' ou ''del''.');
+                  'Method must be ''mdc'' or ''del''.');
     end
 end

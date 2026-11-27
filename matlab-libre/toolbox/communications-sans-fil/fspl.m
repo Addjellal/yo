@@ -15,7 +15,7 @@ function L = fspl(R, lambda)
 %   Voir aussi FRIIS, PATHLOSS, RADAREQRNG.
     if any(R(:) < 0) || any(lambda(:) <= 0)
         error('phased:fspl:Arguments', ...
-              'R est positif ou nul, LAMBDA strictement positif.');
+              'R must be nonnegative and LAMBDA strictly positive.');
     end
     if isscalar(lambda)
         L = 20 * log10(4 * pi * R / lambda);

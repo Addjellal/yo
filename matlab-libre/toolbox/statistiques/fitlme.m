@@ -72,7 +72,7 @@ function modele = fitlme(donnees, formule, varargin)
     end
     if isempty(termesAleatoires)
         error('stats:fitlme:Aleatoire', ...
-              'La formule doit porter au moins un terme aléatoire, comme (1|g).');
+              'The formula must have at least one random-effects term, such as (1|g).');
     end
     % Chaque facteur de regroupement donne un bloc d'indicatrices.
     Z = zeros(n, 0);
@@ -157,7 +157,7 @@ function [reponse, fixes, aleatoires] = lireFormuleMixte(formule)
 %LIREFORMULEMIXTE Découpe « y ~ 1 + x + (1|g) ».
     morceaux = strsplit(formule, '~');
     if numel(morceaux) ~= 2
-        error('stats:fitlme:Formule', 'La formule doit contenir un « ~ ».');
+        error('stats:fitlme:Formule', 'The formula must contain ''~''.');
     end
     reponse = strtrim(morceaux{1});
     droite = strtrim(morceaux{2});
@@ -174,12 +174,12 @@ function [reponse, fixes, aleatoires] = lireFormuleMixte(formule)
             barre = strfind(interieur, '|');
             if isempty(barre)
                 error('stats:fitlme:Formule', ...
-                      'Un terme aléatoire s''écrit (1|facteur).');
+                      'A random-effects term must be written (1|factor).');
             end
             gauche = strtrim(interieur(1:barre(1)-1));
             if ~strcmp(gauche, '1')
                 error('stats:fitlme:PenteAleatoire', ...
-                      'MatLibre n''ajuste que les intercepts aléatoires : (1|facteur).');
+                      'MatLibre fits random intercepts only: (1|factor).');
             end
             aleatoires{end + 1} = strtrim(interieur(barre(1)+1:end));   %#ok<AGROW>
         else
@@ -196,7 +196,7 @@ function v = colonneDe(donnees, nom)
         v = double(donnees.(nom));
         v = v(:);
     else
-        error('stats:fitlme:Donnees', 'FITLME attend une table.');
+        error('stats:fitlme:Donnees', 'FITLME requires a table.');
     end
 end
 

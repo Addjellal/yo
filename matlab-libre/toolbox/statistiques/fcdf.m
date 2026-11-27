@@ -16,7 +16,7 @@ function p = fcdf(x, d1, d2, queue)
     if nargin >= 4
         if ~(ischar(queue) || (isstring(queue) && isscalar(queue))) || ...
                 ~any(strcmpi(char(queue), {'upper', 'lower'}))
-            error('stats:fcdf:BadTail', 'La queue vaut ''lower'' ou ''upper''.');
+            error('stats:fcdf:BadTail', 'Tail must be ''lower'' or ''upper''.');
         end
         superieure = strcmpi(char(queue), 'upper');
     end

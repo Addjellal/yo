@@ -13,6 +13,6 @@ function mu = matlibre_lien_inverse(eta, lien)
         case 'comploglog',             mu = 1 - exp(-exp(eta));
         case {'reciprocal', 'gamma'},  mu = 1 ./ eta;
         otherwise
-            error('stats:lien:Inconnu', 'Fonction de lien inconnue : %s.', char(lien));
+            error('stats:lien:Inconnu', 'Unknown link function: %s.', char(lien));
     end
 end

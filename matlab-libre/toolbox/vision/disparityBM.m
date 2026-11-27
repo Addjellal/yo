@@ -37,7 +37,7 @@ function [carte, cout] = disparityBM(gauche, droite, varargin)
     D = enGris(droite);
     if ~isequal(size(G), size(D))
         error('vision:disparityBM:BadSize', ...
-              'Les deux images doivent avoir la même taille.');
+              'The two images must be the same size.');
     end
     if mod(tailleBloc, 2) == 0
         tailleBloc = tailleBloc + 1;

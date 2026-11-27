@@ -23,7 +23,7 @@ function [indices, quantifie, distorsion] = quantiz(signal, partition, codebook)
     partition = double(partition(:)).';
     if any(diff(partition) <= 0)
         error('comm:quantiz:Partition', ...
-              'Les seuils doivent être en ordre strictement croissant.');
+              'The partition must be strictly increasing.');
     end
     indices = zeros(size(signal));
     for k = 1:numel(signal)
@@ -32,13 +32,13 @@ function [indices, quantifie, distorsion] = quantiz(signal, partition, codebook)
     if nargout > 1
         if nargin < 3 || isempty(codebook)
             error('comm:quantiz:Codebook', ...
-                  'Les valeurs quantifiées demandent un dictionnaire.');
+                  'Quantized values require a codebook.');
         end
         codebook = double(codebook(:)).';
         if numel(codebook) ~= numel(partition) + 1
             error('comm:quantiz:Taille', ...
-                  ['Le dictionnaire doit compter un élément de plus que ' ...
-                   'la partition : %d au lieu de %d.'], ...
+                  ['The codebook must have one more element than ' ...
+                   'the partition: %d instead of %d.'], ...
                   numel(partition) + 1, numel(codebook));
         end
         quantifie = codebook(indices + 1);

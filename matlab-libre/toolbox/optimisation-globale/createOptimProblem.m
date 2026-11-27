@@ -46,6 +46,6 @@ function probleme = createOptimProblem(solveur, varargin)
     end
     if isempty(probleme.objective)
         error('globaloptim:createOptimProblem:Objectif', ...
-              'Le problème doit porter une fonction objectif.');
+              'The problem must have an objective function.');
     end
 end

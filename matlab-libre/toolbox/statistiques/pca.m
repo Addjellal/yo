@@ -53,11 +53,11 @@ function [coeff, score, latent, tsquared, explained, mu] = pca(X, varargin)
 %
 %   Voir aussi PCACOV, PCARES, CMDSCALE, FACTORAN, SVD.
     if ~isnumeric(X) && ~islogical(X)
-        error('stats:pca:BadData', 'PCA attend une matrice numérique.');
+        error('stats:pca:BadData', 'PCA requires a numeric matrix.');
     end
     if ~ismatrix(X)
         error('stats:pca:BadData', ...
-              'PCA attend une matrice : une observation par ligne.');
+              'PCA requires a matrix with one observation per row.');
     end
     classe = class(X);
     if ~strcmp(classe, 'single')
@@ -71,8 +71,8 @@ function [coeff, score, latent, tsquared, explained, mu] = pca(X, varargin)
     if any(manquantes)
         if strcmp(lignes, 'all')
             error('stats:pca:RowsAll', ...
-                  ['Rows,''all'' n''admet pas de NaN : écartez-les, ou laissez ' ...
-                   'la valeur par défaut ''complete''.']);
+                  ['Rows,''all'' does not accept NaN: remove them, or keep ' ...
+                   'the default ''complete''.']);
         end
     end
     gardees = ~manquantes;
@@ -98,8 +98,8 @@ function [coeff, score, latent, tsquared, explained, mu] = pca(X, varargin)
         variances = var(Xg, 0, 1);
         if any(variances == 0)
             error('stats:pca:ZeroVariance', ...
-                  ['VariableWeights,''variance'' : une variable est constante, ' ...
-                   'elle ne peut être réduite.']);
+                  ['VariableWeights,''variance'': a variable is constant, ' ...
+                   'so it cannot be scaled.']);
         end
         racinePoids = 1 ./ sqrt(variances);
         Xc = Xc .* racinePoids;
@@ -180,8 +180,8 @@ function [coeff, score, latent, tsquared, explained, mu] = pca(X, varargin)
     if ~isempty(nbAxes)
         if nbAxes > size(coeff, 2) && nbAxes > dof
             error('stats:pca:NumComponents', ...
-                  ['NumComponents vaut au plus %d ici : c''est le nombre d''axes ' ...
-                   'que portent les données.'], size(coeff, 2));
+                  ['NumComponents can be at most %d here: the number of components ' ...
+                   'the data supports.'], size(coeff, 2));
         end
         nbAxes = min(nbAxes, size(coeff, 2));
         coeff = coeff(:, 1:nbAxes);
@@ -226,25 +226,25 @@ function [algorithme, centre, economie, nbAxes, lignes, poidsVariables] = lireOp
     poidsVariables = [];
     if mod(numel(arguments), 2) ~= 0
         error('stats:pca:BadNameValue', ...
-              'PCA : les options vont par paires, un nom et une valeur.');
+              'PCA: options must be name-value pairs.');
     end
     for k = 1:2:numel(arguments)
         nom = arguments{k};
         valeur = arguments{k + 1};
         if ~(ischar(nom) || (isstring(nom) && isscalar(nom)))
-            error('stats:pca:BadNameValue', 'PCA : nom d''option attendu.');
+            error('stats:pca:BadNameValue', 'PCA: expected an option name.');
         end
         switch lower(char(nom))
             case 'algorithm'
                 algorithme = lower(char(valeur));
                 if strcmp(algorithme, 'als')
                     error('stats:pca:NotSupported', ...
-                          ['Algorithm,''als'' (moindres carrés alternés pour les ' ...
-                           'données manquantes) n''est pas pris en charge par MatLibre.']);
+                          ['Algorithm,''als'' (alternating least squares for ' ...
+                           'missing data) is not supported by MatLibre.']);
                 end
                 if ~any(strcmp(algorithme, {'svd', 'eig'}))
                     error('stats:pca:BadAlgorithm', ...
-                          'Algorithm vaut ''svd'' ou ''eig'', non ''%s''.', algorithme);
+                          'Algorithm must be ''svd'' or ''eig'', not ''%s''.', algorithme);
                 end
             case 'centered'
                 centre = logical(valeur);
@@ -254,34 +254,34 @@ function [algorithme, centre, economie, nbAxes, lignes, poidsVariables] = lireOp
                 if ~(isnumeric(valeur) && isscalar(valeur) && valeur >= 1 && ...
                      valeur == round(valeur))
                     error('stats:pca:BadNumComponents', ...
-                          'NumComponents est un entier positif.');
+                          'NumComponents must be a positive integer.');
                 end
                 nbAxes = double(valeur);
             case 'rows'
                 lignes = lower(char(valeur));
                 if strcmp(lignes, 'pairwise')
                     error('stats:pca:NotSupported', ...
-                          ['Rows,''pairwise'' n''est pas pris en charge par MatLibre : ' ...
-                           'employez ''complete'' (défaut).']);
+                          ['Rows,''pairwise'' is not supported by MatLibre: ' ...
+                           'use ''complete'' (default).']);
                 end
                 if ~any(strcmp(lignes, {'complete', 'all'}))
                     error('stats:pca:BadRows', ...
-                          'Rows vaut ''complete'' ou ''all'', non ''%s''.', lignes);
+                          'Rows must be ''complete'' or ''all'', not ''%s''.', lignes);
                 end
             case 'variableweights'
                 if (ischar(valeur) || isstring(valeur)) && strcmpi(char(valeur), 'variance')
                     poidsVariables = 'variance';
                 else
                     error('stats:pca:NotSupported', ...
-                          ['VariableWeights n''admet dans MatLibre que ''variance'' ; ' ...
-                           'un vecteur de poids n''est pas pris en charge.']);
+                          ['VariableWeights accepts only ''variance'' in MatLibre; ' ...
+                           'a weight vector is not supported.']);
                 end
             case 'weights'
                 error('stats:pca:NotSupported', ...
-                      ['Weights (poids des observations) n''est pas pris en charge ' ...
-                       'par MatLibre.']);
+                      ['Weights (observation weights) is not supported ' ...
+                       'by MatLibre.']);
             otherwise
-                error('stats:pca:BadNameValue', 'PCA n''a pas d''option ''%s''.', char(nom));
+                error('stats:pca:BadNameValue', 'PCA has no option ''%s''.', char(nom));
         end
     end
 end

@@ -19,7 +19,7 @@ function sortie = appliquerMatriceCouleur(entree, M)
     end
     if numel(d) < 3 || d(3) ~= 3
         error('images:appliquerMatriceCouleur:BadInput', ...
-              'L''entrée doit être une image à trois plans ou une liste N x 3.');
+              'Input must be a three-plane image or an N-by-3 list.');
     end
     liste = reshape(entree, [], 3) * M';
     sortie = reshape(liste, d);

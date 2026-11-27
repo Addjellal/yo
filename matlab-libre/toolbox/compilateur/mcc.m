@@ -40,7 +40,7 @@ function chemin = mcc(varargin)
         programme = fullfile(pwd(), programme);
     end
     if exist(programme, 'file') ~= 2
-        error('compiler:mcc:Programme', 'Le programme « %s » n''existe pas.', programme);
+        error('compiler:mcc:Programme', 'Program ''%s'' does not exist.', programme);
     end
     [~, nom] = fileparts(programme);
     if isempty(sortie)
@@ -57,7 +57,7 @@ function chemin = mcc(varargin)
     end
     if endsWith(lower(sortie), '.m') || strcmp(sortie, programme)
         error('compiler:mcc:Ecrasement', ...
-              'MCC n''écrit pas sur un fichier .m : « %s » serait écrasé.', sortie);
+              'MCC does not write over a .m file: ''%s'' would be overwritten.', sortie);
     end
     chemins = {};
     for k = 1:numel(joints)
@@ -128,7 +128,7 @@ function [programme, sortie, dossier, joints, bavard] = lireOptions(arguments)
                 bavard = true;
             case {'-o', '-d', '-a'}
                 if k == numel(arguments)
-                    error('compiler:mcc:Option', 'L''option %s attend une valeur.', option);
+                    error('compiler:mcc:Option', 'Option %s requires a value.', option);
                 end
                 valeur = arguments{k + 1};
                 k = k + 1;
@@ -142,11 +142,11 @@ function [programme, sortie, dossier, joints, bavard] = lireOptions(arguments)
             otherwise
                 if startsWith(option, '-')
                     error('compiler:mcc:Option', ...
-                          'MatLibre ne connaît pas l''option %s de mcc (-m, -o, -d, -a, -v).', option);
+                          'MatLibre does not support mcc option %s (-m, -o, -d, -a, -v).', option);
                 end
                 if ~isempty(programme)
                     error('compiler:mcc:Programmes', ...
-                          'MatLibre ne compile qu''un programme à la fois (%s, puis %s).', ...
+                          'MatLibre compiles one program at a time (%s, then %s).', ...
                           programme, option);
                 end
                 programme = option;
@@ -154,6 +154,6 @@ function [programme, sortie, dossier, joints, bavard] = lireOptions(arguments)
         k = k + 1;
     end
     if isempty(programme)
-        error('compiler:mcc:Programme', 'MCC attend un programme : mcc -m programme.m.');
+        error('compiler:mcc:Programme', 'MCC requires a program: mcc -m program.m.');
     end
 end

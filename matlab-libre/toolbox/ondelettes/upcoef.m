@@ -30,7 +30,7 @@ function y = upcoef(genre, x, varargin)
         case 'd', premier = Hi_R;
         otherwise
             error('Wavelet:FunctionArgVal:Invalid_ArgVal', ...
-                  'UPCOEF : le type est ''a'' ou ''d''.');
+                  'UPCOEF: type must be ''a'' or ''d''.');
     end
     colonne = size(x, 1) > 1;
     y = double(x(:)).';

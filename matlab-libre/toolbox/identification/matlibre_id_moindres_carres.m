@@ -25,7 +25,7 @@ function modele = matlibre_id_moindres_carres(donnees, ordres, methode)
         Y = [Y; cible];        %#ok<AGROW>
     end
     if isempty(Phi)
-        error('ident:arx:Donnees', 'Trop peu de données pour ces ordres.');
+        error('ident:arx:Donnees', 'Not enough data for these orders.');
     end
     theta = Phi \ Y;
     modele = matlibre_id_squelette(ordres, donnees.Ts);

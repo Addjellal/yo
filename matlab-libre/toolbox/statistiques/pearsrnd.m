@@ -28,7 +28,7 @@ function [r, type, coefficients] = pearsrnd(mu, sigma, asymetrie, aplatissement,
 %
 %   Voir aussi RANDOM, SKEWNESS, KURTOSIS, MLE, FITDIST.
     if nargin < 4
-        error('stats:pearsrnd:Arguments', 'pearsrnd attend quatre moments.');
+        error('stats:pearsrnd:Arguments', 'PEARSRND requires four moments.');
     end
     dimensions = varargin;
     if isempty(dimensions)
@@ -41,7 +41,7 @@ function [r, type, coefficients] = pearsrnd(mu, sigma, asymetrie, aplatissement,
     beta2 = aplatissement;
     if beta2 <= beta1 + 1
         error('stats:pearsrnd:Moments', ...
-              'L''aplatissement doit dépasser le carré de l''asymétrie plus un.');
+              'Kurtosis must be greater than the squared skewness plus one.');
     end
     if abs(beta1) < 1e-12 && abs(beta2 - 3) < 1e-12
         type = 0;

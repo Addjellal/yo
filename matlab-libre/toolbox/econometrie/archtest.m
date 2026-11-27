@@ -38,7 +38,7 @@ function [rejet, pValeur, statistique, valeurCritique] = archtest(residus, varar
     end
     if retards < 1 || retards >= n - 1
         error('econ:archtest:Retards', ...
-              'Le nombre de retards doit rester entre un et %d.', n - 2);
+              'The number of lags must be between 1 and %d.', n - 2);
     end
     carres = (residus - mean(residus)) .^ 2;
     % Régression du carré sur ses retards : y = a0 + a1 y(-1) + ...

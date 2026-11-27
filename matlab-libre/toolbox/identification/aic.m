@@ -32,11 +32,12 @@ function valeur = aic(varargin)
     champs = {'nAIC', 'AIC', 'AICc', 'BIC'};
     rang = find(strcmpi(mesure, noms), 1);
     if isempty(rang)
-        error('ident:aic:Mesure', 'La mesure vaut ''nAIC'', ''aic'', ''AICc'' ou ''BIC'', non ''%s''.', ...
+        error('ident:aic:Mesure', ['Measure must be ''nAIC'', ''aic'', ''AICc'', or ''BIC'', ' ...
+                                   'not ''%s''.'], ...
               mesure);
     end
     if isempty(varargin)
-        error('ident:aic:Modele', 'Il faut au moins un modèle estimé.');
+        error('ident:aic:Modele', 'At least one estimated model is required.');
     end
     valeur = zeros(1, numel(varargin));
     for k = 1:numel(varargin)

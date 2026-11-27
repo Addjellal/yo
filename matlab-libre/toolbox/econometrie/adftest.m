@@ -56,7 +56,7 @@ function [rejet, pValeur, statistique, valeurCritique] = adftest(serie, varargin
         k = k + 2;
     end
     if ~(isscalar(alpha) && alpha >= 0.001 && alpha <= 0.999)
-        error('econ:adftest:Alpha', 'Alpha est un nombre de 0,001 à 0,999.');
+        error('econ:adftest:Alpha', 'Alpha must be a number from 0.001 to 0.999.');
     end
     [statistique, ~] = matlibre_dickey_fuller(serie, retards, modele, forme);
     taille = numel(serie) - 1 - retards;

@@ -20,7 +20,7 @@ function [ajustement, qualite, sortie] = matlibre_ajuster_surface(xy, z, modele,
             surface = matlibre_modele_surface(nom);
             if isempty(surface)
                 error('curvefit:fit:Surface', ...
-                      'Modèle de surface inconnu : %s.', char(nom));
+                      'Unknown surface model: %s.', char(nom));
             end
             modele = matlibre_fittype_surface(surface);
         end

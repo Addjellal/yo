@@ -13,7 +13,7 @@ function sys = append(varargin)
 %
 %   Voir aussi PARALLEL, SERIES, FEEDBACK.
     if isempty(varargin)
-        error('control:append:NoInput', 'Il faut au moins un modèle.');
+        error('control:append:NoInput', 'At least one model is required.');
     end
     A = []; B = []; C = []; D = []; Ts = 0;
     for k = 1:numel(varargin)

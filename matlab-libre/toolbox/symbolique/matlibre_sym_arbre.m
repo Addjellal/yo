@@ -14,6 +14,6 @@ function arbre = matlibre_sym_arbre(valeur)
         arbre = {'num', double(valeur)};
     else
         error('symbolic:sym:Conversion', ...
-              'Cette valeur ne se convertit pas en expression symbolique.');
+              'This value cannot be converted to a symbolic expression.');
     end
 end

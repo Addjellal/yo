@@ -10,7 +10,7 @@ function indices = indicesSymboles(seq, symboles, m)
         indices = round(double(seq(:)).');
         if any(indices < 1) || any(indices > m)
             error('stats:hmm:Symbole', ...
-                  'Les symboles doivent être des entiers de 1 à %d.', m);
+                  'Symbols must be integers from 1 to %d.', m);
         end
         return;
     end
@@ -38,7 +38,7 @@ function indices = indicesSymboles(seq, symboles, m)
             end
         end
         if trouve == 0
-            error('stats:hmm:Symbole', 'Symbole inconnu à la position %d.', k);
+            error('stats:hmm:Symbole', 'Unknown symbol at position %d.', k);
         end
         indices(k) = trouve;
     end

@@ -45,7 +45,7 @@ function [reel, imaginaire, w] = nyquist(varargin)
     end
     plot(courbes{:});
     grid on;
-    xlabel('Partie réelle');
-    ylabel('Partie imaginaire');
-    title('Lieu de Nyquist');
+    xlabel('Real Axis');
+    ylabel('Imaginary Axis');
+    title('Nyquist Diagram');
 end

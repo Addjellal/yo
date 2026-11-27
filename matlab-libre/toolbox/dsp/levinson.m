@@ -30,7 +30,7 @@ function [a, e, k] = levinson(r, p)
     end
     if ~isscalar(p) || p < 0 || p ~= fix(p) || p > size(r, 1) - 1
         error('signal:levinson:Ordre', ...
-              'L''ordre est un entier entre 0 et numel(R) - 1.');
+              'The order must be an integer between 0 and numel(R) - 1.');
     end
     nColonnes = size(r, 2);
     a = zeros(nColonnes, p + 1);

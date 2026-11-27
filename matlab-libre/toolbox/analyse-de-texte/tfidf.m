@@ -37,7 +37,7 @@ function M = tfidf(effectifs, varargin)
                'Normalized', false);
     noms = fieldnames(o);
     if mod(numel(varargin), 2) ~= 0
-        error('textanalytics:tfidf:Options', 'Les options vont par paires nom, valeur.');
+        error('textanalytics:tfidf:Options', 'Options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         trouve = find(strcmpi(varargin{k}, noms), 1);
@@ -56,7 +56,8 @@ function M = tfidf(effectifs, varargin)
             tf = zeros(size(C));
             tf(C > 0) = 1 + log(C(C > 0));
         otherwise
-            error('textanalytics:tfidf:TFWeight', 'TFWeight vaut ''raw'', ''binary'' ou ''log''.');
+            error('textanalytics:tfidf:TFWeight', ['TFWeight must be ''raw'', ''binary'', or ' ...
+                                                   '''log''.']);
     end
     NTp = max(NT, 1);
     switch lower(char(o.IDFWeight))

@@ -48,7 +48,7 @@ function robot = importrobot(source, varargin)
         identifiant = fopen(texte, 'r');
         if identifiant < 0
             error('robotics:importrobot:Fichier', ...
-                  'Impossible d''ouvrir « %s ».', texte);
+                  'Unable to open file ''%s''.', texte);
         end
         texte = fread(identifiant, inf, '*char').';
         fclose(identifiant);
@@ -62,7 +62,7 @@ function robot = importrobot(source, varargin)
     end
     if isempty(racine)
         error('robotics:importrobot:SansRobot', ...
-              'Le document ne contient pas de balise « robot ».');
+              'The document has no ''robot'' element.');
     end
     % Les corps d'abord, les liaisons ensuite : un URDF les donne dans un
     % ordre quelconque, et une liaison nomme deux corps qui doivent déjà
@@ -90,7 +90,7 @@ function robot = importrobot(source, varargin)
     end
     if isempty(base)
         error('robotics:importrobot:SansBase', ...
-              'Aucun corps ne sert de base : le graphe n''est pas un arbre.');
+              'No body serves as the base: the graph is not a tree.');
     end
     robot = rigidBodyTree('DataFormat', format, 'BaseName', base);
     % On attache les corps dans l'ordre où leur parent devient disponible.
@@ -131,7 +131,7 @@ function robot = importrobot(source, varargin)
         end
         if ~avance
             error('robotics:importrobot:Cycle', ...
-                  'Les liaisons ne forment pas un arbre depuis « %s ».', base);
+                  'The joints do not form a tree from ''%s''.', base);
         end
     end
 end

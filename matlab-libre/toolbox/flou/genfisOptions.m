@@ -35,7 +35,7 @@ function options = genfisOptions(methode, varargin)
                              'MinImprovement', 1e-5);
         otherwise
             error('fuzzy:genfisOptions:Methode', ...
-                  'Méthode inconnue : %s.', methode);
+                  'Unknown method: %s.', methode);
     end
     options = poserOptions(options, 'genfisOptions', varargin{:});
 end

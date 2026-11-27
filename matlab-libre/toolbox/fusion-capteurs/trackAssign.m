@@ -42,7 +42,7 @@ function assignation = trackAssign(pistes, mesures, seuil)
     end
     if size(pistes, 2) ~= size(mesures, 2)
         error('fusion:trackAssign:Dimension', ...
-              'Pistes et mesures ont le même nombre de coordonnées.');
+              'Tracks and detections must have the same number of coordinates.');
     end
     distances = zeros(nPistes, size(mesures, 1));
     for k = 1:nPistes

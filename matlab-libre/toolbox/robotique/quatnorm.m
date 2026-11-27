@@ -9,7 +9,7 @@ function n = quatnorm(q)
 %
 %   Voir aussi QUATMOD, QUATNORMALIZE, QUATINV.
     if size(q, 2) ~= 4
-        error('aero:quatnorm:Taille', 'Les quaternions sont des lignes [w x y z] : M x 4.');
+        error('aero:quatnorm:Taille', 'Quaternions must be rows [w x y z]: M-by-4.');
     end
     n = sum(double(q) .^ 2, 2);
 end

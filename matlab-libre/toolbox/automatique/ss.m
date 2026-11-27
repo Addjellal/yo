@@ -155,7 +155,7 @@ classdef ss
             end
             if isempty(a.D) || rcond(a.D) < eps
                 error('Control:transformation:InvSingular', ...
-                      ['The model cannot be inverted : its feedthrough matrix D ' ...
+                      ['The model cannot be inverted: its feedthrough matrix D ' ...
                        'is singular.']);
             end
             di = inv(a.D);
@@ -280,7 +280,7 @@ classdef ss
                 n = hinfnorm(sys);
             else
                 error('Control:analysis:NormType', ...
-                      'NORM(SYS,TYPE) accepte TYPE = 2 (norme H2) ou Inf (norme H-infini).');
+                      'NORM(SYS,TYPE) accepts TYPE = 2 (H2 norm) or Inf (H-infinity norm).');
             end
         end
         function r = isempty(sys), r = isempty(sys.D); end

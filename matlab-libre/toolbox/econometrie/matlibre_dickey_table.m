@@ -40,7 +40,7 @@ function [pValeur, valeurCritique] = matlibre_dickey_table(statistique, modele, 
             table = tableT2(modele);
         otherwise
             error('econ:dickeyTable:Forme', ...
-                  'La forme du test vaut ''t1'' ou ''t2'', pas ''%s''.', forme);
+                  'Test must be ''t1'' or ''t2'', not ''%s''.', forme);
     end
     ligne = interpolerTaille(table, tailles, taille);
     valeurCritique = interp1(niveaux, ligne, alpha, 'linear');

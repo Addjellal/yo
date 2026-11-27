@@ -15,7 +15,7 @@ function resume = summarize(modele)
 %   Voir aussi ARIMA, GARCH, ESTIMATE, AICBIC.
     if ~isa(modele, 'arima') && ~isa(modele, 'garch')
         error('econ:summarize:Modele', ...
-              'SUMMARIZE attend un modèle ARIMA ou GARCH.');
+              'SUMMARIZE requires an ARIMA or GARCH model.');
     end
     if ~modele.Estimated
         if nargout > 0

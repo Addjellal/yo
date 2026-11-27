@@ -19,11 +19,11 @@ function modele = discardSupportVectors(modele)
 %   Voir aussi FITCSVM, PREDICT.
     if ~isstruct(modele) || ~isfield(modele, 'type') || ~strcmp(modele.type, 'svm')
         error('stats:discardSupportVectors:Modele', ...
-              'Le modèle doit venir de FITCSVM ou de FITRSVM.');
+              'The model must come from FITCSVM or FITRSVM.');
     end
     if ~strcmp(modele.Options.KernelFunction, 'linear')
         error('stats:discardSupportVectors:Noyau', ...
-              'Seul un modèle à noyau linéaire peut se passer de ses points.');
+              'Only a linear kernel model can discard its support vectors.');
     end
     modele.SupportVectors = zeros(0, numel(modele.Beta));
     modele.Alpha = zeros(0, 1);

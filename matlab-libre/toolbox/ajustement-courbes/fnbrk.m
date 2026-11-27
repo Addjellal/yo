@@ -21,7 +21,7 @@ function varargout = fnbrk(f, partie)
         pp = matlibre_pp_forme(f);
         indice = round(partie);
         if indice < 1 || indice > pp.pieces
-            error('curvefit:fnbrk:Morceau', 'Il n''y a que %d morceaux.', pp.pieces);
+            error('curvefit:fnbrk:Morceau', 'There are only %d pieces.', pp.pieces);
         end
         varargout{1} = struct('form', 'pp', ...
                               'breaks', pp.breaks(indice:(indice + 1)), ...

@@ -28,7 +28,7 @@ function distance = gfweight(generateur, forme)
         k = n - (numel(generateur) - 1);
         if k < 1
             error('comm:gfweight:Longueur', ...
-                  'Le polynôme générateur est trop long pour cette longueur.');
+                  'The generator polynomial is too long for this codeword length.');
         end
         G = zeros(k, n);
         for ligne = 1:k
@@ -42,14 +42,14 @@ function distance = gfweight(generateur, forme)
             G = gen2par(G);
         elseif ~strcmp(forme, 'gen')
             error('comm:gfweight:Forme', ...
-                  'La forme doit être ''gen'', ''par'', ou la longueur du code.');
+                  'The form must be ''gen'', ''par'', or the codeword length.');
         end
         k = size(G, 1);
     end
     if k > 22
         error('comm:gfweight:Trop', ...
-              ['Le parcours des %d mots de code est hors de portée ; ' ...
-               'MatLibre s''arrête à 22 bits d''information.'], 2 ^ k);
+              ['Searching all %d codewords is out of reach; ' ...
+               'MatLibre stops at 22 information bits.'], 2 ^ k);
     end
     % Le code étant linéaire, la distance minimale est le plus petit
     % poids d'un mot non nul : on les parcourt tous.

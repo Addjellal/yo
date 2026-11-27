@@ -18,7 +18,7 @@ function varargout = writeline(v, commande)
 %
 %   Voir aussi READLINE, WRITEREAD, VISADEV.
     if ~isa(v, 'visadev')
-        error('instrument:writeline:Objet', 'WRITELINE attend une liaison VISADEV.');
+        error('instrument:writeline:Objet', 'WRITELINE requires a VISADEV connection.');
     end
     v.journal{end + 1} = char(commande);
     matlibre_scpi(v, commande);

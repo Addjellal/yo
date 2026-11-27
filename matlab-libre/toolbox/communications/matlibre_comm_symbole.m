@@ -13,7 +13,7 @@ function symbole = matlibre_comm_symbole(position, M, ordre)
         return
     end
     if ~strcmpi(ordre, 'gray')
-        error('comm:ordre:Inconnu', 'L''ordre vaut ''bin'' ou ''gray''.');
+        error('comm:ordre:Inconnu', 'Symbol order must be ''bin'' or ''gray''.');
     end
     table = matlibre_comm_table_gray(M);
     symbole = reshape(table(mod(position(:), M) + 1), size(position));

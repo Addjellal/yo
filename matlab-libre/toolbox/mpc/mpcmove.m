@@ -48,7 +48,7 @@ function [u, sequence] = mpcmove(controleur, x, consigne)
         [sequence, ~, drapeau] = quadprog((H + H.') / 2, g, [], [], [], [], bas, haut);
         if drapeau ~= 1
             error('mpc:mpcmove:Infaisable', ...
-                  'Le programme quadratique sous contraintes n''a pas de solution admissible.');
+                  'The constrained quadratic program has no feasible solution.');
         end
     else
         sequence = -H \ g;

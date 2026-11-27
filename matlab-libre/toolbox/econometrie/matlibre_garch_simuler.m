@@ -18,8 +18,8 @@ function [Y, E, V] = matlibre_garch_simuler(obj, nombre, varargin)
     persistance = sum(garchs) + sum(archs);
     if persistance >= 1
         error('econ:garch:Stationnarite', ...
-              ['La somme des coefficients vaut %.4f : la variance ' ...
-               'n''a pas de valeur de long terme.'], persistance);
+              ['The sum of the coefficients is %.4f: the variance ' ...
+               'has no long-run value.'], persistance);
     end
     longTerme = modele.Constant / (1 - persistance);
     p = numel(garchs);

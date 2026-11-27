@@ -46,7 +46,7 @@ function [rejet, pValeur, statistique, valeurCritique, estimations] = jcitest(Y,
     n = size(Y, 2);
     if n < 2
         error('econ:jcitest:Series', ...
-              'Il faut au moins deux séries pour parler de cointégration.');
+              'At least two series are required to test for cointegration.');
     end
     modele = 'H1';
     retards = 0;
@@ -69,7 +69,7 @@ function [rejet, pValeur, statistique, valeurCritique, estimations] = jcitest(Y,
     end
     if ~any(strcmpi(forme, {'trace', 'maxeig'}))
         error('econ:jcitest:Test', ...
-              'La statistique vaut ''trace'' ou ''maxeig'', pas ''%s''.', forme);
+              'The test statistic must be ''trace'' or ''maxeig'', not ''%s''.', forme);
     end
     [lambda, vecteurs, Teff, ~, S00, S01] = matlibre_johansen(Y, retards, modele);
     rejet = zeros(1, n);

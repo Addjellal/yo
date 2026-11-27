@@ -12,7 +12,7 @@ function [z, p, k] = cheb1ap(n, rp)
 %   Voir aussi CHEBY1, BUTTAP, CHEB2AP, ELLIPAP.
     n = round(n);
     if n < 1
-        error('signal:cheb1ap:BadOrder', 'L''ordre doit être au moins 1.');
+        error('signal:cheb1ap:BadOrder', 'The order must be at least 1.');
     end
     epsilon = sqrt(10 ^ (rp / 10) - 1);
     mu = asinh(1 / epsilon) / n;

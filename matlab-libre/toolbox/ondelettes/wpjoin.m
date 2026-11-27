@@ -19,7 +19,7 @@ function [arbre, coefficients] = wpjoin(arbre, noeud)
     indice = indiceDeNoeud(arbre, noeud);
     if ~any(arbre.noeuds == indice)
         error('wavelet:wpjoin:Absent', ...
-              'Le nœud %d n''est pas dans l''arbre.', indice);
+              'Node %d is not in the tree.', indice);
     end
     % Les coefficients du nœud sont ceux que ses descendants
     % reconstruisent : refermer une branche ne doit rien perdre.

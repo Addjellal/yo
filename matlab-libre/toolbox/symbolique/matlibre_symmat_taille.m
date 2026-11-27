@@ -24,7 +24,7 @@ function d = matlibre_symmat_taille(arbre)
             if isequal(h, [1 1]), d = g; return; end
             if ~isequal(g, h)
                 error('symbolic:symmatrix:Dimensions', ...
-                      'Formats incompatibles : %dx%d et %dx%d.', g(1), g(2), h(1), h(2));
+                      'Incompatible sizes: %dx%d and %dx%d.', g(1), g(2), h(1), h(2));
             end
             d = g;
         case '*'
@@ -34,7 +34,8 @@ function d = matlibre_symmat_taille(arbre)
             if isequal(h, [1 1]), d = g; return; end
             if g(2) ~= h(1)
                 error('symbolic:symmatrix:Dimensions', ...
-                      'Produit impossible : %dx%d par %dx%d.', g(1), g(2), h(1), h(2));
+                      ['Incompatible sizes for multiplication: %dx%d by ' ...
+                       '%dx%d.'], g(1), g(2), h(1), h(2));
             end
             d = [g(1) h(2)];
         case 'trans'
@@ -54,7 +55,7 @@ function d = matlibre_symmat_taille(arbre)
             d = [g(1) * h(1), g(2) * h(2)];
         otherwise
             error('symbolic:symmatrix:Operateur', ...
-                  'Opérateur matriciel inconnu « %s ».', arbre{1});
+                  'Unknown matrix operator ''%s''.', arbre{1});
     end
 end
 
@@ -62,7 +63,7 @@ function d = carree(sousArbre, quoi)
     d = matlibre_symmat_taille(sousArbre);
     if d(1) ~= d(2)
         error('symbolic:symmatrix:Carree', ...
-              '%s demande une matrice carrée ; celle-ci est %dx%d.', ...
+              '%s requires a square matrix; this one is %dx%d.', ...
               quoi, d(1), d(2));
     end
 end

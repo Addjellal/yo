@@ -11,7 +11,7 @@ function y = linzmf(x, params)
 %
 %   Voir aussi LINSMF, ZMF, SMF, TRIMF, EVALMF.
     if numel(params) < 2
-        error('fuzzy:linzmf:Parametres', 'LINZMF demande deux paramètres.');
+        error('fuzzy:linzmf:Parametres', 'LINZMF requires two parameters.');
     end
     y = 1 - linsmf(x, params);
 end

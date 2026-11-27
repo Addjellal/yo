@@ -13,7 +13,7 @@ function [Q, deborde] = matlibre_fixe_quantifier(v, T, F)
     x = (double(v) - T.Bias) / T.Slope;
     nan = isnan(x);
     if any(nan(:))
-        warning('fixed:fi:nanToZero', 'NaN est converti en 0.');
+        warning('fixed:fi:nanToZero', 'NaN is converted to 0.');
         x(nan) = 0;
     end
     Q = matlibre_fixe_arrondir(x, F.RoundingMethod);

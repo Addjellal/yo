@@ -60,7 +60,7 @@ function [x, resnorm, residual, exitflag, output] = ...
                      estVrai(lireOption(options, {'Jacobian'}, false));
     if ~any(strcmp(differences, {'forward', 'central'}))
         error('optim:lsqnonlin:BadFiniteDifferenceType', ...
-              'FiniteDifferenceType doit valoir ''forward'' ou ''central''.');
+              'FiniteDifferenceType must be ''forward'' or ''central''.');
     end
 
     forme = size(x0);

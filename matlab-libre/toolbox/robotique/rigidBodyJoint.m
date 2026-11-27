@@ -110,7 +110,7 @@ classdef rigidBodyJoint < handle
             if strcmpi(convention, 'matrice') || isequal(size(entree), [4 4])
                 if ~isequal(size(entree), [4 4])
                     error('robotics:rigidBodyJoint:Transformation', ...
-                          'La transformation doit etre une matrice 4x4.');
+                          'The transformation must be a 4-by-4 matrix.');
                 end
                 obj.ChildToJointTransform = double(entree);
                 return
@@ -118,7 +118,7 @@ classdef rigidBodyJoint < handle
             p = double(entree(:)).';
             if numel(p) ~= 4
                 error('robotics:rigidBodyJoint:Parametres', ...
-                      'Les parametres de Denavit-Hartenberg sont quatre : [A ALPHA D THETA].');
+                      'Denavit-Hartenberg parameters must be four values: [A ALPHA D THETA].');
             end
             a = p(1); alpha = p(2); d = p(3); theta = p(4);
             Tz = @(v) trvec2tform([0 0 v]);
@@ -157,7 +157,7 @@ classdef rigidBodyJoint < handle
                     end
                 otherwise
                     error('robotics:rigidBodyJoint:Convention', ...
-                          'Convention inconnue : %s. Employez ''dh'' ou ''mdh''.', ...
+                          'Unknown convention: %s. Use ''dh'' or ''mdh''.', ...
                           char(convention));
             end
         end

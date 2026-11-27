@@ -37,6 +37,6 @@ function C = matlibre_covariance_forme(c, n, nom)
         C = c;
     else
         error('phased:sensorcov:Taille', ...
-              '%s est un scalaire, un vecteur de %d valeurs ou une matrice %d x %d.', nom, n, n, n);
+              '%s must be a scalar, a vector of %d values, or a %d-by-%d matrix.', nom, n, n, n);
     end
 end

@@ -38,12 +38,12 @@ function y = groupnorm(x, decalage, echelle, groupes, varargin)
             case 'all-channels', groupes = 1;
             otherwise
                 error('nnet:groupnorm:Groupes', ...
-                      'Nombre de groupes inconnu : %s.', groupes);
+                      'Unknown number of groups: %s.', groupes);
         end
     end
     if mod(canaux, groupes) ~= 0
         error('nnet:groupnorm:Partage', ...
-              'Les %d canaux ne se partagent pas en %d groupes.', canaux, groupes);
+              'The %d channels cannot be divided into %d groups.', canaux, groupes);
     end
     % Le canal est coupé en deux dimensions — au sein du groupe, puis le
     % groupe —, ce qui ramène la normalisation par groupe à une moyenne sur

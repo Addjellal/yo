@@ -55,7 +55,7 @@ function [B, info] = lasso(X, y, varargin)
         k = k + 2;
     end
     if alpha <= 0 || alpha > 1
-        error('stats:lasso:Alpha', 'Alpha doit être dans ]0, 1].');
+        error('stats:lasso:Alpha', 'Alpha must be in (0, 1].');
     end
     % Centrage et réduction : la pénalité n'a de sens que si les colonnes
     % sont comparables, et l'ordonnée à l'origine ne doit pas être punie.

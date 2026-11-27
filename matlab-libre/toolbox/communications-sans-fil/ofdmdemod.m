@@ -42,7 +42,7 @@ function [y, pilots] = ofdmdemod(x, nfft, cplen, symOffset, nullidx, pilotidx, v
     cp = matlibre_ofdm_prefixes(cplen, round(nSym), nfft, 'ofdmdemod');
     if nSym ~= fix(nSym) || n ~= nSym * nfft + sum(cp)
         error('comm:ofdmdemod:Longueur', ...
-              'X doit compter NSym x NFFT échantillons, plus la somme des préfixes.');
+              'X must have NSym*NFFT samples plus the total cyclic prefix length.');
     end
     if nargin < 4 || isempty(symOffset)
         decalage = cp;
@@ -54,7 +54,7 @@ function [y, pilots] = ofdmdemod(x, nfft, cplen, symOffset, nullidx, pilotidx, v
     if numel(decalage) ~= nSym || any(decalage < 0) || any(decalage > cp) ...
             || any(decalage ~= fix(decalage))
         error('comm:ofdmdemod:Decalage', ...
-              'SYMOFFSET est un entier entre 0 et CPLEN, scalaire ou un par symbole.');
+              'SYMOFFSET must be an integer between 0 and CPLEN, scalar or one per symbol.');
     end
     % Porteuses dans l'ordre centré : k va de -NFFT/2 à NFFT/2 - 1 (pair).
     k = (0:nfft - 1).' - floor(nfft / 2);

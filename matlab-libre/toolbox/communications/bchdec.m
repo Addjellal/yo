@@ -34,7 +34,7 @@ function [decode, nombreErreurs, motCorrige] = bchdec(code, n, k, forme)
         valeurs = valeurs(:).';
     end
     if size(valeurs, 2) ~= n
-        error('comm:bchdec:Longueur', 'Le mot doit compter %d colonnes.', n);
+        error('comm:bchdec:Longueur', 'The codeword must have %d columns.', n);
     end
     m = round(log2(n + 1));
     prim = matlibre_gf_primitif(m);

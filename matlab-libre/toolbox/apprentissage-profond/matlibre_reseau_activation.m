@@ -9,7 +9,7 @@ function y = matlibre_reseau_activation(reseau, X, couche)
 %   Voir aussi DLNETWORK, ACTIVATIONS.
     couche = char(couche);
     if ~any(strcmp(reseau.Names, couche))
-        error('nnet:activations:Couche', 'Aucune couche nommée « %s ».', couche);
+        error('nnet:activations:Couche', 'No layer named ''%s''.', couche);
     end
     tronque = reseau;
     tronque.OutputNames = {couche};

@@ -21,7 +21,7 @@ function dbSave(t, nomFichier)
 %   Voir aussi DBLOAD, DBTABLE.
     fid = fopen(nomFichier, 'w');
     if fid < 0
-        error('database:dbSave:Ouverture', 'Impossible d''écrire « %s ».', nomFichier);
+        error('database:dbSave:Ouverture', 'Unable to write file ''%s''.', nomFichier);
     end
     fprintf(fid, '%s\n', strjoin(cellfun(@champ, t.colonnes, 'UniformOutput', false), ','));
     for i = 1:numel(t.lignes)

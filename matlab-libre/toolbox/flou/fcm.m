@@ -31,13 +31,13 @@ function [centres, U, historique] = fcm(donnees, nClusters, options)
     tolerance = reglages(3);
     affichage = reglages(4);
     if m <= 1
-        error('fuzzy:fcm:BadExponent', 'L''exposant doit dépasser un.');
+        error('fuzzy:fcm:BadExponent', 'The exponent must be greater than one.');
     end
     X = double(donnees);
     n = size(X, 1);
     nClusters = round(nClusters);
     if nClusters < 1 || nClusters > n
-        error('fuzzy:fcm:BadCount', 'Le nombre de classes doit être entre 1 et %d.', n);
+        error('fuzzy:fcm:BadCount', 'The number of clusters must be between 1 and %d.', n);
     end
     % Initialisation : appartenances aléatoires, normalisées par colonne.
     U = rand(nClusters, n);

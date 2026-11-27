@@ -47,7 +47,7 @@ function [positions, metriques, echelles, signes] = detectSURFFeatures(I, vararg
     end
     if niveaux < 3
         error('vision:detectSURFFeatures:Niveaux', ...
-              'Il faut au moins trois échelles pour un maximum local.');
+              'At least three scales are required for a local maximum.');
     end
     G = matlibre_gris_255(I);
     taille = size(G);

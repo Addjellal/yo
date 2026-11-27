@@ -29,13 +29,13 @@ function [P, E] = phantom(def, n)
                 E = ellipses([2 -0.98 -0.02 -0.02 0.01 0.01 0.01 0.01 0.01 0.01]);
             otherwise
                 error('images:phantom:unknownPhantom', ...
-                      'Fantôme inconnu : ''Modified Shepp-Logan'' ou ''Shepp-Logan''.');
+                      'Unknown phantom: expected ''Modified Shepp-Logan'' or ''Shepp-Logan''.');
         end
     else
         E = def;
         if size(E, 2) ~= 6
             error('images:phantom:invalidEllipseMatrix', ...
-                  'Une ellipse par ligne : [A a b x0 y0 phi].');
+                  'One ellipse per row: [A a b x0 y0 phi].');
         end
     end
     axe = ((0:n - 1) - (n - 1) / 2) / ((n - 1) / 2);

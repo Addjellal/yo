@@ -35,7 +35,7 @@ classdef gf
             obj.m = round(m);
             if obj.m < 1 || obj.m > 16
                 error('comm:gf:Degre', ...
-                      'L''extension doit aller de un à seize.');
+                      'The extension degree must be from 1 to 16.');
             end
             if nargin < 3 || isempty(prim)
                 obj.prim_poly = matlibre_gf_primitif(obj.m);
@@ -45,7 +45,7 @@ classdef gf
             v = round(double(v));
             if any(v(:) < 0) || any(v(:) >= 2 ^ obj.m)
                 error('comm:gf:Valeur', ...
-                      'Les valeurs doivent aller de 0 à %d.', 2 ^ obj.m - 1);
+                      'Values must be from 0 to %d.', 2 ^ obj.m - 1);
             end
             obj.x = v;
         end
@@ -78,7 +78,7 @@ classdef gf
             [ga, gb, m, prim] = matlibre_gf_paire(a, b);
             if size(ga, 2) ~= size(gb, 1)
                 error('comm:gf:Dimensions', ...
-                      'Les dimensions intérieures doivent concorder.');
+                      'Inner matrix dimensions must agree.');
             end
             produit = zeros(size(ga, 1), size(gb, 2));
             for i = 1:size(ga, 1)
@@ -110,7 +110,7 @@ classdef gf
         function r = power(a, n)
             if isa(n, 'gf')
                 error('comm:gf:Exposant', ...
-                      'L''exposant est un entier ordinaire, non un élément du corps.');
+                      'The exponent must be an ordinary integer, not a field element.');
             end
             valeurs = matlibre_gf_valeurs(a);
             [valeurs, n] = matlibre_gf_etendre(valeurs, round(double(n)));
@@ -125,7 +125,7 @@ classdef gf
             n = round(double(n));
             if n < 0
                 error('comm:gf:Puissance', ...
-                      'Une puissance de matrice doit être positive.');
+                      'A matrix power must be positive.');
             end
             r = gf(eye(size(a.x, 1)) ~= 0, a.m, a.prim_poly);
             r = gf(double(eye(size(a.x, 1))), a.m, a.prim_poly);
@@ -189,7 +189,7 @@ classdef gf
             % Logarithme discret : l'exposant de l'élément primitif.
             valeurs = a.x;
             if any(valeurs(:) == 0)
-                error('comm:gf:Log', 'Le logarithme de zéro n''existe pas.');
+                error('comm:gf:Log', 'The logarithm of zero does not exist.');
             end
             table = matlibre_gf_journal(a.m, a.prim_poly);
             r = table(valeurs + 1);
@@ -217,7 +217,7 @@ classdef gf
                     end
                 otherwise
                     error('comm:gf:Indexation', ...
-                          'L''indexation par accolades n''a pas de sens ici.');
+                          'Brace indexing is not supported for this type.');
             end
         end
 
@@ -227,7 +227,7 @@ classdef gf
                     if isa(valeur, 'gf')
                         if valeur.m ~= a.m
                             error('comm:gf:Corps', ...
-                                  'Les deux tableaux ne sont pas du même corps.');
+                                  'The two arrays are not in the same field.');
                         end
                         valeur = valeur.x;
                     end
@@ -237,7 +237,7 @@ classdef gf
                     a.(s(1).subs) = valeur;
                 otherwise
                     error('comm:gf:Indexation', ...
-                          'L''indexation par accolades n''a pas de sens ici.');
+                          'Brace indexing is not supported for this type.');
             end
         end
 

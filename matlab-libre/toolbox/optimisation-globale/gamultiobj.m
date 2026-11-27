@@ -42,11 +42,11 @@ function [x, valeurs, drapeau, sortie] = gamultiobj(fonction, nVariables, A, b, 
     elseif numel(varargin) == 2
         [nonlin, options] = varargin{:};
     elseif numel(varargin) > 2
-        error('globaloptim:gamultiobj:Arguments', 'Trop d''arguments pour GAMULTIOBJ.');
+        error('globaloptim:gamultiobj:Arguments', 'Too many input arguments for GAMULTIOBJ.');
     end
     if ~isempty(nonlin)
         error('globaloptim:gamultiobj:NonLineaire', ...
-              'MatLibre ne prend pas encore les contraintes non linéaires de GAMULTIOBJ.');
+              'MatLibre does not yet support nonlinear constraints in GAMULTIOBJ.');
     end
     if isempty(options)
         options = struct();

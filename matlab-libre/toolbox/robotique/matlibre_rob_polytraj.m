@@ -15,7 +15,7 @@ function [q, qd, qdd, pp] = matlibre_rob_polytraj(points, instants, echantillons
     nPoints = size(points, 2);
     if numel(instants) ~= nPoints
         error('robotics:polytraj:Instants', ...
-              'Il faut un instant par point de passage.');
+              'One time point per waypoint is required.');
     end
     vitesses = zeros(nDegres, nPoints);
     accelerations = zeros(nDegres, nPoints);
@@ -36,7 +36,7 @@ function [q, qd, qdd, pp] = matlibre_rob_polytraj(points, instants, echantillons
         duree = instants(s + 1) - instants(s);
         if duree <= 0
             error('robotics:polytraj:Duree', ...
-                  'Les instants doivent être strictement croissants.');
+                  'Time points must be strictly increasing.');
         end
         for d = 1:nDegres
             if degre == 3

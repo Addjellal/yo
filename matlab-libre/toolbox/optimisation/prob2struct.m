@@ -22,7 +22,7 @@ function probleme = prob2struct(prob, varargin)
     variables = recenserVariables(prob);
     noms = fieldnames(variables);
     if isempty(noms)
-        error('optim:prob2struct:Vide', 'Le problème ne porte aucune variable.');
+        error('optim:prob2struct:Vide', 'The problem has no variables.');
     end
     positions = struct();
     total = 0;
@@ -61,12 +61,12 @@ function probleme = prob2struct(prob, varargin)
         c = prob.Constraints.(nomsContraintes{k});
         if ~isa(c, 'optimconstr')
             error('optim:prob2struct:Contrainte', ...
-                  'La contrainte « %s » n''en est pas une.', nomsContraintes{k});
+                  'Constraint ''%s'' is not a constraint.', nomsContraintes{k});
         end
         [ligne, quadratique, decalage] = assembler(c.Expression, positions, total);
         if any(quadratique(:) ~= 0)
             error('optim:prob2struct:Quadratique', ...
-                  'MatLibre ne traite pas les contraintes quadratiques.');
+                  'MatLibre does not support quadratic constraints.');
         end
         if strcmp(c.Sens, '==')
             Aeq = [Aeq; ligne.'];        %#ok<AGROW>

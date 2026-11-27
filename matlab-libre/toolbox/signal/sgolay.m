@@ -13,11 +13,11 @@ function [b, g] = sgolay(ordre, longueur, poids)
 %
 %   Voir aussi SGOLAYFILT.
     if mod(longueur, 2) ~= 1
-        error('signal:sgolay:EvenFrameLength', 'La longueur doit être impaire.');
+        error('signal:sgolay:EvenFrameLength', 'The length must be odd.');
     end
     if ordre >= longueur
         error('signal:sgolay:OrderTooLarge', ...
-              'Le degré doit être strictement inférieur à la longueur.');
+              'The polynomial order must be less than the frame length.');
     end
     m = (longueur - 1) / 2;
     s = (-m:m)';

@@ -29,7 +29,7 @@ function x = wrcoef2(genre, C, S, varargin)
         case 'a'
             if ~(niveau >= 0 && niveau <= nmax && niveau == round(niveau))
                 error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-                      'WRCOEF2 : le niveau va de 0 à %d.', nmax);
+                      'WRCOEF2: the level must be from 0 to %d.', nmax);
             end
             x = appcoef2(C, S, Lo_R, Hi_R, niveau);
             F1 = Lo_R;
@@ -37,7 +37,7 @@ function x = wrcoef2(genre, C, S, varargin)
         case {'h', 'v', 'd'}
             if ~(niveau >= 1 && niveau <= nmax && niveau == round(niveau))
                 error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-                      'WRCOEF2 : le niveau va de 1 à %d.', nmax);
+                      'WRCOEF2: the level must be from 1 to %d.', nmax);
             end
             x = detcoef2(genre, C, S, niveau);
             switch genre
@@ -47,7 +47,7 @@ function x = wrcoef2(genre, C, S, varargin)
             end
         otherwise
             error('Wavelet:FunctionArgVal:Invalid_ArgVal', ...
-                  'WRCOEF2 : le type est ''a'', ''h'', ''v'' ou ''d''.');
+                  'WRCOEF2: type must be ''a'', ''h'', ''v'', or ''d''.');
     end
     if niveau > 0
         imin = rmax - niveau;

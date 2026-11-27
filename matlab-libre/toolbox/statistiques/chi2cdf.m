@@ -21,7 +21,7 @@ function p = chi2cdf(x, k, queue)
     if nargin >= 3
         if ~(ischar(queue) || (isstring(queue) && isscalar(queue))) || ...
                 ~any(strcmpi(char(queue), {'upper', 'lower'}))
-            error('stats:chi2cdf:BadTail', 'La queue vaut ''lower'' ou ''upper''.');
+            error('stats:chi2cdf:BadTail', 'Tail must be ''lower'' or ''upper''.');
         end
         superieure = strcmpi(char(queue), 'upper');
     end

@@ -20,8 +20,8 @@ function periodes = annuterm(taux, versement, valeurActuelle, valeurFuture, term
     reste = ajuste - valeurActuelle .* taux;
     if reste <= 0
         error('finance:annuterm:Impossible', ...
-              ['Le versement ne couvre pas l''intérêt : le capital ne ' ...
-               'sera jamais remboursé.']);
+              ['The payment does not cover the interest: the principal will ' ...
+               'never be repaid.']);
     end
     periodes = log((ajuste - valeurFuture .* taux) ./ reste) ./ log(1 + taux);
 end

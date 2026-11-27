@@ -52,7 +52,7 @@ function [robot, donnees] = loadrobot(nom, varargin)
     position = find(strcmpi(catalogue, nom), 1);
     if isempty(position)
         error('robotics:loadrobot:Inconnu', ...
-              'Modele inconnu : « %s ». LOADROBOT(''list'') donne la liste.', nom);
+              'Unknown robot model: ''%s''. LOADROBOT(''list'') gives the list.', nom);
     end
     nom = catalogue{position};
     % Chaque modèle se décrit par ses paramètres de Denavit-Hartenberg

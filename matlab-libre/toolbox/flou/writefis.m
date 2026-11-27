@@ -26,7 +26,7 @@ function writefis(fis, nomFichier)
     end
     fid = fopen(nomFichier, 'w');
     if fid < 0
-        error('fuzzy:writefis:CannotOpen', 'Impossible d''écrire %s.', nomFichier);
+        error('fuzzy:writefis:CannotOpen', 'Unable to write %s.', nomFichier);
     end
     fprintf(fid, '[System]\n');
     fprintf(fid, 'Name=''%s''\n', fis.nom);

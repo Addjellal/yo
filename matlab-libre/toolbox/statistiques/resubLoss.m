@@ -21,8 +21,8 @@ function L = resubLoss(modele, varargin)
 %   Voir aussi LOSS, RESUBPREDICT, PREDICT, CVPARTITION.
     if ~isstruct(modele) || ~isfield(modele, 'X') || ~isfield(modele, 'Y')
         error('stats:resubLoss:NoData', ...
-              ['RESUBLOSS a besoin des données d''apprentissage, que ce modèle ne ' ...
-               'garde pas (champs X et Y).']);
+              ['RESUBLOSS needs the training data, which this model does not ' ...
+               'keep (fields X and Y).']);
     end
     L = loss(modele, modele.X, modele.Y, varargin{:});
 end

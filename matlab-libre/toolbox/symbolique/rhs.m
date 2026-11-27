@@ -17,7 +17,7 @@ function r = rhs(equation)
     equation = sym(equation);
     if ~strcmp(equation.arbre{1}, '=')
         error('symbolic:rhs:pasUneEquation', ...
-              'RHS attend une équation, avec ses deux membres.');
+              'RHS requires an equation with two sides.');
     end
     r = sym(equation.arbre{3});
 end

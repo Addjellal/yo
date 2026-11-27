@@ -27,7 +27,7 @@ function [doas, spec, specang] = musicdoa(covmat, nsig, varargin)
     specang = o.ScanAngles(:).';
     if isempty(specang) || any(diff(specang) <= 0) || any(abs(specang) > 90)
         error('phased:musicdoa:Angles', ...
-              'ScanAngles est un vecteur croissant d''angles entre -90 et 90 degrés.');
+              'ScanAngles must be an increasing vector of angles between -90 and 90 degrees.');
     end
     n = size(covmat, 1);
     [V, D] = eig(covmat);
@@ -44,7 +44,7 @@ function [doas, spec, specang] = musicdoa(covmat, nsig, varargin)
     pics = pics(rang);
     if numel(pics) < nsig
         error('phased:musicdoa:Pics', ...
-              'Le spectre n''a que %d pics sur la grille, pour %d signaux.', numel(pics), nsig);
+              'The spectrum has only %d peaks on the grid, for %d signals.', numel(pics), nsig);
     end
     doas = specang(pics(1:nsig));
 end

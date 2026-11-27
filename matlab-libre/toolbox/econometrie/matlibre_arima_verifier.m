@@ -16,8 +16,8 @@ function obj = matlibre_arima_verifier(obj)
         for j = 1:numel(coefficients)
             if isnan(coefficients{j})
                 error('econ:arima:Incomplet', ...
-                      ['Le coefficient %s numéro %d n''est pas fixé : ' ...
-                       'estimez le modèle d''abord.'], listes{k}, j);
+                      ['Coefficient %s number %d is not set: ' ...
+                       'estimate the model first.'], listes{k}, j);
             end
         end
     end

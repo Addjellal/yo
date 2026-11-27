@@ -37,6 +37,6 @@ function ordre = matlibre_reseau_ordre(noms, connexions)
     end
     if numel(ordre) ~= n
         error('nnet:dlnetwork:Cycle', ...
-              'Le graphe de couches contient un cycle.');
+              'The layer graph contains a cycle.');
     end
 end

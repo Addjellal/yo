@@ -25,7 +25,7 @@ function [courbes, grille] = plotmf(fis, genre, indice, resolution)
     entree = estEntree(genre);
     variables = variablesDe(fis, entree);
     if indice < 1 || indice > numel(variables)
-        error('fuzzy:plotmf:BadVariable', 'Variable %d inexistante.', indice);
+        error('fuzzy:plotmf:BadVariable', 'Variable %d does not exist.', indice);
     end
     v = variables{indice};
     grille = linspace(v.intervalle(1), v.intervalle(2), resolution)';

@@ -18,6 +18,6 @@ function message = matlibre_bch_extraire(mots, n, k, forme)
             end
         otherwise
             error('comm:bchdec:Forme', ...
-                  'La forme doit être ''end'', ''beg'' ou ''none''.');
+                  'Parity position must be ''end'', ''beg'', or ''none''.');
     end
 end

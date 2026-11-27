@@ -25,7 +25,7 @@ function y = mskmod(x, surechantillonnage, codage, phaseInitiale)
     if nargin < 4 || isempty(phaseInitiale), phaseInitiale = 0; end
     bits = double(x(:))';
     if any(bits ~= 0 & bits ~= 1)
-        error('comm:mskmod:BadInput', 'L''entrée doit être binaire.');
+        error('comm:mskmod:BadInput', 'Input must be binary.');
     end
     n = numel(bits);
     if strncmpi(char(codage), 'diff', 4)

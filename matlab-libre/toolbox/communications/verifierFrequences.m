@@ -10,6 +10,6 @@ function verifierFrequences(Fc, Fs)
 %   Voir aussi PSKMOD, FSKMOD, MODULATE.
     if Fs <= 2 * Fc
         error('comm:modulation:BadFs', ...
-              'FS doit dépasser deux fois FC (FS = %g, FC = %g).', Fs, Fc);
+              'FS must be greater than twice FC (FS = %g, FC = %g).', Fs, Fc);
     end
 end

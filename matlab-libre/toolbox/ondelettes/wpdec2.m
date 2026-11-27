@@ -22,11 +22,11 @@ function arbre = wpdec2(x, profondeur, nom, entropie, parametre)
     if nargin < 5, parametre = []; end
     profondeur = round(profondeur);
     if profondeur < 0
-        error('wavelet:wpdec2:Profondeur', 'La profondeur doit être positive.');
+        error('wavelet:wpdec2:Profondeur', 'The depth must be positive.');
     end
     x = double(x);
     if ndims(x) > 2 %#ok<ISMAT>
-        error('wavelet:wpdec2:Dimension', 'WPDEC2 attend une image plane.');
+        error('wavelet:wpdec2:Dimension', 'WPDEC2 requires a two-dimensional image.');
     end
     arbre = struct('type', 'wptree', 'dimension', 2, 'ordre', 4, ...
                    'nom', nom, 'profondeur', profondeur, ...

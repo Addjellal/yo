@@ -15,8 +15,8 @@ function [etiquettes, scores] = resubPredict(modele)
 %   Voir aussi RESUBLOSS, PREDICT, LOSS.
     if ~isstruct(modele) || ~isfield(modele, 'X')
         error('stats:resubPredict:NoData', ...
-              ['RESUBPREDICT a besoin des données d''apprentissage, que ce modèle ' ...
-               'ne garde pas (champ X).']);
+              ['RESUBPREDICT needs the training data, which this model ' ...
+               'does not keep (field X).']);
     end
     if nargout > 1
         [etiquettes, scores] = predict(modele, modele.X);

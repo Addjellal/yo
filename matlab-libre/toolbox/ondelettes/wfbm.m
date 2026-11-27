@@ -26,10 +26,10 @@ function [fBm, bruit] = wfbm(H, L, varargin)
     L = round(L);
     if H <= 0 || H >= 1
         error('wavelet:wfbm:Hurst', ...
-              'Le paramètre de Hurst doit être strictement entre zéro et un.');
+              'The Hurst parameter must be strictly between zero and one.');
     end
     if L < 2
-        error('wavelet:wfbm:Longueur', 'Il faut au moins deux points.');
+        error('wavelet:wfbm:Longueur', 'At least two points are required.');
     end
     bruit = bruitFractionnaire(H, L);
     fBm = cumsum(bruit);

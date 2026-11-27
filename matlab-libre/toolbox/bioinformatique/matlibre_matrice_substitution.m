@@ -218,7 +218,7 @@ function [matrice, ordre, echelle] = matlibre_matrice_substitution(nom)
             ];
         otherwise
             error('bioinfo:matrice:Inconnue', ...
-                  ['Matrice de substitution inconnue : %s. Sont disponibles BLOSUM45, ', ...
-                   'BLOSUM50, BLOSUM62, BLOSUM80, BLOSUM90, PAM250 et NUC44.'], char(nom));
+                  ['Unknown substitution matrix: %s. Available matrices are BLOSUM45, ', ...
+                   'BLOSUM50, BLOSUM62, BLOSUM80, BLOSUM90, PAM250, and NUC44.'], char(nom));
     end
 end

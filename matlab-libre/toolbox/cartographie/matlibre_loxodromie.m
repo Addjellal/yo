@@ -12,7 +12,7 @@ function [s, az] = matlibre_loxodromie(phi1, lam1, phi2, lam2, a, e)
 %   Voir aussi DISTANCE, RECKON.
     if e ~= 0
         error('map:loxodromie:Ellipsoide', ...
-              'La loxodromie n''est calculée que sur la sphère (excentricité nulle).');
+              'Rhumb lines are computed on the sphere only (zero eccentricity).');
     end
     dphi = phi2 - phi1;
     dpsi = log(tan(pi / 4 + phi2 / 2) ./ tan(pi / 4 + phi1 / 2));

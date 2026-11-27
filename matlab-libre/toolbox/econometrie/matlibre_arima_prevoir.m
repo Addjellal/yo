@@ -17,7 +17,7 @@ function [Y, variances] = matlibre_arima_prevoir(obj, horizon, varargin)
     [phi, theta, phiNiveaux] = matlibre_arima_polynomes(modele);
     if isempty(historique)
         error('econ:arima:Historique', ...
-              'FORECAST demande la série observée, passée par ''Y0''.');
+              'FORECAST requires the observed series, given with ''Y0''.');
     end
     if size(historique, 1) == 1
         historique = historique.';

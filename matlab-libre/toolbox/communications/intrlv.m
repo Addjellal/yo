@@ -16,14 +16,14 @@ function y = intrlv(donnees, permutation)
     if isvector(donnees)
         if numel(donnees) ~= numel(permutation)
             error('comm:intrlv:BadLength', ...
-                  'La permutation doit avoir la longueur des données.');
+                  'The permutation must have the same length as the data.');
         end
         y = donnees(permutation);
         if iscolumn(donnees), y = y(:); end
     else
         if size(donnees, 1) ~= numel(permutation)
             error('comm:intrlv:BadLength', ...
-                  'La permutation doit avoir autant d''éléments que de lignes.');
+                  'The permutation must have as many elements as there are rows.');
         end
         y = donnees(permutation, :);
     end

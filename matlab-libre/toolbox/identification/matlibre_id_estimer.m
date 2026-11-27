@@ -16,8 +16,8 @@ function modele = matlibre_id_estimer(donnees, ordres, methode, arguments)
     tolerance = 1e-10;
     if mod(numel(arguments), 2) ~= 0
         error('ident:polyest:Options', ...
-              ['Les options vont par paires nom, valeur : MatLibre n''a pas les objets ' ...
-               'd''options de MATLAB (armaxOptions, oeOptions...).']);
+              ['Options must be name-value pairs: MatLibre does not have the option ' ...
+               'objects of MATLAB (armaxOptions, oeOptions...).']);
     end
     for k = 1:2:numel(arguments)
         switch lower(char(arguments{k}))
@@ -25,13 +25,13 @@ function modele = matlibre_id_estimer(donnees, ordres, methode, arguments)
             case 'tolerance', tolerance = double(arguments{k + 1});
             otherwise
                 error('ident:polyest:Option', ...
-                      ['%s n''est pas pris en charge : seules MaxIter et Tolerance le sont ' ...
-                       '(conditions initiales nulles, Levenberg-Marquardt).'], char(arguments{k}));
+                      ['%s is not supported: only MaxIter and Tolerance are ' ...
+                       '(zero initial conditions, Levenberg-Marquardt).'], char(arguments{k}));
         end
     end
     if ordres(1) == 0 && ordres(2) == 0 && ordres(3) == 0 && ...
        ordres(4) == 0 && ordres(5) == 0
-        error('ident:polyest:Ordres', 'Aucun paramètre à estimer.');
+        error('ident:polyest:Ordres', 'No parameters to estimate.');
     end
     depart = matlibre_id_depart(donnees, ordres);
     squelette = matlibre_id_squelette(ordres, donnees.Ts);

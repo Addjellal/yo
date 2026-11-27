@@ -35,20 +35,20 @@ function x = wrcoef(genre, C, L, varargin)
         case 'a'
             if ~(niveau >= 0 && niveau <= nmax && niveau == round(niveau))
                 error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-                      'WRCOEF : le niveau va de 0 à %d.', nmax);
+                      'WRCOEF: the level must be from 0 to %d.', nmax);
             end
             x = appcoef(C, L, Lo_R, Hi_R, niveau);
             premier = Lo_R;
         case 'd'
             if ~(niveau >= 1 && niveau <= nmax && niveau == round(niveau))
                 error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-                      'WRCOEF : le niveau va de 1 à %d.', nmax);
+                      'WRCOEF: the level must be from 1 to %d.', nmax);
             end
             x = detcoef(C, L, niveau);
             premier = Hi_R;
         otherwise
             error('Wavelet:FunctionArgVal:Invalid_ArgVal', ...
-                  'WRCOEF : le type est ''a'' ou ''d''.');
+                  'WRCOEF: type must be ''a'' or ''d''.');
     end
     colonne = size(x, 1) > 1;
     if niveau > 0

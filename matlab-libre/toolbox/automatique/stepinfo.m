@@ -21,14 +21,14 @@ function s = stepinfo(systeme, varargin)
     if isnumeric(systeme)
         if isempty(varargin)
             error('control:stepinfo:Arguments', ...
-                  'STEPINFO(Y,T) demande aussi les instants.');
+                  'STEPINFO(Y,T) also requires the time vector.');
         end
         y = double(systeme(:));
         t = double(varargin{1});
         t = t(:);
         if numel(t) ~= numel(y)
             error('control:stepinfo:Longueurs', ...
-                  'Y et T doivent avoir le même nombre de points.');
+                  'Y and T must have the same number of points.');
         end
         if numel(varargin) > 1 && ~isempty(varargin{2})
             finale = double(varargin{2});

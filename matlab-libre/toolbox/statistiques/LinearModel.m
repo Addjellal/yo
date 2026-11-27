@@ -111,7 +111,7 @@ classdef LinearModel
             simultane = false;
             if mod(numel(varargin), 2) ~= 0
                 error('stats:LinearModel:predict:BadNameValue', ...
-                      'PREDICT : les options vont par paires, un nom et une valeur.');
+                      'PREDICT: options must be name-value pairs.');
             end
             for k = 1:2:numel(varargin)
                 valeur = varargin{k + 1};
@@ -120,19 +120,19 @@ classdef LinearModel
                         alpha = double(valeur);
                         if ~(isscalar(alpha) && alpha > 0 && alpha < 1)
                             error('stats:LinearModel:predict:BadAlpha', ...
-                                  'Alpha est un nombre entre zéro et un.');
+                                  'Alpha must be a number between zero and one.');
                         end
                     case 'prediction'
                         observation = strcmpi(char(valeur), 'observation');
                         if ~observation && ~strcmpi(char(valeur), 'curve')
                             error('stats:LinearModel:predict:BadPrediction', ...
-                                  'Prediction vaut ''curve'' ou ''observation''.');
+                                  'Prediction must be ''curve'' or ''observation''.');
                         end
                     case 'simultaneous'
                         simultane = logical(valeur);
                     otherwise
                         error('stats:LinearModel:predict:BadNameValue', ...
-                              'PREDICT n''a pas d''option ''%s''.', char(varargin{k}));
+                              'PREDICT has no option ''%s''.', char(varargin{k}));
                 end
             end
             D = conceptionNouvelle(mdl, Xnouveau);
@@ -167,7 +167,7 @@ classdef LinearModel
             end
             if numel(varargin) ~= mdl.NumPredictors
                 error('stats:LinearModel:feval:BadNumArgs', ...
-                      'FEVAL attend un argument par prédicteur (%d).', mdl.NumPredictors);
+                      'FEVAL requires one argument per predictor (%d).', mdl.NumPredictors);
             end
             colonnes = varargin;
             n = max(cellfun(@(c) size(c, 1) * (~ischar(c)) + ischar(c), colonnes));
@@ -220,7 +220,7 @@ classdef LinearModel
             end
             if size(H, 2) ~= k
                 error('stats:LinearModel:coefTest:BadH', ...
-                      'H compte une colonne par coefficient (%d).', k);
+                      'H must have one column per coefficient (%d).', k);
             end
             if nargin < 3 || isempty(c)
                 c = zeros(size(H, 1), 1);
@@ -263,7 +263,7 @@ classdef LinearModel
                                 'RowNames', {'Total'; 'Model'; 'Residual'});
                 otherwise
                     error('stats:LinearModel:anova:BadType', ...
-                          'ANOVA : ''component'' ou ''summary'', non ''%s''.', genre);
+                          'ANOVA: type must be ''component'' or ''summary'', not ''%s''.', genre);
             end
         end
 
@@ -290,8 +290,8 @@ classdef LinearModel
 
         function plot(~, varargin)
             error('stats:LinearModel:plot:NotSupported', ...
-                  ['LinearModel/plot n''est pas encore pris en charge par MatLibre : ' ...
-                   'tracez mdl.Fitted et mdl.Residuals.Raw.']);
+                  ['LinearModel/plot is not supported by MatLibre yet: ' ...
+                   'plot mdl.Fitted and mdl.Residuals.Raw.']);
         end
     end
 
@@ -309,7 +309,7 @@ end
 
 function mdl = ajusterModele(varargin)
     if nargin < 1
-        error('stats:fitlm:TooFewInputs', 'FITLM attend des données.');
+        error('stats:fitlm:TooFewInputs', 'Not enough input arguments.');
     end
     e = lireEntrees(varargin);
     n = e.n;
@@ -326,16 +326,16 @@ function mdl = ajusterModele(varargin)
     utilisees(iReponse) = false;
     if any(termes(:, iReponse) > 0)
         error('stats:fitlm:ResponseInTerms', ...
-              'La réponse %s ne peut figurer parmi les termes.', nomsVariables{iReponse});
+              'Response %s cannot appear among the terms.', nomsVariables{iReponse});
     end
     if e.estCat(iReponse)
         error('stats:fitlm:BadResponse', ...
-              'La réponse %s doit être numérique.', nomsVariables{iReponse});
+              'Response %s must be numeric.', nomsVariables{iReponse});
     end
     for v = find(e.estCat)
         if any(termes(:, v) > 1)
             error('stats:fitlm:CategoricalPower', ...
-                  'La variable catégorielle %s ne peut être élevée à une puissance.', ...
+                  'Categorical variable %s cannot be raised to a power.', ...
                   nomsVariables{v});
         end
     end
@@ -538,20 +538,20 @@ function e = lireEntrees(args)
         k = 2;
     else
         if numel(args) < 2
-            error('stats:fitlm:TooFewInputs', 'FITLM(X,Y) attend X et Y.');
+            error('stats:fitlm:TooFewInputs', 'FITLM(X,Y) requires X and Y.');
         end
         X = args{1};
         y = args{2};
         if ~(isnumeric(X) || islogical(X)) || ~(isnumeric(y) || islogical(y))
             error('stats:fitlm:BadData', ...
-                  'FITLM attend une table, ou une matrice X et un vecteur Y numériques.');
+                  'FITLM requires a table, or a numeric matrix X and vector Y.');
         end
         if isvector(X) && size(X, 1) == 1 && numel(y) == numel(X) && numel(y) > 1
             X = X(:);
         end
         if size(X, 1) ~= numel(y)
             error('stats:fitlm:BadSizes', ...
-                  'X a %d lignes et Y %d valeurs : il en faut autant.', size(X, 1), numel(y));
+                  'X has %d rows and Y has %d values: they must match.', size(X, 1), numel(y));
         end
         p = size(X, 2);
         e.noms = [arrayfun(@(j) sprintf('x%d', j), 1:p, 'UniformOutput', false), {'y'}];
@@ -567,7 +567,7 @@ function e = lireEntrees(args)
     e.n = size(e.donnees{1}, 1);
     for j = 1:numel(e.donnees)
         if size(e.donnees{j}, 1) ~= e.n
-            error('stats:fitlm:BadSizes', 'Les variables n''ont pas toutes %d lignes.', e.n);
+            error('stats:fitlm:BadSizes', 'Not all variables have %d rows.', e.n);
         end
     end
 
@@ -584,7 +584,7 @@ function e = lireEntrees(args)
     reste = args(k:end);
     if mod(numel(reste), 2) ~= 0
         error('stats:fitlm:BadNameValue', ...
-              'FITLM : les options vont par paires, un nom et une valeur.');
+              'FITLM: options must be name-value pairs.');
     end
     e.avecConstante = true;
     e.iPredicteurs = [];
@@ -601,13 +601,13 @@ function e = lireEntrees(args)
             case 'varnames'
                 if ~e.matrice
                     error('stats:fitlm:VarNamesTable', ...
-                          ['VarNames ne s''emploie qu''avec une matrice X ; une table ' ...
-                           'porte ses noms.']);
+                          ['VarNames is only valid with a matrix X; a table ' ...
+                           'has its own names.']);
                 end
                 noms = cellstr(valeur);
                 if numel(noms) ~= numel(e.noms)
                     error('stats:fitlm:BadVarNames', ...
-                          'VarNames compte %d noms : les prédicteurs puis la réponse.', ...
+                          'VarNames must have %d names: the predictors, then the response.', ...
                           numel(e.noms));
                 end
                 e.noms = noms(:).';
@@ -619,14 +619,14 @@ function e = lireEntrees(args)
                 w = double(valeur(:));
                 if numel(w) ~= e.n || any(w < 0)
                     error('stats:fitlm:BadWeights', ...
-                          'Weights compte un poids positif ou nul par observation (%d).', e.n);
+                          'Weights must have one nonnegative weight per observation (%d).', e.n);
                 end
                 e.poids = w;
             case 'exclude'
                 if islogical(valeur)
                     if numel(valeur) ~= e.n
                         error('stats:fitlm:BadExclude', ...
-                              'Exclude logique compte une valeur par observation.');
+                              'A logical Exclude must have one value per observation.');
                     end
                     e.exclues = valeur(:);
                 else
@@ -638,24 +638,24 @@ function e = lireEntrees(args)
                 if ~((ischar(valeur) || isstring(valeur)) && strcmpi(char(valeur), 'off')) && ...
                         ~(islogical(valeur) && ~valeur)
                     error('stats:fitlm:NotSupported', ...
-                          ['RobustOpts n''est pas pris en charge par FITLM dans MatLibre ; ' ...
-                           'ROBUSTFIT ajuste un modèle robuste.']);
+                          ['RobustOpts is not supported by FITLM in MatLibre; ' ...
+                           'ROBUSTFIT fits a robust model.']);
                 end
             case 'dummyvarcoding'
                 if ~strcmpi(char(valeur), 'reference')
                     error('stats:fitlm:NotSupported', ...
-                          ['DummyVarCoding n''admet dans MatLibre que ''reference'' : la ' ...
-                           'première catégorie sert de référence.']);
+                          ['DummyVarCoding accepts only ''reference'' in MatLibre: the ' ...
+                           'first category is the reference.']);
                 end
             otherwise
-                error('stats:fitlm:BadNameValue', 'FITLM n''a pas d''option ''%s''.', ...
+                error('stats:fitlm:BadNameValue', 'FITLM has no option ''%s''.', ...
                       char(reste{j}));
         end
     end
     e.iPredicteurs = indicesDeVariables(e.iPredicteurs, e.noms, 'PredictorVars');
     e.iReponse = indicesDeVariables(e.iReponse, e.noms, 'ResponseVar');
     if numel(e.iReponse) > 1
-        error('stats:fitlm:BadResponseVar', 'ResponseVar désigne une seule variable.');
+        error('stats:fitlm:BadResponseVar', 'ResponseVar must specify a single variable.');
     end
     nVar = numel(e.noms);
     e.estCat = false(1, nVar);
@@ -683,14 +683,14 @@ function indices = indicesDeVariables(valeur, noms, option)
         for k = 1:numel(cherches)
             i = find(strcmp(noms, cherches{k}), 1);
             if isempty(i)
-                error('stats:fitlm:BadVarName', '%s : pas de variable ''%s''.', ...
+                error('stats:fitlm:BadVarName', '%s: no variable ''%s''.', ...
                       option, cherches{k});
             end
             indices(k) = i;
         end
     end
     if any(indices < 1 | indices > numel(noms) | indices ~= round(indices))
-        error('stats:fitlm:BadVarIndex', '%s désigne une variable inexistante.', option);
+        error('stats:fitlm:BadVarIndex', '%s refers to a variable that does not exist.', option);
     end
 end
 
@@ -726,18 +726,18 @@ function [termes, iReponse] = termesDuModele(e)
                 termes = complet;
             else
                 error('stats:fitlm:BadTerms', ...
-                      'La matrice des termes compte une colonne par variable (%d).', nVar);
+                      'The terms matrix must have one column per variable (%d).', nVar);
             end
         end
         if any(termes(:) < 0 | termes(:) ~= round(termes(:)))
             error('stats:fitlm:BadTerms', ...
-                  'La matrice des termes porte des puissances entières positives.');
+                  'The terms matrix must hold nonnegative integer powers.');
         end
         return
     end
     if ~ischar(spec)
         error('stats:fitlm:BadModelSpec', ...
-              'La spécification du modèle est un nom, une formule ou une matrice de termes.');
+              'The model specification must be a name, a formula, or a terms matrix.');
     end
     if isempty(e.iPredicteurs)
         iPredicteurs = setdiff(1:nVar, iReponse);
@@ -774,17 +774,17 @@ function [termes, iReponse] = termesDuModele(e)
                 degres = spec(5:end) - '0';
                 if numel(degres) ~= p
                     error('stats:fitlm:BadPoly', ...
-                          '%s donne %d degrés pour %d prédicteurs.', spec, numel(degres), p);
+                          '%s gives %d degrees for %d predictors.', spec, numel(degres), p);
                 end
                 if any(degres(~continus) > 1)
                     error('stats:fitlm:BadPoly', ...
-                          'Un prédicteur catégoriel ne peut dépasser le degré un.');
+                          'A categorical predictor cannot exceed degree one.');
                 end
                 termes = polynome(degres, iPredicteurs, nVar);
             else
                 error('stats:fitlm:BadModelSpec', ...
-                      ['Modèle inconnu : ''%s''. Noms admis : constant, linear, interactions, ' ...
-                       'purequadratic, quadratic, polyIJK, ou une formule « y ~ ... ».'], spec);
+                      ['Unknown model ''%s''. Valid names: constant, linear, interactions, ' ...
+                       'purequadratic, quadratic, polyIJK, or a formula ''y ~ ...''.'], spec);
             end
     end
 end
@@ -828,19 +828,19 @@ end
 function [termes, iReponse] = lireFormule(texte, noms)
     morceaux = strsplit(texte, '~');
     if numel(morceaux) ~= 2
-        error('stats:fitlm:BadFormula', 'Une formule a la forme « reponse ~ termes ».');
+        error('stats:fitlm:BadFormula', 'A formula must have the form ''response ~ terms''.');
     end
     reponse = strtrim(morceaux{1});
     iReponse = find(strcmp(noms, reponse), 1);
     if isempty(iReponse)
-        error('stats:fitlm:BadFormula', 'La réponse ''%s'' n''est pas une variable.', reponse);
+        error('stats:fitlm:BadFormula', 'Response ''%s'' is not a variable.', reponse);
     end
     jetons = jetonsDe(morceaux{2});
     position = 1;
     nVar = numel(noms);
     [ensemble, position, constante] = lireSomme(jetons, position, noms, nVar);
     if position <= numel(jetons)
-        error('stats:fitlm:BadFormula', 'Formule mal formée près de ''%s''.', jetons{position});
+        error('stats:fitlm:BadFormula', 'Invalid formula near ''%s''.', jetons{position});
     end
     termes = ensemble;
     if constante
@@ -868,7 +868,7 @@ function jetons = jetonsDe(texte)
             jetons{end + 1} = texte(i:j - 1); %#ok<AGROW>
             i = j;
         else
-            error('stats:fitlm:BadFormula', 'Caractère inattendu dans la formule : ''%s''.', c);
+            error('stats:fitlm:BadFormula', 'Unexpected character in formula: ''%s''.', c);
         end
     end
 end
@@ -885,7 +885,7 @@ function [ensemble, position, constante] = lireSomme(jetons, position, noms, nVa
     end
     while true
         if position > numel(jetons)
-            error('stats:fitlm:BadFormula', 'Formule incomplète.');
+            error('stats:fitlm:BadFormula', 'Incomplete formula.');
         end
         if any(strcmp(jetons{position}, {'1', '0'}))
             valeur = jetons{position};
@@ -914,7 +914,7 @@ function [ensemble, position, constante] = lireSomme(jetons, position, noms, nVa
         elseif strcmp(jetons{position}, '-')
             signe = -1;
         else
-            error('stats:fitlm:BadFormula', 'Formule mal formée près de ''%s''.', ...
+            error('stats:fitlm:BadFormula', 'Invalid formula near ''%s''.', ...
                   jetons{position});
         end
         position = position + 1;
@@ -943,13 +943,13 @@ end
 % puissance := primaire [ '^' entier ] ; A^k = A + A^2 + ... + A^k.
 function [ensemble, position] = lirePuissance(jetons, position, noms, nVar)
     if position > numel(jetons)
-        error('stats:fitlm:BadFormula', 'Formule incomplète.');
+        error('stats:fitlm:BadFormula', 'Incomplete formula.');
     end
     jeton = jetons{position};
     if strcmp(jeton, '(')
         [ensemble, position, ~] = lireSomme(jetons, position + 1, noms, nVar);
         if position > numel(jetons) || ~strcmp(jetons{position}, ')')
-            error('stats:fitlm:BadFormula', 'Parenthèse non fermée dans la formule.');
+            error('stats:fitlm:BadFormula', 'Unbalanced parenthesis in formula.');
         end
         position = position + 1;
         entreParentheses = true;
@@ -957,7 +957,7 @@ function [ensemble, position] = lirePuissance(jetons, position, noms, nVar)
         i = find(strcmp(noms, jeton), 1);
         if isempty(i)
             error('stats:fitlm:BadFormula', ...
-                  'La formule nomme ''%s'', qui n''est pas une variable.', jeton);
+                  'The formula names ''%s'', which is not a variable.', jeton);
         end
         ensemble = zeros(1, nVar);
         ensemble(i) = 1;
@@ -967,14 +967,14 @@ function [ensemble, position] = lirePuissance(jetons, position, noms, nVar)
     if position <= numel(jetons) && strcmp(jetons{position}, '^')
         if position + 1 > numel(jetons) || isempty(str2double(jetons{position + 1})) || ...
                 isnan(str2double(jetons{position + 1}))
-            error('stats:fitlm:BadFormula', 'Une puissance est un entier positif.');
+            error('stats:fitlm:BadFormula', 'A power must be a positive integer.');
         end
         k = str2double(jetons{position + 1});
         position = position + 2;
         if entreParentheses || size(ensemble, 1) ~= 1
             error('stats:fitlm:NotSupported', ...
-                  ['Une puissance d''une somme, « (A + B)^k », n''est pas prise en charge ' ...
-                   'par MatLibre : écrivez les termes.']);
+                  ['A power of a sum, ''(A + B)^k'', is not supported ' ...
+                   'by MatLibre: write out the terms.']);
         end
         base = ensemble;
         ensemble = zeros(k, nVar);
@@ -1121,7 +1121,7 @@ function D = conceptionNouvelle(mdl, Xnouveau)
             if ismember(v, iPred)
                 if ~any(strcmp(nomsT, nomsVariables{v}))
                     error('stats:LinearModel:predict:MissingVar', ...
-                          'La table ne porte pas le prédicteur %s.', nomsVariables{v});
+                          'The table does not have predictor %s.', nomsVariables{v});
                 end
                 donnees{v} = Xnouveau.(nomsVariables{v});
             else
@@ -1136,7 +1136,7 @@ function D = conceptionNouvelle(mdl, Xnouveau)
         end
         if size(Xnouveau, 2) ~= numel(iPred)
             error('stats:LinearModel:predict:BadX', ...
-                  'XNEW compte une colonne par prédicteur (%d).', numel(iPred));
+                  'XNEW must have one column per predictor (%d).', numel(iPred));
         end
         n = size(Xnouveau, 1);
         donnees = cell(1, nVar);
@@ -1197,8 +1197,8 @@ function tbl = anovaComposantes(mdl, typeSomme)
     typeSomme = lower(char(typeSomme));
     if ~any(strcmp(typeSomme, {'1', '3', 'h'}))
         error('stats:LinearModel:anova:BadSSType', ...
-              ['MatLibre calcule les sommes de carrés de types 1, 3 et ''h'' ; ' ...
-               'le type ''%s'' n''est pas pris en charge.'], typeSomme);
+              ['MatLibre computes sums of squares of types 1, 3, and ''h''; ' ...
+               'type ''%s'' is not supported.'], typeSomme);
     end
     termes = mdl.Termes;
     nomsVariables = mdl.VariableNames;

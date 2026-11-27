@@ -18,7 +18,7 @@ function [r, p, k] = residuez(b, a)
     a = double(a(:)).';
     if isempty(a) || a(1) == 0
         error('signal:residuez:BadDenominator', ...
-              'Le premier coefficient du dénominateur doit être non nul.');
+              'The leading denominator coefficient must be nonzero.');
     end
     [R, P, K] = residue(fliplr(b), fliplr(a));
     r = zeros(numel(R), 1);

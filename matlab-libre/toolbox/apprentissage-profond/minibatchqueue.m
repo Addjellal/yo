@@ -72,14 +72,14 @@ classdef minibatchqueue < handle
                 k = k + 2;
             end
             if isempty(donnees)
-                error('nnet:minibatchqueue:Donnees', 'Aucune donnée fournie.');
+                error('nnet:minibatchqueue:Donnees', 'No data provided.');
             end
             obj.Donnees = donnees;
             obj.NumObservations = matlibre_dl_nombre_observations(donnees{1});
             for j = 2:numel(donnees)
                 if matlibre_dl_nombre_observations(donnees{j}) ~= obj.NumObservations
                     error('nnet:minibatchqueue:Effectifs', ...
-                          'Tous les tableaux doivent avoir le même nombre d''observations.');
+                          'All arrays must have the same number of observations.');
                 end
             end
             reset(obj);
@@ -110,7 +110,7 @@ classdef minibatchqueue < handle
         function varargout = next(obj)
         %NEXT Lot suivant.
             if ~hasdata(obj)
-                error('nnet:minibatchqueue:Fin', 'Il ne reste aucun lot.');
+                error('nnet:minibatchqueue:Fin', 'No mini-batches remain.');
             end
             fin = min(obj.Position + obj.MiniBatchSize - 1, obj.NumObservations);
             choisies = obj.Ordre(obj.Position:fin);

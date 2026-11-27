@@ -36,6 +36,6 @@ function bords = matlibre_dl_remplissage(specification, taille, noyau, pas, dila
                  specification(1, 2) specification(2, 2)];
     else
         error('nnet:dlconv:Remplissage', ...
-              'Le remplissage se donne par un nombre, un couple ou une matrice deux par deux.');
+              'Padding must be a number, a pair, or a 2-by-2 matrix.');
     end
 end

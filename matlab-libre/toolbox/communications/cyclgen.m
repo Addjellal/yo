@@ -19,11 +19,11 @@ function [parmat, genmat, k] = cyclgen(n, polynome)
     polynome = mod(double(polynome(:))', 2);
     degre = find(polynome ~= 0, 1, 'last') - 1;
     if isempty(degre) || degre < 1
-        error('comm:cyclgen:BadPolynomial', 'Le polynôme doit être de degré au moins un.');
+        error('comm:cyclgen:BadPolynomial', 'The polynomial must have degree at least one.');
     end
     k = n - degre;
     if k < 1
-        error('comm:cyclgen:BadSize', 'Le degré du polynôme doit rester sous N.');
+        error('comm:cyclgen:BadSize', 'The degree of the polynomial must be less than N.');
     end
     genmat = zeros(k, n);
     for i = 1:k

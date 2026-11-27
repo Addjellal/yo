@@ -16,7 +16,7 @@ function v = fnval(f, x)
     end
     if ~isstruct(f) || ~isfield(f, 'form')
         error('curvefit:fnval:Forme', ...
-              'FNVAL attend une spline sous forme « pp » ou « B- ».');
+              'FNVAL requires a spline in ppform or B-form.');
     end
     if strncmp(f.form, 'B', 1)
         v = matlibre_bspline_valeurs(f.knots, f.order, f.coefs, x);

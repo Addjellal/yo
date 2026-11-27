@@ -21,7 +21,7 @@ function [C, S] = wavedec2(x, niveaux, varargin)
     [Lo_D, Hi_D] = matlibre_ondelette_arguments(varargin, 'd', 'wavedec2');
     if ~(isnumeric(niveaux) && isscalar(niveaux) && niveaux >= 1 && niveaux == round(niveaux))
         error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-              'WAVEDEC2 : le nombre de niveaux est un entier positif.');
+              'WAVEDEC2: the number of levels must be a positive integer.');
     end
     x = double(x);
     C = [];

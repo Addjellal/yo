@@ -77,22 +77,22 @@ function [gainMarge, phaseMarge, wGain, wPhase] = margin(varargin)
         axes(haut);
         semilogx(w, dB);
         grid on;
-        ylabel('Gain (dB)');
+        ylabel('Magnitude (dB)');
         if isfinite(gainMarge)
-            titre = sprintf('Gm = %.3g dB (a %.3g rad/s)', 20 * log10(gainMarge), wGain);
+            titre = sprintf('Gm = %.3g dB (at %.3g rad/s)', 20 * log10(gainMarge), wGain);
         else
             titre = 'Gm = Inf';
         end
         if isfinite(phaseMarge)
-            titre = sprintf('%s,  Pm = %.3g deg (a %.3g rad/s)', titre, phaseMarge, wPhase);
+            titre = sprintf('%s ,  Pm = %.3g deg (at %.3g rad/s)', titre, phaseMarge, wPhase);
         else
-            titre = [titre ',  Pm = Inf'];
+            titre = [titre ' ,  Pm = Inf'];
         end
         title(titre);
         axes(bas);
         semilogx(w, p);
         grid on;
-        xlabel('Pulsation (rad/s)');
+        xlabel('Frequency (rad/s)');
         ylabel('Phase (deg)');
         clear gainMarge phaseMarge wGain wPhase
     end

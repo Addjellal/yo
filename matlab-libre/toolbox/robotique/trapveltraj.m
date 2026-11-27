@@ -38,12 +38,12 @@ function [q, qd, qdd, t, pp] = trapveltraj(points, nombre, varargin)
     [n, p] = size(points);
     if p < 2 || nombre < 2
         error('robotics:trapveltraj:Points', ...
-              'Il faut au moins deux points de passage et deux échantillons.');
+              'At least two waypoints and two samples are required.');
     end
     noms = {'EndTime', 'PeakVelocity', 'Acceleration', 'AccelTime'};
     valeurs = cell(1, 4);
     if mod(numel(varargin), 2) ~= 0
-        error('robotics:trapveltraj:Options', 'Les options vont par paires nom, valeur.');
+        error('robotics:trapveltraj:Options', 'Options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         rang = find(strcmpi(varargin{k}, noms), 1);
@@ -55,7 +55,7 @@ function [q, qd, qdd, t, pp] = trapveltraj(points, nombre, varargin)
     donnees = ~cellfun(@isempty, valeurs);
     if nnz(donnees) > 2
         error('robotics:trapveltraj:TropDeParametres', ...
-              'Deux grandeurs au plus : EndTime, PeakVelocity, Acceleration, AccelTime.');
+              'At most two of EndTime, PeakVelocity, Acceleration, and AccelTime can be given.');
     end
     T = zeros(n, p - 1);
     ta = zeros(n, p - 1);
@@ -101,10 +101,10 @@ function v = choisir(valeur, d, s, n, p)
         v = valeur(d, s);
     else
         error('robotics:trapveltraj:Taille', ...
-              'Un paramètre est un scalaire, %d valeurs, ou une matrice %d x %d.', n, n, p - 1);
+              'A parameter must be a scalar, %d values, or a %d-by-%d matrix.', n, n, p - 1);
     end
     if ~isempty(v) && ~(v > 0)
-        error('robotics:trapveltraj:Valeur', 'Les paramètres du profil sont positifs.');
+        error('robotics:trapveltraj:Valeur', 'Profile parameters must be positive.');
     end
 end
 
@@ -142,8 +142,8 @@ function [T, ta] = profil(D, choix)
             sous = T ^ 2 - 4 * D / a;
             if sous < 0
                 error('robotics:trapveltraj:Acceleration', ...
-                      ['L''accélération demandée ne suffit pas à parcourir %g en %g : ' ...
-                       'il faut au moins %g.'], D, T, 4 * D / T ^ 2);
+                      ['The requested acceleration is not enough to cover %g in %g: ' ...
+                       'at least %g is required.'], D, T, 4 * D / T ^ 2);
             end
             ta = (T - sqrt(sous)) / 2;
         else
@@ -152,14 +152,15 @@ function [T, ta] = profil(D, choix)
     end
     if ta <= 0
         error('robotics:trapveltraj:Vitesse', ...
-              'La vitesse de palier ne suffit pas : parcourir %g en %g demande plus de %g.', ...
+              'The peak velocity is not enough: covering %g in %g requires more than %g.', ...
               D, T, D / T);
     end
     if ta > T / 2 + 1e-12 * T
         error('robotics:trapveltraj:Rampe', ...
-              ['Le temps de rampe vaut %g pour une durée de %g : il ne peut pas dépasser ' ...
-               'la moitié, sans quoi le palier disparaît (vitesse ou accélération ' ...
-               'incompatibles avec la distance).'], ta, T);
+              ['The acceleration time is %g for a duration of %g: it cannot exceed ' ...
+               'half of it, or the constant-velocity segment disappears (velocity or ' ...
+               'acceleration ' ...
+               'incompatible with the distance).'], ta, T);
     end
 end
 

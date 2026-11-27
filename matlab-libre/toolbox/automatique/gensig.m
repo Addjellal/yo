@@ -30,6 +30,6 @@ function [u, t] = gensig(type, tau, Tf, Ts)
             u = double(phase < Ts / 2 | abs(phase - tau) < Ts / 2);
         otherwise
             error('control:gensig:BadType', ...
-                  'Le type doit être ''sin'', ''square'' ou ''pulse''.');
+                  'Type must be ''sin'', ''square'', or ''pulse''.');
     end
 end

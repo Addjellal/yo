@@ -15,7 +15,7 @@ function y = genqammod(x, constellation)
     M = numel(constellation);
     if any(x(:) < 0) || any(x(:) > M - 1) || any(x(:) ~= round(x(:)))
         error('comm:genqammod:BadSymbol', ...
-              'Les symboles doivent être des entiers entre 0 et %d.', M - 1);
+              'Symbols must be integers between 0 and %d.', M - 1);
     end
     y = constellation(x + 1);
     y = reshape(y, size(x));

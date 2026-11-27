@@ -11,7 +11,7 @@ function permutation = matlibre_helice(lignes, colonnes, pas)
     pas = round(pas);
     if lignes < 1 || colonnes < 1
         error('comm:helscan:Taille', ...
-              'Le nombre de lignes et de colonnes doit être positif.');
+              'The numbers of rows and columns must be positive.');
     end
     permutation = zeros(1, lignes * colonnes);
     rang = 0;

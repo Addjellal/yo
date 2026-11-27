@@ -57,7 +57,7 @@ function sys = feedback(direct, retour, signe)
     boucle = eye(nu) - signe * h.D * g.D;
     if rcond(boucle) < eps
         error('Control:combination:AlgebraicLoop', ...
-              'The feedback loop is algebraic : I - H.D*G.D is singular.');
+              'The feedback loop is algebraic: I - H.D*G.D is singular.');
     end
     F = inv(boucle);
     n1 = size(g.A, 1);

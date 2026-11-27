@@ -16,7 +16,7 @@ function [k, e] = poly2rc(a, efinal)
     a = double(a(:)).';
     if a(1) == 0
         error('signal:poly2rc:ZeroLeading', ...
-              'Le premier coefficient doit être non nul.');
+              'The leading coefficient must be nonzero.');
     end
     a = a / a(1);
     p = numel(a) - 1;
@@ -27,7 +27,7 @@ function [k, e] = poly2rc(a, efinal)
         k(m) = courant(m + 1);
         if abs(k(m)) == 1
             error('signal:poly2rc:UnstablePolynomial', ...
-                  'Le polynôme n''est pas à phase minimale.');
+                  'The polynomial does not have minimum phase.');
         end
         precedent = ones(1, m);
         for i = 1:m-1

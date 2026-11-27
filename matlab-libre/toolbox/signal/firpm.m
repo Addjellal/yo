@@ -36,7 +36,7 @@ function [b, err, res] = firpm(n, f, a, w, genre)
     w = double(w(:))';
     if mod(numel(f), 2) ~= 0 || numel(a) ~= numel(f)
         error('signal:firpm:BadBands', ...
-              'F et A doivent avoir un nombre pair d''éléments, et le même.');
+              'F and A must have the same even number of elements.');
     end
     n = round(n);
     antisymetrique = any(strcmpi(genre, {'hilbert', 'differentiator', 'h', 'd'}));
@@ -61,7 +61,7 @@ function [b, err, res] = firpm(n, f, a, w, genre)
         end
     end
     if L < 1
-        error('signal:firpm:OrderTooSmall', 'L''ordre est trop petit.');
+        error('signal:firpm:OrderTooSmall', 'The order is too small.');
     end
     nombreExtrema = L + 2;
 

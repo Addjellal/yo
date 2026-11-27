@@ -88,7 +88,7 @@ function a = fi(varargin)
         end
     end
     if mod(numel(args), 2) ~= 0
-        error('fixed:fi:invalidPVPairs', 'Les proprietes de FI se donnent par paires nom, valeur.');
+        error('fixed:fi:invalidPVPairs', 'FI properties must be name-value pairs.');
     end
     proprietesMaths = properties(F);
     for i = 1:2:numel(args)
@@ -108,14 +108,14 @@ function a = fi(varargin)
     end
     if ~strcmp(T.Mode, 'fixe')
         error('fixed:fi:floatingPointType', ...
-              'MatLibre ne range en FI que des types a virgule fixe, pas des %s.', T.Mode);
+              'MatLibre stores only fixed-point types in FI, not %s types.', T.Mode);
     end
     if strcmp(T.Scaling, 'Unspecified')
         T.FractionLength = matlibre_fixe_precision(v, T.Signed, T.WordLength, F);
         T.Scaling = 'BinaryPoint';
     end
     if ~(isnumeric(v) || islogical(v))
-        error('fixed:fi:invalidValue', 'FI range des nombres, pas des %s.', class(v));
+        error('fixed:fi:invalidValue', 'FI stores numbers, not %s values.', class(v));
     end
     a = embedded.fi(matlibre_fixe_quantifier(double(v), T, F), T, F, locale);
 end
@@ -125,7 +125,7 @@ function T = numerictypeAvec(T, nom, valeur)
             'FixedExponent', 'SlopeAdjustmentFactor', 'DataTypeMode', 'Scaling'};
     k = find(strcmpi(nom, noms), 1);
     if isempty(k)
-        error('fixed:fi:invalidProperty', 'FI n''a pas de propriete ''%s''.', nom);
+        error('fixed:fi:invalidProperty', 'FI has no property ''%s''.', nom);
     end
     T.(noms{k}) = valeur;
     if any(strcmp(noms{k}, {'FractionLength', 'FixedExponent'})) && strcmp(T.Scaling, 'Unspecified')

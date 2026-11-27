@@ -16,7 +16,7 @@ function [r, v, b] = impixel(I, x, y)
 %   Voir aussi IMSHOW, IMCROP, IMPROFILE, GINPUT.
     if nargin < 3
         error('images:impixel:Arguments', ...
-              'MatLibre demande les coordonnées : impixel(I, X, Y).');
+              'MatLibre requires the coordinates: impixel(I, X, Y).');
     end
     x = round(double(x(:)));
     y = round(double(y(:)));

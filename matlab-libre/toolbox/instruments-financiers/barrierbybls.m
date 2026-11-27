@@ -119,6 +119,6 @@ function valeur = une(S, K, H, R, r, b, T, sigma, genre, forme)
             end
         otherwise
             error('finstr:barrier:Type', ...
-                  'La barrière vaut ''UI'', ''UO'', ''DI'' ou ''DO'', pas ''%s''.', forme);
+                  'The barrier type must be ''UI'', ''UO'', ''DI'', or ''DO'', not ''%s''.', forme);
     end
 end

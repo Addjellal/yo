@@ -17,7 +17,7 @@ function [Cnouveau, Snouveau, cA] = upwlev2(C, S, varargin)
     [Lo_R, Hi_R] = matlibre_ondelette_arguments(varargin, 'r', 'upwlev2');
     if size(S, 1) < 3
         error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-              'UPWLEV2 : la décomposition n''a pas de niveau à remonter.');
+              'UPWLEV2: the decomposition has no level to reconstruct.');
     end
     nmax = size(S, 1) - 2;
     a = reshape(C(1:prod(S(1, :))), S(1, :));

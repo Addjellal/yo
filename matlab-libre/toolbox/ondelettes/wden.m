@@ -49,10 +49,10 @@ function [xd, C, L] = wden(varargin)
     sorh = lower(char(sorh));
     scal = lower(char(scal));
     if ~any(strcmp(tptr, {'rigrsure', 'heursure', 'sqtwolog', 'minimaxi'}))
-        error('wavelet:wden:Regle', 'Règle de seuil inconnue : %s.', tptr);
+        error('wavelet:wden:Regle', 'Unknown threshold rule: %s.', tptr);
     end
     if ~any(strcmp(scal, {'one', 'sln', 'mln'}))
-        error('wavelet:wden:Echelle', 'SCAL doit valoir ''one'', ''sln'' ou ''mln''.');
+        error('wavelet:wden:Echelle', 'SCAL must be ''one'', ''sln'', or ''mln''.');
     end
     switch scal
         case 'one', sigmaGlobal = 1;

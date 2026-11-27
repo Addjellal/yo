@@ -30,7 +30,7 @@ function [coefficients, scores, valeurs, T2] = princomp(X, econ)
     elseif (ischar(econ) || isstring(econ)) && strcmpi(char(econ), 'econ')
         economie = true;
     else
-        error('stats:princomp:BadEcon', 'Le second argument de PRINCOMP est ''econ''.');
+        error('stats:princomp:BadEcon', 'The second argument of PRINCOMP must be ''econ''.');
     end
     [coefficients, scores, valeurs, T2] = pca(X, 'Economy', economie);
 end

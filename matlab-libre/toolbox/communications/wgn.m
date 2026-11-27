@@ -39,7 +39,7 @@ function bruit = wgn(m, n, puissance, imp, varargin)
         case 'linear', watts = puissance;
     end
     if watts < 0
-        error('comm:wgn:Puissance', 'La puissance ne peut pas être négative.');
+        error('comm:wgn:Puissance', 'Power cannot be negative.');
     end
     % La puissance sur une impédance R vaut v^2/R : l'écart type de la
     % tension est donc racine de P fois R.

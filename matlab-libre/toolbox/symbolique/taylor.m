@@ -26,7 +26,7 @@ function serie = taylor(f, varargin)
         if (ischar(argument) || isstring(argument)) && ...
                 any(strcmpi(char(argument), {'Order', 'ExpansionPoint', 'OrderMode'}))
             if k == numel(varargin)
-                error('symbolic:taylor:Option', 'L''option %s attend une valeur.', ...
+                error('symbolic:taylor:Option', 'Option %s requires a value.', ...
                       char(argument));
             end
             switch lower(char(argument))
@@ -37,7 +37,7 @@ function serie = taylor(f, varargin)
                 case 'ordermode'
                     if ~strcmpi(char(varargin{k + 1}), 'absolute')
                         error('symbolic:taylor:OrderMode', ...
-                              'Seul OrderMode ''absolute'' est fait.');
+                              'Only OrderMode ''absolute'' is supported.');
                     end
             end
             k = k + 2;
@@ -58,7 +58,7 @@ function serie = taylor(f, varargin)
     nom = matlibre_sym_nom(variable);
     ordre = round(ordre);
     if ordre < 1
-        error('symbolic:taylor:Ordre', 'Il faut au moins un terme.');
+        error('symbolic:taylor:Ordre', 'At least one term is required.');
     end
     arbrePoint = matlibre_sym_arbre(point);
     derivee = matlibre_sym_arbre(f);

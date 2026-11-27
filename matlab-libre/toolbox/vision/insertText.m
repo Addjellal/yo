@@ -50,7 +50,7 @@ function J = insertText(I, position, texte, varargin)
     position = double(position);
     if size(position, 2) < 2
         error('vision:insertText:Position', ...
-              'POSITION donne un point [x y] par ligne.');
+              'POSITION must give one point [x y] per row.');
     end
     lignes = matlibre_textes_cellules(texte, size(position, 1));
     couleurTexte = matlibre_couleur_dessin(couleurTexte, numel(lignes));

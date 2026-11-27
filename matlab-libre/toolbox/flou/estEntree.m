@@ -15,6 +15,6 @@ function oui = estEntree(genre)
         oui = false;
     else
         error('fuzzy:estEntree:BadType', ...
-              'Le type doit être ''input'' ou ''output''.');
+              'Type must be ''input'' or ''output''.');
     end
 end

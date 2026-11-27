@@ -33,7 +33,7 @@ function mots = tokenizedDocument(texte)
     end
     if ischar(texte) && size(texte, 1) > 1
         error('textanalytics:tokenizedDocument:Matrice', ...
-              'Un texte par ligne de caractères : passer un tableau de chaînes ou une cellule.');
+              'Use a string array or a cell array, one document per element.');
     end
     texte = lower(char(texte));
     propre = regexprep(texte, '[^a-z0-9àâçéèêëîïôûùüÿñæœ'']', ' ');

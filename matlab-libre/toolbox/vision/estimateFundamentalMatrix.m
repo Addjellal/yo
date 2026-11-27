@@ -47,7 +47,7 @@ function [F, valides, statut] = estimateFundamentalMatrix(points1, points2, vara
     n = size(P1, 1);
     if n < 8
         error('vision:estimateFundamentalMatrix:TooFewPoints', ...
-              'Il faut au moins huit correspondances.');
+              'At least eight matched points are required.');
     end
     statut = 0;
     switch methode

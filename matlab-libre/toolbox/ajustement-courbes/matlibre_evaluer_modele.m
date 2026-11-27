@@ -30,7 +30,7 @@ function y = matlibre_evaluer_modele(modele, arguments)
     end
     if isempty(modele.Evaluer)
         error('curvefit:feval:Interpolant', ...
-              'Un interpolant ne s''évalue qu''une fois ajusté.');
+              'An interpolant can only be evaluated after it is fitted.');
     end
     coefficients = double(coefficients);
     if nargin(modele.Evaluer) == 2

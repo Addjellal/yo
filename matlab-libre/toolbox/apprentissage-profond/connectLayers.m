@@ -15,11 +15,11 @@ function lg = connectLayers(lg, source, destination)
     source = matlibre_reseau_nom_seul(source);
     destination = matlibre_reseau_nom_seul(destination);
     if ~any(strcmp(lg.Names, source))
-        error('nnet:connectLayers:Source', 'Aucune couche nommée « %s ».', source);
+        error('nnet:connectLayers:Source', 'No layer named ''%s''.', source);
     end
     if ~any(strcmp(lg.Names, destination))
         error('nnet:connectLayers:Destination', ...
-              'Aucune couche nommée « %s ».', destination);
+              'No layer named ''%s''.', destination);
     end
     ajout = table({source}, {destination}, ...
                   'VariableNames', {'Source', 'Destination'});

@@ -56,13 +56,13 @@ function J = adapthisteq(I, varargin)
               'Distribution inconnue : %s.', loi);
     end
     if alpha <= 0
-        error('images:adapthisteq:Alpha', 'Alpha doit être positif.');
+        error('images:adapthisteq:Alpha', 'Alpha must be positive.');
     end
     classeEntree = class(I);
     I = im2double(I);
     if size(I, 3) > 1
         error('images:adapthisteq:Couleur', ...
-              'ADAPTHISTEQ traite une image en niveaux de gris ; convertissez-la d''abord.');
+              'ADAPTHISTEQ requires a grayscale image; convert it first.');
     end
     [m, n] = size(I);
     hauteur = ceil(m / tuiles(1));

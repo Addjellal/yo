@@ -11,7 +11,7 @@ function y = diric(x, n)
 %
 %   Voir aussi SQUARE, CHIRP.
     if n <= 0 || n ~= round(n)
-        error('signal:diric:BadOrder', 'N doit être un entier positif.');
+        error('signal:diric:BadOrder', 'N must be a positive integer.');
     end
     x = double(x);
     y = zeros(size(x));

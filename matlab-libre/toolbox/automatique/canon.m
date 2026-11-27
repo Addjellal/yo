@@ -51,12 +51,12 @@ function [sysc, T] = canon(sys, type)
             Co = ctrb(A, s.B(:, 1));
             if rank(Co) < n
                 error('control:canon:NotControllable', ...
-                      'La forme compagne demande un modèle commandable.');
+                      'The companion form requires a controllable model.');
             end
             T = inv(Co);
         otherwise
             error('control:canon:BadType', ...
-                  'Le type doit être ''modal'' ou ''companion''.');
+                  'Type must be ''modal'' or ''companion''.');
     end
     sysc = ss(T * A / T, T * s.B, s.C / T, s.D, s.Ts);
 end

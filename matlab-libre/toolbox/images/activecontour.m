@@ -50,7 +50,7 @@ function BW = activecontour(I, masque, n, methode, varargin)
     masque = logical(masque);
     if ~isequal(size(masque), size(I))
         error('images:activecontour:Taille', ...
-              'Le masque doit avoir la taille de l''image.');
+              'The mask must be the same size as the image.');
     end
     % La fonction de niveau : positive dedans, négative dehors. Faire
     % évoluer une fonction plutôt qu'une courbe laisse le contour se

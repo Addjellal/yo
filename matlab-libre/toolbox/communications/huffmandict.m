@@ -24,7 +24,7 @@ function [dictionnaire, longueurMoyenne] = huffmandict(symboles, probabilites, b
     if nargin < 4, variante = ''; end   %#ok<NASGU>
     base = round(base);
     if base < 2
-        error('comm:huffmandict:Base', 'La base doit valoir au moins deux.');
+        error('comm:huffmandict:Base', 'The base must be at least two.');
     end
     probabilites = double(probabilites(:)).';
     n = numel(probabilites);
@@ -35,11 +35,11 @@ function [dictionnaire, longueurMoyenne] = huffmandict(symboles, probabilites, b
     end
     if numel(listeSymboles) ~= n
         error('comm:huffmandict:Taille', ...
-              'Il faut autant de probabilités que de symboles.');
+              'The number of probabilities must match the number of symbols.');
     end
     if any(probabilites < 0) || abs(sum(probabilites) - 1) > 1e-6
         error('comm:huffmandict:Probabilites', ...
-              'Les probabilités doivent être positives et sommer à un.');
+              'Probabilities must be nonnegative and sum to one.');
     end
     if n == 1
         dictionnaire = {listeSymboles{1}, 0};

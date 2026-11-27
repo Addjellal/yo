@@ -53,7 +53,7 @@ function jeu = instaddfield(varargin)
         k = k + 2;
     end
     if isempty(noms)
-        error('finstr:instaddfield:Champs', 'Il faut des noms de champs.');
+        error('finstr:instaddfield:Champs', 'Field names are required.');
     end
     if isempty(classes)
         classes = cell(1, numel(noms));

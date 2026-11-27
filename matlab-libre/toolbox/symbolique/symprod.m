@@ -22,7 +22,7 @@ function produit = symprod(f, variable, bas, haut)
     haut = round(matlibre_sym_valeur(haut));
     if ~isfinite(bas) || ~isfinite(haut)
         error('symbolic:symprod:Bornes', ...
-              'MatLibre multiplie terme à terme : les bornes doivent être finies.');
+              'MatLibre multiplies term by term: the bounds must be finite.');
     end
     arbre = matlibre_sym_arbre(f);
     total = 1;

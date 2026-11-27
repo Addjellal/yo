@@ -119,7 +119,7 @@ function c = coefficientsScalaires(poly, p)
         v = poly{k};
         if any(mod(v(2:end), p) ~= 0)
             error('comm:gfroots:NonMinimal', ...
-                  'Le produit sur la classe n''est pas à coefficients dans GF(p).');
+                  'The product over the coset does not have coefficients in GF(p).');
         end
         c(k) = mod(v(1), p);
     end

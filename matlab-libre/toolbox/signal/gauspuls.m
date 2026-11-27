@@ -18,7 +18,7 @@ function [yi, yq, ye] = gauspuls(t, fc, bw, bwr)
     if nargin < 4 || isempty(bwr), bwr = -6; end
     if bwr >= 0
         error('signal:gauspuls:BadReference', ...
-              'La référence de bande doit être négative (en décibels).');
+              'The bandwidth reference level must be negative (in dB).');
     end
     % Variance en fréquence puis en temps : la gaussienne est sa propre
     % transformée, la conversion est exacte.

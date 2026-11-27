@@ -13,7 +13,7 @@ function [z, p, k] = besselap(n)
 %   Voir aussi BESSELF, BUTTAP, CHEB1AP.
     n = round(n);
     if n < 1
-        error('signal:besselap:BadOrder', 'L''ordre doit être au moins 1.');
+        error('signal:besselap:BadOrder', 'The order must be at least 1.');
     end
     [~, a] = besself(n, 1);
     z = zeros(0, 1);

@@ -14,6 +14,6 @@ function [num, den, Ts] = tfdata(sys, forme)
     den = g.den(:).';
     Ts = g.Ts;
     if nargin >= 2 && ~isempty(forme) && ~any(strcmpi(char(forme), {'v', 'vector'}))
-        error('control:tfdata:BadForm', 'La forme doit être ''v''.');
+        error('control:tfdata:BadForm', 'Format must be ''v''.');
     end
 end

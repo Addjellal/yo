@@ -42,7 +42,7 @@ function [img, H] = iradon(p, theta, varargin)
                 interp = mot;
             elseif any(strcmp(mot, {'spline', 'pchip', 'cubic', 'v5cubic'}))
                 error('images:iradon:Interpolation', ...
-                      'MatLibre interpole la rétroprojection en ''linear'' ou ''nearest''.');
+                      'MatLibre interpolates the backprojection with ''linear'' or ''nearest''.');
             elseif any(strcmp(mot, {'ram-lak', 'shepp-logan', 'cosine', 'hamming', 'hann', 'none'}))
                 filtre = mot;
             else
@@ -55,7 +55,7 @@ function [img, H] = iradon(p, theta, varargin)
     if numel(nombres) >= 1 && ~isempty(nombres{1}), echelle = nombres{1}; end
     if numel(nombres) >= 2, taille = nombres{2}; end
     if ~(echelle > 0 && echelle <= 1)
-        error('images:iradon:invalidFrequencyScaling', 'L''échelle des fréquences est dans ]0, 1].');
+        error('images:iradon:invalidFrequencyScaling', 'Frequency scaling must be in (0, 1].');
     end
     p = double(p);
     long = size(p, 1);
@@ -64,7 +64,7 @@ function [img, H] = iradon(p, theta, varargin)
     end
     if numel(theta) ~= size(p, 2)
         error('images:iradon:thetaNotMatchingProjectionNumber', ...
-              'Il faut un angle par projection (%d).', size(p, 2));
+              'One angle per projection (%d) is required.', size(p, 2));
     end
     theta = theta(:).' * pi / 180;
     if isempty(taille)

@@ -6,7 +6,7 @@ function r = matlibre_gf_div(a, b, m, prim)
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
     if any(b(:) == 0)
         error('comm:gf:DivisionParZero', ...
-              'La division par zéro n''a pas de sens dans un corps.');
+              'Division by zero is undefined in a field.');
     end
     [journal, exponentielle] = matlibre_gf_journal(m, prim);
     n = 2 ^ m - 1;

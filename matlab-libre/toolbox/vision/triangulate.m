@@ -54,7 +54,7 @@ function M = normaliserMatrice(M)
     end
     if ~isequal(size(M), [3 4])
         error('vision:triangulate:BadMatrix', ...
-              'La matrice de projection doit être 3x4 ou 4x3.');
+              'The projection matrix must be 3-by-4 or 4-by-3.');
     end
 end
 

@@ -73,7 +73,7 @@ function M = matlibre_symmat_etendre(arbre)
                                  matlibre_symmat_etendre(arbre{3}));
         otherwise
             error('symbolic:symmatrix:Operateur', ...
-                  'Opérateur matriciel inconnu « %s ».', arbre{1});
+                  'Unknown matrix operator ''%s''.', arbre{1});
     end
 end
 

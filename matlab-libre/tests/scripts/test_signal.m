@@ -1117,7 +1117,7 @@ refuse = false;
 try
     maxflat(6, 3, 0.5);
 catch erreur
-    refuse = contains(erreur.message, 'coupure');
+    refuse = contains(erreur.message, 'cutoff');
 end
 assert(refuse);
 [~, ~, b1, b2] = maxflat(6, 3, 0.3);

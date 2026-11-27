@@ -7,7 +7,7 @@ function [F1, F2, mode, reste] = matlibre_ondelette_arguments(arguments, genre, 
 %   défaut, MODE est celui de DWTMODE. RESTE garde les autres arguments.
     if isempty(arguments)
         error('Wavelet:FunctionInput:NotEnoughArgs', ...
-              '%s : il faut un nom d''ondelette ou deux filtres.', upper(nomFonction));
+              '%s: a wavelet name or two filters are required.', upper(nomFonction));
     end
     premier = arguments{1};
     if ischar(premier) || (isstring(premier) && isscalar(premier))
@@ -23,7 +23,7 @@ function [F1, F2, mode, reste] = matlibre_ondelette_arguments(arguments, genre, 
     else
         if numel(arguments) < 2 || ~isnumeric(arguments{2})
             error('Wavelet:FunctionInput:NotEnoughArgs', ...
-                  '%s : les filtres vont par deux, passe-bas puis passe-haut.', ...
+                  '%s: filters come in pairs, lowpass then highpass.', ...
                   upper(nomFonction));
         end
         F1 = arguments{1};
@@ -34,7 +34,7 @@ function [F1, F2, mode, reste] = matlibre_ondelette_arguments(arguments, genre, 
     F2 = double(F2(:)).';
     if numel(F1) ~= numel(F2)
         error('Wavelet:FunctionInput:FilterLength', ...
-              '%s : les deux filtres ont la même longueur.', upper(nomFonction));
+              '%s: the two filters must have the same length.', upper(nomFonction));
     end
     mode = dwtmode('status', 'nodisp');
     reste = {};

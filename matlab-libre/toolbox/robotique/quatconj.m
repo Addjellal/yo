@@ -18,7 +18,7 @@ function n = quatconj(q)
 %
 %   Voir aussi QUATINV, QUATNORMALIZE, QUATMULTIPLY.
     if size(q, 2) ~= 4
-        error('aero:quatconj:Taille', 'Les quaternions sont des lignes [w x y z] : M x 4.');
+        error('aero:quatconj:Taille', 'Quaternions must be rows [w x y z]: M-by-4.');
     end
     n = [q(:, 1), -q(:, 2:4)];
 end

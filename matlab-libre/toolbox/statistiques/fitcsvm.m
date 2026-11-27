@@ -33,7 +33,7 @@ function modele = fitcsvm(X, y, varargin)
     classes = unique(y);
     if numel(classes) ~= 2
         error('stats:fitcsvm:DeuxClasses', ...
-              'FITCSVM ne traite que deux classes ; voir FITCECOC.');
+              'FITCSVM supports two classes only; see FITCECOC.');
     end
     cible = ones(size(y));
     cible(y == classes(1)) = -1;

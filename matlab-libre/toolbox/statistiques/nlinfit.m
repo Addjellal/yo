@@ -76,13 +76,13 @@ function [beta, residus, jacobienne, covariance, erreurQuadratique, infoErreur] 
     end
     if ~strcmpi(modeleErreur, 'constant')
         error('stats:nlinfit:ErrorModelNotSupported', ...
-              ['NLINFIT : le modèle d''erreur ''%s'' n''est pas fait ; ', ...
-               'seul ''constant'' l''est.'], modeleErreur);
+              ['NLINFIT: error model ''%s'' is not supported; ', ...
+               'only ''constant'' is.'], modeleErreur);
     end
     if strcmpi(options.Robust, 'on')
         error('stats:nlinfit:RobustNotSupported', ...
-              ['NLINFIT : l''ajustement robuste (Robust ''on'') n''est pas ', ...
-               'fait. ROBUSTFIT le fait pour un modèle linéaire.']);
+              ['NLINFIT: robust fitting (Robust ''on'') is not ', ...
+               'supported. ROBUSTFIT does it for a linear model.']);
     end
     y = double(y(:));
     beta = double(beta0(:));
@@ -97,7 +97,7 @@ function [beta, residus, jacobienne, covariance, erreurQuadratique, infoErreur] 
     garde = ~isnan(y) & ~isnan(yAjuste);
     if ~any(garde)
         error('stats:nlinfit:NoUsableData', ...
-              'Il ne reste aucune observation sans NaN.');
+              'No observations without NaN remain.');
     end
     [beta, cause, iterations] = levenbergMarquardt(modele, X, y, beta, garde, options);
     switch cause
@@ -304,7 +304,7 @@ function [options, modeleErreur] = lireArguments(arguments)
     while k <= numel(arguments)
         if k == numel(arguments) || ~(ischar(arguments{k}) || isstring(arguments{k}))
             error('stats:nlinfit:BadArgs', ...
-                  'Les options de NLINFIT vont par paires nom-valeur.');
+                  'NLINFIT options must be name-value pairs.');
         end
         nom = lower(char(arguments{k}));
         valeur = arguments{k + 1};
@@ -317,9 +317,9 @@ function [options, modeleErreur] = lireArguments(arguments)
                 % sans objet pour le modèle 'constant'
             case 'weights'
                 error('stats:nlinfit:WeightsNotSupported', ...
-                      ['NLINFIT : les poids d''observation (''Weights'') ne sont ', ...
-                       'pas faits. LSQCURVEFIT ajuste sqrt(w).*MODELE contre ', ...
-                       'sqrt(w).*Y, ce qui revient au même.']);
+                      ['NLINFIT: observation weights (''Weights'') are ', ...
+                       'not supported. LSQCURVEFIT fitting sqrt(w).*MODEL against ', ...
+                       'sqrt(w).*Y is equivalent.']);
             otherwise
                 error('stats:nlinfit:BadParamName', ...
                       'Unknown parameter name ''%s''.', char(arguments{k}));

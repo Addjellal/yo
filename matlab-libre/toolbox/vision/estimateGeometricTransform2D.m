@@ -39,7 +39,7 @@ function [T, valides, statut] = estimateGeometricTransform2D(points1, points2, t
 %   Voir aussi ESTIMATEGEOMETRICTRANSFORM, ESTIMATEFUNDAMENTALMATRIX.
     if nargin < 3 || isempty(type)
         error('vision:estimateGeometricTransform2D:Type', ...
-              'Le type est ''rigid'', ''similarity'', ''affine'' ou ''projective''.');
+              'Type must be ''rigid'', ''similarity'', ''affine'', or ''projective''.');
     end
     type = lower(char(type));
     distanceMax = 1.5;
@@ -47,7 +47,7 @@ function [T, valides, statut] = estimateGeometricTransform2D(points1, points2, t
     confiance = 99;
     if mod(numel(varargin), 2) ~= 0
         error('vision:estimateGeometricTransform2D:Options', ...
-              'Les options vont par paires nom, valeur.');
+              'Options must be name-value pairs.');
     end
     for k = 1:2:numel(varargin)
         switch lower(char(varargin{k}))
@@ -61,13 +61,14 @@ function [T, valides, statut] = estimateGeometricTransform2D(points1, points2, t
     end
     if ~(distanceMax > 0) || ~(confiance > 0 && confiance < 100) || tiragesMax < 1
         error('vision:estimateGeometricTransform2D:Options', ...
-              'MaxDistance est positif, Confidence entre 0 et 100, MaxNumTrials au moins 1.');
+              ['MaxDistance must be positive, Confidence between 0 and 100, and MaxNumTrials at ' ...
+               'least 1.']);
     end
     P1 = double(points1);
     P2 = double(points2);
     if size(P1, 2) ~= 2 || ~isequal(size(P1), size(P2))
         error('vision:estimateGeometricTransform2D:Points', ...
-              'P1 et P2 sont deux matrices N x 2 de points appariés.');
+              'P1 and P2 must be N-by-2 matrices of matched points.');
     end
     n = size(P1, 1);
     minimum = minimumPoints(type);
@@ -124,10 +125,10 @@ function signaler(statut, nSorties, minimum)
     end
     if statut == 1
         error('vision:points:notEnoughMatchedPts', ...
-              'Il faut au moins %d appariements pour ce type de transformation.', minimum);
+              'At least %d matched pairs are required for this transformation type.', minimum);
     end
     error('vision:points:notEnoughInlierMatches', ...
-          'Trop peu d''appariements concordent : augmentez MaxDistance, ou MaxNumTrials.');
+          'Too few inlier matches: increase MaxDistance or MaxNumTrials.');
 end
 
 function m = minimumPoints(type)
@@ -137,7 +138,7 @@ function m = minimumPoints(type)
         case 'projective',            m = 4;
         otherwise
             error('vision:estimateGeometricTransform2D:Type', ...
-                  'Le type est ''rigid'', ''similarity'', ''affine'' ou ''projective''.');
+                  'Type must be ''rigid'', ''similarity'', ''affine'', or ''projective''.');
     end
 end
 

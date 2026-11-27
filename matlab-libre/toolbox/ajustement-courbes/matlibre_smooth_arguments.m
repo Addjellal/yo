@@ -32,7 +32,7 @@ function [x, y, portee, methode, degre] = matlibre_smooth_arguments(arguments)
             if any(strcmp(methodes, nom))
                 methode = nom;
             else
-                error('curvefit:smooth:Methode', 'Méthode inconnue : %s.', nom);
+                error('curvefit:smooth:Methode', 'Unknown method: %s.', nom);
             end
         elseif isempty(portee)
             portee = double(courant);

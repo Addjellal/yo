@@ -46,7 +46,7 @@ classdef pointCloud
                     case 'intensity', obj.Intensity = double(varargin{k+1});
                     otherwise
                         error('vision:pointCloud:Option', ...
-                              'Propriété inconnue : %s.', char(varargin{k}));
+                              'Unknown property: %s.', char(varargin{k}));
                 end
                 k = k + 2;
             end

@@ -41,7 +41,7 @@ function h = coifletFiltre(N)
     N = round(N);
     if ~isscalar(N) || N < 1 || N > 8
         error('wavelet:coifletFiltre:Ordre', ...
-              'L''ordre d''une coiflette doit être un entier de 1 à 8.');
+              'The order of a coiflet must be an integer from 1 to 8.');
     end
     if isempty(connus)
         connus = {};
@@ -103,7 +103,7 @@ function h = resoudreCoiflette(N, precedente)
     end
     if meilleurEcart > 1e-8
         error('wavelet:coifletFiltre:Convergence', ...
-              'La coiflette d''ordre %d n''a pas convergé (écart %g).', ...
+              'The coiflet of order %d did not converge (residual %g).', ...
               N, meilleurEcart);
     end
     if sum(meilleure) < 0

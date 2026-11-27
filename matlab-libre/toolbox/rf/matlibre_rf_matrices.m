@@ -10,7 +10,7 @@ function R = matlibre_rf_matrices(M, fonction)
 %
 %   Voir aussi S2Z, Z2S, S2Y, Y2S.
     if size(M, 1) ~= size(M, 2) || ndims(M) > 3
-        error('rf:parametres:Taille', 'Il faut une matrice N x N, ou N x N x K.');
+        error('rf:parametres:Taille', 'An N-by-N or N-by-N-by-K array is required.');
     end
     R = zeros(size(M));
     for k = 1:size(M, 3)

@@ -37,7 +37,7 @@ function [RF, DF] = filtresSplines(Nr, Nd)
 %   Voir aussi WFILTERS, BIORFILT, REFUSERHORSSPLINE.
     if mod(Nr + Nd, 2) ~= 0
         error('wavelet:filtresSplines:Parite', ...
-              'La somme des deux ordres doit être paire.');
+              'The sum of the two orders must be even.');
     end
     L = (Nr + Nd) / 2;
     % Le binôme (1+z)^Nr, à une normalisation près.

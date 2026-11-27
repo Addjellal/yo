@@ -16,7 +16,7 @@ function annuites = depfixdb(cout, valeurResiduelle, duree, periode, mois)
     if nargin < 5 || isempty(mois),    mois = 12;       end
     periode = round(periode);
     if cout <= 0
-        error('finance:depfixdb:Cout', 'Le coût doit être positif.');
+        error('finance:depfixdb:Cout', 'The cost must be positive.');
     end
     taux = 1 - (max(valeurResiduelle, eps) / cout) ^ (1 / duree);
     nombre = periode;

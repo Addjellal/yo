@@ -42,7 +42,7 @@ function [C, renseignements] = pidtune(sys, type, wc)
         case 'pidf', phaseCible = -180 + margeVoulue - 45; filtre = true;
         otherwise
             error('control:pidtune:BadType', ...
-                  'Le type doit être ''p'', ''pi'', ''pd'', ''pdf'', ''pid'' ou ''pidf''.');
+                  'Type must be ''p'', ''pi'', ''pd'', ''pdf'', ''pid'', or ''pidf''.');
     end
     grille = logspace(-4, 4, 4000).';
     [module, phase] = bode(g, grille);

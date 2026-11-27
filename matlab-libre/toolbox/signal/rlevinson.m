@@ -16,7 +16,7 @@ function [r, u, kr, e] = rlevinson(a, efinal)
 %   Voir aussi LEVINSON, POLY2RC, RC2POLY, POLY2AC, AC2POLY.
     a = double(a(:));
     if a(1) == 0
-        error('signal:rlevinson:NullLeading', 'A(1) ne peut pas être nul.');
+        error('signal:rlevinson:NullLeading', 'A(1) cannot be zero.');
     end
     a = a / a(1);
     p = numel(a) - 1;
@@ -44,7 +44,7 @@ function [r, u, kr, e] = rlevinson(a, efinal)
         kr(ordre) = k;
         if abs(1 - k ^ 2) < eps
             error('signal:rlevinson:Singular', ...
-                  'Un coefficient de réflexion vaut 1 : le modèle n''est pas régulier.');
+                  'A reflection coefficient equals 1: the model is singular.');
         end
         precedent = (courant(1:ordre) - k * conj(courant(ordre + 1:-1:2))) / (1 - k ^ 2);
         u(1:ordre, ordre) = precedent;

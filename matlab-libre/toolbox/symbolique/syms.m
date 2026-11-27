@@ -20,7 +20,7 @@ function syms(varargin)
         nom = char(varargin{k});
         if isempty(regexp(nom, '^[A-Za-z][A-Za-z0-9_]*$', 'once'))
             error('symbolic:syms:Nom', ...
-                  '''%s'' n''est pas un nom de variable valide.', nom);
+                  '''%s'' is not a valid variable name.', nom);
         end
         assignin('caller', nom, sym(nom));
     end

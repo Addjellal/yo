@@ -37,7 +37,7 @@ function [w, energies] = modwpt(x, varargin)
     x = double(x(:)).';
     n = numel(x);
     if niveaux < 1
-        error('wavelet:modwpt:Niveau', 'Le niveau doit valoir au moins un.');
+        error('wavelet:modwpt:Niveau', 'The level must be at least one.');
     end
     [analyseBas, analyseHaut] = wfilters(nom, 'd');
     bas = analyseBas(end:-1:1) / sqrt(2);

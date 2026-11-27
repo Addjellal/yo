@@ -52,7 +52,7 @@ function [xd, coefficientsDebruites, coefficientsOrigine] = wdenoise(x, varargin
     for k = debut:2:numel(varargin)
         if k + 1 > numel(varargin)
             error('wavelet:wdenoise:PairAttendue', ...
-                  'Les options vont par paires nom-valeur.');
+                  'Options must be name-value pairs.');
         end
         nomOption = lower(char(varargin{k}));
         valeur = varargin{k + 1};
@@ -87,11 +87,11 @@ function [xd, coefficientsDebruites, coefficientsOrigine] = wdenoise(x, varargin
     end
     if strcmp(regle, 'james-stein') && ~strcmp(methode, 'blockjs')
         error('wavelet:wdenoise:RegleIncompatible', ...
-              'La règle ''James-Stein'' n''existe que pour ''BlockJS''.');
+              'The ''James-Stein'' rule is only valid with ''BlockJS''.');
     end
     if strcmp(methode, 'blockjs') && ~strcmp(regle, 'james-stein')
         error('wavelet:wdenoise:RegleIncompatible', ...
-              '''BlockJS'' n''accepte que la règle ''James-Stein''.');
+              '''BlockJS'' accepts only the ''James-Stein'' rule.');
     end
 
     [C, L] = wavedec(x, niveau, ondelette);
@@ -147,7 +147,7 @@ function d = attenuer(d, sigma, methode, regle, n)
             d = tauxFaussesDecouvertes(d, sigma, 0.05, lettre(regle));
         otherwise
             error('wavelet:wdenoise:MethodeInconnue', ...
-                  'Méthode inconnue : %s.', methode);
+                  'Unknown method: %s.', methode);
     end
 end
 

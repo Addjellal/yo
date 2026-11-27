@@ -30,14 +30,14 @@ function [bz, az] = impinvar(b, a, fs, tol)
     a = double(a(:)).';
     if numel(b) >= numel(a)
         error('signal:impinvar:NotProper', ...
-              'Le filtre analogique doit être strictement propre.');
+              'The analog filter must be strictly proper.');
     end
     % La décomposition en éléments simples donne un pôle par terme ; un
     % terme d'ordre m devient un pôle numérique d'ordre m.
     [r, p, k] = residue(b, a);
     if ~isempty(k) && any(abs(k) > tol)
         error('signal:impinvar:NotProper', ...
-              'Le filtre analogique doit être strictement propre.');
+              'The analog filter must be strictly proper.');
     end
     % La somme part du premier terme, non d'un zéro : mettre 0/1 au
     % départ ajoutait un coefficient de tête au numérateur, et toute la

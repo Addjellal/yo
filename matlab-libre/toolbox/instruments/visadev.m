@@ -49,7 +49,7 @@ classdef visadev < handle
     methods
         function v = visadev(adresse)
             if nargin < 1
-                error('instrument:visadev:Adresse', 'VISADEV attend une adresse VISA.');
+                error('instrument:visadev:Adresse', 'VISADEV requires a VISA resource name.');
             end
             v.ResourceName = char(adresse);
         end

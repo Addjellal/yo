@@ -21,7 +21,7 @@ function [cA, cH, cV, cD] = dwt2(x, varargin)
     [Lo_D, Hi_D, mode] = matlibre_ondelette_arguments(varargin, 'd', 'dwt2');
     if ndims(x) > 3
         error('Wavelet:FunctionInput:InvalidSizeArray', ...
-              'DWT2 attend une matrice, ou une image en couleurs.');
+              'DWT2 requires a matrix or a color image.');
     end
     x = double(x);
     pages = size(x, 3);

@@ -14,7 +14,7 @@ function phat = gamfit(x)
 %   Voir aussi GAMPDF, GAMCDF, GAMINV, GAMRND, PDF, CDF.
     x = double(x(:));
     if any(x <= 0)
-        error('stats:gamfit:BadData', 'Les données doivent être strictement positives.');
+        error('stats:gamfit:BadData', 'Data must be strictly positive.');
     end
     n = numel(x);
     s = log(sum(x) / n) - sum(log(x)) / n;

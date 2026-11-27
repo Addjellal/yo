@@ -36,7 +36,7 @@ function Cnouveau = wthcoef2(genre, C, S, niveaux, parametre, sorh)
     for indice = 1:numel(niveaux)
         niveau = niveaux(indice);
         if niveau < 1 || niveau > niveauMax
-            error('wavelet:wthcoef2:Niveau', 'Niveau hors de la décomposition.');
+            error('wavelet:wthcoef2:Niveau', 'Level is outside the decomposition.');
         end
         for famille = familles
             plage = plageDe(S, niveau, famille);
@@ -59,7 +59,7 @@ function famille = trouverFamille(genre)
         case 'd', famille = 3;
         otherwise
             error('wavelet:wthcoef2:Genre', ...
-                  'Le genre doit être ''a'', ''h'', ''v'', ''d'' ou ''t''.');
+                  'Type must be ''a'', ''h'', ''v'', ''d'', or ''t''.');
     end
 end
 
@@ -79,7 +79,7 @@ function plage = plageDe(S, niveau, famille)
         end
         position = position + 3 * n;
     end
-    error('wavelet:wthcoef2:Niveau', 'Niveau hors de la décomposition.');
+    error('wavelet:wthcoef2:Niveau', 'Level is outside the decomposition.');
 end
 
 function v = valeurAu(parametre, indice, defaut)

@@ -38,7 +38,7 @@ function [pEtats, logp, avant, arriere, echelle] = hmmdecode(seq, tr, e, varargi
         echelle(k + 1) = sum(colonne);
         if echelle(k + 1) == 0
             error('stats:hmmdecode:ZeroProbability', ...
-                  'La suite observée est impossible avec ce modèle.');
+                  'The observed sequence is impossible with this model.');
         end
         avant(:, k + 1) = colonne / echelle(k + 1);
     end

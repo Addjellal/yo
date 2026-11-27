@@ -21,7 +21,7 @@ function [psi, xval] = gauswavf(bas, haut, n, ordre)
     if nargin < 4 || isempty(ordre), ordre = 1; end
     ordre = round(ordre);
     if ordre < 1 || ordre > 8
-        error('wavelet:gauswavf:BadOrder', 'L''ordre doit aller de 1 à 8.');
+        error('wavelet:gauswavf:BadOrder', 'The order must be from 1 to 8.');
     end
     xval = linspace(bas, haut, n);
     % Polynôme d'Hermite par récurrence : H0 = 1, H1 = 2x,

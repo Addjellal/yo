@@ -23,15 +23,15 @@ function [intervalle, tauxMesure] = berconfint(nombreErreurs, nombreEssais, nive
     nombreErreurs = round(double(nombreErreurs));
     nombreEssais = round(double(nombreEssais));
     if nombreEssais < 1
-        error('comm:berconfint:Essais', 'Il faut au moins un essai.');
+        error('comm:berconfint:Essais', 'At least one trial is required.');
     end
     if nombreErreurs < 0 || nombreErreurs > nombreEssais
         error('comm:berconfint:Erreurs', ...
-              'Le nombre d''erreurs doit rester entre zéro et le nombre d''essais.');
+              'The number of errors must be between zero and the number of trials.');
     end
     if niveau <= 0 || niveau >= 1
         error('comm:berconfint:Niveau', ...
-              'Le niveau de confiance doit être strictement entre zéro et un.');
+              'The confidence level must be strictly between zero and one.');
     end
     tauxMesure = nombreErreurs / nombreEssais;
     alpha = (1 - niveau) / 2;

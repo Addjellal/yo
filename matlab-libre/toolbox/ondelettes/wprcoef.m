@@ -18,7 +18,7 @@ function x = wprcoef(arbre, noeud)
     donnees = lireNoeud(arbre, indice);
     if isempty(donnees)
         error('wavelet:wprcoef:Absent', ...
-              'Le nœud %d n''est pas dans l''arbre.', indice);
+              'Node %d is not in the tree.', indice);
     end
     % On remonte le nœud seul, en mettant à zéro le frère à chaque étage.
     if arbre.dimension == 1

@@ -70,7 +70,7 @@ function [Lo_D, Hi_D, Lo_R, Hi_R] = biorfilt(DF, RF, sansSortie)
         % La forme à huit sorties de MATLAB n'est pas reprise : elle rend
         % les mêmes filtres découpés en deux bancs.
         error('wavelet:biorfilt:HuitSorties', ...
-              'La forme à huit sorties n''est pas gérée.');
+              'The eight-output syntax is not supported.');
     end
 end
 

@@ -25,8 +25,8 @@ function [u, x, t] = wave1D(u0, c, longueur, tFinal, nx, nt)
     courant = c * dt / dx;
     if courant > 1
         warning('edp:wave1D:Courant', ...
-                ['Nombre de Courant c*dt/dx = %.3g > 1 : le schéma est instable ', ...
-                 'et la solution va diverger. Augmentez NT ou diminuez NX.'], courant);
+                ['Courant number c*dt/dx = %.3g > 1: the scheme is unstable ', ...
+                 'and the solution will diverge. Increase NT or decrease NX.'], courant);
     end
     lambda = courant ^ 2;
     u = zeros(nx, nt + 1);

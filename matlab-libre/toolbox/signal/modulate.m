@@ -33,12 +33,12 @@ function [y, t] = modulate(x, fc, fs, methode, opt)
         case 'qam'
             if nargin < 5 || isempty(opt)
                 error('signal:modulate:MissingQuadrature', ...
-                      'La modulation en quadrature demande un second signal.');
+                      'Quadrature modulation requires a second signal.');
             end
             q = double(opt(:));
             y = x .* cos(2 * pi * fc * t) + q .* sin(2 * pi * fc * t);
         otherwise
-            error('signal:modulate:UnknownMethod', 'Méthode inconnue : %s.', char(methode));
+            error('signal:modulate:UnknownMethod', 'Unknown method: %s.', char(methode));
     end
     if ~colonne, y = y.'; t = t.'; end
 end

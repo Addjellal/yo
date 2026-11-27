@@ -10,7 +10,7 @@ function [muhat, sigmahat] = lognfit(x)
 %   Voir aussi LOGNPDF, LOGNCDF, LOGNINV, LOGNRND, PDF, CDF.
     x = double(x(:));
     if any(x <= 0)
-        error('stats:lognfit:BadData', 'Les données doivent être strictement positives.');
+        error('stats:lognfit:BadData', 'Data must be strictly positive.');
     end
     l = log(x);
     muhat = mean(l);

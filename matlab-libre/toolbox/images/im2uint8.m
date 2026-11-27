@@ -25,7 +25,7 @@ function y = im2uint8(x)
         y = uint8(round(double(x) / 257));
     elseif isinteger(x)
         error('MATLAB:im2uint8:classe', ...
-              'IM2UINT8 ne traite pas la classe %s.', class(x));
+              'IM2UINT8 does not support class %s.', class(x));
     else
         y = uint8(round(max(0, min(1, double(x))) * 255));
     end

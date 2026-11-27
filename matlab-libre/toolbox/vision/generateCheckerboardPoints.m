@@ -19,7 +19,7 @@ function [points, tailleDamier] = generateCheckerboardPoints(tailleDamier, taill
     colonnes = tailleDamier(2) - 1;
     if lignes < 1 || colonnes < 1
         error('vision:generateCheckerboardPoints:BadSize', ...
-              'Le damier doit compter au moins deux carrés dans chaque sens.');
+              'The checkerboard must have at least two squares in each direction.');
     end
     [X, Y] = meshgrid((0:colonnes-1) * tailleCarre, (0:lignes-1) * tailleCarre);
     points = [X(:), Y(:)];

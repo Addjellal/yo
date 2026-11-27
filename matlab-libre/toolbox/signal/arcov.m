@@ -14,7 +14,7 @@ function [a, e] = arcov(x, p)
     x = double(x(:));
     n = numel(x);
     if p >= n
-        error('signal:arcov:OrderTooLarge', 'L''ordre dépasse la longueur.');
+        error('signal:arcov:OrderTooLarge', 'The order exceeds the signal length.');
     end
     lignes = n - p;
     M = zeros(lignes, p);

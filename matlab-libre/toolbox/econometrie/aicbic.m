@@ -25,13 +25,13 @@ function [aic, bic] = aicbic(logVraisemblance, nombreParametres, nombreObservati
     end
     if numel(logVraisemblance) ~= numel(nombreParametres)
         error('econ:aicbic:Tailles', ...
-              'Il faut autant de comptes de paramètres que de vraisemblances.');
+              'The number of parameter counts must match the number of log-likelihoods.');
     end
     aic = -2 * logVraisemblance + 2 * nombreParametres;
     if nargout > 1
         if nargin < 3 || isempty(nombreObservations)
             error('econ:aicbic:Observations', ...
-                  'Le critère de Schwarz demande le nombre d''observations.');
+                  'BIC requires the number of observations.');
         end
         bic = -2 * logVraisemblance + nombreParametres * log(nombreObservations);
     end

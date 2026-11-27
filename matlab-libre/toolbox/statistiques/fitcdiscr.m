@@ -45,13 +45,13 @@ function modele = fitcdiscr(X, y, varargin)
     y = y(:);
     if size(X, 1) ~= numel(y)
         error('stats:fitcdiscr:Tailles', ...
-              'X et Y doivent avoir le même nombre d''observations.');
+              'X and Y must have the same number of observations.');
     end
     [classes, ~, indices] = unique(y);
     k = numel(classes);
     if k < 2
         error('stats:fitcdiscr:Classes', ...
-              'Il faut au moins deux classes.');
+              'At least two classes are required.');
     end
     genre = 'linear';
     apriori = [];
@@ -77,7 +77,7 @@ function modele = fitcdiscr(X, y, varargin)
         error('stats:fitcdiscr:Genre', 'DiscrimType inconnu : %s.', genre);
     end
     if gamma < 0 || gamma > 1
-        error('stats:fitcdiscr:Gamma', 'Gamma doit être entre zéro et un.');
+        error('stats:fitcdiscr:Gamma', 'Gamma must be between zero and one.');
     end
     p = size(X, 2);
     moyennes = zeros(k, p);
@@ -117,7 +117,7 @@ function modele = fitcdiscr(X, y, varargin)
     elseif ischar(apriori) || isstring(apriori)
         if ~strcmpi(char(apriori), 'uniform')
             error('stats:fitcdiscr:Apriori', ...
-                  'Prior vaut ''uniform'' ou un vecteur.');
+                  'Prior must be ''uniform'' or a vector.');
         end
         apriori = ones(k, 1) / k;
     else

@@ -27,7 +27,7 @@ function z = qamdemod(y, M, varargin)
         struct('OutputType', 'integer', 'UnitAveragePower', false, ...
                'OutputDataType', 'double', 'NoiseVariance', 1, 'PlotConstellation', false));
     if ~strcmpi(o.OutputDataType, 'double')
-        error('comm:qamdemod:OutputDataType', 'MatLibre produit des sorties ''double''.');
+        error('comm:qamdemod:OutputDataType', 'MatLibre produces ''double'' outputs only.');
     end
     if o.UnitAveragePower
         y = y * sqrt(2 * (M - 1) / 3);
@@ -53,9 +53,9 @@ function z = qamdemod(y, M, varargin)
             z = reshape(bits, [], nCol);
         case {'llr', 'approxllr'}
             error('comm:qamdemod:Souple', ...
-                  'MatLibre ne calcule pas encore les rapports de vraisemblance (''%s'').', ...
+                  'MatLibre does not compute log-likelihood ratios yet (''%s'').', ...
                   lower(char(o.OutputType)));
         otherwise
-            error('comm:qamdemod:OutputType', 'OutputType vaut ''integer'' ou ''bit''.');
+            error('comm:qamdemod:OutputType', 'OutputType must be ''integer'' or ''bit''.');
     end
 end

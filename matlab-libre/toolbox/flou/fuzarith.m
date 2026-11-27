@@ -22,7 +22,7 @@ function y = fuzarith(x, A, B, operation)
     B = double(B(:))';
     if numel(A) ~= numel(x) || numel(B) ~= numel(x)
         error('fuzzy:fuzarith:BadSize', ...
-              'A et B doivent avoir la taille de X.');
+              'A and B must be the same size as X.');
     end
     operation = lower(char(operation));
     niveaux = linspace(0, 1, 101);
@@ -59,13 +59,13 @@ function [bas, haut] = combinerIntervalles(a1, a2, b1, b2, operation)
         case 'div'
             if b1 <= 0 && b2 >= 0
                 error('fuzzy:fuzarith:DivisionParZero', ...
-                      'Le diviseur ne doit pas contenir zéro.');
+                      'The divisor must not contain zero.');
             end
             quotients = [a1 / b1, a1 / b2, a2 / b1, a2 / b2];
             bas = min(quotients);
             haut = max(quotients);
         otherwise
             error('fuzzy:fuzarith:BadOperation', ...
-                  'L''opération doit être ''sum'', ''sub'', ''prod'' ou ''div''.');
+                  'Operation must be ''sum'', ''sub'', ''prod'', or ''div''.');
     end
 end

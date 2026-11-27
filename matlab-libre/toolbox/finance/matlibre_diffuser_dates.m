@@ -7,6 +7,6 @@ function [a, b] = matlibre_diffuser_dates(a, b)
         b = repmat(b, size(a));
     elseif ~isequal(size(a), size(b))
         error('finance:dates:Tailles', ...
-              'Les deux séries de dates n''ont pas la même taille.');
+              'The two date series do not have the same size.');
     end
 end

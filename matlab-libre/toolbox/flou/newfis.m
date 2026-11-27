@@ -20,7 +20,7 @@ function fis = newfis(nom, type, varargin)
     if nargin < 2 || isempty(type), type = 'mamdani'; end
     type = lower(char(type));
     if ~any(strcmp(type, {'mamdani', 'sugeno'}))
-        error('fuzzy:newfis:BadType', 'Le type doit être ''mamdani'' ou ''sugeno''.');
+        error('fuzzy:newfis:BadType', 'Type must be ''mamdani'' or ''sugeno''.');
     end
     if strcmp(type, 'sugeno')
         defauts = {'prod', 'probor', 'prod', 'sum', 'wtaver'};

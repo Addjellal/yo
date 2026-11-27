@@ -30,7 +30,7 @@ function J = roifilt2(entree, I, masque, varargin)
     end
     if ~isequal(size(region), size(image))
         error('images:roifilt2:Taille', ...
-              'Le masque doit avoir la taille de l''image.');
+              'The mask must be the same size as the image.');
     end
     J = image;
     J(region) = filtree(region);

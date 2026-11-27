@@ -11,7 +11,7 @@ function [valeursPropres, vecteurs, nombreEffectif, dimension, S00, S01] = matli
     [T, n] = size(Y);
     if T <= retards + 2
         error('econ:johansen:Observations', ...
-              'Il faut plus de %d observations.', retards + 2);
+              'More than %d observations are required.', retards + 2);
     end
     differences = diff(Y);                 % lignes t = 2..T
     % Échantillon utile : t = retards+2 .. T, soit les lignes
@@ -39,7 +39,7 @@ function [valeursPropres, vecteurs, nombreEffectif, dimension, S00, S01] = matli
             deterministe = [ones(Teff, 1), tempsUtile];
         otherwise
             error('econ:johansen:Modele', ...
-                  'Le modèle vaut H2, H1*, H1, H* ou H, pas « %s ».', modele);
+                  'Model must be H2, H1*, H1, H*, or H, not ''%s''.', modele);
     end
     Z2 = deterministe;
     for j = 1:retards

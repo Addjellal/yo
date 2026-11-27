@@ -18,10 +18,10 @@ function [b, a] = yulewalk(n, f, m)
     f = double(f(:))';
     m = double(m(:))';
     if numel(f) ~= numel(m)
-        error('signal:yulewalk:BadSpec', 'F et M doivent avoir la même longueur.');
+        error('signal:yulewalk:BadSpec', 'F and M must have the same length.');
     end
     if f(1) ~= 0 || abs(f(end) - 1) > 1e-12
-        error('signal:yulewalk:BadEdges', 'F doit aller de 0 à 1.');
+        error('signal:yulewalk:BadEdges', 'F must go from 0 to 1.');
     end
     npt = 512;
     grille = (0:npt)' / npt;

@@ -45,7 +45,7 @@ function [rejet, pValeur, statistique, valeurCritique] = lbqtest(residus, vararg
     if isempty(libertes), libertes = retards; end
     if retards < 1 || retards >= n
         error('econ:lbqtest:Retards', ...
-              'Le nombre de retards doit rester entre un et %d.', n - 1);
+              'The number of lags must be between 1 and %d.', n - 1);
     end
     centre = residus - mean(residus);
     denominateur = sum(centre .^ 2);

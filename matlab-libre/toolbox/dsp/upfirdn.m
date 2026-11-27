@@ -18,7 +18,7 @@ function y = upfirdn(x, h, p, q)
     if nargin < 3, p = 1; end
     if nargin < 4, q = 1; end
     if ~isscalar(p) || ~isscalar(q) || p < 1 || q < 1 || p ~= fix(p) || q ~= fix(q)
-        error('signal:upfirdn:Facteurs', 'P et Q sont des entiers positifs.');
+        error('signal:upfirdn:Facteurs', 'P and Q must be positive integers.');
     end
     ligne = isrow(x);
     if ligne

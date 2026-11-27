@@ -26,7 +26,7 @@ function [b, a] = stmcb(x, varargin)
         k = 2;
     end
     if numel(varargin) < k + 1
-        error('signal:stmcb:Arguments', 'stmcb attend les deux ordres.');
+        error('signal:stmcb:Arguments', 'STMCB requires both orders.');
     end
     nb = round(varargin{k});
     na = round(varargin{k + 1});

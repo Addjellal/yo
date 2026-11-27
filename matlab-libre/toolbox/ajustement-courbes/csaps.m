@@ -30,7 +30,7 @@ function [sortie, parametre] = csaps(x, y, p, xx, w)
     y = double(y(:));
     n = numel(x);
     if n ~= numel(y)
-        error('curvefit:csaps:Tailles', 'X et Y doivent avoir le même nombre d''éléments.');
+        error('curvefit:csaps:Tailles', 'X and Y must have the same number of elements.');
     end
     [x, ordre] = sort(x);
     y = y(ordre);

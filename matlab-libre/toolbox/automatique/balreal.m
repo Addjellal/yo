@@ -25,7 +25,7 @@ function [sysb, g, T, Ti] = balreal(sys)
     end
     if ~isstable(s)
         error('control:balreal:Unstable', ...
-              'Les grammiens ne convergent que pour un modèle stable.');
+              'The gramians converge only for a stable model.');
     end
     Wc = gram(s, 'c');
     Wo = gram(s, 'o');

@@ -26,7 +26,7 @@ function Lo_R = daubechiesFiltre(N, phase)
     if nargin < 2 || isempty(phase), phase = 'minimale'; end
     N = round(N);
     if N < 1
-        error('wavelet:daubechiesFiltre:BadOrder', 'N doit valoir au moins 1.');
+        error('wavelet:daubechiesFiltre:BadOrder', 'N must be at least 1.');
     end
     if N == 1
         Lo_R = [1 1] / sqrt(2);

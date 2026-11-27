@@ -58,7 +58,7 @@ function jeu = instsetfield(jeu, varargin)
             rang = find(strcmpi(jeu.FieldName{j}, noms{c}), 1);
             if isempty(rang)
                 error('finstr:instsetfield:Champ', ...
-                      'Le type %s n''a pas de champ %s.', jeu.Type{j}, noms{c});
+                      'Type %s has no field %s.', jeu.Type{j}, noms{c});
             end
             if iscell(jeu.FieldData{j}{rang})
                 if iscell(valeur)

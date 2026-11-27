@@ -26,6 +26,6 @@ function mot = matlibre_rs_coder(message, generateur, n, k, m, prim, position)
         case 'beg',  mot = [controle, message];
         otherwise
             error('comm:rsenc:Position', ...
-                  'La position doit être ''end'' ou ''beg''.');
+                  'Parity position must be ''end'' or ''beg''.');
     end
 end

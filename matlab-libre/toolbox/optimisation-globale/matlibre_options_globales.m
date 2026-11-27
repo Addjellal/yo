@@ -18,7 +18,7 @@ function options = matlibre_options_globales(defauts, nomFonction, varargin)
     arguments_ = varargin(debut:end);
     if mod(numel(arguments_), 2) ~= 0
         error('globaloptim:options:Couples', ...
-              '%s attend des couples nom-valeur.', nomFonction);
+              '%s requires name-value pairs.', nomFonction);
     end
     champs = fieldnames(defauts);
     for k = 1:2:numel(arguments_)
@@ -32,7 +32,7 @@ function options = matlibre_options_globales(defauts, nomFonction, varargin)
         end
         if isempty(trouve)
             error('globaloptim:options:Inconnue', ...
-                  '%s ne connaît pas l''option ''%s''.', nomFonction, nom);
+                  '%s has no option ''%s''.', nomFonction, nom);
         end
         options.(trouve) = arguments_{k + 1};
     end

@@ -18,7 +18,7 @@ function [Cnouveau, Lnouveau, cA] = upwlev(C, L, varargin)
     [Lo_R, Hi_R] = matlibre_ondelette_arguments(varargin, 'r', 'upwlev');
     if numel(L) < 3
         error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
-              'UPWLEV : la décomposition n''a pas de niveau à remonter.');
+              'UPWLEV: the decomposition has no level to reconstruct.');
     end
     a = C(1:L(1));
     d = C(L(1) + (1:L(2)));

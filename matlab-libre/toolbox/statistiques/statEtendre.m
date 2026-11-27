@@ -16,6 +16,6 @@ function y = statEtendre(v, forme)
         y = v;
     else
         error('stats:statEtendre:InputSizeMismatch', ...
-              'Les dimensions demandées ne correspondent pas à celles des paramètres.');
+              'The requested dimensions do not match those of the parameters.');
     end
 end

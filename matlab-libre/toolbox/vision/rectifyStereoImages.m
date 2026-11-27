@@ -56,11 +56,11 @@ function [J1, J2] = rectifyStereoImages(I1, I2, T1, T2, varargin)
             ymax = min(boite1(4), boite2(4));
             if xmax <= xmin || ymax <= ymin
                 error('vision:rectifyStereoImages:VueVide', ...
-                      'Les deux images redressées ne se recouvrent pas.');
+                      'The two rectified images do not overlap.');
             end
         otherwise
             error('vision:rectifyStereoImages:Vue', ...
-                  'OutputView vaut ''valid'' ou ''full''.');
+                  'OutputView must be ''valid'' or ''full''.');
     end
     cadre = [xmin, ymin, round(xmax - xmin) + 1, round(ymax - ymin) + 1];
     J1 = matlibre_projeter_image(I1, T1, cadre, remplissage);

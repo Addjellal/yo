@@ -36,7 +36,7 @@ function aire = areaint(latitudes, longitudes, varargin)
     phi = v{1}(:) * vers;
     lam = v{2}(:) * vers;
     if ~isequal(isnan(phi), isnan(lam))
-        error('map:areaint:NaN', 'Les NaN de LAT et de LON doivent se correspondre.');
+        error('map:areaint:NaN', 'The NaNs of LAT and LON must match.');
     end
     if e > 0
         phi = matlibre_latitude_authalique(phi, e);

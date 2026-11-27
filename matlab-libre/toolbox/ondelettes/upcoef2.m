@@ -35,7 +35,7 @@ function y = upcoef2(genre, x, varargin)
         case 'd', F1 = Hi_R; F2 = Hi_R;
         otherwise
             error('Wavelet:FunctionArgVal:Invalid_ArgVal', ...
-                  'UPCOEF2 : le type est ''a'', ''h'', ''v'' ou ''d''.');
+                  'UPCOEF2: type must be ''a'', ''h'', ''v'', or ''d''.');
     end
     y = double(x);
     for k = 1:niveaux

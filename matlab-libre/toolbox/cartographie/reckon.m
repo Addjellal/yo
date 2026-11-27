@@ -42,7 +42,7 @@ function [lat2, lon2] = reckon(varargin)
     if strcmp(piste, 'rh')
         if e ~= 0
             error('map:reckon:Ellipsoide', ...
-                  'La loxodromie n''est calculée que sur la sphère (excentricité nulle).');
+                  'Rhumb lines are computed on the sphere only (zero eccentricity).');
         end
         delta = s / a;
         dphi = delta .* cos(az);

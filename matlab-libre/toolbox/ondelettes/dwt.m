@@ -27,7 +27,7 @@ function [cA, cD] = dwt(x, varargin)
     [Lo_D, Hi_D, mode] = matlibre_ondelette_arguments(varargin, 'd', 'dwt');
     if ~(isnumeric(x) || islogical(x)) || (~isvector(x) && ~isempty(x))
         error('Wavelet:FunctionInput:InvalidVector', ...
-              'DWT attend un vecteur ; DWT2 traite les matrices.');
+              'DWT requires a vector; DWT2 handles matrices.');
     end
     colonne = size(x, 1) > 1;
     x = double(x(:)).';

@@ -18,7 +18,7 @@ function [axes, signe, tiers, propre] = matlibre_rob_sequence(nom)
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
     if ~(ischar(nom) || isstring(nom))
         error('robotics:conversion:Sequence', ...
-              'La sequence doit etre une chaine de trois lettres.');
+              'The sequence must be a three-letter string.');
     end
     lettres = upper(char(nom));
     if numel(lettres) ~= 3 || any(~ismember(lettres, 'XYZ'))
@@ -28,7 +28,7 @@ function [axes, signe, tiers, propre] = matlibre_rob_sequence(nom)
     axes = double(lettres) - double('X') + 1;
     if axes(1) == axes(2) || axes(2) == axes(3)
         error('robotics:conversion:Sequence', ...
-              'Deux axes consecutifs ne peuvent etre le meme : %s.', lettres);
+              'Two consecutive axes cannot be the same: %s.', lettres);
     end
     propre = axes(1) == axes(3);
     if propre
