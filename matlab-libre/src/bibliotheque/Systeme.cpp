@@ -14,6 +14,15 @@
 #ifndef _WIN32
 #include <sys/wait.h>
 #include <unistd.h>
+#else
+// GetModuleFileNameA, pour le chemin de l'interpréteur (fnExecutable).
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #endif
 
 #include "matlibre/Affichage.h"
