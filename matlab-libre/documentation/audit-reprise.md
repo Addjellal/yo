@@ -966,5 +966,6 @@ racine double ne se calcule qu'à la racine de la précision près),
 Misra1a à huit chiffres (la tolérance d'arrêt n'en promet pas plus :
 9,3 sous Linux, 7,9 sous Windows) — ou écrivaient dans `/tmp`, et un
 autre lançait un programme par `./prog`, que `cmd.exe` ne lit pas
-(`d0ade9d`, `3beca73`, `d590b4e`).
+(`d0ade9d`, `3beca73`, `d590b4e`). La nuit suivante, sur la branche
+(`2bfcea9`), macOS et Windows sont verts.
 

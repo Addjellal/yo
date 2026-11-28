@@ -419,19 +419,16 @@ faites P2, P4, P6, P7, P3, P9, P5 et les constats P40, P41, P42 (section
 (`9370c6a`, le 28 novembre) a donné : la batterie entière avec LAPACK,
 la construction sans Qt avec l'installation et les archives, et TSan,
 verts ; macOS, deux échecs, et Windows, cinq. Leurs causes sont
-corrigées (section 3, la dernière ligne) et éprouvées par une nuit
-lancée à la main sur la branche : macOS y est vert. À relire au prochain
-passage :
-- **Windows** : la nuit de vérification a montré le bureau démarré
-  (greffon `offscreen` trouvé) et 416 vérifications sur 418 ; les deux
-  dernières et le programme C de `test_litterature` sont corrigés depuis
-  (`d590b4e`), à confirmer. Le script qui pose et simule tous les blocs
-  de la bibliothèque y prend plus d'une minute, contre dix secondes sous
-  Linux : une lenteur propre à Windows, à mesurer (le parcours du
-  dossier courant à chaque appel de fonction ?) ;
+corrigées (section 3, la dernière ligne), et une nuit lancée à la main
+sur la branche (`2bfcea9`) a montré **macOS et Windows verts**, bureau
+compris. À relire au prochain passage :
 - **ASan et la couverture**, qui passent toute la batterie et prennent
-  plus d'une heure : leur premier résultat sur `main` n'était pas connu
-  à l'écriture de ces lignes (onglet Actions, « matlab-libre nuit »).
+  plus d'une heure : leur premier résultat n'était pas connu à
+  l'écriture de ces lignes (onglet Actions, « matlab-libre nuit ») ;
+- sous Windows, le script du bureau qui pose et simule tous les blocs
+  de la bibliothèque prend plus d'une minute, contre dix secondes sous
+  Linux : une lenteur propre à Windows, à mesurer (le parcours du
+  dossier courant à chaque appel de fonction ?).
 
 **La suite du tableau** : P10 (le PNG sans dépendance), P11
 (`jsondecode` natif), P13 (un scalaire sans allocation), P38, P12, P15…
