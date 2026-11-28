@@ -841,10 +841,14 @@ int main(int argc, char** argv) {
         std::printf("  (premier texte apres %lld ms)\n",
                     (long long)chronoAffichage.elapsed());
         // Et la fenetre repond toujours, sous le flot : c'est ce qui
-        // permet au Ctrl-C d'arriver jusqu'au moteur.
+        // permet au Ctrl-C d'arriver jusqu'au moteur. Plus de cinq tours
+        // de la boucle d'evenements en une seconde : sur une machine
+        // chargee (l'integration continue), un tour qui insere un gros
+        // paquet de texte en prend parfois 50 ms, et une fenetre de 200 ms
+        // echouait sans que rien ne soit fige.
         tours = 0;
         patience.restart();
-        while (patience.elapsed() < 200) {
+        while (patience.elapsed() < 1000) {
             QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
             ++tours;
         }
