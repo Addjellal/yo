@@ -97,7 +97,9 @@ portent un exemple, et celles qu'un test ou un exemple nomme. Il écrit
   sans avertissement et tous les tests de moins d'une minute ; chaque
   nuit, la batterie entière, puis sous ASan et UBSan, en couverture
   (`outils/couverture.sh`), sans Qt avec l'installation, et sur macOS et
-  Windows.
+  Windows. La première nuit sur `main` a trouvé deux défauts propres à
+  macOS et Windows (le chemin de l'interpréteur, le séparateur de
+  `path`), corrigés ; `reprise.md` (section 6) dit ce qui reste à relire.
 
 La règle de vérification est la même partout : **on vérifie la propriété
 qui définit la fonction, jamais une constante recopiée**. Le tableau

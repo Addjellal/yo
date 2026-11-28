@@ -202,6 +202,7 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 | `f3629df` | **P9** : `test_simulink` en quatre parts (la section 26, la moitié du temps, coupée elle-même) ; `test_aide` non coupé : deux exemples de `flou` en faisaient l'essentiel (`222a7ee`, 18 → 4 min). |
 | `8c08b70`, `11fc163`, `66086a5` | **P40** : une poignée de fonction n'est plus écrite en `double` dans un `.mat` (avertissement, variable laissée) ; **P42** : `dbstop in f at 3` ; **P41** : les 77 dernières erreurs en français passent en anglais. |
 | `075f958`, `4d97f45`, `c551dd2`, `abfefae`, `f0ba0c2`, `1f737f1`, `3b828d0`, `2aecde8` | Ce que la première intégration continue a montré : Windows ne compilait plus (`Systeme.cpp`) ; `tempdir` sans séparateur final ; la fusion FMA de clang sur ARM64 ; `fopen` en mode texte par défaut (Windows) ; un chemin symbolique de macOS dans `test_langage` ; un seuil de réactivité du bureau trop serré ; le test du bureau écrit sa console quand la bibliothèque échoue, ce qui a montré qu'il laissait le bureau dans un dossier effacé. |
+| `4f12d7d`, `d0ade9d`, `bbb50f1`, `6b0f75f`, `68aa25d`, `3beca73` | Ce que la première nuit sur `main` a montré : sous macOS, l'interpréteur ne connaissait pas son chemin (`/proc` n'y existe pas), et le lanceur de `mcc` était vide ; sous Windows, `path` séparait ses dossiers par « : » au lieu de `pathsep`, et le test du bureau ne trouvait pas le greffon `offscreen` (le `qt.conf` de `windeployqt` envoie Qt dans `greffons/`, où n'est que `windows`) et restait suspendu sans rien écrire ; trois seuils ou messages de test (pôle double, Misra1a, `/tmp` en dur). |
 
 ## 4. Les pièces récentes, et où elles sont
 
@@ -414,24 +415,20 @@ cherche un fragment de l'anglais, ou l'identifiant.
 faites P2, P4, P6, P7, P3, P9, P5 et les constats P40, P41, P42 (section
 3, et la fin d'`audit-reprise.md`).
 
-**L'intégration continue d'abord.** Sa première nuit, sur le commit
-`075f958`, a construit MatLibre sous **macOS** (Apple clang, Qt de
-Homebrew : 46 tests rapides sur 50) et sous **Windows** (MinGW de MSYS2,
-bureau Qt compris : 38 sur 47) ; TSan est vert. Les causes trouvées sont
-corrigées depuis (section 3). Restent, à relire au prochain passage :
-- le bureau, « les blocs de la bibliothèque … se simulent tous », qui
-  échouait sur les runners Linux et macOS : le diagnostic ajouté a montré
-  `run('/essaiBlocs.m')`. Le test laissait le bureau dans un dossier
-  temporaire effacé, et la suite écrivait à la racine du disque, ce que
-  seul l'administrateur (le conteneur) peut faire. Corrigé par `2aecde8`,
-  à confirmer au prochain passage ;
-- sous Windows : le bureau dépasse son délai de 30 minutes (une attente
-  qui ne finit pas hors écran) ; `test_defauts` (ligne 463),
-  `test_es_texte` (31), `test_mat` (258), `test_litterature` (228) et une
-  valeur de `aide_valeurs` échouent — la plupart sont sans doute le mode
-  texte de `fopen`, corrigé par `abfefae` ; `test_graphique` écrit dans
-  `/tmp/matlibre_test_figure.svg`, un chemin en dur ;
-- ASan et la couverture n'avaient pas fini à l'écriture de ces lignes.
+**L'intégration continue d'abord.** La première nuit sur `main`
+(`9370c6a`, le 28 novembre) a donné : la batterie entière avec LAPACK,
+la construction sans Qt avec l'installation et les archives, et TSan,
+verts ; macOS, deux échecs, et Windows, cinq. Leurs causes sont
+corrigées (section 3, la dernière ligne) et éprouvées par une nuit
+lancée à la main sur la branche : macOS y est vert. À relire au prochain
+passage :
+- **Windows** : le bureau, qui doit maintenant démarrer (greffon
+  `offscreen` trouvé) ou, s'il échoue encore, le dire en quinze minutes,
+  messages de Qt compris ; `path` et Misra1a, corrigés après la nuit de
+  vérification ;
+- **ASan et la couverture**, qui passent toute la batterie et prennent
+  plus d'une heure : leur premier résultat sur `main` n'était pas connu
+  à l'écriture de ces lignes (onglet Actions, « matlab-libre nuit »).
 
 **La suite du tableau** : P10 (le PNG sans dépendance), P11
 (`jsondecode` natif), P13 (un scalaire sans allocation), P38, P12, P15…
