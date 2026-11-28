@@ -51,7 +51,11 @@ option(MATLIBRE_TESTS       "Construire les tests"               ON)
 if(MSVC)
   add_compile_options(/W4 /utf-8 /bigobj)
 else()
-  add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+  # -ffp-contract=off : pas de fusion de a*b+c en une seule operation.
+  # clang la fait par defaut sur ARM64 (macOS) : -70:0.1:90 finissait a
+  # 90.00000000000001, et -2e-3:1e-7:2e-3 ne passait plus par zero. Les
+  # memes chiffres sur toutes les machines valent mieux que l'ulp gagne.
+  add_compile_options(-Wall -Wextra -Wno-unused-parameter -ffp-contract=off)
 endif()
 
 # Assainisseurs et couverture, pour chercher ce que les tests ne voient
