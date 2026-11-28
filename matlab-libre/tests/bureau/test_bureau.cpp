@@ -119,8 +119,6 @@ int main(int argc, char** argv) {
     QTemporaryDir travail;
     if (travail.isValid()) QDir::setCurrent(travail.path());
     const QString dossierTravail = QDir::currentPath();
-
-    std::printf("--- bureau ---\n");
     FenetrePrincipale fenetre;
     fenetre.resize(1280, 820);
     fenetre.show();
@@ -1191,7 +1189,8 @@ int main(int argc, char** argv) {
                  "le dossier est cree");
         // Une fonction neuve porte deja son en-tete.
         QFile modele(QDir(bac.path()).filePath(QStringLiteral("ma_fonction.m")));
-        modele.open(QIODevice::ReadOnly | QIODevice::Text);
+        verifier(modele.open(QIODevice::ReadOnly | QIODevice::Text),
+                 "la fonction neuve se relit");
         QString texteModele = QString::fromUtf8(modele.readAll());
         modele.close();
         verifier(texteModele.contains(QLatin1String("function sortie = ma_fonction")),
@@ -1245,12 +1244,14 @@ int main(int argc, char** argv) {
         // Un nom deja pris ne remplace rien en silence.
         fenetre.creerDansDossier(QStringLiteral("script"), QStringLiteral("unique.m"));
         QFile pris(QDir(bac.path()).filePath(QStringLiteral("unique.m")));
-        pris.open(QIODevice::WriteOnly | QIODevice::Text);
+        verifier(pris.open(QIODevice::WriteOnly | QIODevice::Text),
+                 "le fichier deja pris s'ecrit");
         pris.write("% ne pas effacer\n");
         pris.close();
         fenetre.creerDansDossier(QStringLiteral("script"), QStringLiteral("unique.m"));
         QFile relu(QDir(bac.path()).filePath(QStringLiteral("unique.m")));
-        relu.open(QIODevice::ReadOnly | QIODevice::Text);
+        verifier(relu.open(QIODevice::ReadOnly | QIODevice::Text),
+                 "le fichier deja pris se relit");
         verifier(QString::fromUtf8(relu.readAll()).contains(QLatin1String("ne pas effacer")),
                  "un fichier existant n'est pas ecrase");
         relu.close();
@@ -1328,8 +1329,7 @@ int main(int argc, char** argv) {
         QDir(bac.path()).mkdir(QStringLiteral("Fig"));
         for (const char* nom : {"Khinf.mat", "Kbis.mat", "analyse.m"}) {
             QFile f(QDir(bac.path()).filePath(QLatin1String(nom)));
-            f.open(QIODevice::WriteOnly);
-            f.write("1\n");
+            if (f.open(QIODevice::WriteOnly)) f.write("1\n");
             f.close();
         }
         envoyer(fenetre, QStringLiteral("cd('%1')").arg(bac.path()));
