@@ -939,10 +939,12 @@ trouver ce qui suit, corrigé chaque fois avec son test :
 | `fopen` ouvrait en mode texte sauf `'b'` (MATLAB : binaire sauf `'t'`) ; sous Windows, un Parquet écrit ne se relisait pas | `test_parquet` sous Windows | haute sous Windows | `abfefae` |
 | deux exemples de la logique floue prenaient 370 et 58 s | mesure de `test_aide` par module | basse (temps) | `222a7ee` |
 
-Restent ouverts, à relire au prochain passage de l'intégration continue :
-le test du bureau « les blocs de la bibliothèque se simulent tous », rouge
-sur les runners Linux et macOS, vert dans le conteneur (il écrit
-désormais la console quand il échoue) ; sous Windows, le bureau qui
+Le test du bureau « les blocs de la bibliothèque se simulent tous »,
+rouge sur les runners Linux et macOS et vert dans le conteneur, laissait
+le bureau dans un dossier temporaire effacé : la suite écrivait à la
+racine du disque, possible au seul administrateur (`2aecde8`, trouvé par
+la console qu'il écrit désormais en cas d'échec). Restent ouverts, à
+relire au prochain passage de l'intégration continue : sous Windows, le bureau qui
 dépasse son délai et cinq scripts (`test_defauts`, `test_es_texte`,
 `test_mat`, `test_litterature`, `aide_valeurs`), dont le mode texte de
 `fopen` explique sans doute une partie, et `test_graphique`, qui écrit

@@ -201,7 +201,7 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 | `5abfd63` | **P5** : LAPACK et BLAS facultatifs (`MATLIBRE_LAPACK`) pour le produit, `A\b` carré, `svd` et `eig` — `eig` symétrique 300×300 de 0,31 s à 6 ms ; le paquet `.deb` déclare ses dépendances. Il a fait trouver trois défauts : `zp2sos` (sections du premier ordre fausses, `cf549b6`), `lasso` (premier modèle du chemin non nul, `df83dd8`), Daubechies d'ordre élevé (`f4c1cca`). |
 | `f3629df` | **P9** : `test_simulink` en quatre parts (la section 26, la moitié du temps, coupée elle-même) ; `test_aide` non coupé : deux exemples de `flou` en faisaient l'essentiel (`222a7ee`, 18 → 4 min). |
 | `8c08b70`, `11fc163`, `66086a5` | **P40** : une poignée de fonction n'est plus écrite en `double` dans un `.mat` (avertissement, variable laissée) ; **P42** : `dbstop in f at 3` ; **P41** : les 77 dernières erreurs en français passent en anglais. |
-| `075f958`, `4d97f45`, `c551dd2`, `abfefae`, `f0ba0c2`, `1f737f1`, `3b828d0` | Ce que la première intégration continue a montré : Windows ne compilait plus (`Systeme.cpp`) ; `tempdir` sans séparateur final ; la fusion FMA de clang sur ARM64 ; `fopen` en mode texte par défaut (Windows) ; un chemin symbolique de macOS dans `test_langage` ; un seuil de réactivité du bureau trop serré ; le test du bureau écrit sa console quand la bibliothèque échoue. |
+| `075f958`, `4d97f45`, `c551dd2`, `abfefae`, `f0ba0c2`, `1f737f1`, `3b828d0`, `2aecde8` | Ce que la première intégration continue a montré : Windows ne compilait plus (`Systeme.cpp`) ; `tempdir` sans séparateur final ; la fusion FMA de clang sur ARM64 ; `fopen` en mode texte par défaut (Windows) ; un chemin symbolique de macOS dans `test_langage` ; un seuil de réactivité du bureau trop serré ; le test du bureau écrit sa console quand la bibliothèque échoue, ce qui a montré qu'il laissait le bureau dans un dossier effacé. |
 
 ## 4. Les pièces récentes, et où elles sont
 
@@ -419,11 +419,12 @@ faites P2, P4, P6, P7, P3, P9, P5 et les constats P40, P41, P42 (section
 Homebrew : 46 tests rapides sur 50) et sous **Windows** (MinGW de MSYS2,
 bureau Qt compris : 38 sur 47) ; TSan est vert. Les causes trouvées sont
 corrigées depuis (section 3). Restent, à relire au prochain passage :
-- le bureau, « les blocs de la bibliothèque … se simulent tous », échoue
-  sur les runners Linux et macOS et passe dans le conteneur (en locale
-  POSIX comme en C.UTF-8, sans fichier `untitled.mat` traînant) ; le test
-  écrit désormais la fin de la console quand il échoue : lire la cause
-  dans le journal ;
+- le bureau, « les blocs de la bibliothèque … se simulent tous », qui
+  échouait sur les runners Linux et macOS : le diagnostic ajouté a montré
+  `run('/essaiBlocs.m')`. Le test laissait le bureau dans un dossier
+  temporaire effacé, et la suite écrivait à la racine du disque, ce que
+  seul l'administrateur (le conteneur) peut faire. Corrigé par `2aecde8`,
+  à confirmer au prochain passage ;
 - sous Windows : le bureau dépasse son délai de 30 minutes (une attente
   qui ne finit pas hors écran) ; `test_defauts` (ligne 463),
   `test_es_texte` (31), `test_mat` (258), `test_litterature` (228) et une
