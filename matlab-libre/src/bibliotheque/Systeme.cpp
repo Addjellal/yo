@@ -323,10 +323,18 @@ FONCTION(fnPathsep) {
 #endif
 }
 
+// Le dossier temporaire, terminé par un séparateur comme dans MATLAB
+// (« /tmp/ ») : « [tempdir 'f.csv'] » est l'usage, et sans le séparateur
+// il désignait /tmpf.csv, à la racine du disque — un fichier que seul
+// l'administrateur peut y écrire.
 FONCTION(fnTempdir) {
     INUTILISE
     std::error_code ec;
-    return {Valeur::texte(fs::temp_directory_path(ec).string())};
+    std::string dossier = fs::temp_directory_path(ec).string();
+    if (dossier.empty()) dossier = ".";
+    const char separateur = (char)fs::path::preferred_separator;
+    if (dossier.back() != '/' && dossier.back() != separateur) dossier += separateur;
+    return {Valeur::texte(dossier)};
 }
 
 // Un nom tiré au hasard, « tp » puis un identifiant à la façon de MATLAB.
