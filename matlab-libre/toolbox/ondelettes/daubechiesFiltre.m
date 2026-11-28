@@ -37,7 +37,14 @@ function Lo_R = daubechiesFiltre(N, phase)
     for k = 0:N-1
         coefficients(N - k) = nchoosek(N - 1 + k, k);
     end
-    racinesY = roots(coefficients);
+    % Les coefficients vont de 1 à C(2N-2, N-1) — 1e25 pour db45 — et
+    % croissent comme 4^k : la matrice compagnon en est déséquilibrée, et
+    % ses valeurs propres dépendent de l'algorithme (LAPACK ou le QR du
+    % dépôt) — db45 perdait son orthogonalité à 1e-4 près. En posant
+    % y = t/4, les coefficients du polynôme en t restent du même ordre ;
+    % ses racines se calculent bien, et l'on revient à y.
+    echelle = 4 .^ -(N - 1:-1:0);
+    racinesY = roots(coefficients .* echelle) / 4;
     % y = -(z - 2 + 1/z)/4  =>  z^2 - (2 - 4y) z + 1 = 0.
     paires = cell(1, numel(racinesY));
     for k = 1:numel(racinesY)
