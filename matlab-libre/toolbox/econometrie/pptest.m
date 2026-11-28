@@ -3,9 +3,12 @@ function [rejet, pValeur, statistique, valeurCritique] = pptest(serie, varargin)
 %   H = PPTEST(Y) teste si Y a une racine unitaire. H vaut un quand
 %   l'hypothèse est rejetée : la série est stationnaire.
 %
-%   PPTEST(...,'Lags',L) choisit la fenêtre de la correction,
-%   'Model',M le modèle — 'AR' sans constante, 'ARD' avec constante
-%   (défaut), 'TS' avec constante et tendance —, 'Alpha',A le seuil.
+%   PPTEST(...,'Lags',L) choisit la fenêtre de la correction (zéro par
+%   défaut, comme dans MATLAB : sans retard, la statistique est celle de
+%   Dickey-Fuller), 'Model',M le modèle — 'AR' sans constante (défaut),
+%   'ARD' avec constante, 'TS' avec constante et tendance —, 'Alpha',A le
+%   seuil. Les valeurs critiques sont celles d'ADFTEST, à la taille
+%   effective de l'échantillon.
 %   [H,P,STAT,CRIT] = PPTEST(...) rend la valeur p, la statistique et la
 %   valeur critique.
 %
@@ -21,9 +24,8 @@ function [rejet, pValeur, statistique, valeurCritique] = pptest(serie, varargin)
 %
 %   Voir aussi ADFTEST, KPSSTEST, VRATIOTEST, LMCTEST.
     serie = double(serie(:));
-    n = numel(serie);
-    retards = max(1, floor(4 * (n / 100) ^ 0.25));
-    modele = 'ard';
+    retards = 0;
+    modele = 'ar';
     alpha = 0.05;
     k = 1;
     while k + 1 <= numel(varargin)
@@ -46,7 +48,7 @@ function [rejet, pValeur, statistique, valeurCritique] = pptest(serie, varargin)
         case 'ts',  X = [ones(m, 1), (1:m).', yRetarde];
         otherwise
             error('econ:pptest:Modele', ...
-                  'Le modèle doit être ''AR'', ''ARD'' ou ''TS''.');
+                  'Model must be ''AR'', ''ARD'', or ''TS''.');
     end
     coefficients = X \ y;
     residus = y - X * coefficients;
@@ -62,6 +64,7 @@ function [rejet, pValeur, statistique, valeurCritique] = pptest(serie, varargin)
     sigmaLong = matlibre_newey_west(residus, retards);
     statistique = sqrt(sigmaCourt / sigmaLong) * tBrut - ...
                   (sigmaLong - sigmaCourt) * m * ecartType / (2 * sigmaLong * sqrt(sigmaCourt));
-    [pValeur, valeurCritique] = matlibre_dickey_table(statistique, modele, alpha);
+    [pValeur, valeurCritique] = ...
+        matlibre_dickey_table(statistique, modele, alpha, 't1', m);
     rejet = statistique < valeurCritique;
 end

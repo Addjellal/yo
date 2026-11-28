@@ -3,7 +3,7 @@ function [contributions, total] = matlibre_contribution_credit(modele)
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
     if isempty(modele.Losses)
         error('risque:contribution:Simulation', ...
-              'Il faut simuler le modèle avant de décomposer son risque.');
+              'Simulate the model before computing risk contributions.');
     end
     pertes = modele.Losses;
     portefeuille = modele.PortfolioLosses;

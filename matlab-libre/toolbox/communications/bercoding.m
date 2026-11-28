@@ -23,7 +23,7 @@ function ber = bercoding(EbNodB, type, decision, varargin)
     decision = lower(char(decision));
     if ~any(strcmp(decision, {'hard', 'soft'}))
         error('comm:bercoding:Decision', ...
-              'La décision doit être ''hard'' ou ''soft''.');
+              'Decision must be ''hard'' or ''soft''.');
     end
     switch lower(char(type))
         case 'conv'
@@ -44,7 +44,7 @@ function ber = bercoding(EbNodB, type, decision, varargin)
             ber = matlibre_ber_bloc(EbNo, n, k, dmin, decision);
         otherwise
             error('comm:bercoding:Type', ...
-                  'Le type doit être ''conv'' ou ''block''.');
+                  'Type must be ''conv'' or ''block''.');
     end
     ber = reshape(ber, size(EbNodB));
 end

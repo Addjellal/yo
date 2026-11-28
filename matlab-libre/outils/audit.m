@@ -23,7 +23,7 @@ corpus = '';
 for dossier = {fullfile(racine, 'tests', 'scripts'), ...
                fullfile(racine, 'exemples'), ...
                fullfile(racine, 'exemples', 'toolboxes')}
-    fichiers = dir(fullfile(dossier{1}, '*.m'));
+    fichiers = matlibre_fichiers_module(dossier{1});
     for k = 1:numel(fichiers)
         corpus = [corpus, ' ', fileread(fullfile(fichiers(k).folder, fichiers(k).name))]; %#ok<AGROW>
     end
@@ -59,7 +59,7 @@ for b = 1:numel(noms)
     if strcmp(nom, 'aide')
         continue
     end
-    fichiers = dir(fullfile(dossierToolbox, nom, '*.m'));
+    fichiers = matlibre_fichiers_module(fullfile(dossierToolbox, nom));
     nFonctions = 0;
     nDocumentees = 0;
     nExemples = 0;

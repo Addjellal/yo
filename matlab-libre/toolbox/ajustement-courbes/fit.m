@@ -41,7 +41,7 @@ function [ajustement, qualite, sortie] = fit(x, y, modele, varargin)
     x = x(:);
     if numel(x) ~= numel(y)
         error('curvefit:fit:Tailles', ...
-              'X et Y doivent avoir le même nombre d''éléments.');
+              'X and Y must have the same number of elements.');
     end
     if ~isa(modele, 'fittype')
         modele = fittype(modele);

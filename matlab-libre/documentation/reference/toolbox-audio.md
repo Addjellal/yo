@@ -3,9 +3,19 @@
 ```
 % Audio Toolbox — sons et descripteurs.
 %
+% Fichiers
 %   audiowrite, audioread - Fichiers WAV PCM 16 bits
-%   spectralCentroid      - Centre de gravité spectral
-%   zerocrossrate         - Taux de passages par zéro
+%
+% Descripteurs (signatures de MATLAB)
+%   spectralCentroid      - Centroïde spectral trame par trame (Peeters, 2004)
+%   zerocrossrate         - Taux de passages par zéro ou par un niveau
+%
+% Échelles perceptives
+%   hz2mel, mel2hz        - Échelle de Mel (O'Shaughnessy, 1987)
+%   hz2bark, bark2hz      - Échelle de Bark (Traunmüller, 1990)
+%   hz2erb, erb2hz        - Échelle ERB (Glasberg et Moore, 1990)
+%
+% Propres à MatLibre
 %   melFilterBank         - Banc de filtres de Mel
 %   mfccSimple            - Coefficients cepstraux
 %   dbfs                  - Niveau en dB pleine échelle
@@ -57,6 +67,20 @@ AUDIOWRITE Écrit un fichier WAV PCM 16 bits monophonique.
   Voir aussi AUDIOREAD, DBFS.
 ```
 
+## `bark2hz`
+
+```
+BARK2HZ Échelle de Bark vers les hertz, inverse de HZ2BARK (Traunmüller, 1990).
+  Les corrections des bouts s'inversent d'abord — sous 2 Bark,
+  (b - 0.3) / 0.85 ; au-dessus de 20.1, (b + 4.422) / 1.22 — puis
+  HZ = 1960 (b + 0.53) / (26.28 - b).
+
+  Exemple :
+     bark2hz(hz2bark(1000))     % 1000
+
+  Voir aussi HZ2BARK, MEL2HZ, ERB2HZ.
+```
+
 ## `dbfs`
 
 ```
@@ -79,6 +103,73 @@ DBFS Niveau en décibels pleine échelle.
      dbfs(0.1 * ones(1, 100))        % -20
 
   Voir aussi AUDIOREAD, RMS, SPECTRALCENTROID.
+```
+
+## `erb2hz`
+
+```
+ERB2HZ Échelle ERB vers les hertz, inverse de HZ2ERB (Glasberg et Moore, 1990).
+  HZ = (10^(ERB/A) - 1) / 0.00437, A = 1000 ln(10) / (24.7 x 4.37).
+
+  Exemple :
+     erb2hz(hz2erb(440))        % 440
+
+  Voir aussi HZ2ERB, MEL2HZ, BARK2HZ.
+```
+
+## `hz2bark`
+
+```
+HZ2BARK Fréquences en hertz vers l'échelle de Bark (Traunmüller, 1990).
+  BARK = HZ2BARK(HZ) = 26.81 HZ / (1960 + HZ) - 0.53, corrigé aux deux
+  bouts comme dans MATLAB : sous 2 Bark, b + 0.15 (2 - b) ; au-dessus de
+  20.1 Bark, b + 0.22 (b - 20.1). L'échelle de Bark compte les bandes
+  critiques de l'oreille (Zwicker) : 1000 Hz tombent vers 8.5 Bark.
+
+  Exemple :
+     hz2bark(1000)              % 8.527
+
+  Voir aussi BARK2HZ, HZ2MEL, HZ2ERB.
+```
+
+## `hz2erb`
+
+```
+HZ2ERB Fréquences en hertz vers l'échelle ERB (Glasberg et Moore, 1990).
+  ERB = HZ2ERB(HZ) = A log10(1 + 0.00437 HZ), A = 1000 ln(10) / (24.7
+  x 4.37) : le nombre de bandes rectangulaires équivalentes sous HZ, la
+  bande à F valant 24.7 (4.37 F/1000 + 1) hertz. 1000 Hz valent 15.57.
+
+  Exemple :
+     hz2erb(1000)               % 15.572
+
+  Voir aussi ERB2HZ, HZ2MEL, HZ2BARK.
+```
+
+## `hz2mel`
+
+```
+HZ2MEL Fréquences en hertz vers l'échelle de Mel.
+  MEL = HZ2MEL(HZ) = 2595 log10(1 + HZ/700), la formule
+  d'O'Shaughnessy (1987) qu'emploie MATLAB. Par construction, 1000 Hz
+  valent 1000 mels.
+
+  Exemple :
+     hz2mel([0 1000 4000])      % 0, 1000, 2146.1
+
+  Voir aussi MEL2HZ, HZ2BARK, HZ2ERB, MELFILTERBANK.
+```
+
+## `mel2hz`
+
+```
+MEL2HZ Échelle de Mel vers les hertz : HZ = 700 (10^(MEL/2595) - 1).
+  L'inverse exact de HZ2MEL (O'Shaughnessy, 1987).
+
+  Exemple :
+     mel2hz(1000)               % 1000.02 : presque l'identite a 1 kHz
+
+  Voir aussi HZ2MEL, BARK2HZ, ERB2HZ.
 ```
 
 ## `melFilterBank`
@@ -157,37 +248,76 @@ MFCCSIMPLE Coefficients cepstraux sur l'échelle de Mel.
 ## `spectralCentroid`
 
 ```
-SPECTRALCENTROID Centre de gravité du spectre, en hertz.
-  C = SPECTRALCENTROID(X,FS) rend la moyenne des fréquences pondérée par
-  l'amplitude du spectre. FS vaut un par défaut, auquel cas le résultat
-  est une fréquence réduite.
+SPECTRALCENTROID Centroïde spectral, trame par trame (Peeters, 2004).
+  CENTROID = SPECTRALCENTROID(X,FS) découpe le signal X (une colonne par
+  voie) en trames, et rend pour chacune le centre de gravité de son
+  spectre, en hertz :
+     centroïde = somme(f_k s_k) / somme(s_k),
+  sur les raies f_k de la bande Range. CENTROID a une ligne par trame et
+  une colonne par voie. Comme MATLAB, les trames durent par défaut
+  30 ms (fenêtre rectangulaire) et se recouvrent de 20 ms.
 
-  C'est le descripteur qui correspond le mieux à la « brillance »
-  perçue d'un son : un son grave a un centroïde bas, un son clair un
-  centroïde haut. Il sert dans presque toute classification de timbre.
+  CENTROID = SPECTRALCENTROID(S,F), F étant un vecteur de fréquences,
+  prend S pour un spectre déjà calculé : numel(F) lignes, une colonne
+  par spectre (et une page par voie). Les options n'y servent pas.
 
-  Les repères : le centroïde d'un sinus pur est sa fréquence ; celui
-  d'un bruit blanc tombe au quart de la fréquence d'échantillonnage,
-  c'est-à-dire au milieu de la bande utile.
+  Options, pour un signal temporel :
+     'Window'         fenêtre (défaut rectwin(round(FS*0.03)))
+     'OverlapLength'  recouvrement en échantillons (défaut round(FS*0.02))
+     'FFTLength'      longueur de la transformée (défaut numel(Window))
+     'Range'          bande [fmin fmax] en hertz (défaut [0 FS/2])
+     'SpectrumType'   'power' (défaut, s = |X|²) ou 'magnitude' (|X|)
+  Le spectre d'une trame est |FFT|² (ou |FFT|) de la trame fenêtrée, sur
+  les raies de 0 à FS/2.
+
+  Sans argument de sortie, trace le centroïde en fonction du temps.
 
   Exemple :
-     fs = 8000; t = (0:fs-1) / fs;
-     spectralCentroid(sin(2*pi*1000*t), fs)      % 1000
-     spectralCentroid(randn(1, fs), fs)          % environ fs/4
+     fs = 8000; t = (0:fs - 1).' / fs;
+     c = spectralCentroid(sin(2 * pi * 1000 * t), fs);   % 1000 Hz partout
 
-  Voir aussi DBFS, MFCCSIMPLE, MELFILTERBANK.
+  Voir aussi ZEROCROSSRATE, MELFILTERBANK, STFT.
 ```
 
 ## `zerocrossrate`
 
 ```
-ZEROCROSSRATE Proportion de passages par zéro.
-  R = ZEROCROSSRATE(X) compte les changements de signe et divise par la
-  longueur de la fenêtre, comme le fait MATLAB.
+ZEROCROSSRATE Taux de passages par zéro (ou par un niveau).
+  RATE = ZEROCROSSRATE(X) rend le taux de passages par zéro de X, comme
+  MATLAB : le nombre de passages divisé par la longueur de la fenêtre.
+  Une matrice X est traitée colonne par colonne, une colonne par voie.
+  [RATE,COUNT,INDICES] = ZEROCROSSRATE(X) rend aussi le nombre de
+  passages par fenêtre et les échantillons marqués (fenêtres x
+  WindowLength x voies, logiques).
 
-  Exemple :
-     zerocrossrate([1 -1 1 -1])   % 0.75
+  Options (nom, valeur) :
+     'Method'          'difference' (défaut) ou 'comparison'
+     'WindowLength'    longueur des fenêtres (défaut : tout le signal)
+     'OverlapLength'   recouvrement des fenêtres (défaut 0)
+     'Level'           niveau dont on compte les passages (défaut 0)
+     'Threshold'       les écarts au niveau de module au plus égal à ce
+                       seuil comptent pour zéro (défaut 0)
+     'InitialState'    l'échantillon qui précède le signal (défaut 0)
+     'TransitionEdge'  'both' (défaut), 'rising' ou 'falling'
+     'ZeroPositive'    un zéro compte comme positif (défaut false)
 
-  Voir aussi RMS, SPECTRALCENTROID, MFCC.
+  Méthode 'difference' : chaque échantillon apporte |sgn(x(i)) -
+  sgn(x(i-1))| / 2, où sgn suit SIGN (zéro a son propre signe, sauf
+  ZeroPositive) ; un passage franc de +1 à -1 compte un, un passage par
+  un zéro compte deux demis. Méthode 'comparison' : un passage ne compte
+  qu'une fois achevé, quand le signe non nul s'inverse. L'échantillon
+  initial vaut 0 par défaut : un premier échantillon non nul compte
+  donc pour un demi passage en méthode 'difference'. Le taux est le
+  compte divisé par WindowLength.
+
+  Exemples :
+     % Documentation de MATLAB.
+     x = [1 -1 1 -1 1 -1 1 -1 1 -1];
+     zerocrossrate(x)                         % 0.95
+     zerocrossrate(x, 'Method', 'comparison') % 0.90
+     zerocrossrate(x, 'ZeroPositive', true)   % 0.90
+     zerocrossrate(x, 'InitialState', 1)      % 0.90
+
+  Voir aussi SIGN, SPECTRALCENTROID, RMS.
 ```
 

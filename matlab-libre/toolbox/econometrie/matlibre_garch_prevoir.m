@@ -21,7 +21,7 @@ function [variances, memeChose] = matlibre_garch_prevoir(obj, horizon, varargin)
     modele = matlibre_garch_verifier(obj);
     if isempty(historique)
         error('econ:garch:Historique', ...
-              'FORECAST demande la série observée, passée par ''Y0''.');
+              'FORECAST requires the observed series, given with ''Y0''.');
     end
     if size(historique, 1) == 1
         historique = historique.';

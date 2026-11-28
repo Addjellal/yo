@@ -8,9 +8,10 @@ function E = dipolePattern(theta, longueurOnde)
 %   le fil par le bout, ce qui est une conséquence directe du rayonnement
 %   d'un élément de courant.
 %
-%   Le demi-onde ouvre à 78 degrés à mi-puissance et a une directivité de
-%   1,64, soit 2,15 dBi : ces deux nombres du cours se retrouvent en
-%   passant le diagramme à BEAMWIDTH et DIRECTIVITY.
+%   Le demi-onde ouvre à 78,08 degrés à mi-puissance et a une directivité
+%   de 4 / Cin(2 pi) = 1,6409, soit 2,15 dBi (Balanis, Antenna Theory,
+%   § 4.6) : ces deux nombres du cours se retrouvent en passant le
+%   diagramme à BEAMWIDTH et DIRECTIVITY.
 %
 %   Allonger le dipôle resserre le faisceau et augmente la directivité,
 %   jusqu'à une longueur d'onde environ ; au-delà, des lobes secondaires
@@ -28,13 +29,7 @@ function E = dipolePattern(theta, longueurOnde)
         longueurOnde = 0.5;
     end
     kl = pi * longueurOnde;
-    E = zeros(size(theta));
-    for k = 1:numel(theta)
-        s = sin(theta(k));
-        if abs(s) < 1e-12
-            E(k) = 0;
-        else
-            E(k) = abs((cos(kl * cos(theta(k))) - cos(kl)) / s);
-        end
-    end
+    s = sin(theta);
+    E = abs((cos(kl * cos(theta)) - cos(kl)) ./ s);
+    E(abs(s) < 1e-12) = 0;
 end

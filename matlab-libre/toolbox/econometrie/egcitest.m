@@ -40,7 +40,7 @@ function [rejet, pValeur, statistique, valeurCritique, regression, residuelle] =
     [T, n] = size(Y);
     if n < 2
         error('econ:egcitest:Series', ...
-              'Il faut au moins deux séries pour parler de cointégration.');
+              'At least two series are required to test for cointegration.');
     end
     creg = 'c';
     rreg = 'adf';
@@ -70,7 +70,7 @@ function [rejet, pValeur, statistique, valeurCritique, regression, residuelle] =
         case 'ctt',  deterministe = [ones(T, 1), (1:T).', ((1:T).') .^ 2];
         otherwise
             error('econ:egcitest:Creg', ...
-                  'La régression de cointégration vaut ''nc'', ''c'', ''ct'' ou ''ctt''.');
+                  'The cointegrating regression must be ''nc'', ''c'', ''ct'', or ''ctt''.');
     end
     if isempty(vecteur)
         X = [deterministe, Y(:, 2:end)];
@@ -80,7 +80,7 @@ function [rejet, pValeur, statistique, valeurCritique, regression, residuelle] =
     else
         if numel(vecteur) ~= n
             error('econ:egcitest:Cvec', ...
-                  'Le vecteur de cointégration doit avoir %d composantes.', n);
+                  'The cointegrating vector must have %d elements.', n);
         end
         coefficients = vecteur;
         brut = Y * vecteur;
@@ -104,11 +104,17 @@ function [rejet, pValeur, statistique, valeurCritique, regression, residuelle] =
                 matlibre_phillips_perron(residus, retards, 'ar', forme);
         otherwise
             error('econ:egcitest:Rreg', ...
-                  'Le test des résidus vaut ''adf'' ou ''pp'', pas ''%s''.', rreg);
+                  'The residual test must be ''adf'' or ''pp'', not ''%s''.', rreg);
     end
     residuelle = struct('coefficients', coefficientsResiduels, ...
                         'rreg', rreg, 'lags', retards, 'test', forme);
+    % La taille effective de la régression des résidus, pour les tables.
+    if strcmp(rreg, 'adf')
+        taille = numel(residus) - 1 - retards;
+    else
+        taille = numel(residus) - 1;
+    end
     [pValeur, valeurCritique] = ...
-        matlibre_egci_table(statistique, creg, regresseurs, forme, alpha);
+        matlibre_egci_table(statistique, creg, regresseurs, forme, alpha, taille);
     rejet = statistique < valeurCritique;
 end

@@ -16,6 +16,6 @@ function reseau = assembleNetwork(couches)
     reseau = dlnetwork(couches);
     if ~reseau.Initialized
         error('nnet:assembleNetwork:Tailles', ...
-              'Les tailles ne se déduisent pas des couches ; donnez une couche d''entrée.');
+              'Sizes cannot be inferred from the layers; add an input layer.');
     end
 end

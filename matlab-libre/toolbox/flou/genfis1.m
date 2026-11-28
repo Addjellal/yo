@@ -30,7 +30,7 @@ function fis = genfis1(donnees, nombreMf, typeEntree, typeSortie)
     donnees = double(donnees);
     nEntrees = size(donnees, 2) - 1;
     if nEntrees < 1
-        error('fuzzy:genfis1:BadData', 'Il faut au moins une entrée et une sortie.');
+        error('fuzzy:genfis1:BadData', 'At least one input and one output are required.');
     end
     if numel(nombreMf) == 1
         nombreMf = repmat(nombreMf, 1, nEntrees);

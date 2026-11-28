@@ -23,7 +23,7 @@ function [psi, xval] = shanwavf(bas, haut, n, fb, fc)
     if nargin < 4 || isempty(fb), fb = 1; end
     if nargin < 5 || isempty(fc), fc = 1; end
     if fb <= 0 || fc <= 0
-        error('wavelet:shanwavf:Parametres', 'FB et FC doivent être positifs.');
+        error('wavelet:shanwavf:Parametres', 'FB and FC must be positive.');
     end
     xval = linspace(bas, haut, n);
     psi = sqrt(fb) * sinc(fb * xval) .* exp(2 * 1i * pi * fc * xval);

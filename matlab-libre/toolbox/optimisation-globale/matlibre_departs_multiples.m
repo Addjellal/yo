@@ -11,7 +11,7 @@ function [meilleurX, meilleureValeur, sortie] = matlibre_departs_multiples(probl
     x0 = double(probleme.x0);
     if isempty(x0)
         error('globaloptim:run:Depart', ...
-              'Le problème doit porter un point de départ.');
+              'The problem must have a start point.');
     end
     x0 = x0(:);
     n = numel(x0);

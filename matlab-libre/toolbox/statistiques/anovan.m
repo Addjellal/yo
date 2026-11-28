@@ -86,7 +86,7 @@ function [p, tableau, stats] = anovan(y, groupes, varargin)
     ddlResiduel = n - rang(A);
     if ddlResiduel <= 0
         error('stats:anovan:DegresDeLiberte', ...
-              'Le modèle absorbe toutes les observations : pas de résidu.');
+              'The model uses all observations: no residual degrees of freedom.');
     end
     carreMoyenResiduel = sceCourante / ddlResiduel;
     F = (sommes ./ max(ddl, 1)) / max(carreMoyenResiduel, eps);

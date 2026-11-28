@@ -196,44 +196,49 @@ FONCTION(fnIntmin) {
 
 // ------------------------------------------------------------- aléatoire
 
+// La graine d'un appel historique, rand('seed', g) ou rand('twister', g).
+bool ancienneGraine(Interpreteur& it, const Arguments& args) {
+    if (args.empty() || !(args[0].estTexte() || args[0].estChaine())) return false;
+    std::string quoi = args[0].versTexte();
+    if (quoi != "seed" && quoi != "state" && quoi != "twister") return false;
+    double graine = args.size() > 1 && args[1].nelem() >= 1 ? args[1].scal() : 0.0;
+    it.generateur.initialiser((std::uint32_t)graine);
+    return true;
+}
+
 FONCTION(fnRand) {
     INUTILISE
+    if (ancienneGraine(it, args)) return {};
     Classe c = extraireClasse(args, Classe::Double);
-    if (!args.empty() && (args[0].estTexte() || args[0].estChaine())) {
-        std::string quoi = args[0].versTexte();
-        if (quoi == "seed" || quoi == "state" || quoi == "twister") {
-            unsigned long long graine = args.size() > 1 ? (unsigned long long)args[1].scal() : 0;
-            it.generateur.seed(graine ? graine : 5489u);
-            return {};
-        }
-    }
     Dims d = dimsDepuisArguments(args, 0, args.size());
     Valeur v = Valeur::matriceDims(d);
+    for (auto& x : v.re) x = it.generateur.uniforme();
+    if (c == Classe::Simple)
+        for (auto& x : v.re) x = (double)(float)x;
     v.classe = c;
-    std::uniform_real_distribution<double> loi(0.0, 1.0);
-    for (auto& x : v.re) x = loi(it.generateur);
     return {v};
 }
 
 FONCTION(fnRandn) {
     INUTILISE
+    if (ancienneGraine(it, args)) return {};
     Classe c = extraireClasse(args, Classe::Double);
-    if (!args.empty() && (args[0].estTexte() || args[0].estChaine())) {
-        it.generateur.seed((unsigned long long)(args.size() > 1 ? args[1].scal() : 5489));
-        return {};
-    }
     Dims d = dimsDepuisArguments(args, 0, args.size());
     Valeur v = Valeur::matriceDims(d);
+    for (auto& x : v.re) x = it.generateur.normale();
+    if (c == Classe::Simple)
+        for (auto& x : v.re) x = (double)(float)x;
     v.classe = c;
-    std::normal_distribution<double> loi(0.0, 1.0);
-    for (auto& x : v.re) x = loi(it.generateur);
     return {v};
 }
 
+// randi([bas haut]) : bas - 1 + ceil(u (haut - bas + 1)), ce que fait
+// MATLAB — rng default puis randi(10,1,5) rend 9 10 2 10 7.
 FONCTION(fnRandi) {
     INUTILISE
     exigerArguments(args, 1, 0, "randi");
-    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "randi");
+    for (std::size_t k = 0; k < args.size(); ++k)
+        if (!(args[k].estTexte() || args[k].estChaine())) exigerNumerique(args[k], "randi");
     Classe c = extraireClasse(args, Classe::Double);
     double bas = 1, haut = 1;
     if (args[0].nelem() >= 2) {
@@ -242,64 +247,63 @@ FONCTION(fnRandi) {
     } else {
         haut = args[0].scal();
     }
+    if (!(haut >= bas) || bas != std::floor(bas) || haut != std::floor(haut))
+        erreur("MATLAB:randi:invalidLimits",
+               "The first input must be a positive integer, or a pair of increasing integers.");
     Dims d = dimsDepuisArguments(args, 1, args.size());
     if (args.size() == 1) d = Dims{1, 1};
     Valeur v = Valeur::matriceDims(d);
+    double etendue = haut - bas + 1;
+    for (auto& x : v.re) x = bas - 1 + std::ceil(it.generateur.uniforme() * etendue);
     v.classe = c;
-    std::uniform_int_distribution<long long> loi((long long)bas, (long long)haut);
-    for (auto& x : v.re) x = (double)loi(it.generateur);
     return {v};
 }
 
+// randperm(n) : l'ordre qui trie n tirages de rand, comme MATLAB — rng
+// default puis randperm(8) rend 6 3 7 8 5 1 2 4. randperm(n,k) en garde
+// les k premiers.
 FONCTION(fnRandperm) {
     INUTILISE
     exigerArguments(args, 1, 2, "randperm");
     int n = (int)argScalaire(args, 0, "randperm");
     int k = args.size() > 1 ? (int)args[1].scal() : n;
-    std::vector<double> v((std::size_t)n);
-    for (int i = 0; i < n; ++i) v[(std::size_t)i] = i + 1;
-    for (int i = n - 1; i > 0; --i) {
-        std::uniform_int_distribution<int> loi(0, i);
-        std::swap(v[(std::size_t)i], v[(std::size_t)loi(it.generateur)]);
-    }
-    v.resize((std::size_t)std::min(k, n));
+    if (n < 0 || k < 0 || k > n)
+        erreur("MATLAB:randperm:inputKTooLarge", "K must be less than or equal to N.");
+    std::vector<std::pair<double, int>> tirages((std::size_t)n);
+    for (int i = 0; i < n; ++i) tirages[(std::size_t)i] = {it.generateur.uniforme(), i + 1};
+    std::stable_sort(tirages.begin(), tirages.end(),
+                     [](const auto& a, const auto& b) { return a.first < b.first; });
+    std::vector<double> v((std::size_t)k);
+    for (int i = 0; i < k; ++i) v[(std::size_t)i] = tirages[(std::size_t)i].second;
     return {Valeur::ligne(v)};
 }
 
-// Etat du generateur, rendu sous forme numerique. Les mots de mt19937_64
-// font 64 bits, ce qu'un double ne represente pas exactement : chacun est
-// donc coupe en deux moities de 32 bits, ce qui rend la restitution exacte.
-static Valeur etatGenerateur(const std::mt19937_64& g) {
-    std::ostringstream flux;
-    flux << g;
-    std::istringstream lecture(flux.str());
-    std::vector<double> mots;
-    unsigned long long mot = 0;
-    while (lecture >> mot) {
-        mots.push_back((double)(mot >> 32));
-        mots.push_back((double)(mot & 0xFFFFFFFFull));
-    }
-    Valeur v = Valeur::matrice((int)mots.size(), 1);
-    for (std::size_t k = 0; k < mots.size(); ++k) v.re[k] = mots[k];
+// L'état du générateur, comme le champ State de rng : 625 entiers.
+static Valeur etatGenerateur(const GenerateurMatlab& g) {
+    auto e = g.etat();
+    Valeur v = Valeur::matrice((int)e.size(), 1);
+    for (std::size_t k = 0; k < e.size(); ++k) v.re[k] = e[k];
+    v.classe = Classe::UInt32;
     return v;
 }
 
-static void restaurerGenerateur(std::mt19937_64& g, const Valeur& etat) {
-    if (etat.nelem() % 2 != 0) erreur("MATLAB:rng:badState", "rng : etat de longueur impaire.");
-    std::ostringstream flux;
-    for (std::size_t k = 0; k + 1 < etat.nelem(); k += 2) {
-        unsigned long long haut = (unsigned long long)etat.re[k];
-        unsigned long long bas = (unsigned long long)etat.re[k + 1];
-        if (k) flux << ' ';
-        flux << ((haut << 32) | bas);
-    }
-    std::istringstream lecture(flux.str());
-    lecture >> g;
-    if (lecture.fail()) erreur("MATLAB:rng:badState", "rng : etat illisible.");
+static void restaurerGenerateur(GenerateurMatlab& g, const Valeur& etat) {
+    if (etat.nelem() != 625)
+        erreur("MATLAB:rng:badState",
+               "The state of the 'twister' generator must have 625 elements.");
+    std::array<std::uint32_t, 625> e{};
+    for (std::size_t k = 0; k < 625; ++k) e[k] = (std::uint32_t)etat.re[k];
+    g.restaurer(e);
 }
 
+// rng(graine), rng(graine,'twister'), rng('default'), rng('shuffle'),
+// rng(S), S = rng : comme MATLAB, avec son générateur 'twister' — les
+// autres (philox, threefry, combRecursive...) sont refusés en le disant.
 FONCTION(fnRng) {
-    static double dernierGerme = 5489.0;
+    // Propre au fil : le générateur appartient à chaque interpréteur, la
+    // graine qu'on en rapporte aussi — sinon les travailleurs d'un parfor
+    // l'écrivaient ensemble, sans verrou.
+    static thread_local double dernierGerme = 0.0;
     auto rendreEtat = [&]() {
         Valeur s;
         s.classe = Classe::Structure;
@@ -315,37 +319,51 @@ FONCTION(fnRng) {
         if (nargout >= 1) return {rendreEtat()};
         return {};
     }
-    if (args[0].classe == Classe::Structure) {
-        // rng(S) restitue un etat rendu par un appel precedent.
-        if (!args[0].st) erreur("MATLAB:rng:badState", "rng : structure vide.");
-        auto it2 = args[0].st->champs.find("State");
-        if (it2 == args[0].st->champs.end() || it2->second.empty())
-            erreur("MATLAB:rng:badState", "rng : la structure doit porter un champ State.");
-        Valeur avant;
-        if (nargout >= 1) avant = rendreEtat();
-        restaurerGenerateur(it.generateur, it2->second[0]);
-        auto itGerme = args[0].st->champs.find("Seed");
-        if (itGerme != args[0].st->champs.end() && !itGerme->second.empty() &&
-            itGerme->second[0].nelem() == 1)
-            dernierGerme = itGerme->second[0].re[0];
-        if (nargout >= 1) return {avant};
-        return {};
-    }
     Valeur avant;
     if (nargout >= 1) avant = rendreEtat();
-    if (args[0].estTexte() || args[0].estChaine()) {
-        std::string s = args[0].versTexte();
-        if (s == "default") { it.generateur.seed(5489u); dernierGerme = 5489.0; }
-        else if (s == "shuffle") {
-            unsigned germe = std::random_device{}();
-            it.generateur.seed(germe);
-            dernierGerme = (double)germe;
-        }
+    if (args[0].classe == Classe::Structure) {
+        // rng(S) restitue un état rendu par un appel précédent.
+        if (!args[0].st) erreur("MATLAB:rng:badState", "rng : structure vide.");
+        auto etat = args[0].st->champs.find("State");
+        if (etat == args[0].st->champs.end() || etat->second.empty())
+            erreur("MATLAB:rng:badState", "The settings structure must have a State field.");
+        restaurerGenerateur(it.generateur, etat->second[0]);
+        auto germe = args[0].st->champs.find("Seed");
+        if (germe != args[0].st->champs.end() && !germe->second.empty() &&
+            germe->second[0].nelem() == 1)
+            dernierGerme = germe->second[0].re[0];
         if (nargout >= 1) return {avant};
         return {};
     }
-    it.generateur.seed((unsigned long long)args[0].scal());
-    dernierGerme = args[0].scal();
+    std::size_t suivant = 1;
+    if (args[0].estTexte() || args[0].estChaine()) {
+        std::string s = args[0].versTexte();
+        if (s == "default") {
+            it.generateur.initialiser(0);
+            dernierGerme = 0;
+        } else if (s == "shuffle") {
+            std::uint32_t germe = std::random_device{}();
+            it.generateur.initialiser(germe);
+            dernierGerme = germe;
+        } else {
+            erreur("MATLAB:rng:badFirstOpt",
+                   "First input must be a seed, 'default', 'shuffle', or a settings structure.");
+        }
+    } else {
+        double germe = args[0].scal();
+        if (!(germe >= 0) || germe != std::floor(germe) || germe > 4294967295.0)
+            erreur("MATLAB:rng:badSeed",
+                   "The seed must be a nonnegative integer less than 2^32.");
+        it.generateur.initialiser((std::uint32_t)germe);
+        dernierGerme = germe;
+    }
+    if (args.size() > suivant) {
+        std::string genre = args[suivant].versTexte();
+        if (genre != "twister")
+            erreur("MatLibre:rng:Generateur",
+                   "MatLibre ne fournit que le générateur 'twister' de MATLAB, non '" + genre +
+                       "'.");
+    }
     if (nargout >= 1) return {avant};
     return {};
 }
@@ -950,7 +968,7 @@ FONCTION(fnSuperclasses) {
         for (const auto& q : vus) deja = deja || q == ancetre;
         if (!deja) vus.push_back(ancetre);
     }
-    r = Valeur::celluleDims({vus.size(), 1});
+    r = Valeur::celluleDims({static_cast<int>(vus.size()), 1});
     for (std::size_t k = 0; k < vus.size(); ++k) r.cellules[k] = Valeur::texte(vus[k]);
     return {r};
 }
@@ -1160,6 +1178,14 @@ FONCTION(fnChar) {
     if (lignes.empty()) return {Valeur::texte("")};
     std::size_t largeur = 0;
     for (const auto& l : lignes) largeur = std::max(largeur, l.size());
+    // Des lignes toutes vides : char("") est un tableau de caractères vide,
+    // non un double vide qu'aurait laissé la concaténation.
+    if (largeur == 0) {
+        if (lignes.size() == 1) return {Valeur::videClasse(Classe::Caractere)};
+        Valeur v = Valeur::matrice((int)lignes.size(), 0);
+        v.classe = Classe::Caractere;
+        return {v};
+    }
     std::vector<Valeur> rangs;
     rangs.reserve(lignes.size());
     for (auto l : lignes) {

@@ -25,7 +25,7 @@ function taux = mirr(flux, tauxFinancement, tauxReplacement)
     valeurPositive = fvvar(positifs, tauxReplacement);
     if valeurNegative == 0
         error('finance:mirr:AucunDecaissement', ...
-              'La série ne contient aucun flux négatif.');
+              'The cash flow series has no negative flow.');
     end
     taux = (-valeurPositive / valeurNegative) ^ (1 / n) - 1;
 end

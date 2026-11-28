@@ -1,8 +1,7 @@
 function H = fmesh(fonction, intervalle, varargin)
 %FMESH Trace le maillage d'une surface donnée par une poignée.
-%   FMESH(F) fait ce que fait FSURF, en dessinant le quadrillage plutôt
-%   que la surface pleine. Le rendu de MatLibre étant plan, les deux
-%   donnent la même image.
+%   FMESH(F) fait ce que fait FSURF, en dessinant le maillage — faces
+%   blanches, arêtes colorées, comme MESH — plutôt que la surface pleine.
 %
 %   FMESH(F,[A B]) et FMESH(F,[A B C D]) fixent le domaine, comme FSURF.
 %   FMESH(...,'MeshDensity',N) change la finesse de la grille.
@@ -17,6 +16,7 @@ function H = fmesh(fonction, intervalle, varargin)
         intervalle = [];
     end
     H = fsurf(fonction, intervalle, varargin{:});
+    set(H, 'FaceColor', 'w', 'EdgeColor', 'flat');
     if nargout == 0
         clear H;
     end

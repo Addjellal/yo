@@ -3,6 +3,9 @@ function [donnees, temps] = readData(session, nEchantillons)
 %   [DONNEES,TEMPS] = READDATA(SESSION,N) rend N échantillons : une ligne
 %   par instant, une colonne par voie, et le vecteur des instants.
 %
+%   Les lectures se suivent : la première commence à l'instant zéro, la
+%   suivante où celle-ci s'est arrêtée, comme une acquisition continue.
+%
 %   Le pas d'échantillonnage est l'inverse de la fréquence de la session :
 %   c'est la seule chose que la fréquence veut dire. N échantillons
 %   couvrent donc (N-1)/frequence secondes, non N/frequence — l'erreur
@@ -20,7 +23,10 @@ function [donnees, temps] = readData(session, nEchantillons)
 %      1 / diff(temps(1:2))            % la frequence d'echantillonnage
 %
 %   Voir aussi DAQ, ADDANALOGINPUT, WRITEDATA.
-    temps = (0:nEchantillons-1).' / session.frequence;
+    % L'horloge de la session : la lecture commence où la précédente
+    % s'est arrêtée.
+    temps = session.instant + (0:nEchantillons-1).' / session.frequence;
+    session.instant = session.instant + nEchantillons / session.frequence;
     donnees = zeros(nEchantillons, numel(session.entrees));
     for k = 1:numel(session.entrees)
         g = session.entrees{k}.generateur;

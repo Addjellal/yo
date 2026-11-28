@@ -1,24 +1,42 @@
-function r = bboxOverlapRatio(a, b)
-%BBOXOVERLAPRATIO Recouvrement de boîtes englobantes (intersection/union).
-%   Les boîtes s'écrivent [x y largeur hauteur].
+function r = bboxOverlapRatio(a, b, ratioType)
+%BBOXOVERLAPRATIO Recouvrement de boîtes englobantes.
+%   R = BBOXOVERLAPRATIO(A,B) rend, pour chaque boîte de A (M x 4) et
+%   chaque boîte de B (N x 4), le rapport de l'aire de leur intersection à
+%   celle de leur union : l'indice de Jaccard, ou IoU. Les boîtes
+%   s'écrivent [x y largeur hauteur] ; R est M x N.
+%   R = BBOXOVERLAPRATIO(A,B,RATIOTYPE) choisit le dénominateur : 'Union'
+%   (défaut) ou 'Min', la plus petite des deux aires.
 %
 %   Exemple :
-%      bboxOverlapRatio([0 0 10 10], [0 0 10 10])     % 1 : deux boites identiques
-%      bboxOverlapRatio([0 0 10 10], [20 20 5 5])     % 0 : disjointes
+%      % Documentation de MATLAB.
+%      bboxA = [150 80 100 100];
+%      bboxOverlapRatio(bboxA, bboxA + 50)             % 0.0833
+%      bboxOverlapRatio(bboxA, bboxA + 50, 'Min')      % 0.25
 %
 %   Voir aussi BBOXOVERLAPRATIOMATRIX, SELECTSTRONGESTBBOX, BBOX2POINTS.
-    r = zeros(size(a, 1), size(b, 1));
-    for i = 1:size(a, 1)
-        for j = 1:size(b, 1)
-            x1 = max(a(i,1), b(j,1));
-            y1 = max(a(i,2), b(j,2));
-            x2 = min(a(i,1)+a(i,3), b(j,1)+b(j,3));
-            y2 = min(a(i,2)+a(i,4), b(j,2)+b(j,4));
-            inter = max(0, x2 - x1) * max(0, y2 - y1);
-            union = a(i,3)*a(i,4) + b(j,3)*b(j,4) - inter;
-            if union > 0
-                r(i, j) = inter / union;
-            end
-        end
+    if nargin < 3
+        ratioType = 'Union';
     end
+    parUnion = strcmpi(ratioType, 'Union');
+    if ~parUnion && ~strcmpi(ratioType, 'Min')
+        error('vision:bboxOverlapRatio:Type', 'RATIOTYPE must be ''Union'' or ''Min''.');
+    end
+    if size(a, 2) ~= 4 || size(b, 2) ~= 4
+        error('vision:bboxOverlapRatio:Taille', 'Boxes must be rows [x y width height].');
+    end
+    a = double(a);
+    b = double(b);
+    largeur = max(0, min(a(:, 1) + a(:, 3), (b(:, 1) + b(:, 3)).') - max(a(:, 1), b(:, 1).'));
+    hauteur = max(0, min(a(:, 2) + a(:, 4), (b(:, 2) + b(:, 4)).') - max(a(:, 2), b(:, 2).'));
+    inter = largeur .* hauteur;
+    aireA = a(:, 3) .* a(:, 4);
+    aireB = (b(:, 3) .* b(:, 4)).';
+    if parUnion
+        denominateur = aireA + aireB - inter;
+    else
+        denominateur = min(aireA, aireB);
+    end
+    r = zeros(size(inter));
+    positif = denominateur > 0;
+    r(positif) = inter(positif) ./ denominateur(positif);
 end

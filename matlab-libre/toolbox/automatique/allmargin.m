@@ -19,6 +19,13 @@ function m = allmargin(sys)
 %   Voir aussi MARGIN, BODE, NYQUIST.
     matlibre_monovoie(sys, 'ALLMARGIN', 'LOOPMARGIN');
     w = logspace(-4, 4, 8000).';
+    if sys.Ts > 0
+        % Au-delà de la pulsation de Nyquist, la réponse d'un modèle
+        % échantillonné se répète : MATLAB s'y arrête, sans quoi chaque
+        % repli ajouterait de fausses traversées.
+        nyquist = pi / sys.Ts;
+        w = [w(w < nyquist); nyquist];
+    end
     [module, phase, w] = bode(sys, w);
     dB = 20 * log10(module);
     % Marges de gain : la phase traverse -180 degrés modulo 360.
@@ -28,10 +35,12 @@ function m = allmargin(sys)
         cible = -180 + 360 * floor((phase(k) + 180) / 360);
         for essai = [cible, cible - 360, cible + 360]
             if (phase(k) - essai) * (phase(k+1) - essai) < 0
-                f = (essai - phase(k)) / (phase(k+1) - phase(k));
-                gainDb = dB(k) + f * (dB(k+1) - dB(k));
-                marges(end+1) = 10 ^ (-gainDb / 20);          %#ok<AGROW>
-                pulsations(end+1) = w(k) + f * (w(k+1) - w(k)); %#ok<AGROW>
+                % La grille situe la traversée ; elle se lit sur la réponse
+                % exacte, comme dans MATLAB, et non par interpolation.
+                [wg, ~, module] = matlibre_traversee(sys, 'phase', essai, w(k), w(k+1), ...
+                                                     phase(k), phase(k+1));
+                marges(end+1) = 1 / module;                    %#ok<AGROW>
+                pulsations(end+1) = wg;                        %#ok<AGROW>
             end
         end
     end
@@ -40,9 +49,7 @@ function m = allmargin(sys)
     pulsationsPhase = [];
     for k = 1:numel(w) - 1
         if dB(k) * dB(k+1) < 0
-            f = -dB(k) / (dB(k+1) - dB(k));
-            ph = phase(k) + f * (phase(k+1) - phase(k));
-            wc = w(k) + f * (w(k+1) - w(k));
+            [wc, ph] = matlibre_traversee(sys, 'gain', 0, w(k), w(k+1), phase(k), phase(k+1));
             % Marge de phase : 180 + phase, ramenée dans (-180, 180].
             marge = mod(ph + 180, 360);
             if marge > 180

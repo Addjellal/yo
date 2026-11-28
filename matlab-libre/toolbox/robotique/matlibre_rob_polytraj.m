@@ -15,7 +15,7 @@ function [q, qd, qdd, pp] = matlibre_rob_polytraj(points, instants, echantillons
     nPoints = size(points, 2);
     if numel(instants) ~= nPoints
         error('robotics:polytraj:Instants', ...
-              'Il faut un instant par point de passage.');
+              'One time point per waypoint is required.');
     end
     vitesses = zeros(nDegres, nPoints);
     accelerations = zeros(nDegres, nPoints);
@@ -36,7 +36,7 @@ function [q, qd, qdd, pp] = matlibre_rob_polytraj(points, instants, echantillons
         duree = instants(s + 1) - instants(s);
         if duree <= 0
             error('robotics:polytraj:Duree', ...
-                  'Les instants doivent être strictement croissants.');
+                  'Time points must be strictly increasing.');
         end
         for d = 1:nDegres
             if degre == 3
@@ -83,6 +83,13 @@ function [q, qd, qdd, pp] = matlibre_rob_polytraj(points, instants, echantillons
             end
         end
     end
-    pp = struct('form', 'pp', 'breaks', instants, 'coefs', coefficients, ...
-                'pieces', nPoints - 1, 'order', nCoefficients, 'dim', nDegres);
+    % La forme de MATLAB, que PPVAL évalue : une ligne par morceau et par
+    % degré de liberté, puissances décroissantes.
+    lignes = zeros(nDegres * (nPoints - 1), nCoefficients);
+    for s = 1:(nPoints - 1)
+        for d = 1:nDegres
+            lignes((s - 1) * nDegres + d, :) = fliplr(reshape(coefficients(d, :, s), 1, []));
+        end
+    end
+    pp = mkpp(instants, lignes, nDegres);
 end

@@ -17,7 +17,7 @@ function J = stereoAnaglyph(gauche, droite)
     D = enNiveauxDeGris(droite);
     if ~isequal(size(G), size(D))
         error('vision:stereoAnaglyph:BadSize', ...
-              'Les deux images doivent avoir la même taille.');
+              'The two images must be the same size.');
     end
     J = zeros(size(G, 1), size(G, 2), 3);
     J(:, :, 1) = G;

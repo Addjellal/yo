@@ -69,11 +69,11 @@ classdef cwtfilterbank
             end
             if ~isempty(obj.SamplingFrequency) && ~isempty(obj.SamplingPeriod)
                 error('wavelet:cwtfilterbank:Cadence', ...
-                      'SamplingFrequency et SamplingPeriod s''excluent.');
+                      'SamplingFrequency and SamplingPeriod are mutually exclusive.');
             end
             if obj.VoicesPerOctave < 1 || obj.VoicesPerOctave > 48
                 error('wavelet:cwtfilterbank:Voix', ...
-                      'VoicesPerOctave doit être entre 1 et 48.');
+                      'VoicesPerOctave must be between 1 and 48.');
             end
             obj.Wavelet = char(obj.Wavelet);
             if isempty(obj.WaveletParameters) && strcmpi(obj.Wavelet, 'Morse')
@@ -100,7 +100,7 @@ classdef cwtfilterbank
             n = numel(x);
             if n ~= obj.SignalLength
                 error('wavelet:cwtfilterbank:Longueur', ...
-                      'Le signal doit avoir %d points.', obj.SignalLength);
+                      'The signal must have %d samples.', obj.SignalLength);
             end
             [etendu, debut] = prolonger(obj, x);
             m = numel(etendu);

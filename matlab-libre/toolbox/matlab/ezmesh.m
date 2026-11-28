@@ -1,7 +1,7 @@
 function H = ezmesh(fonction, intervalle)
 %EZMESH Trace le maillage d'une surface (nom historique).
-%   EZMESH(F) fait ce que fait EZSURF, en dessinant le quadrillage. Le
-%   rendu de MatLibre étant plan, les deux donnent la même image.
+%   EZMESH(F) fait ce que fait EZSURF, en dessinant le maillage — faces
+%   blanches, arêtes colorées, comme MESH — plutôt que la surface pleine.
 %
 %   EZMESH(F,[A B]) ou EZMESH(F,[A B C D]) fixe le domaine.
 %
@@ -16,6 +16,7 @@ function H = ezmesh(fonction, intervalle)
         intervalle = [];
     end
     H = ezsurf(fonction, intervalle);
+    set(H, 'FaceColor', 'w', 'EdgeColor', 'flat');
     if nargout == 0
         clear H;
     end

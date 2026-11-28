@@ -19,7 +19,7 @@ function indices = depo2ind(ordre, depos)
 %   Voir aussi IND2DEPO, WPDEC, LEAVES, TNODES.
     ordre = round(ordre);
     if ordre < 2
-        error('wavelet:depo2ind:Ordre', 'L''ordre doit valoir au moins deux.');
+        error('wavelet:depo2ind:Ordre', 'The order must be at least two.');
     end
     depos = double(depos);
     if size(depos, 2) ~= 2
@@ -29,7 +29,7 @@ function indices = depo2ind(ordre, depos)
     positions = depos(:, 2);
     if any(positions < 0) || any(positions >= ordre .^ profondeurs)
         error('wavelet:depo2ind:Position', ...
-              'La position doit rester dans la profondeur donnée.');
+              'The position must be within the given depth.');
     end
     indices = (ordre .^ profondeurs - 1) / (ordre - 1) + positions;
 end

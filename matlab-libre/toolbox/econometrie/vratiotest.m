@@ -45,11 +45,11 @@ function [rejet, pValeur, statistique, valeurCritique, ratio] = vratiotest(serie
     end
     n = numel(serie) - 1;                % nombre d'accroissements
     if n < 4
-        error('econ:vratiotest:Serie', 'La série est trop courte.');
+        error('econ:vratiotest:Serie', 'The series is too short.');
     end
     if any(horizons < 2) || any(horizons > n)
         error('econ:vratiotest:Horizon', ...
-              'Les horizons doivent rester entre deux et %d.', n);
+              'Periods must be between 2 and %d.', n);
     end
     accroissements = diff(serie);
     moyenne = (serie(end) - serie(1)) / n;

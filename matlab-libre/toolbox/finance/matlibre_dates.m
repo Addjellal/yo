@@ -11,6 +11,6 @@ function numeros = matlibre_dates(dates)
         numeros = datenum(dates);
     else
         error('finance:dates:Type', ...
-              'Une date se donne par un numéro de série ou par du texte.');
+              'A date must be a serial date number or text.');
     end
 end

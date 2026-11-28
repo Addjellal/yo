@@ -8,6 +8,7 @@
 // champs cachés, et les crochets de l'interpréteur routent la lecture et
 // l'écriture vers la figure elle-même.
 #include <algorithm>
+#include <mutex>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -181,14 +182,99 @@ bool vraiDe(const Valeur& v) {
 
 Valeur marche(bool actif) { return Valeur::texte(actif ? "on" : "off"); }
 
+// Le côté des ordonnées que vise une poignée d'axe : celui qu'elle porte
+// (« plotyy »), sinon le côté actif de « yyaxis », sinon la gauche.
+int coteDe(const Axes& a, const Valeur& p) {
+    if (p.aChamp("Cote")) return (int)p.champ("Cote", 0).scal();
+    return a.deuxOrdonnees ? a.coteActif : 0;
+}
+
+// Un interprète de texte : 'tex', 'latex' ou 'none'.
+std::string interpreteValide(const Valeur& v) {
+    std::string mode = v.versTexte();
+    for (auto& c : mode) c = (char)std::tolower((unsigned char)c);
+    if (mode != "tex" && mode != "latex" && mode != "none")
+        erreur("MATLAB:hg:InvalidInterpreter", "Interpreter must be 'tex', 'latex', or 'none'.");
+    return mode;
+}
+
 // --- écriture -----------------------------------------------------------
 
 bool ecrireAxes(Interpreteur& it, const Valeur& p, const std::string& nom,
                 const Valeur& v) {
+    {
+        auto axe = axesDe(it, p);
+        if (memeNom(nom, "CLim")) {
+            auto b = versVecteur(v);
+            if (b.size() != 2 || !(b[1] > b[0]))
+                erreur("MATLAB:hg:InvalidCLim", "CLim must be a 2-element increasing vector.");
+            axe->climManuelle = true;
+            axe->cmin = b[0];
+            axe->cmax = b[1];
+            return true;
+        }
+        if (memeNom(nom, "CLimMode")) {
+            axe->climManuelle = v.versTexte() == "manual";
+            return true;
+        }
+        if (memeNom(nom, "Colormap")) {
+            if (!v.estNumerique() || v.ncolonnes() != 3)
+                erreur("MATLAB:hg:InvalidColormap", "Colormap must have 3 columns: [R,G,B].");
+            int m = v.nlignes();
+            axe->palette.clear();
+            for (int r = 0; r < m; ++r)
+                for (int c = 0; c < 3; ++c)
+                    axe->palette.push_back(v.re[(std::size_t)r + (std::size_t)c * (std::size_t)m]);
+            return true;
+        }
+    }
     auto a = axesDe(it, p);
+    if (coteDe(*a, p) == 1) {
+        // Le côté droit d'un axe à deux ordonnées.
+        if (memeNom(nom, "YTick")) { a->ticksYDroite = versVecteur(v); return true; }
+        if (memeNom(nom, "YTickLabel")) { a->etiquettesTicksYDroite = versTextes(v); return true; }
+        if (memeNom(nom, "YScale")) { a->logYDroite = v.versTexte() == "log"; return true; }
+        if (memeNom(nom, "YLabel")) { a->etiquetteYDroite = v.versTexte(); return true; }
+        if (memeNom(nom, "YLim")) {
+            auto b = versVecteur(v);
+            if (b.size() != 2) erreur("MATLAB:hg:shaped_arrays", "YLim must have two elements.");
+            a->yminDroite = b[0];
+            a->ymaxDroite = b[1];
+            a->limitesManuellesYDroite = true;
+            return true;
+        }
+    }
     if (memeNom(nom, "XTick")) { a->ticksX = versVecteur(v); return true; }
     if (memeNom(nom, "YTick")) { a->ticksY = versVecteur(v); return true; }
     if (memeNom(nom, "XTickLabel")) { a->etiquettesTicksX = versTextes(v); return true; }
+    if (memeNom(nom, "XTickLabelRotation")) { a->angleTicksX = v.scal(); return true; }
+    if (memeNom(nom, "ZTickLabelRotation")) { a->angleTicksZ = v.scal(); return true; }
+    if (memeNom(nom, "ZTick")) { a->ticksZ = versVecteur(v); return true; }
+    if (memeNom(nom, "TickLabelInterpreter")) {
+        a->interpretes["ticks"] = interpreteValide(v);
+        return true;
+    }
+    if (memeNom(nom, "ZTickLabel")) { a->etiquettesTicksZ = versTextes(v); return true; }
+    if (memeNom(nom, "View")) {
+        auto b = versVecteur(v);
+        if (b.size() != 2) erreur("MATLAB:hg:shaped_arrays", "View must have two elements.");
+        a->azimut = b[0];
+        a->elevation = b[1];
+        return true;
+    }
+    if (memeNom(nom, "ZLim")) {
+        auto b = versVecteur(v);
+        if (b.size() != 2 || !(b[1] > b[0]))
+            erreur("MATLAB:hg:shaped_arrays", "ZLim must be a 2-element increasing vector.");
+        a->zmin = b[0];
+        a->zmax = b[1];
+        a->limitesManuellesZ = true;
+        return true;
+    }
+    if (memeNom(nom, "ZLimMode")) { a->limitesManuellesZ = v.versTexte() == "manual"; return true; }
+    if (memeNom(nom, "ZLabel")) { a->etiquetteZ = v.versTexte(); return true; }
+    if (memeNom(nom, "ZGrid")) { a->grille = vraiDe(v); return true; }
+    if (memeNom(nom, "YTickLabelRotation")) { a->angleTicksY = v.scal(); return true; }
     if (memeNom(nom, "YTickLabel")) { a->etiquettesTicksY = versTextes(v); return true; }
     if (memeNom(nom, "XLim")) {
         auto b = versVecteur(v);
@@ -239,6 +325,9 @@ bool ecrireTexte(Interpreteur& it, const Valeur& p, const std::string& nom,
         std::string texte = v.versTexte();
         if (cible == "xlabel") a->etiquetteX = texte;
         else if (cible == "ylabel") a->etiquetteY = texte;
+        else if (cible == "colorbarlabel") a->etiquetteBarre = texte;
+        else if (cible == "zlabel") a->etiquetteZ = texte;
+        else if (cible == "ylabeldroite") a->etiquetteYDroite = texte;
         else a->titre = texte;
         return true;
     }
@@ -247,11 +336,15 @@ bool ecrireTexte(Interpreteur& it, const Valeur& p, const std::string& nom,
         else a->taillePolice = v.scal();
         return true;
     }
-    // Les autres proprietes d'un texte — couleur, police, interprete —
-    // sont acceptees sans effet : le rendu n'en a pas encore l'usage, et
-    // un script qui les pose ne doit pas s'arreter pour autant.
+    if (memeNom(nom, "Interpreter")) {
+        a->interpretes[cible] = interpreteValide(v);
+        return true;
+    }
+    // Les autres proprietes d'un texte — couleur, police — sont acceptees
+    // sans effet : le rendu n'en a pas encore l'usage, et un script qui
+    // les pose ne doit pas s'arreter pour autant.
     if (memeNom(nom, "Color") || memeNom(nom, "FontWeight") ||
-        memeNom(nom, "FontName") || memeNom(nom, "Interpreter") ||
+        memeNom(nom, "FontName") ||
         memeNom(nom, "Rotation") || memeNom(nom, "HorizontalAlignment") ||
         memeNom(nom, "VerticalAlignment") || memeNom(nom, "Position"))
         return true;
@@ -262,10 +355,17 @@ bool ecrireTexte(Interpreteur& it, const Valeur& p, const std::string& nom,
 bool lireTexte(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
     auto a = axesDe(it, p);
     std::string cible = p.champ("Cible", 0).versTexte();
+    if (memeNom(nom, "Interpreter")) {
+        sortie = Valeur::texte(interpreteDe(*a, cible));
+        return true;
+    }
     if (memeNom(nom, "String")) {
-        sortie = Valeur::texte(cible == "xlabel"   ? a->etiquetteX
-                               : cible == "ylabel" ? a->etiquetteY
-                                                   : a->titre);
+        sortie = Valeur::texte(cible == "xlabel"          ? a->etiquetteX
+                               : cible == "ylabel"        ? a->etiquetteY
+                               : cible == "colorbarlabel" ? a->etiquetteBarre
+                               : cible == "zlabel"        ? a->etiquetteZ
+                               : cible == "ylabeldroite"  ? a->etiquetteYDroite
+                                                          : a->titre);
         return true;
     }
     if (memeNom(nom, "FontSize")) {
@@ -284,9 +384,54 @@ bool lireTexte(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
 // Une courbe : ce que « set(h,'LineWidth',2) » et « h.Color = 'r' »
 // atteignent. Les donnees elles-memes — XData, YData — s'ecrivent aussi,
 // ce dont se servent les animations.
+// Les données d'une surface, en matrice de la forme de sa grille.
+Valeur matriceGrille(const Serie& s, const std::vector<double>& v) {
+    Valeur m = Valeur::matrice(s.lignesGrille, s.colonnesGrille);
+    for (std::size_t k = 0; k < m.nelem() && k < v.size(); ++k) m.re[k] = v[k];
+    return m;
+}
+
+// Un mode de face ou d'arête : 'flat', 'interp', 'none' ou une couleur.
+std::string modeDepuis(const Valeur& v) {
+    if (v.estTexte() || v.estChaine()) {
+        std::string t = v.versTexte();
+        for (auto& c : t) c = (char)std::tolower((unsigned char)c);
+        if (t == "flat" || t == "interp" || t == "none") return t;
+    }
+    std::string couleur = couleurDepuisValeur(v);
+    if (couleur.empty())
+        erreur("MATLAB:hg:InvalidColor", "Couleur inconnue : " + v.versTexte() + ".");
+    return couleur;
+}
+
 bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
                  const Valeur& v) {
     Serie* s = serieDe(it, p);
+    if (s->genre == GenreTrace::Surface || s->genre == GenreTrace::Polygone) {
+        if (memeNom(nom, "FaceColor")) {
+            s->modeFaces = modeDepuis(v);
+            if (s->genre == GenreTrace::Polygone && s->modeFaces != "flat" &&
+                s->modeFaces != "interp")
+                s->couleur = s->modeFaces;
+            return true;
+        }
+        if (memeNom(nom, "EdgeColor")) {
+            s->modeAretes = modeDepuis(v);
+            if (s->modeAretes != "flat" && s->modeAretes != "interp")
+                s->couleurBord = s->modeAretes;
+            return true;
+        }
+        if (memeNom(nom, "FaceAlpha")) { s->opacite = v.scal(); return true; }
+        if (memeNom(nom, "EdgeAlpha") || memeNom(nom, "FaceLighting")) return true;
+    }
+    if (s->genre == GenreTrace::Surface && (memeNom(nom, "ZData") || memeNom(nom, "CData"))) {
+        std::vector<double> valeurs = versVecteur(v);
+        if (valeurs.size() != s->x.size())
+            erreur("MATLAB:hg:InvalidData", "Data must keep the size of the grid.");
+        if (memeNom(nom, "ZData")) s->z = valeurs;
+        else s->valeursCouleurPoints = valeurs;
+        return true;
+    }
     if (memeNom(nom, "XData")) {
         s->x = versVecteur(v);
         if (!s->xVraies.empty()) s->xVraies = s->x;
@@ -307,8 +452,10 @@ bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
     if (memeNom(nom, "LineStyle")) { s->style = v.versTexte(); return true; }
     if (memeNom(nom, "Marker")) { s->marqueur = v.versTexte(); return true; }
     if (memeNom(nom, "DisplayName")) { s->etiquette = v.versTexte(); return true; }
-    // Un texte pose par « text(x,y,'ici') » : sa chaine et sa taille.
+    // Un texte pose par « text(x,y,'ici') » : sa chaine, sa taille, son
+    // interprete.
     if (memeNom(nom, "String")) { s->legendeConstante = v.versTexte(); return true; }
+    if (memeNom(nom, "Interpreter")) { s->interprete = interpreteValide(v); return true; }
     if (memeNom(nom, "FontSize")) { s->taillePoliceTexte = v.scal(); return true; }
     if (memeNom(nom, "Position")) {
         auto b = versVecteur(v);
@@ -320,11 +467,21 @@ bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
         s->alignement = a.empty() ? 'l' : (a[0] == 'c' ? 'c' : (a[0] == 'r' ? 'r' : 'l'));
         return true;
     }
+    if (memeNom(nom, "MarkerSize")) { s->tailleMarqueur = v.scal(); return true; }
+    if (memeNom(nom, "MarkerFaceColor") || memeNom(nom, "MarkerEdgeColor")) {
+        std::string couleur;
+        std::string texte = (v.estTexte() || v.estChaine()) ? v.versTexte() : std::string();
+        for (auto& c : texte) c = (char)std::tolower((unsigned char)c);
+        if (texte == "none" || texte == "auto") couleur = texte;
+        else couleur = couleurDepuisValeur(v);
+        if (couleur.empty()) couleur = "none";
+        if (memeNom(nom, "MarkerFaceColor")) s->couleurFaceMarqueur = couleur;
+        else s->couleurBordMarqueur = couleur;
+        return true;
+    }
     // Ce que le rendu de MatLibre n'emploie pas encore, mais qu'un script
     // pose couramment : accepte sans effet plutot que de s'arreter.
-    if (memeNom(nom, "MarkerSize") || memeNom(nom, "MarkerFaceColor") ||
-        memeNom(nom, "MarkerEdgeColor") || memeNom(nom, "Visible") ||
-        memeNom(nom, "Tag") || memeNom(nom, "UserData"))
+    if (memeNom(nom, "Visible") || memeNom(nom, "Tag") || memeNom(nom, "UserData"))
         return true;
     erreur("MATLAB:hg:InvalidProperty",
            "Unrecognized property '" + nom + "' for class 'Line'.");
@@ -332,6 +489,40 @@ bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
 
 bool lireLigne(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
     Serie* s = serieDe(it, p);
+    if (s->genre == GenreTrace::Surface) {
+        if (memeNom(nom, "XData")) { sortie = matriceGrille(*s, s->x); return true; }
+        if (memeNom(nom, "YData")) { sortie = matriceGrille(*s, s->y); return true; }
+        if (memeNom(nom, "ZData")) { sortie = matriceGrille(*s, s->z); return true; }
+        if (memeNom(nom, "CData")) {
+            sortie = matriceGrille(*s, s->valeursCouleurPoints);
+            return true;
+        }
+        if (memeNom(nom, "Type")) { sortie = Valeur::texte("surface"); return true; }
+    }
+    if (s->genre == GenreTrace::Surface || s->genre == GenreTrace::Polygone) {
+        if (memeNom(nom, "FaceColor")) {
+            sortie = Valeur::texte(s->modeFaces);
+            return true;
+        }
+        if (memeNom(nom, "EdgeColor")) {
+            sortie = Valeur::texte(s->modeAretes);
+            return true;
+        }
+        if (memeNom(nom, "FaceAlpha")) { sortie = Valeur::scalaire(s->opacite); return true; }
+        if (memeNom(nom, "Type") && s->genre == GenreTrace::Polygone) {
+            sortie = Valeur::texte("patch");
+            return true;
+        }
+    }
+    if (memeNom(nom, "MarkerSize")) { sortie = Valeur::scalaire(s->tailleMarqueur); return true; }
+    if (memeNom(nom, "MarkerFaceColor")) {
+        sortie = Valeur::texte(s->couleurFaceMarqueur.empty() ? "none" : s->couleurFaceMarqueur);
+        return true;
+    }
+    if (memeNom(nom, "MarkerEdgeColor")) {
+        sortie = Valeur::texte(s->couleurBordMarqueur.empty() ? "auto" : s->couleurBordMarqueur);
+        return true;
+    }
     // Une courbe de l'espace garde ses vraies coordonnees a cote de la
     // projection : ce sont elles qu'on rend.
     if (memeNom(nom, "XData")) {
@@ -352,6 +543,7 @@ bool lireLigne(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
     }
     if (memeNom(nom, "DisplayName")) { sortie = Valeur::texte(s->etiquette); return true; }
     if (memeNom(nom, "String")) { sortie = Valeur::texte(s->legendeConstante); return true; }
+    if (memeNom(nom, "Interpreter")) { sortie = Valeur::texte(s->interprete); return true; }
     if (memeNom(nom, "FontSize")) {
         sortie = Valeur::scalaire(s->taillePoliceTexte > 0 ? s->taillePoliceTexte : 11.0);
         return true;
@@ -391,8 +583,86 @@ bool ecrireFigure(Interpreteur& it, const Valeur& p, const std::string& nom,
 
 bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
     auto a = axesDe(it, p);
-    if (memeNom(nom, "XTick")) { sortie = depuisVecteur(a->ticksX); return true; }
-    if (memeNom(nom, "YTick")) { sortie = depuisVecteur(a->ticksY); return true; }
+    if (memeNom(nom, "CLim")) {
+        double bas, haut;
+        limitesCouleur(*a, bas, haut);
+        sortie = Valeur::ligne({bas, haut});
+        return true;
+    }
+    if (memeNom(nom, "CLimMode")) {
+        sortie = Valeur::texte(a->climManuelle ? "manual" : "auto");
+        return true;
+    }
+    if (memeNom(nom, "Colormap")) {
+        const auto& palette = paletteEnVigueur(*figureDe(it, p), *a);
+        int m = (int)(palette.size() / 3);
+        sortie = Valeur::matrice(m, 3);
+        for (int i = 0; i < m; ++i)
+            for (int j = 0; j < 3; ++j)
+                sortie.re[(std::size_t)i + (std::size_t)j * (std::size_t)m] =
+                    palette[3 * (std::size_t)i + (std::size_t)j];
+        return true;
+    }
+    if (coteDe(*a, p) == 1) {
+        if (memeNom(nom, "YLim") || memeNom(nom, "YTick")) {
+            double ymin, ymax;
+            limitesAxeDroite(*a, ymin, ymax);
+            if (memeNom(nom, "YLim")) sortie = Valeur::ligne({ymin, ymax});
+            else
+                sortie = depuisVecteur(a->ticksYDroite.empty()
+                                           ? graduationsAxe(ymin, ymax, 6, a->logYDroite)
+                                           : a->ticksYDroite);
+            return true;
+        }
+        if (memeNom(nom, "YScale")) {
+            sortie = Valeur::texte(a->logYDroite ? "log" : "linear");
+            return true;
+        }
+        if (memeNom(nom, "YLabel")) {
+            sortie = poigneeTexte((int)p.champ("NumeroFigure", 0).scal(),
+                                  (int)p.champ("NumeroAxe", 0).scal(), "ylabeldroite");
+            return true;
+        }
+    }
+    if (memeNom(nom, "XTick") || memeNom(nom, "YTick")) {
+        // Les graduations montrées, même choisies d'office, comme MATLAB.
+        double xmin, xmax, ymin, ymax;
+        limitesAxe(*a, xmin, xmax, ymin, ymax);
+        sortie = depuisVecteur(memeNom(nom, "XTick")
+                                   ? graduationsEffectives(*a, 'x', xmin, xmax, a->logX)
+                                   : graduationsEffectives(*a, 'y', ymin, ymax, a->logY));
+        return true;
+    }
+    if (memeNom(nom, "ZTick")) {
+        double zmin, zmax;
+        limitesAxeZ(*a, zmin, zmax);
+        sortie = depuisVecteur(a->ticksZ.empty() ? graduationsAxe(zmin, zmax, 6, false)
+                                                 : a->ticksZ);
+        return true;
+    }
+    if (memeNom(nom, "ZLim")) {
+        double zmin, zmax;
+        limitesAxeZ(*a, zmin, zmax);
+        sortie = Valeur::ligne({zmin, zmax});
+        return true;
+    }
+    if (memeNom(nom, "View")) {
+        sortie = Valeur::ligne({a->azimut, a->elevation});
+        return true;
+    }
+    if (memeNom(nom, "TickLabelInterpreter")) {
+        sortie = Valeur::texte(interpreteDe(*a, "ticks"));
+        return true;
+    }
+    if (memeNom(nom, "ZTickLabelRotation")) {
+        sortie = Valeur::scalaire(a->angleTicksZ);
+        return true;
+    }
+    if (memeNom(nom, "XTickLabelRotation") || memeNom(nom, "YTickLabelRotation")) {
+        sortie = Valeur::scalaire(memeNom(nom, "XTickLabelRotation") ? a->angleTicksX
+                                                                      : a->angleTicksY);
+        return true;
+    }
     if (memeNom(nom, "XLim") || memeNom(nom, "YLim")) {
         double xmin, xmax, ymin, ymax;
         limitesAxe(*a, xmin, xmax, ymin, ymax);
@@ -429,9 +699,11 @@ bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur&
     }
     // « get(gca,'Title') » rend la poignee du texte, comme MATLAB : c'est
     // sur elle qu'on ecrit ensuite la taille de police.
-    if (memeNom(nom, "Title") || memeNom(nom, "XLabel") || memeNom(nom, "YLabel")) {
+    if (memeNom(nom, "Title") || memeNom(nom, "XLabel") || memeNom(nom, "YLabel") ||
+        memeNom(nom, "ZLabel")) {
         const char* cible = memeNom(nom, "XLabel")   ? "xlabel"
                             : memeNom(nom, "YLabel") ? "ylabel"
+                            : memeNom(nom, "ZLabel") ? "zlabel"
                                                      : "title";
         sortie = poigneeTexte((int)p.champ("NumeroFigure", 0).scal(),
                               (int)p.champ("NumeroAxe", 0).scal(), cible);
@@ -560,9 +832,20 @@ bool lireLegende(Interpreteur& it, const Valeur& p, const std::string& nom, Vale
         sortie = Valeur::scalaire(a->taillePolice);
         return true;
     }
-    if (memeNom(nom, "Location") || memeNom(nom, "Box") ||
-        memeNom(nom, "Orientation") || memeNom(nom, "Interpreter")) {
-        sortie = Valeur::texte("");
+    if (memeNom(nom, "Location")) {
+        sortie = Valeur::texte(a->positionLegende);
+        return true;
+    }
+    if (memeNom(nom, "Orientation")) {
+        sortie = Valeur::texte(a->legendeHorizontale ? "horizontal" : "vertical");
+        return true;
+    }
+    if (memeNom(nom, "Box")) {
+        sortie = Valeur::texte(a->boiteLegende ? "on" : "off");
+        return true;
+    }
+    if (memeNom(nom, "Interpreter")) {
+        sortie = Valeur::texte("tex");
         return true;
     }
     return false;
@@ -590,30 +873,74 @@ bool ecrireLegende(Interpreteur& it, const Valeur& p, const std::string& nom,
         a->taillePolice = v.scal();
         return true;
     }
+    if (memeNom(nom, "Location")) {
+        std::string position = v.versTexte();
+        for (auto& c : position) c = (char)std::tolower((unsigned char)c);
+        a->positionLegende = (position == "layout" || position == "none") ? "northeast" : position;
+        return true;
+    }
+    if (memeNom(nom, "Orientation")) {
+        std::string o = v.versTexte();
+        a->legendeHorizontale = !o.empty() && (o[0] == 'h' || o[0] == 'H');
+        return true;
+    }
+    if (memeNom(nom, "Box")) {
+        a->boiteLegende = v.versTexte() != "off";
+        return true;
+    }
+    if (memeNom(nom, "Interpreter")) {
+        axesDe(it, p)->interpretes["legend"] = interpreteValide(v);
+        return true;
+    }
     // Les autres proprietes sont acceptees sans effet : le rendu n'en a
     // pas l'usage, et un programme qui les pose ne doit pas s'arreter.
-    if (memeNom(nom, "Location") || memeNom(nom, "Box") ||
-        memeNom(nom, "Orientation") || memeNom(nom, "Interpreter") ||
-        memeNom(nom, "Color") || memeNom(nom, "Position") ||
+    if (memeNom(nom, "Color") || memeNom(nom, "Position") ||
         memeNom(nom, "NumColumns") || memeNom(nom, "AutoUpdate"))
         return true;
     erreur("MATLAB:hg:InvalidProperty",
            "Unrecognized property '" + nom + "' for class 'Legend'.");
 }
 
-// La barre de couleurs n'est pas encore dessinee : ses proprietes se
-// posent et se relisent sans effet sur le trace, ce qui suffit a ce
-// qu'un programme qui la regle ne s'arrete pas.
+// La barre de couleurs : sa position, son etiquette, ses graduations et
+// leurs textes se lisent et s'ecrivent, et le trace les suit.
 bool lireBarre(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
     // La poignee designe bien un axe existant : le verifier ici fait que
     // lire une propriete d'une barre supprimee echoue comme il se doit.
-    axesDe(it, p);
+    auto a = axesDe(it, p);
     if (memeNom(nom, "Visible")) {
-        sortie = Valeur::texte("on");
+        sortie = marche(a->barreCouleurs);
         return true;
     }
-    if (memeNom(nom, "Location") || memeNom(nom, "Label")) {
-        sortie = Valeur::texte("");
+    if (memeNom(nom, "Location")) {
+        sortie = Valeur::texte(a->positionBarre);
+        return true;
+    }
+    // L'etiquette est un texte, comme dans MATLAB : « cb.Label.String = 'T' »
+    // lit la poignee, puis ecrit sa chaine.
+    if (memeNom(nom, "Label")) {
+        sortie = poigneeTexte((int)p.champ("NumeroFigure", 0).scal(),
+                              (int)p.champ("NumeroAxe", 0).scal(), "colorbarlabel");
+        return true;
+    }
+    if (memeNom(nom, "Ticks")) {
+        sortie = depuisVecteur(barreCouleurs(*figureDe(it, p), *a).valeurs);
+        return true;
+    }
+    if (memeNom(nom, "TickLabels")) {
+        BarreCouleurs barre = barreCouleurs(*figureDe(it, p), *a);
+        sortie = Valeur::celluleDims({(int)barre.textes.size(), 1});
+        for (std::size_t k = 0; k < barre.textes.size(); ++k)
+            sortie.cellules[k] = Valeur::texte(barre.textes[k]);
+        return true;
+    }
+    if (memeNom(nom, "Limits")) {
+        double bas, haut;
+        limitesCouleur(*a, bas, haut);
+        sortie = Valeur::ligne({bas, haut});
+        return true;
+    }
+    if (memeNom(nom, "Type")) {
+        sortie = Valeur::texte("colorbar");
         return true;
     }
     return false;
@@ -621,12 +948,39 @@ bool lireBarre(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
 
 bool ecrireBarre(Interpreteur& it, const Valeur& p, const std::string& nom,
                  const Valeur& v) {
-    (void)it; (void)p; (void)v;
-    if (memeNom(nom, "Visible") ||
-        memeNom(nom, "Location") || memeNom(nom, "Label") ||
-        memeNom(nom, "FontSize") || memeNom(nom, "Ticks") ||
-        memeNom(nom, "TickLabels"))
+    auto a = axesDe(it, p);
+    if (memeNom(nom, "Visible")) {
+        a->barreCouleurs = vraiDe(v);
         return true;
+    }
+    if (memeNom(nom, "Location")) {
+        std::string ou = v.versTexte();
+        for (auto& c : ou) c = (char)std::tolower((unsigned char)c);
+        static const char* permises[] = {"east",         "west",        "north",
+                                         "south",        "eastoutside", "westoutside",
+                                         "northoutside", "southoutside"};
+        for (const char* permise : permises)
+            if (ou == permise) {
+                a->positionBarre = ou;
+                return true;
+            }
+        erreur("MATLAB:colorbar:InvalidLocation",
+               "Invalid location '" + v.versTexte() + "' for a colorbar.");
+    }
+    if (memeNom(nom, "Label")) {
+        // « cb.Label = 'T' », ou la poignee relue apres « cb.Label.String ».
+        if (v.estTexte() || v.estChaine()) a->etiquetteBarre = v.versTexte();
+        return true;
+    }
+    if (memeNom(nom, "Ticks")) {
+        a->ticksBarre = versVecteur(v);
+        return true;
+    }
+    if (memeNom(nom, "TickLabels")) {
+        a->etiquettesTicksBarre = versTextes(v);
+        return true;
+    }
+    if (memeNom(nom, "FontSize")) return true;
     erreur("MATLAB:hg:InvalidProperty",
            "Unrecognized property '" + nom + "' for class 'ColorBar'.");
 }
@@ -720,6 +1074,13 @@ bool supprimerGraphique(Interpreteur& moteur, const Valeur& p) {
 }
 
 void enregistrerPoigneesGraphiques(Interpreteur& it) {
+    // Les crochets sont communs au processus, et chaque interpréteur —
+    // chaque travailleur d'un parfor — installe sa bibliothèque : ils
+    // étaient réécrits pendant qu'un autre fil pouvait les appeler, une
+    // course que ThreadSanitizer signale. Ils ne changent jamais : on les
+    // pose une fois.
+    static std::once_flag pose;
+    std::call_once(pose, [] {
     crochetEcrirePropriete = [](Interpreteur& moteur, const Valeur& objet,
                                 const std::string& nom, const Valeur& valeur) {
         if (estPoignee(objet, CLASSE_AXES)) return ecrireAxes(moteur, objet, nom, valeur);
@@ -743,6 +1104,7 @@ void enregistrerPoigneesGraphiques(Interpreteur& it) {
     crochetSupprimerGraphique = [](Interpreteur& moteur, const Valeur& objet) {
         return supprimerGraphique(moteur, objet);
     };
+    });
     it.enregistrer("set", fnSetPoignee, "graphique",
                    "set  Ecrit une propriete d'une poignee graphique.");
     it.enregistrer("get", fnGetPoignee, "graphique",

@@ -31,7 +31,7 @@ function [r, p, k] = residue(b, a, varargin)
     b = retirerZerosDeTete(b);
     a = retirerZerosDeTete(a);
     if isempty(a)
-        error('MATLAB:residue:ZeroDenominator', 'Le dénominateur est nul.');
+        error('MATLAB:residue:ZeroDenominator', 'The denominator is zero.');
     end
     % Partie entière : la division euclidienne, si le numérateur est de
     % degré au moins égal à celui du dénominateur.

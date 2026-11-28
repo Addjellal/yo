@@ -14,7 +14,7 @@ function r = matlibre_gf_pow(a, n, m, prim)
                 r(k) = 1;
             elseif n(k) < 0
                 error('comm:gf:Puissance', ...
-                      'Zéro n''a pas de puissance négative.');
+                      'Zero has no negative power.');
             else
                 r(k) = 0;
             end

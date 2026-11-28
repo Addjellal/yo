@@ -45,12 +45,12 @@ function [indices, deciles] = concentrationIndices(portefeuille, varargin)
     expositions = double(portefeuille(:));
     if any(expositions < 0)
         error('risque:concentration:Negatif', ...
-              'Les expositions doivent être positives ou nulles.');
+              'Exposures must be nonnegative.');
     end
     total = sum(expositions);
     if total <= 0
         error('risque:concentration:Total', ...
-              'Le portefeuille est vide.');
+              'The portfolio is empty.');
     end
     parts = sort(expositions / total, 'descend');
     n = numel(parts);

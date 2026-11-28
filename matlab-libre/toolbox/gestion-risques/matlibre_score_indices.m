@@ -4,7 +4,7 @@ function [indices, etiquettes] = matlibre_score_indices(grille, nom, colonne)
     tranche = matlibre_score_tranche(grille, nom);
     if isempty(tranche)
         error('risque:creditscorecard:Tranche', ...
-              'La variable %s n''est pas encore découpée : appelez AUTOBINNING.', nom);
+              'Variable %s is not binned yet: call AUTOBINNING.', nom);
     end
     if strcmp(tranche.type, 'categorie')
         categories = tranche.categories;

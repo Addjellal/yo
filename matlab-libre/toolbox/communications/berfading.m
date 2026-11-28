@@ -28,7 +28,7 @@ function taux = berfading(EbNodB, methode, M, diversite)
     if nargin < 4 || isempty(diversite), diversite = 1; end
     L = round(double(diversite));
     if L < 1
-        error('comm:berfading:BadOrder', 'L''ordre de diversité doit valoir au moins un.');
+        error('comm:berfading:BadOrder', 'The diversity order must be at least one.');
     end
     EbNodB = double(EbNodB);
     taux = zeros(size(EbNodB));

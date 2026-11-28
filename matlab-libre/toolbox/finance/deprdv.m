@@ -4,7 +4,7 @@ function reste = deprdv(cout, valeurResiduelle, amortissements)
 %   amortir une fois retranchés les amortissements déjà pratiqués.
 %
 %   Exemple :
-%      deprdv(10000, 1000, depsoyd(10000, 1000, 5)(1:2))    % 4600
+%      deprdv(10000, 1000, depsoyd(10000, 1000, 5)(1:2))    % 3600 : 10000 - 1000 - 5400
 %
 %   Voir aussi DEPSTLN, DEPSOYD, DEPFIXDB, DEPGENDB.
     reste = cout - valeurResiduelle - sum(amortissements(:));

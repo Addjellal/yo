@@ -15,7 +15,7 @@ function y = udecode(u, n, v, saturation)
     if nargin < 4, saturation = 'saturate'; end
     n = round(n);
     if n < 2 || n > 32
-        error('signal:udecode:BitCount', 'N doit être entre 2 et 32.');
+        error('signal:udecode:BitCount', 'N must be between 2 and 32.');
     end
     niveaux = 2 ^ n;
     codes = double(u);

@@ -19,7 +19,7 @@ function x = imodwpt(w, nom)
     niveaux = round(log2(lignes));
     if 2 ^ niveaux ~= lignes
         error('wavelet:imodwpt:Lignes', ...
-              'Le nombre de bandes doit être une puissance de deux.');
+              'The number of subbands must be a power of two.');
     end
     courant = w;
     for niveau = niveaux:-1:1

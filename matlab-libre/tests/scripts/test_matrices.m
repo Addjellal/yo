@@ -206,10 +206,21 @@ assert(isequal(sourceA(iau), [1 2]));   % ce qui vient de A
 assert(isequal(sourceB(ibu), 3));       % et ce qui vient de B
 
 % setdiff n'a que deux sorties : ses elements ne sont dans aucune
-% position de B.
+% position de B. Comme dans MATLAB depuis R2013a, les indices sont une
+% colonne, quelle que soit la forme des entrees.
 [d, iad] = setdiff([1 2 3 4], [2 4]);
 assert(isequal(d, [1 3]));
-assert(isequal(iad, [1 3]));
+assert(isequal(iad, [1; 3]));
+
+% 'rows' compare des lignes entieres, 'stable' garde l'ordre d'apparition.
+[cr, iar, ibr] = union([3 1; 2 2; 3 1], [2 2; 0 5], 'rows');
+assert(isequal(cr, [0 5; 2 2; 3 1]) && isequal(iar, [2; 1]) && isequal(ibr, 2));
+assert(isequal(setdiff([1 0 0; 0 1 0], [1 0 0], 'rows'), [0 1 0]));
+[tfr, locr] = ismember([1 2; 9 9; 3 4], [3 4; 1 2; 3 4], 'rows');
+assert(isequal(tfr, [true; false; true]) && isequal(locr, [2; 0; 1]));
+assert(isequal(union([5 1 3], [2 1], 'stable'), [5 1 3 2]));
+assert(isequal(setdiff([5 4 3 2 1], [2 4], 'stable'), [5 3 1]));
+assert(isequal(size(union([1; 2], [3 4])), [4 1]));   % ligne seulement si les deux le sont
 
 % Sur des cellules aussi.
 [cc, icc] = intersect({'a','b'}, {'b','c'});
@@ -592,5 +603,73 @@ assert(norm(U' * U - eye(3)) < 1e-15 && norm(V' * V - eye(3)) < 1e-15, 'svd de l
 assert(norm(U' * U - eye(2)) < 1e-14 && norm(U * S * V' - A) < 1e-13, 'svd economique de rang 1');
 N0 = null([1 1; 1 1]);
 assert(abs(norm(N0) - 1) < 1e-14 && norm([1 1; 1 1] * N0) < 1e-14, 'null d''une matrice singuliere');
+
+%% ------------------------------------------------- qr pivotee et complexe
+% [Q,R,E] = qr(A,0) pivote les colonnes comme LAPACK : A(:,E) = Q*R, et la
+% diagonale de R décroît en module — c'est ce qui révèle le rang.
+Arang = magic(4);
+Arang(:, 4) = Arang(:, 1) + Arang(:, 2);
+[Qp, Rp, Ep] = qr(Arang, 0);
+assert(isequal(Ep, [4 2 3 1]) && norm(Qp * Rp - Arang(:, Ep)) < 1e-12);
+assert(all(diff(abs(diag(Rp))) <= 0) && abs(Rp(4, 4)) < 1e-12);
+[Qm, Rm, Pm] = qr(Arang);
+assert(norm(Arang * Pm - Qm * Rm) < 1e-12 && isequal(size(Pm), [4 4]));
+[~, ~, Ev] = qr(Arang, 'econ', 'vector');
+assert(isequal(Ev, [4 2 3 1]));
+% Une matrice complexe garde sa partie imaginaire ; la diagonale de R est
+% réelle, comme celle de LAPACK.
+Bc = [1+2i 3; 4 5i; 2 1-1i];
+[Qc, Rc] = qr(Bc);
+assert(norm(Qc * Rc - Bc) < 1e-12 && norm(Qc' * Qc - eye(3)) < 1e-12);
+assert(max(abs(imag(diag(Rc)))) < 1e-15);
+% Une colonne déjà nulle sous la diagonale n'est pas réfléchie.
+[Q2, R2] = qr([2; 0]);
+assert(isequal(Q2, eye(2)) && isequal(R2, [2; 0]));
+% La forme économique ne forme pas de Q carré : 3000 lignes restent légères.
+[Qe, Re] = qr(randn(3000, 4), 0);
+assert(isequal(size(Qe), [3000 4]) && isequal(size(Re), [4 4]));
+
+%% ------------------------------------------- algebre lineaire complexe
+% Ces fonctions jetaient la partie imaginaire sans le dire : eig de
+% [2, 1+i; 1-i, 2] rendait 3 et 1, les valeurs propres de sa partie
+% reelle. Valeurs attendues recoupees avec numpy.linalg.
+H = [2, 1+1i; 1-1i, 2];                       % hermitienne : 2 +/- sqrt(2)
+assert(ishermitian(H) && ~issymmetric(H));
+assert(max(abs(eig(H) - [2 - sqrt(2); 2 + sqrt(2)])) < 1e-14);
+[V, D] = eig(H);
+assert(isreal(D) && norm(H * V - V * D) < 1e-14 && norm(V' * V - eye(2)) < 1e-14);
+C = [1 2i; 3 4];                              % complexe quelconque
+valeursC = sort(eig(C));
+assert(max(abs(valeursC - [0.419374756354698 - 1.441874267921469i; ...
+                           4.580625243645302 + 1.441874267921470i])) < 1e-12);
+[V, D] = eig(C);
+assert(norm(C * V - V * D) < 1e-12);
+assert(isequal(eig([1i 0; 0 2i]), [1i; 2i]));  % diagonale imaginaire : pas hermitienne
+assert(max(abs(eig([1 2; 2 1] * 1e-20) - [-1; 3] * 1e-20)) < 1e-33);  % petite echelle
+[L, U, P] = lu(C);
+assert(norm(L * U - P * C) < 1e-14 && ~isreal(U));
+A = [2, 1+1i; 1-1i, 3];                       % hermitienne definie positive
+R = chol(A);
+assert(norm(R' * R - A) < 1e-14 && all(imag(diag(R)) == 0) && all(real(diag(R)) > 0));
+assert(norm(chol(A, 'lower') * chol(A, 'lower')' - A) < 1e-14);
+S = [1 1i; 1i -1];                            % rang un
+assert(isequal(rref(S), [1 1i; 0 0]));
+N = null(S);
+assert(isequal(size(N), [2 1]) && norm(S * N) < 1e-14);
+assert(isequal(size(orth(S)), [2 1]));
+M = [1 2i; 3 4; 1i 1];
+[U, Sg, W] = svd(M);                          % complete : U carree unitaire
+assert(isequal(size(U), [3 3]) && norm(U' * U - eye(3)) < 1e-14);
+assert(norm(U * Sg * W' - M) < 1e-14);
+assert(isequal(kron([1 1i], [1 2]), [1 2 1i 2i]));
+assert(isequal(cross([1; 2; 3], [1i; 0; 1]), [2; -1 + 3i; -2i]));
+assert(isequal(cross([1 2 3; 4 5 6]', [0 0 1; 0 1 0]'), [2 -6; -1 0; 0 4]));
+racinesC = sort(roots([1, -5-2i, 4-6i]));
+assert(max(abs(racinesC - [0.017985202225593 - 1.215941663575811i; ...
+                           4.982014797774408 + 3.215941663575812i])) < 1e-12);
+pc = polyfit([0 1 2], [1i 2 3+1i], 1);
+assert(max(abs(pc - [1.5, 1/6 + 2i/3])) < 1e-14);
+[Vg, Dg] = eig(H, [2 0; 0 1]);                 % generalise, B hermitienne definie positive
+assert(norm(H * Vg - [2 0; 0 1] * Vg * Dg) < 1e-13);
 
 disp('matrices : toutes les verifications passent');

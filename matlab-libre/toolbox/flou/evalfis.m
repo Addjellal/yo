@@ -45,7 +45,7 @@ function [sortie, forces, agregats, sortiesRegles] = evalfis(entrees, fis, resol
     end
     if ~isstruct(fis)
         error('fuzzy:evalfis:Systeme', ...
-              'EVALFIS demande un système d''inférence floue.');
+              'EVALFIS requires a fuzzy inference system.');
     end
     if ~isfield(fis, 'type'), fis.type = 'mamdani'; end
     fis = completerOperateurs(fis);
@@ -177,7 +177,7 @@ function z = conclusionSugeno(mf, x)
             z = sum(p(1:n) .* x(:)') + p(n + 1);
         otherwise
             error('fuzzy:evalfis:BadSugenoMf', ...
-                  'Une sortie de Sugeno doit être ''constant'' ou ''linear''.');
+                  'A Sugeno output must be ''constant'' or ''linear''.');
     end
 end
 

@@ -28,7 +28,7 @@ function indice = rangDeModalite(liste, modalite, nomVariable)
     if isnumeric(modalite)
         indice = round(modalite);
         if indice < 1 || indice > numel(liste)
-            error('fuzzy:removeMF:Rang', 'Modalité %d inexistante.', indice);
+            error('fuzzy:removeMF:Rang', 'Membership function %d does not exist.', indice);
         end
         return
     end
@@ -40,5 +40,5 @@ function indice = rangDeModalite(liste, modalite, nomVariable)
         end
     end
     error('fuzzy:removeMF:Absente', ...
-          'La variable ''%s'' n''a pas de modalité ''%s''.', nomVariable, nom);
+          'Variable ''%s'' has no membership function ''%s''.', nomVariable, nom);
 end

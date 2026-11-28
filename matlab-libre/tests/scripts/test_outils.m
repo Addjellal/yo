@@ -76,6 +76,20 @@ assert(strcmp(etat(1).name, 'profChaud'));
 dbclear all
 assert(isempty(dbstatus()));
 
+% La forme commande, celle de la fiche : « dbstop in f at 3 » passe le
+% numéro en texte, '3', qu'on prenait pour son code de caractère (51).
+dbstop in profChaud at 4
+etat = dbstatus();
+assert(numel(etat) == 1 && etat(1).line == 4);
+dbclear in profChaud at 4
+assert(isempty(dbstatus()));
+try
+    dbstop('in', 'profChaud', 'at', 'quatre');
+    assert(false, 'un numéro de ligne illisible doit être refusé');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:dbstop:InvalidInput'));
+end
+
 % Condition mémorisée telle quelle.
 dbstop('in', 'profChaud', 'at', 4, 'if', 'k > 10');
 etat = dbstatus();
@@ -136,5 +150,52 @@ for k = 1:numel(attendues)
     assert(~isempty(strfind(fiche, 'Exemple')));
     assert(~isempty(strfind(fiche, 'Voir aussi')));
 end
+
+%% ------------------------- verifierValeurs lit les valeurs annoncees
+% L'outil compare ce qu'annoncent les commentaires d'un exemple a ce que
+% rend la ligne : nombres a la precision ecrite, tableaux, textes. Une
+% fiche factice porte des annonces justes et deux fausses ; seules les
+% fausses doivent ressortir.
+racineDepot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+addpath(fullfile(racineDepot, 'outils'));
+dossierFiche = tempname();
+mkdir(dossierFiche);
+fid = fopen(fullfile(dossierFiche, 'ficheFactice__.m'), 'w');
+fprintf(fid, '%s\n', ...
+    'function y = ficheFactice__(x)', ...
+    '%FICHEFACTICE__ Fiche dont deux annonces sont fausses.', ...
+    '%   Exemple :', ...
+    '%      ficheFactice__(2)             % 4', ...
+    '%      ficheFactice__(pi)            % 6.2832', ...
+    '%      ficheFactice__([1 2 3])       % [2 4 6]', ...
+    '%      ficheFactice__([1; 2])        % [2 4] : orientation libre', ...
+    '%      ficheFactice__([1 2; 3 4])    % [2 4; 6 8]', ...
+    '%      ficheFactice__([NaN Inf])     % [NaN Inf]', ...
+    '%      ficheFactice__(0.25)          % 0.5000', ...
+    '%      ficheFactice__([1 2 3])       % [2 4 7]', ...
+    '%      ficheFactice__([1 2; 3 4])    % [2 6; 4 8]', ...
+    '%', ...
+    '%   Voir aussi PLUS.', ...
+    '    y = 2 * x;', ...
+    'end');
+fclose(fid);
+addpath(dossierFiche);
+% Un ecart fait echouer l'outil : c'est ce qui arrete la batterie.
+refuseValeurs = '';
+try
+    evalc('verifierValeurs(''ficheFactice__'')');
+catch err
+    refuseValeurs = err.identifier;
+end
+assert(strcmp(refuseValeurs, 'MatLibre:verifierValeurs:Ecarts'));
+% Les deux annonces fausses, et elles seules, sont relevees.
+journalValeurs = evalc('try, verifierValeurs(''ficheFactice__''); catch, end');
+rmpath(dossierFiche);
+rmdir(dossierFiche, 's');
+assert(numel(strfind(journalValeurs, 'ECART')) == 2);
+assert(~isempty(strfind(journalValeurs, 'annonce [2 4 7]')));
+assert(~isempty(strfind(journalValeurs, 'annonce [2 6; 4 8]')));
+assert(~isempty(strfind(journalValeurs, '9 valeurs comparees, 2 ecarts')));
+disp('verifierValeurs : ok');
 
 disp('outils : toutes les verifications passent');

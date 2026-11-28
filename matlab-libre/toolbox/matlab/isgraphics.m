@@ -15,7 +15,7 @@ function t = isgraphics(h, genre)
 %
 %   Voir aussi ISHANDLE, GCA, GCF, CLASS.
     if nargin < 1
-        error('MATLAB:minrhs', 'ISGRAPHICS attend une valeur.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     t = false(size(h));
     for k = 1:numel(h)

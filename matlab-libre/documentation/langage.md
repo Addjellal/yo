@@ -71,6 +71,13 @@ comme MATLAB l'exige depuis R2016b.
 Fonctions anonymes : `f = @(x, y) x + y`. La capture est faite à la
 création, par valeur.
 
+Les arguments nom-valeur s'écrivent aussi `f(x, Nom=valeur)`, la forme
+de MATLAB depuis R2021a : la fonction reçoit `"Nom", valeur`, le nom en
+chaîne, comme si on l'avait écrit ainsi. Comme dans MATLAB, cette forme
+ne vaut que dans les parenthèses d'un appel, après tous les autres
+arguments — un argument ordinaire qui la suit est refusé à l'analyse —,
+et elle ne sert pas à indexer une variable.
+
 ## Classes
 
 ```matlab
@@ -147,3 +154,26 @@ matlibre -e "expression"     évalue puis quitte
 matlibre --path DOSSIER ...  ajoute un dossier au chemin de recherche
 matlibre --test DOSSIER      exécute les fichiers test_*.m du dossier
 ```
+
+Au terminal, la ligne de commande s'édite comme dans la fenêtre de
+commandes de MATLAB :
+
+| touche | effet |
+|---|---|
+| ← →, Début, Fin (Ctrl-A, Ctrl-E) | se déplacer ; Ctrl-← et Ctrl-→ par mot |
+| ↑ ↓ | l'historique, filtré par ce qui est déjà tapé : `pl` puis ↑ rappelle le dernier `plot(...)` |
+| Tab | compléter une variable, une fonction, un champ (`s.al` → `s.alpha`), un fichier entre apostrophes ou après `cd`, `load`, `run`… ; quand les choix ne s'accordent plus, les montrer |
+| Échap | effacer la ligne |
+| Ctrl-K, Ctrl-U, Ctrl-W | couper jusqu'au bout, jusqu'au début, le mot précédent |
+| Ctrl-C | abandonner la ligne (pendant un calcul : l'interrompre) |
+| Ctrl-D | sur une ligne vide, finir la session |
+| Ctrl-L | effacer l'écran |
+
+L'historique se garde d'une session à l'autre dans `~/.matlibre_historique`
+(lisible de son seul propriétaire, mille commandes) ; la variable
+`MATLIBRE_HISTORIQUE` en donne un autre, ou, vide, n'en garde aucun. Après
+une faute de frappe, la commande corrigée du « Did you mean: » est posée
+dans la saisie : Entrée l'exécute, Échap l'efface. Sous
+`MATLIBRE_EDITION=0`, ou quand la sortie n'est pas un terminal, la console
+lit ligne à ligne, sans édition ; quand l'entrée n'est pas un terminal (un
+tube, un fichier), elle n'écrit pas non plus d'invite.

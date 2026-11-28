@@ -15,7 +15,7 @@ function w = normaliserSomme(w, sumf)
     total = sum(w);
     if total == 0
         error('wavelet:normaliserSomme:SommeNulle', ...
-              'Le filtre est de somme nulle : il n''est pas normalisable.');
+              'The filter sums to zero: it cannot be normalized.');
     end
     if isempty(sumf) || sumf == 0
         w = w / total * sqrt(2);

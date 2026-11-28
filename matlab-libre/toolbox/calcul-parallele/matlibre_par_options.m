@@ -30,6 +30,6 @@ function [entrees, options] = matlibre_par_options(arguments_, reconnues)
     end
     if isempty(entrees)
         error('parallel:options:SansEntree', ...
-              'Il faut au moins un tableau a parcourir.');
+              'At least one array is required.');
     end
 end

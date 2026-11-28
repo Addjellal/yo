@@ -15,8 +15,10 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
   dit ce qu'il n'a pas su reconstruire, mais ne rebâtit pas l'objet.
 - **Figures `.fig`**. Ce sont des fichiers MAT portant le modèle d'objets
   graphiques de MathWorks, que MatLibre n'a pas.
-- **Modèles Simulink `.slx`**. `sim` existe pour les modèles écrits en
-  MatLibre ; le format de MathWorks, non.
+- **Modèles Simulink `.slx`**. `load_system` lit les `.slx` et les
+  `.mdl` de Simulink, et `save_system` écrit un `.slx` ; ce que MatLibre ne
+  connaît pas d'un modèle (annotations, masques au-delà des paramètres,
+  signaux de taille variable) est perdu à la lecture.
 - **Scripts vivants `.mlx`**. Le format est une archive OPC ; l'éditeur
   ne les ouvre pas.
 
@@ -33,15 +35,10 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
 
 - **Dossiers `private/`** : les fonctions privées d'un dossier ne sont pas
   reconnues comme telles.
-- **Dossiers de paquet `+nom/`** : la notation `paquet.fonction` marche
-  pour ce qui est enregistré sous ce nom, non par découverte de dossier.
 - **Événements et écouteurs** (`events`, `addlistener`, `notify`) : les
   `events` sont analysés, les écouteurs manquent. Les **classes poignées**
   (`classdef X < handle`), elles, partagent bien leur état : une méthode
   qui écrit dans l'objet se voit depuis toutes ses copies.
-- **Héritage** : `classdef X < Y` est analysé, mais seul `handle` a un
-  effet ; les méthodes et propriétés du parent ne sont pas héritées.
-- **Énumérations** (`enumeration`) dans un `classdef`.
 - **`matlab.unittest`** : le cadre de tests à classes. Les tests de
   MatLibre sont des scripts à `assert`.
 - **Mots-clés de `classdef`** : `properties`, `methods`, `events` et
@@ -51,6 +48,17 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
   attributs entre parenthèses (`properties (Access = private)`) sont
   analysés et ignorés : rien n'est privé.
 - **Interfaces externes** : MEX, appel de Java, de Python, de C++.
+- **Générateur aléatoire** : `rand`, `randi`, `randperm` et `randn`
+  suivent le générateur `'twister'` de MATLAB — MT19937, doubles sur
+  53 bits, ziggurat à 256 bandes —, si bien que `rng(0)` rend les mêmes
+  nombres que MATLAB. Le rare rejet de `randn` (un tirage sur cent),
+  dont MATLAB ne publie pas le détail, suit Marsaglia et Tsang et peut en
+  différer. Les autres générateurs (`'philox'`, `'threefry'`,
+  `'combRecursive'`...) sont refusés en le disant.
+- **`functions(f)`** ne rend pas le champ `workspace` d'une fonction
+  anonyme. La capture elle-même suit MATLAB : seules les variables que le
+  corps cite sont retenues, à leur valeur du moment, et lues sans copie
+  à chaque appel.
 
 ### Bureau
 
@@ -68,13 +76,21 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
 Les noms du tableau ci-dessus sont tous présents ; ce qui suit est ce
 qu'ils ne font pas encore comme MATLAB.
 
-- **Rendu tridimensionnel** : le rendu de MatLibre est plan. `surf`,
-  `mesh`, `plot3`, `contour3`, `scatter3` et leurs voisins tracent, mais
-  sans perspective ; `view`, `light`, `lighting`, `material` et `hidden`
-  sont acceptés sans effet. Chaque fiche d'aide le dit.
-- **Second axe des ordonnées** : `plotyy` et `yyaxis` remettent la
-  seconde courbe à l'échelle de la première au lieu de lui donner ses
-  propres graduations à droite.
+- **Rendu tridimensionnel** : `surf`, `mesh`, `plot3`, `scatter3`,
+  `fill3`, `patch`, `contour3`, `bar3`, `stem3`, `quiver3`, `slice` et
+  leurs voisins sont projetés comme dans MATLAB (projection
+  orthographique de `viewmtx`, `view`, boîte étirée sauf sous
+  `axis equal`), les faces triées de la plus lointaine à la plus proche.
+  Trois écarts : l'algorithme du peintre ne coupe pas deux faces qui se
+  traversent ; `shading interp` donne à chaque maille la moyenne de ses
+  sommets au lieu d'un dégradé ; aucun éclairage n'est calculé (`light`,
+  `lighting` et `material` sont acceptés sans effet). `bar3h` garde ses
+  barres verticales, et `slice` coupe sur le plan de grille le plus
+  proche au lieu d'interpoler.
+- **Second axe des ordonnées** : `yyaxis` et `plotyy` donnent à la droite
+  ses bornes, ses graduations, son étiquette et sa couleur, comme MATLAB ;
+  `plotyy` rend un seul axe sous deux poignées, une par côté, là où
+  MATLAB en superpose deux.
 - **Axes polaires** : `polarplot`, `compass` et `rose` convertissent en
   coordonnées cartésiennes et dessinent eux-mêmes cercles et rayons ; la
   graduation angulaire du cadre manque.
@@ -87,6 +103,42 @@ qu'ils ne font pas encore comme MATLAB.
   peut pas ; les figures ne sont pas cliquables.
 - **Format `.fig`** : `savefig` écrit du SVG, `openfig` refuse le format
   de MathWorks.
+- **Palette par défaut** : viridis, et non parula. Les valeurs de parula
+  appartiennent à MathWorks ; comme GNU Octave, MatLibre prend viridis
+  (domaine public). `parula` n'existe pas : `colormap(parula)` lève
+  l'erreur ordinaire d'un nom inconnu, sans dire pourquoi (P30 de
+  l'audit de reprise).
+  `colormap`, `clim`/`caxis`, `image` (indices directs), `imagesc` et
+  `imshow` (gris sur la plage du type, couleurs vraies, images indexées)
+  suivent MATLAB.
+- **Légende** : les entrées, leurs styles et marqueurs, `Location` (y
+  compris hors de l'axe et `'best'`), `Orientation` et `Box` suivent
+  MATLAB ; la mise à jour automatique (`AutoUpdate`) et `NumColumns` sont
+  acceptées sans effet, et une légende de contour montre un trait, non
+  l'icône de MATLAB.
+- **TeX** : les titres, étiquettes, légendes, textes et graduations
+  passent par le TeX de MATLAB (exposants, indices, groupes, lettres
+  grecques et symboles, `\bf`, `\it`, `\color`, `\fontsize`) ;
+  `'Interpreter','none'` les écrit tels quels. L'interprète `'latex'` est
+  lu comme du TeX sans les dollars : `\frac`, `\sqrt{}` et les
+  environnements de LaTeX ne sont pas mis en page. Un texte sur plusieurs
+  lignes (cellule) s'écrit sur une seule.
+- **Barre de couleurs** : ses huit positions, son étiquette
+  (`cb.Label.String`), ses graduations et leurs textes suivent MATLAB ;
+  `Direction`, `Limits` en écriture et la police (`FontSize`) ne sont pas
+  pris en compte.
+- **Graduations inclinées** : `xtickangle`, `ytickangle` et
+  `XTickLabelRotation` inclinent les étiquettes ; MATLAB les incline aussi
+  de lui-même quand elles se chevauchent, ce que MatLibre ne fait pas.
+- **Couleurs des lignes** : `get(h,'Color')` rend un code `'#FF0000'`, là
+  où MATLAB rend le triplet `[1 0 0]` ; les deux s'écrivent.
+
+- **`bar`** lit les données, la largeur, `'grouped'` et `'stacked'`,
+  `FaceColor`, `EdgeColor`, `BarWidth`, `FaceAlpha` et `DisplayName` ;
+  les styles `'hist'` et `'histc'` et une ligne de base non nulle
+  (`BaseValue`) sont refusés en le disant. La disposition des barres
+  groupées suit celle de MATLAB — le groupe occupe min(0,8, n/(n+1,5)) de
+  l'écart —, sans en garantir chaque pixel.
 
 ### Traitement du signal
 
@@ -123,9 +175,21 @@ qu'ils ne font pas encore comme MATLAB.
   MATLAB continue d'avancer.
 - **`montage`** assemble et rend l'image assemblée ; la navigation entre
   vignettes n'existe pas.
+- **Tomographie** : `radon`, `iradon` et `phantom` suivent les
+  algorithmes de MATLAB — quatre sous-pixels par pixel pour `radon`,
+  filtre de rampe spatial de Kak et Slaney puis rétroprojection pour
+  `iradon`, avec les filtres `'Ram-Lak'`, `'Shepp-Logan'`, `'Cosine'`,
+  `'Hamming'`, `'Hann'` et `'None'`. La rétroprojection n'interpole qu'en
+  `'linear'` ou `'nearest'` : `'spline'`, `'pchip'` et `'cubic'` sont
+  refusés. La géométrie en éventail (`fanbeam`, `ifanbeam`, `fan2para`,
+  `para2fan`) manque.
 
 ### Systèmes asservis
 
+- **`c2d` connaît `'zoh'`, `'foh'`, `'impulse'` et `'tustin'`** ; les
+  méthodes `'matched'` et `'least-squares'`, l'option de pré-distorsion
+  de Tustin et les objets `c2dOptions` sont refusés en le disant. `d2c`
+  connaît `'zoh'` et `'tustin'`.
 - **Pas de retards internes** : `InputDelay`, `OutputDelay` et `IODelay`
   sont portés et honorés — la réponse fréquentielle en `e^(-jwD)`, la
   réponse temporelle par décalage, exactement —, mais un retard *dans*
@@ -179,6 +243,13 @@ qu'ils ne font pas encore comme MATLAB.
 - **`linprog` et `quadprog`** minimisent une barrière logarithmique par
   Nelder-Mead : pas de simplexe, pas de base optimale, donc ni variables
   duales ni analyse de sensibilité.
+- **`lsqnonlin` et `lsqcurvefit`** n'ont que Levenberg-Marquardt, résolu
+  par QR du système augmenté ; l'algorithme par défaut de MATLAB,
+  trust-region-reflective, n'est pas fait, et l'option `Algorithm` est
+  ignorée. Les résultats coïncident à la tolérance près, non au dernier
+  chiffre. `FunctionTolerance` n'arrête le calcul que si on la donne ;
+  le pas des différences finies est relatif à |x| (`TypicalX` le borne
+  par en dessous quand on le donne), là où MATLAB prend max(|x|, 1).
 
 ### Optimisation globale
 
@@ -195,6 +266,14 @@ qu'ils ne font pas encore comme MATLAB.
   structures dont les champs sont ceux que MatLibre lit réellement. Les
   fonctions personnalisables de MATLAB — `MutationFcn`, `CrossoverFcn`,
   `SearchFcn`, `AnnealingFcn` — sont acceptées et sans effet.
+- **Multiobjectif** : `gamultiobj` suit NSGA-II (Deb et al., 2002), là
+  où MATLAB emploie une variante élitiste contrôlée par `ParetoFraction` ;
+  sur ZDT1, le front trouvé est à un millième du vrai. Il prend les
+  contraintes linéaires et refuse, en le disant, les contraintes non
+  linéaires. `paretosearch` sonde les directions de coordonnées autour
+  de chaque point de l'archive, chacun avec sa maille, et ne prend que des
+  bornes. `ParetoFraction`, `DistanceMeasureFcn` et les fonctions de
+  tracé sont sans effet.
 
 ### Finance
 
@@ -249,17 +328,23 @@ qu'ils ne font pas encore comme MATLAB.
   `runtests(v)`, `score(sc)`. `RUNTESTS` reste une méthode et non une
   fonction de fichier : le nom appartient déjà au lanceur de tests de
   MatLibre, et une fonction de fichier le masquerait.
-- **Les résultats sont des structures ou des tableaux de cellules**, non
-  des tables MATLAB : `runtests` rend une cellule par test, `bininfo` une
-  structure de colonnes.
+- **`varbacktest` rend les tables de MATLAB** — `tl`, `bin`, `pof`,
+  `tuff`, `cci`, `cc`, `tbfi`, `tbf`, `summary` et `runtests`, avec leurs
+  colonnes (`POF`, `LRatioPOF`, `PValuePOF`, `Observations`...) et des
+  verdicts catégoriels ; les valeurs des exemples de MathWorks sont
+  retrouvées au chiffre près. **`esbacktest` et `bininfo` rendent encore
+  des structures**, non des tables.
 - **`esbacktest`** obtient ses valeurs critiques en simulant cinq mille
   fois la statistique sous l'hypothèse nulle, à graine fixée, avec mise en
   cache : deux appels identiques rendent le même verdict, mais la valeur
   diffère de celle de MATLAB à la troisième décimale. `esbacktestbysim`
   et les tests conditionnels manquent.
-- **`varbacktest`** implémente les huit tests. Le test de Kupiec
-  sur-rejette en petit échantillon quand les dépassements sont rares —
-  c'est une propriété connue du test, non un défaut de calcul.
+- **`varbacktest`** implémente les huit tests. Le feu tricolore suit la
+  documentation de MathWorks — `Increase` vaut 3*(z annoncé / z observé
+  - 1) en zone jaune, non la table des majorations du Comité de Bâle. Le
+  test de Kupiec sur-rejette en petit échantillon quand les dépassements
+  sont rares — c'est une propriété connue du test, non un défaut de
+  calcul.
 - **`transprob`** prend une matrice à trois colonnes — identifiant, date,
   notation — et non une table ; les notations sont des entiers, la
   première étant la meilleure.
@@ -342,23 +427,35 @@ qu'ils ne font pas encore comme MATLAB.
 
 ### Calcul formel
 
-- **Une expression, pas un tableau** : un `sym` porte une seule
-  expression. Les tableaux symboliques de MATLAB — une matrice de `sym`,
-  `A\b` en formel — n'existent pas ; `jacobian` et `hessian` rendent des
-  cellules.
-- **`simplify` regroupe, il ne factorise pas.** Il réduit les cas
-  triviaux et, quand l'expression est polynomiale en une variable, la
-  réécrit à partir de ses coefficients — ce qui regroupe les termes
-  semblables. Les identités trigonométriques, la mise en facteur et la
-  réduction des radicaux ne sont pas faites ; `factor`, `collect`,
-  `horner`, `partfrac`, `numden` et `rewrite` manquent.
-- **`solve` ne résout que le polynomial**, par `roots` sur les
-  coefficients : une équation transcendante est refusée, et les systèmes
-  ne sont pas gérés.
-- **`int` ne fait que les formes élémentaires** : constantes, puissances
-  de la variable, sinus, cosinus, exponentielle, et leurs sommes.
-  L'intégration par parties, le changement de variable et les fractions
-  rationnelles ne sont pas faits.
+- **Des nombres flottants, non exacts.** Un `sym` numérique est un
+  double : `sym(1)/3` vaut 0,333..., écrit `1/3` parce que la fraction
+  redonne exactement ce double, et `pi` reste un nombre, non le symbole
+  de MATLAB. L'écriture est sans perte — fraction simple quand elle
+  existe, sinon le plus court décimal qui relit le double —, si bien que
+  `matlabFunction` compile des coefficients justes.
+- **Tableaux de `sym`** : les opérations élément par élément, le produit
+  matriciel, `diff`, `int`, `subs`, `simplify` et `expand` s'appliquent à
+  un tableau, et `solve` rend une colonne. `A\b`, `inv` et `det` d'une
+  matrice de `sym` ne sont pas faits (`symmatrix` raisonne sur une matrice
+  entière) ; `jacobian` et `hessian` rendent des cellules.
+- **`simplify` regroupe, il ne transforme pas.** Il réduit les cas
+  triviaux et réécrit une expression polynomiale en une variable à partir
+  de ses coefficients. Les identités trigonométriques —
+  sin(x)^2 + cos(x)^2 reste tel quel — et la réduction des radicaux ne
+  sont pas faites. `factor` met en facteur les racines rationnelles,
+  exactement, par le théorème qui les borne.
+- **`solve` ne résout que le polynomial** : les racines rationnelles
+  exactement, les autres par `roots` sur le quotient. Une équation
+  transcendante est refusée (`vpasolve` la résout numériquement), et les
+  systèmes ne sont pas gérés.
+- **`int` connaît quelques règles exactes** : sommes, constantes, sinus,
+  cosinus, exponentielle, logarithme et puissance d'un argument affine,
+  base constante, la gaussienne exp(-a x^2 + b x + c) par la fonction
+  d'erreur, et l'inverse d'un polynôme de degré un ou deux (logarithme,
+  arc tangente). Hors de ces règles, il le dit. Une intégrale définie
+  entre bornes numériques est recoupée par `integral`, et refusée si la
+  primitive est discontinue sur l'intervalle. L'intégration par parties
+  et le changement de variable ne sont pas faits.
 - **`limit` est numérique**, par extrapolation de Richardson sur des pas
   géométriquement décroissants : une dizaine de chiffres justes sur les
   limites usuelles, mais aucune preuve. Une forme indéterminée que
@@ -366,6 +463,8 @@ qu'ils ne font pas encore comme MATLAB.
 - **`vpa` n'a pas de précision variable** : MatLibre calcule en double
   précision puis arrondit au nombre de chiffres demandé. Au-delà de
   quinze, les chiffres rendus ne sont pas justes.
+- **`symsum` ne somme qu'entre bornes finies**, terme à terme : la série
+  de Bâle, somme de 1/k^2 jusqu'à l'infini, est refusée.
 - **Pas de transformées** : `laplace`, `ilaplace`, `fourier`, `ztrans` et
   `dsolve` n'existent pas.
 
@@ -479,15 +578,32 @@ qu'ils ne font pas encore comme MATLAB.
 
 ### Statistiques et apprentissage
 
-- **Objets de modèle** : MATLAB rend des objets — `ClassificationSVM`,
-  `GeneralizedLinearModel`, `LinearMixedModel` — à méthodes. MatLibre
-  rend des structures portant les mêmes champs, et une fonction `predict`
-  commune qui reconnaît le modèle à son champ `type`.
+- **Objets de modèle** : `fitlm` rend un objet `LinearModel` comme
+  MATLAB — `Coefficients` en table (`Estimate`, `SE`, `tStat`,
+  `pValue`), `Rsquared.Ordinary`, `Formula.Terms`, diagnostics, méthodes
+  `predict`, `feval`, `random`, `coefCI`, `coefTest`, `anova` —, mais
+  sans ses méthodes graphiques (`plot`, `plotResiduals`...), sans
+  `step`, `addTerms`, `removeTerms`, sans `RobustOpts` ni `HatMatrix`.
+  Les autres modèles — `ClassificationSVM`, `GeneralizedLinearModel`,
+  `LinearMixedModel`... — sont encore des structures portant les mêmes
+  champs, avec une fonction `predict` commune qui reconnaît le modèle à
+  son champ `type` ; leurs `Coefficients` sont un vecteur, non une table.
 - **`fitlme`** n'ajuste que les intercepts aléatoires — la forme
   `(1|g)` —, avec un ou plusieurs facteurs croisés. Les pentes
   aléatoires, `(x|g)`, et les modèles emboîtés ne le sont pas.
-- **Formules de Wilkinson** : seul `fitlme` en lit une, et seulement les
-  termes séparés par `+`. `fitlm` et `fitglm` prennent une matrice.
+- **Formules de Wilkinson** : `fitlm` les lit (`+`, `-`, `*`, `:`,
+  `^` sur une variable, `- 1`), mais pas la puissance d'une somme,
+  `(A + B)^2`. `fitlme` ne lit que des termes séparés par `+`, et
+  `fitglm` prend une matrice.
+- **`nlinfit`** suit l'algorithme et les réglages de MATLAB
+  (`statset('nlinfit')`, avertissements compris), mais refuse en le
+  disant l'ajustement robuste (`Robust`), les poids (`Weights`) et les
+  modèles d'erreur autres que `'constant'`.
+- **`pca`** refuse en le disant les poids d'observation (`Weights`), un
+  vecteur de `VariableWeights`, `Rows','pairwise'` et l'algorithme `als`.
+- **`anova` d'un `LinearModel`** calcule les sommes de carrés de types
+  1, 3 et `'h'`, non le type 2 ; le résumé n'a pas les lignes d'erreur
+  d'ajustement et d'erreur pure.
 - **`polytool` et `stepwise`** ne sont pas interactifs : MatLibre mène la
   procédure et rend le résultat, là où MATLAB ouvre une fenêtre où l'on
   ajoute et retire les termes à la main.
@@ -523,12 +639,286 @@ de MatLibre ne fait pas comme celle de MathWorks.
 - **`iconnect` n'existe pas.** Les schémas s'assemblent par `sysic` ou
   par `connect`.
 
+### Cartographie
+
+- **Géodésie** : `distance`, `azimuth` et `reckon` suivent la forme de
+  MATLAB — arc en degrés sur la sphère unité, longueur dans l'unité du
+  demi-grand axe sur un ellipsoïde — ; sur l'ellipsoïde, la méthode de
+  Vincenty (1975), au dixième de millimètre, qui ne converge pas pour
+  deux points presque antipodaux : `distance` le dit par une erreur, là
+  où MATLAB rend le résultat. La loxodromie (`'rh'`) n'est calculée que
+  sur la sphère.
+- **`areaint` rend l'aire exacte** du polygone à côtés de grand cercle.
+  MATLAB intègre par trapèzes : sa documentation rend 0.0792 pour un
+  fuseau de 30 degrés décrit avec des sommets tous les 30 degrés, dont
+  l'aire exacte, 1/12, est ce que rend MatLibre.
+- **`referenceEllipsoid`** connaît WGS84, GRS80, Hayford (international),
+  Bessel et Clarke 1866, ou un vecteur [a e] ; pas `referenceSphere`, ni
+  la base des codes EPSG. Les projections (`projcrs`, `projfwd`,
+  `mfwdtran`) manquent ; `deg2utm` et `distanceGC` sont propres à
+  MatLibre.
+
+### Bio-informatique
+
+- **`nwalign` et `swalign`** font les alignements de MATLAB — matrices
+  BLOSUM45, 50, 62, 80, 90, PAM250 et NUC44, trous affines, score en
+  bits —, sans le tracé de `Showscore`. Les autres matrices (`blosum(30)`,
+  `pam(120)`...) sont refusées. `multialign`, `seqpdist` et les arbres
+  phylogénétiques manquent.
+
+### Aérospatial
+
+- **`atmosisa`** couvre l'atmosphère type de -5 km à la mésopause
+  (84,852 km), viscosités comprises ; `atmoscoesa`, `atmosnonstd` et les
+  modèles de vent manquent.
+
+### Radar et réseaux d'antennes
+
+- **L'équation du radar** suit les signatures de MATLAB : `radareqpow`,
+  `radareqrng` et `radareqsnr` prennent `RCS`, `Ts`, `Gain` (un gain ou
+  deux, émission et réception), `Loss`, `CustomFactor`,
+  `AtmosphericLoss`, `PropagationFactor` et `unitstr`, monostatique ou
+  bistatique ; les exemples de MathWorks sont retrouvés aux chiffres
+  imprimés. Les objets système (`phased.ULA`, `phased.MUSICEstimator`,
+  `phased.RangeDopplerResponse`...) n'existent pas.
+- **Estimation de direction** : `steervec` (réseau quelconque, phases
+  quantifiées), `sensorcov`, `musicdoa`, `rootmusicdoa` et `espritdoa`
+  suivent MATLAB ; `espritdoa` refuse en le disant une pondération des
+  lignes (`RowWeighting`) autre que un. Avec une covariance exacte,
+  `rootmusicdoa` rend les angles à 1e-7 près seulement : ses racines sont
+  doubles sur le cercle unité, ce qui coûte la moitié des chiffres.
+
+### Radiofréquences et antennes
+
+- **Conversions de paramètres** : `s2z`, `z2s`, `s2y`, `y2s`, `s2abcd`,
+  `abcd2s`, `gammain` et `gammaout` prennent des tableaux N x N x K, comme
+  MATLAB ; l'objet `sparameters`, la lecture des fichiers Touchstone et
+  les objets de circuit (`rfckt`, `circuit`) manquent.
+- **Pas d'objets d'antenne** : `dipole`, `patchMicrostrip` et le calcul
+  par la méthode des moments (impédance, courants, couplage) de l'Antenna
+  Toolbox n'existent pas. MatLibre calcule les diagrammes analytiques —
+  dipôle de longueur quelconque, facteur de réseau — et en tire
+  directivité et ouverture, conformes à Balanis.
+
+### Traitement du signal en temps réel
+
+- **`firls`** calcule les moindres carrés intégrés en forme fermée, types
+  I à IV et transformateur de Hilbert, comme MATLAB ; l'option
+  `'differentiator'`, qui pondère l'erreur en 1/f², est refusée en le
+  disant (`firpm` la connaît).
+- **Pas d'objets système** (`dsp.FIRFilter`, `dsp.AudioFileReader`,
+  `dsp.SpectrumAnalyzer`...) : le traitement par blocs s'écrit avec les
+  fonctions.
+
+### Audio
+
+- **Descripteurs** : `spectralCentroid` et `zerocrossrate` suivent MATLAB
+  — trames de 30 ms recouvertes de 20 ms, fenêtre rectangulaire, spectre
+  de puissance ; méthodes `'difference'` et `'comparison'`, niveau, seuil,
+  état initial. Le spectre d'une trame est |FFT|² sur les raies de 0 à
+  fs/2. `audioFeatureExtractor`, `mfcc`, `melSpectrogram`, `pitch` et les
+  autres descripteurs spectraux manquent ; `mfccSimple` en tient lieu.
+
+### Communications sans fil
+
+- **`ofdmmod` et `ofdmdemod`** suivent MATLAB : sous-porteuses de la plus
+  négative à la plus positive, porteuses nulles, pilotes, préfixe variable
+  d'un symbole à l'autre, fenêtre avancée dans le préfixe avec la rotation
+  de phase compensée. Le suréchantillonnage (`OversamplingFactor` autre
+  que un) est refusé en le disant.
+- **`qammod` et `qamdemod`** placent les symboles comme MATLAB — le
+  symbole 0 en haut à gauche, en descendant chaque colonne —, en ordre
+  binaire, de Gray ou personnalisé, avec `UnitAveragePower` et l'entrée
+  ou la sortie en bits. Les constellations en croix (M = 8, 32, 128...) et
+  les sorties souples (`'llr'`, `'approxllr'`) sont refusées en le disant.
+
+### Vision par ordinateur
+
+- **Les points sont des tableaux**, non des objets `cornerPoints` : les
+  détecteurs rendent les positions [x y] et la métrique, que
+  `selectStrongest` sait trier. `detectHarrisFeatures` et
+  `detectMinEigenFeatures` lisent `MinQuality`, `FilterSize` et `ROI`,
+  retiennent un seul pixel par plateau et affinent la position au
+  sous-pixel par une parabole dans chaque direction — la méthode de
+  MATLAB n'est pas documentée, et les positions peuvent différer au
+  dixième de pixel près.
+- **`estimateGeometricTransform2D`** est robuste par défaut, comme MATLAB
+  (MSAC, `MaxDistance` 1,5 pixel, `MaxNumTrials`, `Confidence`), et
+  connaît les quatre types ; elle rend la matrice 3 x 3, non l'objet
+  `rigid2d`, `affine2d` ou `projective2d`.
+- **`disparityBM` n'a pas les seuils d'OpenCV** (`UniquenessThreshold`,
+  `TextureThreshold`, `ContrastThreshold`) : dans une zone sans texture,
+  où plusieurs décalages s'apparient aussi bien, le plus petit l'emporte,
+  là où MATLAB marque le pixel comme non fiable.
+
+### Robotique
+
+- **Quaternions** : `quatmultiply`, `quatdivide`, `quatconj`,
+  `quatnormalize`, `quatinv`, `quatrotate`, `quatnorm` et `quatmod`
+  suivent l'Aerospace Toolbox, ligne par ligne sur des tableaux M x 4 :
+  `quatdivide(q,r)` rend inv(r) x q, `quatrotate` fait une rotation
+  passive et `quatnorm` rend la somme des carrés. L'objet `quaternion`
+  n'existe pas.
+- **Trajectoires** : `cubicpolytraj`, `quinticpolytraj` et `trapveltraj`
+  rendent la forme `pp` de MATLAB, que `ppval` évalue. Sans paramètre,
+  `trapveltraj` prend une durée d'un par segment et une rampe d'un tiers
+  du temps — MATLAB ne documente pas sa règle par défaut, les profils
+  peuvent donc différer quand on ne fixe rien.
+- **Arbres de corps rigides** : `rigidBodyTree` lit les URDF
+  (`importrobot`) et porte la cinématique et la dynamique (`massMatrix`,
+  `inverseDynamics`, `gravityTorque`, `forwardDynamics`) ; la détection de
+  collisions (`checkCollision`) manque. `ikine2R`, `fkine2R` et
+  `jacobian2R` sont propres à MatLibre.
+
+### Identification de systèmes
+
+- **Critères** : `aic` rend par défaut le critère normalisé nAIC, comme
+  MATLAB, et `Report.Fit` porte `FitPercent`, `LossFcn`, `MSE`, `FPE`,
+  `AIC`, `AICc`, `nAIC` et `BIC` selon les formules de sa documentation.
+- **Estimation** : ARX par moindres carrés sur les échantillons qui ont
+  tout leur passé ; ARMAX, OE, BJ et PEM minimisent l'erreur de
+  prédiction avec des conditions initiales nulles, par Levenberg-Marquardt.
+  L'option `InitialCondition` de MATLAB (`'estimate'`, `'backcast'`) n'est
+  pas faite : sur des données courtes, les estimations diffèrent des
+  siennes du poids des premiers échantillons.
+
+### Navigation, fusion de capteurs, commande prédictive
+
+- **Fonctions propres à MatLibre** : `haversine`, `azimuthTo`, `astar`,
+  `ekfPredict`, `ekfUpdate`, `kalmanFilter`, `madgwickUpdate`,
+  `complementaryFilter` et `trackAssign` rendent des tableaux ; les objets
+  de MATLAB (`trackingEKF`, `trackingKF`, `imufilter`, `ahrsfilter`,
+  `plannerAStarGrid`, `occupancyMap` complet) n'existent pas.
+  `assignmunkres` suit la signature de MATLAB.
+- **`trackAssign`** affecte au plus proche voisin global, exactement, par
+  l'algorithme de Munkres ; `madgwickUpdate` suit le filtre de Madgwick
+  (2010) au dernier chiffre près du paquet Python `ahrs`.
+- **Commande prédictive** : `mpcSetup`, `mpcmove` et `mpcsim` traitent une
+  entrée et une sortie, sans l'objet `mpc` de MATLAB : pas de poids sur
+  les variations de commande, ni de contraintes sur les sorties. Les
+  bornes de commande sont respectées exactement, par `quadprog`.
+
+### Lidar, véhicule, conduite automatisée
+
+- **ICP point à point** (`icpRegister`, en deux dimensions) : la
+  transformation est exacte quand les appariements initiaux sont justes ;
+  plus loin, sur une courbe échantillonnée régulièrement, il s'arrête dans
+  le minimum local où les points ont glissé d'un pas. `pcregistericp` de
+  la boîte vision traite les nuages 3-D.
+- **Fonctions d'école** : `bicycleModel` (cinématique, pas d'Euler),
+  `tireForce` (formule magique de Pacejka à quatre coefficients),
+  `longitudinal`, `purePursuit`, `smoothPath`, `laneOffset` et
+  `timeToCollision` sont propres à MatLibre ; les blocs et objets du
+  Vehicle Dynamics Blockset et de l'Automated Driving Toolbox
+  (`drivingScenario`, `referencePathFrenet`, `lateralControllerStanley`)
+  manquent.
+
+### Apprentissage profond, renforcement, analyse de texte
+
+- **Convolution** : `dlconv` et `convolution2dLayer` calculent, comme
+  MATLAB, Keras, PyTorch et ONNX, une corrélation — le filtre n'est pas
+  retourné, comme dans `filter2` et non dans `conv2` : des poids appris
+  ailleurs donnent les mêmes sorties. L'import et l'export de réseaux
+  (`importONNXNetwork`, `importKerasNetwork`, `exportONNXNetwork`)
+  manquent.
+- **Renforcement** : `gridworld`, `pasGrille`, `qlearning`, `sarsa` et
+  `greedyPolicy` sont propres à MatLibre et tabulaires : ils rendent une
+  table Q. Les agents et environnements de MATLAB (`rlQAgent`,
+  `rlDQNAgent`, `rlPPOAgent`, `rlFunctionEnv`, `train`) n'existent pas.
+- **Documents** : un document est une cellule de mots, non un objet
+  `tokenizedDocument`, et le sac de mots est le couple
+  `[C, V] = bagOfWords(...)` (effectifs, vocabulaire), non un objet.
+  `tokenizedDocument` d'un tableau de textes rend un document par texte.
+  `normalizeWords` fait la racinisation de Porter, pour l'anglais : la
+  lemmatisation (`'Style','lemma'`) et les autres langues sont refusées.
+  `tfidf` et `editDistance` suivent les formules et les options de
+  MATLAB. Pas de modèles de thèmes (`fitlda`, `fitlsa`) ni de plongements
+  de mots (`wordEmbedding`).
+
+### Maintenance prédictive, imagerie médicale
+
+- **Maintenance prédictive** : `faultFeatures`, `healthIndicator`,
+  `rulDegradation` et `rulSimilarity` sont propres à MatLibre et rendent
+  des nombres et des structures ; `rulDegradation` extrapole la droite
+  des moindres carrés. Les modèles de durée de vie de MATLAB
+  (`linearDegradationModel`, `exponentialDegradationModel`,
+  `residualSimilarityModel`, avec `fit` et `predictRUL`) et le Diagnostic
+  Feature Designer manquent.
+- **Imagerie médicale** : `radonTransform` et `iradonTransform` appellent
+  `radon` et `iradon` ; `diceIndex`, `hausdorffDist` et `windowLevel` sont
+  propres à MatLibre. Les objets `medicalVolume` et `medicalImage` et la
+  lecture DICOM (`dicomread`, `dicominfo`) manquent.
+
+### Virgule fixe, Stateflow, Simscape
+
+- **Virgule fixe** : `fi`, `numerictype` et `fimath` suivent
+  Fixed-Point Designer — six arrondis, saturation ou repli, pleine
+  précision des sommes et des produits —, mais les entiers stockés sont
+  des doubles : au-delà de 53 bits, les derniers se perdent. `quantizer`,
+  `quantize`, les fonctions CORDIC (`cordicsincos`, `cordicsqrt`...),
+  `fiaccel` et le Fixed-Point Tool manquent.
+- **Stateflow** : une machine se construit par des fonctions (`sfchart`,
+  `sfstate`, `sftransition`...), non dans l'éditeur graphique ; l'API
+  d'objets de MATLAB (`sfnew`, `sfroot`, `Stateflow.State`) n'existe pas.
+  Les étiquettes s'écrivent dans la syntaxe de Stateflow,
+  `evenement[condition]{action de condition}/action de transition`.
+- **Circuits** : `circuit`, `solveDC` et `solveTransient` sont propres à
+  MatLibre et ne traitent que des réseaux linéaires (résistances,
+  condensateurs, bobines, sources). L'intégration suit la règle des
+  trapèzes de SPICE, au départ de condensateurs déchargés et de bobines
+  sans courant ; pas d'analyse en fréquence, ni de composants non
+  linéaires, ni de langage Simscape (`.ssc`, `ssc_build`). Les blocs
+  Simscape des schémas Simulink sont décrits avec Simulink.
+
+### Calcul parallèle, base de données, acquisition, instruments
+
+- **Calcul parallèle** : un pool de fils sur une machine ; le corps d'un
+  `parfor` voit les fonctions locales du fichier qui le contient. Les
+  travailleurs ne survivent pas d'une boucle à l'autre : chaque `parfor`
+  en démarre de neufs, environ une demi-seconde de coût fixe, qu'une
+  boucle courte ne rembourse pas (quatre cœurs : 3,07 fois plus vite sur
+  quatre secondes de calcul). Pas de `gpuArray`, et `distributed` est
+  l'identité.
+- **Base de données** : `dbTable`, `dbSelect`, `dbGroupSum`... sont des
+  tables en mémoire propres à MatLibre, sauvées en CSV (RFC 4180, nombres
+  à dix-sept chiffres). L'interface SQL de la Database Toolbox
+  (`database`, `sqlite`, `fetch`, `sqlread`, `sqlwrite`, `execute`)
+  manque.
+- **Acquisition** : la session de `daq` est simulée — chaque voie est une
+  fonction du temps — et son horloge avance d'une lecture à l'autre. Les
+  fonctions de MATLAB (`addinput`, `read`, `write`, `start`) manquent :
+  `addAnalogInput`, `readData` et `writeData` en tiennent lieu.
+- **Instruments** : `visadev`, `writeline`, `readline` et `writeread`
+  suivent MATLAB, mais l'instrument est simulé (un multimètre et une
+  alimentation SCPI). Aucune liaison réelle : VISA, GPIB, `serialport`,
+  `tcpclient` et `udpport` manquent.
+
+### Coder, Compiler
+
+- **Coder** : l'arithmétique entière du C produit se calcule en double,
+  puis s'arrondit et sature comme MATLAB ; pour `int64` et `uint64`,
+  au-delà de 2^53, le dernier chiffre peut se perdre là où MATLAB est
+  exact.
+- **Compiler** : `mcc -m` fabrique un lanceur qui appelle l'interpréteur
+  MatLibre — l'équivalent du MATLAB Runtime, qu'il faut installer — et
+  non un binaire autonome. Options reconnues : `-m`, `-o`, `-d`, `-a`,
+  `-v` ; les autres (`-W`, `-T`, `-R`...), les bibliothèques partagées et
+  `compiler.build` sont refusés ou absents.
+
 ### Calcul
 
 - **Décomposition de Schur** (`schur`, `ordschur`, `qz`) : elle manque à
   l'algèbre linéaire, et les solveurs de Riccati doivent s'en passer.
 - **Matrices creuses** : elles existent, mais les factorisations creuses
-  (`chol`, `lu`, `qr` creux) travaillent en dense.
+  (`chol`, `lu`, `qr` creux) travaillent en dense, et `A\b` creux, au-delà
+  de deux cents inconnues, est itératif — BiCGSTAB sans préconditionneur,
+  arrêté à un résidu relatif de 1e-12 — : la solution est juste à 1e-10
+  environ, non à la précision machine du solveur direct de MATLAB.
+- **`hess`, `schur` et `sylvester`** n'existent pas.
+- **`format short` d'une matrice** n'écrit pas le facteur d'échelle commun
+  de MATLAB (« 1.0e+03 * ») : chaque élément garde ses quatre décimales.
+  Un scalaire, lui, passe en notation exponentielle hors de [0.001, 1000)
+  comme dans MATLAB.
 - **Précision variable** (`vpa`) et calcul symbolique complet : la boîte
   Symbolique couvre le dérivé, l'intégré simple et la résolution
   polynomiale, non l'algèbre générale.

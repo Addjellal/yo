@@ -15,14 +15,14 @@ for k = 1:numel(dossiers)
         continue
     end
     chemin = fullfile(racine, dossiers(k).name);
-    fichiers = dir(fullfile(chemin, '*.m'));
+    fichiers = matlibre_fichiers_module(chemin);
     for j = 1:numel(fichiers)
         nom = fichiers(j).name;
         if strcmp(nom, 'Contents.m')
             continue
         end
         noms{end + 1} = nom;                       %#ok<SAGROW>
-        ou{end + 1} = fullfile(chemin, nom);       %#ok<SAGROW>
+        ou{end + 1} = fullfile(fichiers(j).folder, nom);   %#ok<SAGROW>
     end
 end
 % Les noms triés mettent les doublons côte à côte : la comparaison de

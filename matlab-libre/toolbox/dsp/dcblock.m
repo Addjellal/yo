@@ -26,7 +26,7 @@ function y = dcblock(x, alpha)
     end
     if alpha <= 0 || alpha >= 1
         error('dsp:dcblock:Alpha', ...
-              'ALPHA doit être strictement entre zéro et un.');
+              'ALPHA must be strictly between zero and one.');
     end
     y = filter([1 -1], [1 -alpha], x);
 end

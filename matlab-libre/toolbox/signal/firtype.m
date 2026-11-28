@@ -14,7 +14,7 @@ function t = firtype(b)
     antisymetrique = all(abs(b + fliplr(b)) <= tolerance);
     if ~symetrique && ~antisymetrique
         error('signal:firtype:NotLinearPhase', ...
-              'Le filtre n''est pas à phase linéaire.');
+              'The filter does not have linear phase.');
     end
     impair = mod(numel(b), 2) == 1;
     if symetrique

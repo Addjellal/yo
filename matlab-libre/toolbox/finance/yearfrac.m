@@ -56,6 +56,6 @@ function f = une(d1, d2, base)
             f = numel(matlibre_jours_ouvres(d1, d2)) / 252;
         otherwise
             error('finance:yearfrac:Base', ...
-                  'La base doit être un entier de zéro à treize.');
+                  'Basis must be an integer from 0 to 13.');
     end
 end

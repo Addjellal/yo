@@ -25,7 +25,7 @@ function [xs, ys, zs, ws] = prepareSurfaceData(x, y, z, w)
     zs = z(:);
     if numel(xs) ~= numel(zs) || numel(ys) ~= numel(zs)
         error('curvefit:prepareSurfaceData:Tailles', ...
-              'X, Y et Z doivent se correspondre.');
+              'X, Y, and Z must have the same number of elements.');
     end
     if nargin < 4 || isempty(w)
         ws = ones(numel(zs), 1);

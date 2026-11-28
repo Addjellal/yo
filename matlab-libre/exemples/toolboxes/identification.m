@@ -79,16 +79,20 @@ assert(std(residus) < std(y) / 5, 'les residus doivent etre petits devant la sor
 fprintf('\nChoix de l''ordre :\n');
 for ordre = 1:4
     candidat = arx(donnees, [ordre ordre 1]);
-    fprintf('  ordre %d : MSE %.5f, FPE %.5f, AIC %8.1f\n', ordre, ...
-            candidat.Report.Fit.MSE, fpe(candidat), aic(candidat));
+    fprintf('  ordre %d : MSE %.5f, FPE %.5f, nAIC %.4f, BIC %8.1f\n', ordre, ...
+            candidat.Report.Fit.MSE, fpe(candidat), aic(candidat), aic(candidat, 'BIC'));
 end
+% Le critère d'Akaike départage ici les ordres 2 à 4 au millième près :
+% il tend à surestimer l'ordre, sa pénalité ne croissant pas avec N. Celui
+% de Schwarz (BIC), dont la pénalité croît comme log N, désigne le vrai
+% ordre quand les données sont assez nombreuses.
 criteres = zeros(1, 4);
 for ordre = 1:4
-    criteres(ordre) = aic(arx(donnees, [ordre ordre 1]));
+    criteres(ordre) = aic(arx(donnees, [ordre ordre 1]), 'BIC');
 end
 [~, meilleur] = min(criteres);
-fprintf('  ordre retenu par le critere d''Akaike : %d (vrai 2)\n', meilleur);
-assert(meilleur == 2, 'le critere doit designer le vrai ordre');
+fprintf('  ordre retenu par le critere de Schwarz (BIC) : %d (vrai 2)\n', meilleur);
+assert(meilleur == 2, 'BIC doit designer le vrai ordre');
 
 %% 5. Quand le bruit n'est pas blanc en sortie
 % L'ARX suppose que le bruit entre par le même dénominateur que l'entrée.

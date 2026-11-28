@@ -45,8 +45,8 @@ function [grille, V, questions, methode, horsGrille] = lireArguments(args, nom)
     end
     if ~any(strcmp(methode, {'linear', 'nearest', 'pchip', 'makima', 'spline', 'cubic'}))
         error(['MATLAB:' nom ':InvalidMethod'], ...
-              ['%s : la methode est ''linear'', ''nearest'', ''pchip'', ''makima'', ' ...
-               '''spline'' ou ''cubic'' ; pas ''%s''.'], nom, methode);
+              ['%s: the method must be ''linear'', ''nearest'', ''pchip'', ''makima'', ' ...
+               '''spline'' or ''cubic'', not ''%s''.'], nom, methode);
     end
     n2 = (nNum - 1) / 2;
     if nNum >= 3 && n2 == round(n2) && dimensionsDe(args{n2 + 1}) == n2
@@ -69,7 +69,7 @@ function [grille, V, questions, methode, horsGrille] = lireArguments(args, nom)
         questions = args(2:nNum);
     else
         error('MATLAB:interpn:NotEnoughInputs', ...
-              '%s(X1,...,XN,V,XQ1,...,XQN) ou %s(V,XQ1,...,XQN).', upper(nom), upper(nom));
+              'Expected %s(X1,...,XN,V,XQ1,...,XQN) or %s(V,XQ1,...,XQN).', upper(nom), upper(nom));
     end
     n = numel(grille);
     if n == 1
@@ -80,12 +80,12 @@ function [grille, V, questions, methode, horsGrille] = lireArguments(args, nom)
     for d = 1:n
         if numel(grille{d}) ~= tailles(d)
             error('MATLAB:interpn:GridSize', ...
-                  ['%s : la grille a %d point(s) sur sa dimension %d, et V %d.'], nom, ...
+                  ['%s: the grid has %d point(s) in dimension %d, and V has %d.'], nom, ...
                   numel(grille{d}), d, tailles(d));
         end
         if any(diff(grille{d}) <= 0)
             error('MATLAB:interpn:GridNotMonotonic', ...
-                  '%s : les points de la dimension %d doivent croitre strictement.', nom, d);
+                  '%s: the grid vectors must be strictly increasing (dimension %d).', nom, d);
         end
     end
 end
@@ -116,7 +116,7 @@ function Vq = interpolerGrille(grille, V, questions, methode, horsGrille)
     n = numel(grille);
     if numel(questions) ~= n
         error('MATLAB:interpn:QueryCount', ...
-              'La grille a %d dimension(s), et %d tableau(x) de points sont donnes.', n, ...
+              'The grid has %d dimension(s), but %d query array(s) were given.', n, ...
               numel(questions));
     end
     tousVecteurs = all(cellfun(@isvector, questions));
@@ -194,7 +194,7 @@ function Vq = poserHorsGrille(Vq, dehors, horsGrille)
     if ischar(horsGrille) || isstring(horsGrille)
         if ~strcmpi(char(horsGrille), 'extrap')
             error('MATLAB:interpn:InvalidExtrapval', ...
-                  'La valeur hors de la grille est un nombre, pas ''%s''.', char(horsGrille));
+                  'The extrapolation value must be a number, not ''%s''.', char(horsGrille));
         end
         return
     end

@@ -40,7 +40,7 @@ function seuil = thselect(x, methode)
                 seuil = min(seuilSure(x), sqrt(2 * log(n)));
             end
         otherwise
-            error('wavelet:thselect:UnknownMethod', 'Méthode inconnue : %s.', char(methode));
+            error('wavelet:thselect:UnknownMethod', 'Unknown method: %s.', char(methode));
     end
 end
 

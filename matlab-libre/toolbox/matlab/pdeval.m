@@ -33,10 +33,10 @@ function [uout, duoutdx] = pdeval(m, xmesh, ui, xout)
     xq = double(xout);
     N = numel(x);
     if numel(u) ~= N
-        error('MATLAB:pdeval:tailles', 'UI doit avoir autant de valeurs que XMESH.');
+        error('MATLAB:pdeval:tailles', 'UI must have as many values as XMESH.');
     end
     if N < 2
-        error('MATLAB:pdeval:maillage', 'XMESH doit compter au moins deux points.');
+        error('MATLAB:pdeval:maillage', 'XMESH must have at least two points.');
     end
 
     pentes = matlibre_pdeval_pentes(x, u);

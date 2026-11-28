@@ -79,6 +79,19 @@ function d = symdiff(e, variable)
             d = symdiv(symdiff(e{2}, variable), symmul(e{2}, {'log', symnum(2)}));
         case 'log10'
             d = symdiv(symdiff(e{2}, variable), symmul(e{2}, {'log', symnum(10)}));
+        case 'erf'
+            % d/du erf(u) = 2/sqrt(pi) * exp(-u^2)
+            d = symmul(symmul(symnum(2 / sqrt(pi)), ...
+                              {'exp', symmul(symnum(-1), sympow(e{2}, symnum(2)))}), ...
+                       symdiff(e{2}, variable));
+        case 'erfc'
+            d = symmul(symmul(symnum(-2 / sqrt(pi)), ...
+                              {'exp', symmul(symnum(-1), sympow(e{2}, symnum(2)))}), ...
+                       symdiff(e{2}, variable));
+        case 'abs'
+            d = symmul({'sign', e{2}}, symdiff(e{2}, variable));
+        case 'sign'
+            d = symnum(0);
         otherwise
             error('symbolic:symdiff:unknown', 'Unknown operator ''%s''.', operateur);
     end

@@ -39,13 +39,13 @@ classdef dictionary
             end
             if nargin ~= 2
                 error('MATLAB:dictionary:Arguments', ...
-                      'DICTIONARY attend les clés et les valeurs, ou rien.');
+                      'DICTIONARY requires keys and values, or no input.');
             end
             [listeCles, textuelles] = matlibre_dict_cles(cles);
             listeValeurs = matlibre_dict_valeurs(valeurs);
             if numel(listeCles) ~= numel(listeValeurs)
                 error('MATLAB:dictionary:SizeMismatch', ...
-                      'Il faut autant de valeurs que de clés.');
+                      'The number of values must match the number of keys.');
             end
             d.ClesTextuelles = textuelles;
             for k = 1:numel(listeCles)
@@ -110,7 +110,7 @@ classdef dictionary
                 if isempty(j)
                     if ~aRepli
                         error('MATLAB:dictionary:KeyNotFound', ...
-                              'Clé absente du dictionnaire.');
+                              'Key not found in dictionary.');
                     end
                     sorties{k} = repli;
                 else
@@ -143,7 +143,7 @@ classdef dictionary
                 j = matlibre_dict_trouver(d, liste{k});
                 if isempty(j)
                     error('MATLAB:dictionary:KeyNotFound', ...
-                          'Clé absente du dictionnaire.');
+                          'Key not found in dictionary.');
                 end
                 d.Cles(j) = [];
                 d.Valeurs(j) = [];
@@ -180,7 +180,7 @@ classdef dictionary
                     varargout{1} = r;
                 otherwise
                     error('MATLAB:dictionary:badSubscript', ...
-                          'Un dictionnaire s''indexe par parenthèses.');
+                          'A dictionary is indexed with parentheses.');
             end
         end
 
@@ -189,7 +189,7 @@ classdef dictionary
                 d = insert(d, s(1).subs{1}, valeur);
             else
                 error('MATLAB:dictionary:badSubscript', ...
-                      'Un dictionnaire s''indexe par parenthèses.');
+                      'A dictionary is indexed with parentheses.');
             end
         end
 
@@ -204,8 +204,8 @@ classdef dictionary
                 d.ClesTextuelles = textuelle;
             elseif d.ClesTextuelles ~= textuelle
                 error('MATLAB:dictionary:KeyTypeMismatch', ...
-                      ['Les clés d''un dictionnaire sont toutes du même ' ...
-                       'type : le premier insertion le fixe.']);
+                      ['All keys of a dictionary have the same ' ...
+                       'type: the first insertion sets it.']);
             end
             j = matlibre_dict_trouver(d, cle);
             if isempty(j)

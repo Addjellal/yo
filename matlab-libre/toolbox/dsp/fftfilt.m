@@ -37,10 +37,13 @@ function y = fftfilt(b, x, nfft)
         bloc = x(debut:fin);
         Y = ifft(fft(bloc, nfft) .* B);
         n = numel(bloc) + nb - 1;
-        y(debut:debut + n - 1) = y(debut:debut + n - 1) + real(Y(1:n));
+        y(debut:debut + n - 1) = y(debut:debut + n - 1) + Y(1:n);
         debut = fin + 1;
     end
     y = y(1:nx);
+    if isreal(b) && isreal(x)
+        y = real(y);
+    end
     if colonne
         y = y.';
     end

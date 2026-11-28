@@ -14,7 +14,7 @@ function [y, correspondance] = gray2bin(x, modulation, M)
     x = double(x);
     if any(x(:) < 0) || any(x(:) > M - 1) || any(x(:) ~= round(x(:)))
         error('comm:gray2bin:BadSymbol', ...
-              'Les symboles doivent être des entiers entre 0 et %d.', M - 1);
+              'Symbols must be integers between 0 and %d.', M - 1);
     end
     y = reshape(correspondance(x + 1), size(x));
 end

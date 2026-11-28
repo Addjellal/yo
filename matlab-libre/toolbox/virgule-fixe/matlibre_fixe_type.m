@@ -37,7 +37,7 @@ function varargout = matlibre_fixe_type(action, varargin)
             k = find(strcmpi(varargin{1}, choix), 1);
             if isempty(k)
                 error('fixed:numerictype:invalidScaling', ...
-                      'Scaling vaut BinaryPoint, SlopeBias ou Unspecified.');
+                      'Scaling must be BinaryPoint, SlopeBias, or Unspecified.');
             end
             varargout{1} = choix{k};
         case 'texte'
@@ -54,7 +54,7 @@ function T = positionnel(T, args)
     for i = 1:n
         if ~(isnumeric(args{i}) || islogical(args{i})) || ~isscalar(args{i})
             error('fixed:numerictype:invalidArgument', ...
-                  'L''argument %d de NUMERICTYPE doit etre un nombre.', i);
+                  'Argument %d of NUMERICTYPE must be a number.', i);
         end
     end
     if n >= 1
@@ -79,7 +79,7 @@ function T = positionnel(T, args)
             ajustement = double(args{3});
             if ~(ajustement >= 1 && ajustement < 2)
                 error('fixed:numerictype:invalidSlopeAdjustmentFactor', ...
-                      'Le facteur d''ajustement de la pente va de 1 (compris) a 2 (exclu).');
+                      'The slope adjustment factor must be in [1, 2).');
             end
             T.SlopeAdjustmentFactor = ajustement;
             T.FractionLength = -double(args{4});
@@ -90,7 +90,7 @@ function T = positionnel(T, args)
         otherwise
             if n > 5
                 error('fixed:numerictype:invalidArgument', ...
-                      'NUMERICTYPE prend au plus cinq nombres.');
+                      'NUMERICTYPE takes at most five numbers.');
             end
     end
 end
@@ -110,7 +110,7 @@ function T = mode(T, texte)
             T.Scaling = 'Unspecified';
         otherwise
             error('fixed:numerictype:invalidDataTypeMode', ...
-                  'DataTypeMode ''%s'' est inconnu.', texte);
+                  'Unknown DataTypeMode ''%s''.', texte);
     end
 end
 

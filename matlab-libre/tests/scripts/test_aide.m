@@ -105,6 +105,18 @@ assert(isempty(sansFiche));
 % Tous les dossiers y sont : outils/verifierExemples.m fait le meme
 % controle au moment d'ecrire, et aucun exemple ne manque plus nulle part.
 dossierToolbox = matlibre_racine();
+% Deux fichiers dont les chemins ne different que par la casse s'ecrasent
+% sous Windows et macOS au clonage du depot : addmf a cote de addMF. Ils
+% vivent dans des dossiers distincts (sous-dossier « homonymes »).
+tousFichiers = dir(fullfile(dossierToolbox, '**', '*'));
+tousFichiers = tousFichiers(~[tousFichiers.isdir]);
+chemins = lower(fullfile({tousFichiers.folder}, {tousFichiers.name}));
+[~, premiers] = unique(chemins);
+collisions = chemins(setdiff(1:numel(chemins), premiers));
+for k = 1:numel(collisions)
+    fprintf('  collision de casse : %s\n', collisions{k});
+end
+assert(isempty(collisions));
 entrees = dir(dossierToolbox);
 entrees = entrees([entrees.isdir] & ~startsWith({entrees.name}, '.'));
 dossiersVerifies = sort({entrees.name});
@@ -117,7 +129,7 @@ blocsM = 0;
 echecsM = {};
 for kd = 1:numel(dossiersVerifies)
     dossierM = fullfile(matlibre_racine(), dossiersVerifies{kd});
-    fichiersM = dir(fullfile(dossierM, '*.m'));
+    fichiersM = matlibre_fichiers_module(dossierM);
     for kf = 1:numel(fichiersM)
         nomM = fichiersM(kf).name(1:end-2);
         if strcmp(nomM, 'Contents') || strncmp(nomM, 'matlibre_', 9)

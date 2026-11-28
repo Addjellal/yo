@@ -22,7 +22,8 @@ des jetons, les jetons un arbre, l'arbre est parcouru.
        ├── Affichage.cpp       mise en forme des résultats
        ├── FichierMat.cpp      le format MAT, lecture et écriture
        ├── Compression.cpp     DEFLATE, pour les MAT compressés
-       └── bibliotheque/       682 fonctions natives, par domaine
+       ├── Suggestion.cpp      « Did you mean: » sur une faute de frappe
+       └── bibliotheque/       690 fonctions natives, par domaine
 ```
 
 ## Le type unique
@@ -88,6 +89,22 @@ les classes :
 Les tableaux ne sont copiés qu'une fois par affectation indexée : la copie
 de travail est ensuite déplacée de proche en proche.
 
+Les doubles d'une valeur (`re`, `im`) vivent dans un `TamponDouble`
+(`Tampon.h`), partagé entre copies jusqu'à la première écriture, comme
+dans MATLAB : `b = a`, passer `a` à une fonction ou le ranger dans une
+cellule ne recopie rien, et seul celui des deux qu'on modifie se
+détache. Les accès en lecture partagent ; tout accès qui peut écrire
+(l'opérateur `[]` non const, `data()`, `begin()`, `resize`...) détache
+d'abord un tampon partagé. Deux cents appels d'une fonction sur un
+tableau de seize mégaoctets passent ainsi de trois secondes à une
+milliseconde.
+
+Une fonction native qui ne fait que lire son argument le prend donc par
+référence const (`const Valeur& v = args[0]`) : lu par une copie non
+const, `v.re[k]` détache le tampon au premier accès — une recopie
+entière — puis teste à chaque accès qu'il est bien à soi. `sort`
+gagnait ainsi un quart de son temps.
+
 ## Fonctions et portées
 
 Une portée est une table de noms. La pile de portées sert aussi à
@@ -103,6 +120,14 @@ recherche ; la résolution d'un nom est alors une consultation de table.
 L'ordre est celui de MATLAB : variable, sous-fonction du fichier, méthode
 de classe, fichier du chemin, fonction native.
 
+Un nom qu'aucune de ces tables ne connaît lève
+`MATLAB:UndefinedFunction` en gardant le nom à part (`nomInconnu`). Si
+l'erreur est née dans la commande tapée elle-même, la console et le
+bureau cherchent le nom connu le plus proche (distance d'édition à
+transpositions, une lettre mise pour un chiffre comptant double) et
+proposent la commande corrigée, comme MATLAB. Le message que voient
+`try/catch` et `MException` n'en porte rien.
+
 ## Algèbre linéaire
 
 Tout est écrit dans `AlgebreLineaire.cpp` : LU avec pivot partiel, QR de
@@ -111,8 +136,16 @@ Jacobi (matrices symétriques) ou Hessenberg + QR à décalage de Wilkinson
 (cas général), exponentielle de matrice par mise à l'échelle et
 approximant de Padé.
 
-Si LAPACK et BLAS sont trouvés à la compilation, ils sont liés et
-serviront aux grandes matrices ; sans eux, rien ne manque.
+Quand la construction a trouvé LAPACK et BLAS (option `MATLIBRE_LAPACK`,
+qui définit `MATLIBRE_AVEC_LAPACK`), le produit (`dgemm`, `zgemm`), la
+résolution d'un système carré (`dgesv`), la SVD (`dgesdd`) et les valeurs
+propres (`dsyevd`, `zheevd`, `dgeev`, `zgeev`) passent par eux, comme
+dans MATLAB : `eig` d'une matrice symétrique 300×300 descend de 0,31 s à
+6 ms. Les prototypes sont ceux de l'interface Fortran, déclarés dans
+`AlgebreLineaire.cpp` ; aucun en-tête n'est à trouver. Les algorithmes
+écrits à la main restent le repli — sans LAPACK, ou s'il ne converge
+pas — et ce qu'ils sont seuls à faire (Cholesky, QR, exponentielle,
+logarithme) ne change pas.
 
 ## Fourier
 
@@ -123,15 +156,25 @@ remplissage de zéros.
 
 ## Graphique
 
-Le rendu se fait en SVG, écrit à la main dans `src/graphique`. C'est un
-format vectoriel, lisible, que tous les navigateurs affichent, et qui ne
-demande aucune bibliothèque. `print` et `saveas` écrivent le fichier ;
-`matlibre_svg` rend le texte, ce qui permet de tester le tracé.
+Une figure se dessine une seule fois, par `dessinerFigure`
+(`src/graphique/Dessin.cpp`), sur une `Toile` (`Toile.h`) : quelques
+primitives — traits, polygones, rectangles, cercles, textes en morceaux,
+découpe. La mise en page, les graduations, la légende et la barre de
+couleurs ne connaissent que la toile.
+
+Deux toiles l'implantent. `ToileSVG` écrit du SVG — un format vectoriel,
+lisible, que tous les navigateurs affichent, et qui ne demande aucune
+bibliothèque : `print` et `saveas` écrivent le fichier, `matlibre_svg`
+rend le texte, ce qui permet de tester le tracé. La toile du bureau
+(`VueFigure.cpp`) peint avec QPainter. La fenêtre montre donc exactement
+ce que `print` écrirait ; une nouveauté du dessin s'écrit une fois.
 
 ## Ce que coûte un interpréteur à parcours d'arbre
 
-Une instruction scalaire coûte de l'ordre de 8 µs, un appel de fonction
-une dizaine. Les opérations vectorisées, elles, tournent à la vitesse du
+Une instruction scalaire coûte de l'ordre d'une demi-microseconde
+(`s = s + k*0.5`, mesuré par l'audit de reprise), dont un quart en
+allocations : chaque scalaire est une `Valeur` qui alloue ses dimensions
+et son tampon. Les opérations vectorisées, elles, tournent à la vitesse du
 C++ : `sum(x)` sur un million d'éléments est une boucle native. La règle
 est donc celle de MATLAB — vectoriser plutôt que boucler — et elle est ici
 plus impérieuse encore.

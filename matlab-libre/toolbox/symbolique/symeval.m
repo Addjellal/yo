@@ -48,6 +48,9 @@ function v = symeval(e, variables, valeurs)
         case 'abs',  v = abs(symeval(e{2}));
         case 'log2', v = log2(symeval(e{2}));
         case 'log10', v = log10(symeval(e{2}));
+        case 'erf',  v = erf(symeval(e{2}));
+        case 'erfc', v = erfc(symeval(e{2}));
+        case 'sign', v = sign(symeval(e{2}));
         otherwise
             error('symbolic:symeval:unknown', 'Unknown operator ''%s''.', operateur);
     end

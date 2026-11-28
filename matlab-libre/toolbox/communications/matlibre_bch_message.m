@@ -12,10 +12,10 @@ function [valeurs, estCorps] = matlibre_bch_message(message, k)
             valeurs = reshape(valeurs(:).', k, []).';
         else
             error('comm:bch:Longueur', ...
-                  'Le message doit compter %d colonnes.', k);
+                  'The message must have %d columns.', k);
         end
     end
     if any(valeurs(:) ~= 0 & valeurs(:) ~= 1)
-        error('comm:bch:Binaire', 'Le message doit être binaire.');
+        error('comm:bch:Binaire', 'The message must be binary.');
     end
 end

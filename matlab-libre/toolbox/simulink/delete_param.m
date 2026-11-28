@@ -16,6 +16,12 @@ function modele = delete_param(modele, varargin)
 %      isfield(m.parametres, 'StopTime')        % faux
 %
 %   Voir aussi ADD_PARAM, SET_PARAM, GET_PARAM, NEW_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        matlibre_sl_nomme('delete_param', nargout, modele, varargin{:});
+        clear modele
+        return
+    end
     if ~isfield(modele, 'parametres')
         modele.parametres = struct();
     end
@@ -23,7 +29,7 @@ function modele = delete_param(modele, varargin)
         nom = char(varargin{k});
         if ~isfield(modele.parametres, nom)
             error('Simulink:Commands:DeleteParamAbsent', ...
-                  'Le modele ne porte pas de reglage ''%s''.', nom);
+                  'The model has no parameter ''%s''.', nom);
         end
         modele.parametres = rmfield(modele.parametres, nom);
     end

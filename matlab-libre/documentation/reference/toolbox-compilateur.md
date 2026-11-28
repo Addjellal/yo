@@ -3,8 +3,10 @@
 ```
 % MATLAB Compiler — distribution d'un programme.
 %
-%   mcc        - Fabrique un lanceur autonome autour d'un script
+%   mcc        - Fabrique un lanceur autonome (mcc -m programme.m)
 %   deploytool - Décrit ce que contient le paquet produit
+%   isdeployed - Vrai dans une application produite par mcc
+%   ismcc      - Vrai pendant la compilation : toujours faux ici
 ```
 
 ## `deploytool`
@@ -31,6 +33,36 @@ DEPLOYTOOL Décrit le paquet de distribution d'un script.
   Voir aussi MCC, MATLABROOT.
 ```
 
+## `isdeployed`
+
+```
+ISDEPLOYED Vrai dans une application produite par MCC.
+  OUI = ISDEPLOYED() vaut vrai quand le programme tourne par le lanceur
+  que MCC a fabriqué, faux dans l'interpréteur. C'est ce qu'un programme
+  teste pour ne régler son chemin qu'en développement :
+     if ~isdeployed, addpath('outils'); end
+
+  Exemple :
+     isdeployed()                    % false : on est dans l'interpréteur
+
+  Voir aussi MCC, ISMCC.
+```
+
+## `ismcc`
+
+```
+ISMCC Vrai pendant la compilation par MCC.
+  OUI = ISMCC() vaut toujours faux dans MatLibre : MCC n'exécute pas le
+  programme pour l'analyser, comme le fait MATLAB Compiler, il fabrique
+  un lanceur. Un programme qui teste ISMCC pour sauter du code pendant
+  la compilation garde donc son comportement ordinaire.
+
+  Exemple :
+     ismcc()                         % false
+
+  Voir aussi ISDEPLOYED, MCC.
+```
+
 ## `matlibre_cheminAbsolu`
 
 ```
@@ -44,28 +76,41 @@ MATLIBRE_CHEMINABSOLU Vrai si le chemin ne dépend pas du dossier courant.
 ## `mcc`
 
 ```
-MCC Fabrique un lanceur pour un script.
-  CHEMIN = MCC('script.m','programme') écrit un lanceur qui appelle
-  l'interpréteur MatLibre sur le script, avec le chemin des toolboxes
-  déjà réglé. Sans nom de sortie, le lanceur prend celui du script.
+MCC Fabrique un lanceur autonome pour un programme MATLAB.
+  MCC -m PROGRAMME.m fabrique, comme MATLAB Compiler, une application
+  autonome nommée d'après PROGRAMME, dans le dossier courant. Options de
+  MATLAB reconnues :
+     -m            application autonome (la seule cible)
+     -o NOM        nom de l'application
+     -d DOSSIER    dossier où l'écrire
+     -a CHEMIN     fichier ou dossier joint : son dossier va au chemin
+     -v            dit ce qui est produit
+  Les autres options (-W, -T, -R, -e...) sont refusées en le disant.
+  CHEMIN = MCC('programme.m','sortie'), forme historique de MatLibre,
+  reste admise.
 
-  C'est l'équivalent libre du « MATLAB Runtime » : le programme produit
-  a besoin de l'interpréteur, comme un programme compilé par mcc a
-  besoin du runtime. Rien ici ne devient un binaire autonome, et le
-  prétendre serait mentir.
+  L'application est un lanceur qui appelle l'interpréteur MatLibre sur
+  le programme, chemin des toolboxes réglé : c'est l'équivalent libre du
+  MATLAB Runtime, dont un programme compilé par mcc a besoin. Rien ici
+  ne devient un binaire autonome, et le prétendre serait mentir. Comme
+  dans MATLAB, les arguments de la ligne de commande arrivent en texte
+  à la fonction principale : « ./prog 21 » appelle prog('21'), et
+  ISDEPLOYED y vaut vrai.
 
-  Le lanceur nomme l'interpréteur par son chemin complet, celui de
-  l'interpréteur qui a produit le lanceur : écrire « exec matlibre »
-  supposerait qu'il soit dans le PATH de la machine cible, ce qui n'est
-  vrai qu'après installation.
+  MCC n'écrit jamais sur un fichier .m : une sortie qui en porterait le
+  nom est refusée, ce qui protège le programme lui-même.
 
   Sous Windows, le lanceur est un fichier de commandes .bat ; ailleurs,
   un script shell rendu exécutable.
 
   Exemple :
-     mcc('analyse.m', 'analyse')
-     system('./analyse')
+     dossier = tempname(); mkdir(dossier);
+     f = fopen(fullfile(dossier, 'double.m'), 'w');
+     fprintf(f, 'function double(n)\n  disp(2 * str2double(n));\nend\n');
+     fclose(f);
+     lanceur = mcc('-m', fullfile(dossier, 'double.m'), '-d', dossier);
+     if isunix, [~, sortie] = system([lanceur ' 21']); end   % 42
 
-  Voir aussi DEPLOYTOOL, MATLABROOT.
+  Voir aussi DEPLOYTOOL, MATLABROOT, ISDEPLOYED.
 ```
 

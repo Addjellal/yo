@@ -192,10 +192,15 @@ assert(horsSeuil <= 5);
 % Les critères pénalisent le nombre de paramètres.
 assert(fpe(m1) > m1.Report.Fit.MSE);
 n = m1.Report.Fit.nobs;
-assert(abs(aic(m1) - (n * log(m1.Report.Fit.MSE) + 2 * 2)) < 1e-6);
-assert(abs(aic(m1, 'nAIC') - (log(m1.Report.Fit.MSE) + 4 / n)) < 1e-9);
-assert(abs(fpe(m1) - m1.Report.Fit.MSE * (1 + 2 / n) / (1 - 2 / n)) < 1e-12);
-assert(aic(m1, 'BIC') > aic(m1));
+% Les formules de la documentation de MATLAB ; nAIC par defaut.
+V = m1.Report.Fit.LossFcn;
+assert(abs(aic(m1) - (log(V) + 4 / n)) < 1e-12);
+assert(abs(aic(m1, 'nAIC') - aic(m1)) == 0);
+assert(abs(aic(m1, 'aic') - (n * log(V) + 2 * 2 + n * (log(2 * pi) + 1))) < 1e-8);
+assert(abs(aic(m1, 'AICc') - (aic(m1, 'aic') + 2 * 2 * 3 / (n - 3))) < 1e-8);
+assert(abs(aic(m1, 'BIC') - (n * log(V) + n * (log(2 * pi) + 1) + 2 * log(n))) < 1e-8);
+assert(abs(fpe(m1) - V * (1 + 2 / n) / (1 - 2 / n)) < 1e-12);
+assert(isequal(size(aic(m1, m1, 'BIC')), [1 2]));
 disp('analyse : ok');
 
 % Réponse fréquentielle : elle coïncide avec la réponse vraie.

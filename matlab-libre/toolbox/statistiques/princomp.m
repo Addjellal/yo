@@ -1,4 +1,4 @@
-function [coefficients, scores, valeurs, T2] = princomp(X)
+function [coefficients, scores, valeurs, T2] = princomp(X, econ)
 %PRINCOMP Analyse en composantes principales (nom historique).
 %   [COEFF,SCORE,LATENT] = PRINCOMP(X) fait ce que fait PCA : il centre
 %   les colonnes de X, cherche les directions de plus grande variance, et
@@ -10,8 +10,12 @@ function [coefficients, scores, valeurs, T2] = princomp(X)
 %   mesurée dans la métrique des composantes. C'est ce qui sert à
 %   repérer les individus atypiques.
 %
+%   PRINCOMP(X,'econ') ne rend que les axes porteurs de variance quand
+%   les observations sont moins nombreuses que les variables ; sans
+%   'econ', COEFF est carré, comme le rendait PRINCOMP.
+%
 %   PRINCOMP est le nom que la fonction portait avant R2012b ; PCA lui a
-%   succédé, avec les mêmes trois premières sorties. MatLibre garde les
+%   succédé, avec les mêmes quatre premières sorties. MatLibre garde les
 %   deux, pour que les programmes anciens tournent sans retouche.
 %
 %   Exemples :
@@ -21,13 +25,12 @@ function [coefficients, scores, valeurs, T2] = princomp(X)
 %      max(t2)                          % l'individu le plus atypique
 %
 %   Voir aussi PCA, PCACOV, MAHAL, CANONCORR, COV.
-    [coefficients, scores, valeurs] = pca(X);
-    n = size(X, 1);
-    T2 = zeros(n, 1);
-    positives = valeurs > max(size(X)) * eps * max([valeurs; realmin]);
-    if any(positives)
-        reduits = scores(:, positives) ./ ...
-                  repmat(sqrt(valeurs(positives))', n, 1);
-        T2 = sum(reduits .^ 2, 2);
+    if nargin < 2
+        economie = false;
+    elseif (ischar(econ) || isstring(econ)) && strcmpi(char(econ), 'econ')
+        economie = true;
+    else
+        error('stats:princomp:BadEcon', 'The second argument of PRINCOMP must be ''econ''.');
     end
+    [coefficients, scores, valeurs, T2] = pca(X, 'Economy', economie);
 end

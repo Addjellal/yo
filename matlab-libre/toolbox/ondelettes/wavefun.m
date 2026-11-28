@@ -55,7 +55,7 @@ function [phi, psi, xval] = wavefun(nom, iterations)
     % divise le pas de la grille par deux.
     grossier = 1;
     for k = 1:(iterations - 1)
-        grossier = sqrt(2) * conv(dyadup(grossier), Lo_R);
+        grossier = sqrt(2) * conv(dyadup(grossier, 0), Lo_R);
     end
     % Dernier tour. Les deux équations à deux échelles s'écrivent, sur la
     % grille de pas 2^-ITER,

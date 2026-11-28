@@ -20,9 +20,14 @@ function [b, marque] = fillmissing(a, methode, varargin)
 %   B = FILLMISSING(A,'movmean',K) donne la largeur de fenêtre.
 %   B = FILLMISSING(...,'EndValues',E) dit quoi faire des trous en bout,
 %   là où l'interpolation n'a pas de voisin des deux côtés : 'extrap'
-%   (défaut) prolonge, 'none' les laisse, ou une constante les comble.
+%   (défaut) les comble par la méthode elle-même ; 'previous', 'next',
+%   'nearest', 'linear', 'spline' ou 'pchip' par cette autre méthode ;
+%   'none' les laisse ; une constante les comble. 'previous' n'a rien à
+%   mettre avant la première valeur connue, ni 'next' après la dernière :
+%   ces trous-là restent.
 %
-%   [B,MARQUE] = FILLMISSING(...) rend aussi les positions comblées.
+%   [B,MARQUE] = FILLMISSING(...) rend aussi les positions comblées — non
+%   celles restées manquantes.
 %
 %   Un trou en bout n'est pas un trou comme un autre : il n'est pas
 %   encadré. C'est pourquoi il a son option à lui — et pourquoi la
@@ -33,10 +38,12 @@ function [b, marque] = fillmissing(a, methode, varargin)
 %      fillmissing([1 NaN 3], 'linear')        % [1 2 3]
 %      fillmissing([1 NaN 3], 'constant', 0)   % [1 0 3]
 %      fillmissing([NaN 2 3], 'previous')      % [NaN 2 3] : rien avant
+%      fillmissing([NaN 2 3], 'linear')        % [1 2 3] : prolongée
+%      fillmissing([NaN 2 3], 'previous', 'EndValues', 'nearest')   % [2 2 3]
 %
 %   Voir aussi ISMISSING, RMMISSING, STANDARDIZEMISSING, INTERP1.
     if nargin < 2
-        error('MATLAB:fillmissing:Methode', 'FILLMISSING demande une méthode.');
+        error('MATLAB:fillmissing:Methode', 'FILLMISSING requires a fill method.');
     end
     methode = lower(char(methode));
     parametre = [];
@@ -58,7 +65,7 @@ function [b, marque] = fillmissing(a, methode, varargin)
             case 'datavariables'
                 variables = varargin{k + 1};
             otherwise
-                error('MATLAB:fillmissing:Option', 'Option inconnue : %s.', ...
+                error('MATLAB:fillmissing:Option', 'Unrecognized option ''%s''.', ...
                       char(varargin{k}));
         end
         k = k + 2;
@@ -104,6 +111,7 @@ function [b, marque] = comblerTableau(a, methode, parametre, bouts)
     if ~any(marque(:))
         return
     end
+    marqueAvant = marque;
     % Une matrice se comble colonne par colonne : c'est la première
     % dimension non singleton, comme pour toutes les réductions.
     if isvector(b)
@@ -113,6 +121,12 @@ function [b, marque] = comblerTableau(a, methode, parametre, bouts)
             b(:, c) = comblerVecteur(b(:, c), methode, ...
                                      valeurColonne(parametre, c), bouts);
         end
+    end
+    % Seules les positions effectivement comblées sont marquées.
+    if isnumeric(b)
+        marque = marqueAvant & ~isnan(b);
+    else
+        marque = marqueAvant & ~ismissing(b);
     end
 end
 
@@ -142,7 +156,7 @@ function v = comblerVecteur(v, methode, parametre, bouts)
         case 'constant'
             if isempty(parametre)
                 error('MATLAB:fillmissing:Constante', ...
-                      'La méthode ''constant'' demande une valeur.');
+                      'The ''constant'' method requires a fill value.');
             end
             v(manquants) = parametre;
             v = reshape(v, forme);
@@ -159,7 +173,7 @@ function v = comblerVecteur(v, methode, parametre, bouts)
         case {'movmean', 'movmedian'}
             if isempty(parametre)
                 error('MATLAB:fillmissing:Fenetre', ...
-                      'Les méthodes mobiles demandent une largeur de fenêtre.');
+                      'Moving methods require a window length.');
             end
             largeur = round(double(parametre));
             demi = floor(largeur / 2);
@@ -180,25 +194,56 @@ function v = comblerVecteur(v, methode, parametre, bouts)
             v = reshape(v, forme);
             return
         otherwise
-            error('MATLAB:fillmissing:Methode', 'Méthode inconnue : %s.', methode);
+            error('MATLAB:fillmissing:Methode', 'Unknown method: %s.', methode);
     end
-    % Les bouts : ce que l'interpolation n'a pas pu encadrer.
+    % Les bouts : ce que l'interpolation n'a pas pu encadrer. Par défaut
+    % ('extrap'), la méthode elle-même les comble, comme dans MATLAB.
     restants = isnan(v);
     if any(restants)
         if ischar(bouts) || isstring(bouts)
-            switch lower(char(bouts))
-                case 'extrap'
-                    v(restants) = interp1(connus, v(connus), indices(restants), ...
-                                          'nearest', 'extrap');
+            bout = lower(char(bouts));
+            if strcmp(bout, 'extrap')
+                bout = methode;
+            end
+            switch bout
                 case 'none'
                     % Laissés tels quels : c'est ce qu'on demande.
+                case {'previous', 'next', 'nearest', 'linear', 'spline', 'pchip'}
+                    v = prolonger(v, connus, indices, restants, bout);
                 otherwise
                     error('MATLAB:fillmissing:Bouts', ...
-                          'EndValues vaut ''extrap'', ''none'' ou une constante.');
+                          ['EndValues must be ''extrap'', ''previous'', ''next'', ' ...
+                           '''nearest'', ''linear'', ''spline'', ''pchip'', ''none'', ' ...
+                           'or a scalar.']);
             end
         else
             v(restants) = bouts;
         end
     end
     v = reshape(v, forme);
+end
+
+% Comble les trous de bout, avant la première valeur connue et après la
+% dernière, par METHODE : 'previous' ne prolonge que vers la fin, 'next'
+% que vers le début ; les interpolations extrapolent.
+function v = prolonger(v, connus, indices, restants, methode)
+    premier = connus(1);
+    dernier = connus(end);
+    avant = restants & indices < premier;
+    apres = restants & indices > dernier;
+    if numel(connus) < 2 && any(strcmp(methode, {'linear', 'spline', 'pchip'}))
+        methode = 'nearest';     % une seule valeur : aucune pente
+    end
+    switch methode
+        case 'previous'
+            v(apres) = v(dernier);
+        case 'next'
+            v(avant) = v(premier);
+        case 'nearest'
+            v(avant) = v(premier);
+            v(apres) = v(dernier);
+        otherwise
+            bouts = avant | apres;
+            v(bouts) = interp1(connus, v(connus), indices(bouts), methode, 'extrap');
+    end
 end

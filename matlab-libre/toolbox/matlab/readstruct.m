@@ -33,6 +33,6 @@ function s = readstruct(nomFichier, varargin)
             s = matlibre_xml_en_structure(matlibre_xml_analyser(texte));
         otherwise
             error('MATLAB:readstruct:type', ...
-                  'READSTRUCT lit le XML et le JSON, pas « %s ».', type);
+                  'READSTRUCT reads XML and JSON, not ''%s''.', type);
     end
 end

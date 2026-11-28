@@ -43,7 +43,7 @@ function vq = griddata(x, y, v, xq, yq, methode)
         case 'linear'
             vq = matlibre_grille_lineaire(x, y, v, xq, yq);
         otherwise
-            error('MATLAB:griddata:Methode', 'Méthode inconnue : %s.', methode);
+            error('MATLAB:griddata:Methode', 'Unknown method: %s.', methode);
     end
     vq = reshape(vq, forme);
 end

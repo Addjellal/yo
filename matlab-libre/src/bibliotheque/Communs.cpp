@@ -2,9 +2,21 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <sstream>
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 #include "matlibre/Affichage.h"
 #include "matlibre/Bibliotheque.h"
@@ -116,23 +128,81 @@ static void exigerTailleNumerique(const Valeur& v) {
         erreur("MATLAB:invalidSizeInput", "Size inputs must be numeric.");
 }
 
+// Une taille demandée à zeros, ones, rand... « (int)1e10 » est un
+// comportement indéfini qui vaut INT_MIN sur x86, ramené ensuite à zéro :
+// zeros(1e10) rendait un tableau vide sans rien dire, ones(2^31, 1) un
+// 0×1, zeros(NaN) aussi. Une taille non représentable est refusée ; une
+// taille négative vaut zéro, comme dans MATLAB.
+static int tailleDemandee(double x) {
+    if (std::isnan(x)) erreur("MATLAB:NonIntegerInput", "Size inputs must be integers.");
+    if (x <= 0) return 0;
+    if (x > 2147483647.0)
+        erreur("MATLAB:array:SizeLimitExceeded",
+               "Requested array exceeds the maximum possible variable size.");
+    return (int)x;
+}
+
+// La mémoire physique de la machine, en octets ; zéro si on ne sait pas
+// la lire.
+static double memoirePhysique() {
+#ifdef _WIN32
+    MEMORYSTATUSEX etat;
+    etat.dwLength = sizeof etat;
+    if (GlobalMemoryStatusEx(&etat)) return (double)etat.ullTotalPhys;
+    return 0;
+#else
+    long pages = sysconf(_SC_PHYS_PAGES), taille = sysconf(_SC_PAGESIZE);
+    return pages > 0 && taille > 0 ? (double)pages * (double)taille : 0;
+#endif
+}
+
+// Comme MATLAB (« maximum array size preference », la mémoire physique par
+// défaut) : un tableau plus grand que la mémoire de la machine est refusé
+// avant d'être alloué. Sous Linux, une telle demande pouvait être
+// acceptée à crédit, puis la session tuée en le remplissant.
+static void exigerTailleRaisonnable(const Dims& d) {
+    double elements = 1;
+    for (int n : d) elements *= (double)n;
+    double octets = elements * 8.0;
+    static const double limite = memoirePhysique();
+    if (limite > 0 && octets > limite) {
+        std::string forme;
+        for (std::size_t k = 0; k < d.size(); ++k)
+            forme += (k ? "x" : "") + std::to_string(d[k]);
+        erreur("MATLAB:array:SizeLimitExceeded",
+               formater("Requested %s (%.1fGB) array exceeds maximum array size preference "
+                        "(%.1fGB). This might cause MatLibre to become unresponsive.",
+                        forme.c_str(), octets / 1073741824.0, limite / 1073741824.0));
+    }
+}
+
+static Dims dimsDepuisArgumentsBruts(const std::vector<Valeur>& args, std::size_t debut,
+                                     std::size_t fin);
+
 Dims dimsDepuisArguments(const std::vector<Valeur>& args, std::size_t debut, std::size_t fin) {
+    Dims d = dimsDepuisArgumentsBruts(args, debut, fin);
+    exigerTailleRaisonnable(d);
+    return d;
+}
+
+static Dims dimsDepuisArgumentsBruts(const std::vector<Valeur>& args, std::size_t debut,
+                                     std::size_t fin) {
     Dims d;
     if (debut >= fin) return Dims{1, 1};
     for (std::size_t k = debut; k < fin; ++k) exigerTailleNumerique(args[k]);
     if (fin - debut == 1) {
         const Valeur& v = args[debut];
         if (v.nelem() == 1) {
-            int n = (int)v.scal();
-            return Dims{std::max(0, n), std::max(0, n)};
+            int n = tailleDemandee(v.scal());
+            return Dims{n, n};
         }
         for (std::size_t k = 0; k < v.nelem() && k < v.re.size(); ++k)
-            d.push_back(std::max(0, (int)v.re[k]));
+            d.push_back(tailleDemandee(v.re[k]));
         if (d.size() < 2) d.push_back(d.empty() ? 0 : d[0]);
         rognerDimsFinales(d);
         return d;
     }
-    for (std::size_t k = debut; k < fin; ++k) d.push_back(std::max(0, (int)args[k].scal()));
+    for (std::size_t k = debut; k < fin; ++k) d.push_back(tailleDemandee(args[k].scal()));
     while (d.size() < 2) d.push_back(1);
     rognerDimsFinales(d);
     return d;
@@ -217,6 +287,15 @@ Valeur construirePlage(const Valeur& debut, const Valeur& pas, const Valeur& fin
         return v;
     }
     double brut = (b - a) / s;
+    // Une plage dont la longueur n'est pas représentable — « 1:Inf »,
+    // « 1:1e18 » — est refusée avant d'allouer : la conversion en long long
+    // d'un infini est un comportement indéfini, et les dimensions sont des
+    // int. Une borne NaN rend une plage vide, comme avant, sans passer par
+    // cette conversion.
+    if (std::isnan(brut)) return Valeur::matrice(1, 0);
+    if (brut + 1 > 2147483647.0)
+        erreur("MATLAB:array:SizeLimitExceeded",
+               "Requested array exceeds the maximum possible variable size.");
     long long n = (long long)std::floor(brut + 1e-10) + 1;
     if (n < 0) n = 0;
     std::vector<double> valeurs;
@@ -402,7 +481,7 @@ Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>
     if (def->estEnumeration() && !it.enConstructionEnumeration) {
         if (args.size() != 1)
             erreur("MATLAB:class:EnumerationConstructor",
-                   "L'enumeration '" + def->nom + "' se convertit d'une valeur ou d'un nom : " +
+                   "Enumeration '" + def->nom + "' converts a value or a name: " +
                        def->nom + "(2), " + def->nom + "('" + def->enumerations[0] + "').");
         return it.convertirEnEnumeration(def, args[0]);
     }
@@ -535,6 +614,110 @@ Valeur reduire(const Valeur& v, int dimension, bool garderDim,
         if (k < r.re.size()) r.re[k] = f(tranche);
     });
     return r;
+}
+
+std::string fichierSurChemin(Interpreteur& it, const std::string& nom) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path p(nom);
+    if (nom.empty() || p.has_parent_path()) return std::string();
+    if (fs::is_regular_file(p, ec)) return fs::absolute(p, ec).string();
+    for (const std::string& dossier : it.chemin()) {
+        fs::path candidat = fs::path(dossier) / p;
+        if (fs::is_regular_file(candidat, ec)) return candidat.string();
+    }
+    return std::string();
+}
+
+Valeur appliquerParElements(const std::vector<Valeur>& arguments, const char* nom,
+                            const std::function<double(const double*)>& f) {
+    std::vector<Valeur> valeurs;
+    valeurs.reserve(arguments.size());
+    for (const Valeur& a : arguments) {
+        if (!(a.estNumerique() || a.classe == Classe::Logique))
+            erreur(formater("MATLAB:%s:InputType", nom),
+                   formater("Arguments of %s must be numeric.", nom));
+        if (a.estComplexe())
+            erreur(formater("MATLAB:%s:ComplexInput", nom),
+                   formater("Arguments of %s must be real.", nom));
+        valeurs.push_back(versDouble(a));
+    }
+    Dims dims{1, 1};
+    bool tailleFixee = false;
+    for (const Valeur& v : valeurs) {
+        if (v.nelem() == 1) continue;
+        if (!tailleFixee) {
+            dims = v.dims;
+            tailleFixee = true;
+        } else if (v.dims != dims) {
+            erreur(formater("stats:%s:InputSizeMismatch", nom),
+                   "Non-scalar arguments must match in size.");
+        }
+    }
+    Valeur r = Valeur::matriceDims(dims);
+    std::vector<double> courants(valeurs.size());
+    for (std::size_t k = 0; k < r.re.size(); ++k) {
+        for (std::size_t i = 0; i < valeurs.size(); ++i)
+            courants[i] = valeurs[i].nelem() == 1 ? valeurs[i].re[0] : valeurs[i].re[k];
+        r.re[k] = f(courants.data());
+    }
+    return r;
+}
+
+// Quantile de la loi normale centrée réduite : l'algorithme AS 241 de
+// Wichura (1988), juste à 1e-16 près sur tout ]0,1[, puis un pas de Newton
+// sur la queue inférieure, calculée par erfc sans soustraction. Les
+// queues sont traitées en p ou 1-p, jamais en 2p-1 : norminv(1e-20) vaut
+// -9.2623, non -Inf.
+double quantileNormal(double p) {
+    if (std::isnan(p) || p < 0 || p > 1) return std::nan("");
+    if (p == 0) return -INFINITY;
+    if (p == 1) return INFINITY;
+    if (p > 0.5) return -quantileNormal(1.0 - p);  // 1-p exact ici
+    const double q = p - 0.5;
+    double x;
+    if (std::fabs(q) <= 0.425) {
+        const double r = 0.180625 - q * q;
+        x = q * (((((((2.5090809287301226727e3 * r + 3.3430575583588128105e4) * r +
+                      6.7265770927008700853e4) * r + 4.5921953931549871457e4) * r +
+                    1.3731693765509461125e4) * r + 1.9715909503065514427e3) * r +
+                  1.3314166789178437745e2) * r + 3.3871328727963666080e0) /
+            (((((((5.2264952788528545610e3 * r + 2.8729085735721942674e4) * r +
+                  3.9307895800092710610e4) * r + 2.1213794301586595867e4) * r +
+                5.3941960214247511077e3) * r + 6.8718700749205790830e2) * r +
+              4.2313330701600911252e1) * r + 1.0);
+    } else {
+        double r = std::sqrt(-std::log(p));
+        if (r <= 5.0) {
+            r -= 1.6;
+            x = (((((((7.74545014278341407640e-4 * r + 2.27238449892691845833e-2) * r +
+                      2.41780725177450611770e-1) * r + 1.27045825245236838258e0) * r +
+                    3.64784832476320460504e0) * r + 5.76949722146069140550e0) * r +
+                  4.63033784615654529590e0) * r + 1.42343711074968357734e0) /
+                (((((((1.05075007164441684324e-9 * r + 5.47593808499534494600e-4) * r +
+                      1.51986665636164571966e-2) * r + 1.48103976427480074590e-1) * r +
+                    6.89767334985100004550e-1) * r + 1.67638483018380384940e0) * r +
+                  2.05319162663775882187e0) * r + 1.0);
+        } else {
+            r -= 5.0;
+            x = (((((((2.01033439929228813265e-7 * r + 2.71155556874348757815e-5) * r +
+                      1.24266094738807843860e-3) * r + 2.65321895265761230930e-2) * r +
+                    2.96560571828504891230e-1) * r + 1.78482653991729133580e0) * r +
+                  5.46378491116411436990e0) * r + 6.65790464350110377720e0) /
+                (((((((2.04426310338993978564e-15 * r + 1.42151175831644588870e-7) * r +
+                      1.84631831751005468180e-5) * r + 7.86869131145613259100e-4) * r +
+                    1.48753612908506148525e-2) * r + 1.36929880922735805310e-1) * r +
+                  5.99832206555887937690e-1) * r + 1.0);
+        }
+        x = -x;  // queue inférieure
+    }
+    // Un pas de Newton : Phi(x) = erfc(-x/sqrt2)/2 garde ses chiffres pour x < 0.
+    const double densite = std::exp(-0.5 * x * x) / std::sqrt(2.0 * 3.14159265358979323846);
+    if (densite > 0 && p > 1e-300) {
+        const double phi = 0.5 * std::erfc(-x / std::sqrt(2.0));
+        x -= (phi - p) / densite;
+    }
+    return x;
 }
 
 }  // namespace matlibre

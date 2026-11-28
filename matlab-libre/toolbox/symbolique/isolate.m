@@ -33,8 +33,8 @@ function r = isolate(equation, variable)
     end
     if matlibre_sym_compter(gauche, nom) + matlibre_sym_compter(droite, nom) ~= 1
         error('symbolic:isolate:plusieurs', ...
-              ['ISOLATE ne sait defaire les operations que si ''%s'' ' ...
-               'n''apparait qu''une fois.'], nom);
+              ['ISOLATE can undo operations only if ''%s'' ' ...
+               'appears once.'], nom);
     end
     % Si l'inconnue est a droite, on echange : le procede ne sait
     % descendre que dans le membre de gauche.

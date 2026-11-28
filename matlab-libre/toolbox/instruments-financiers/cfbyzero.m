@@ -26,7 +26,7 @@ function prix = cfbyzero(courbe, montants, dates, reglement, base)
     end
     if size(numeros, 2) ~= size(montants, 2)
         error('finstr:cfbyzero:Tailles', ...
-              'Il faut une date par flux.');
+              'One date per cash flow is required.');
     end
     prix = zeros(size(montants, 1), 1);
     for k = 1:size(montants, 1)

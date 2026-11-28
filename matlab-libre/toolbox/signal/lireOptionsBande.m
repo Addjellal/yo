@@ -21,7 +21,7 @@ function [w, options] = lireOptionsBande(w, varargin)
     end
     while k <= numel(varargin)
         if k + 1 > numel(varargin)
-            error('signal:bande:Paire', 'Option sans valeur : %s.', char(varargin{k}));
+            error('signal:bande:Paire', 'Value missing for option %s.', char(varargin{k}));
         end
         switch lower(char(varargin{k}))
             case 'steepness'
@@ -37,9 +37,9 @@ function [w, options] = lireOptionsBande(w, varargin)
     end
     if any(w <= 0) || any(w >= 1)
         error('signal:bande:Frequence', ...
-              'Les fréquences doivent être strictement entre 0 et la moitié de Fs.');
+              'Frequencies must be strictly between 0 and Fs/2.');
     end
     if any(options.Steepness < 0.5) || any(options.Steepness >= 1)
-        error('signal:bande:Raideur', 'La raideur doit être dans [0,5 ; 1[.');
+        error('signal:bande:Raideur', 'Steepness must be in [0.5, 1).');
     end
 end

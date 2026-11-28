@@ -101,6 +101,22 @@ save('comprime.mat', 'm', '-v7');
 assert(isequal(load('clair.mat').m, m));
 assert(isequal(load('comprime.mat').m, m));
 
+%% ------------------------------------------- une poignée ne s'écrit pas
+% MATLAB range une poignée de fonction dans un sous-système du fichier dont
+% le format n'est pas public. Elle s'écrivait en double, sans rien dire, et
+% revenait au chargement comme un nombre : la variable est désormais
+% laissée de côté, avec un avertissement — seule, ou dans une structure.
+fPoignee = @(x) x + 1; gNombre = 3; sAvecPoignee.h = @sin;
+lastwarn('');
+warning('off', 'MatLibre:save:PoigneeNonEcrite');
+save('poignees.mat', 'fPoignee', 'gNombre', 'sAvecPoignee');
+warning('on', 'MatLibre:save:PoigneeNonEcrite');
+[~, idPoignee] = lastwarn();
+assert(strcmp(idPoignee, 'MatLibre:save:PoigneeNonEcrite'));
+relu = load('poignees.mat');
+assert(isequal(fieldnames(relu), {'gNombre'}) && relu.gNombre == 3);
+delete('poignees.mat');
+
 %% ---------------------------------------------------------- whos -file
 inventaire = matlibre_contenu_mat('choix.mat');
 noms = {};
@@ -216,6 +232,28 @@ catch e
     dimensionsFolles = strcmp(e.identifier, 'MATLAB:load:fichierAbime');
 end
 assert(dimensionsFolles);
+
+%% -------- une etiquette courte trop longue ne fait pas lire hors du fichier
+% La forme courte d'un element loge au plus quatre octets dans son
+% etiquette. Une longueur plus grande, lue d'un fichier abime, faisait
+% lire au-dela de ces quatre octets — hors du tampon (AddressSanitizer).
+% Un scalaire « a » dont le nom est en forme courte, d'une longueur
+% annoncee de 64 octets.
+nomCourt = [1 0 64 0, double('a'), 0 0 0];
+corpsCourt = [motLong(6), motLong(8), motLong(6), motLong(0), ...
+              motLong(5), motLong(8), motLong(1), motLong(1), ...
+              nomCourt, motLong(9), motLong(8), reel(7)];
+octets = [entete, motLong(14), motLong(numel(corpsCourt)), corpsCourt];
+fid = fopen('court.mat', 'w');
+fwrite(fid, octets, 'uint8');
+fclose(fid);
+courtRefuse = false;
+try
+    load('court.mat');
+catch e
+    courtRefuse = strcmp(e.identifier, 'MATLAB:load:fichierAbime');
+end
+assert(courtRefuse, 'une forme courte de 64 octets est refusee');
 
 %% -------------------------------------------------- le niveau 7.3 se nomme
 % Un fichier « -v7.3 » est un HDF5 : la signature suit les cinq cent douze

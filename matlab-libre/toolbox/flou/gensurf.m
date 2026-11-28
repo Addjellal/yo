@@ -43,7 +43,7 @@ function [x, y, z] = gensurf(fis, entrees, sortie, points)
     end
     n = numel(fis.entrees);
     if n < 1
-        error('fuzzy:gensurf:Entrees', 'Le système n''a aucune entrée.');
+        error('fuzzy:gensurf:Entrees', 'The system has no inputs.');
     end
     points = round(points);
     if n < 2 || numel(entrees) < 2

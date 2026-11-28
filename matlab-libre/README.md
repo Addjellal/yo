@@ -1,11 +1,11 @@
 # MatLibre
 
 Un interpréteur libre du langage MATLAB, écrit de zéro en C++17, avec
-53 toolboxes écrites dans le langage lui-même.
+54 modules de toolbox écrits dans le langage lui-même.
 
 ```bash
 make            # compile — aucune dépendance obligatoire
-make test       # 57 verifications C++ + 46 suites en langage MATLAB
+make test       # 126 verifications C++, le bureau, 47 suites en langage MATLAB
 ./build/bin/matlibre
 ```
 
@@ -24,13 +24,13 @@ Continuous-time transfer function.
 >> A \ [1; 2]
 ans =
 
-    0.0909
-    0.6364
+   0.0909
+   0.6364
 
 >> [V, D] = eig(A); diag(D)'
 ans =
 
-    2.3820    4.6180
+   2.3820   4.6180
 
 >> G = tf(1, [1 2 1]); step(G); print('reponse.svg');
 ```
@@ -43,12 +43,12 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **682 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **690 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **3042 fonctions de toolbox** en langage MATLAB, réparties en
-  **55 modules** : signal, image, vision, apprentissage profond,
+- **3146 fonctions de toolbox** en langage MATLAB, réparties en
+  **54 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
   antennes, audio, symbolique, EDP, Simulink, Stateflow, Simscape…
@@ -63,7 +63,7 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 - **Un bureau natif** (`matlibre-bureau`) : une fenêtre Qt, l'éditeur, la
   fenêtre de commandes, l'espace de travail, les figures, le débogueur pas
   à pas et le profileur dans un seul exécutable.
-- **Une aide qui ne ment pas** : 665 fonctions ont leur fiche — syntaxe,
+- **Une aide qui ne ment pas** : 671 fonctions ont leur fiche — syntaxe,
   exemples, fonctions voisines —, et chaque exemple qu'elle montre est
   exécuté à chaque passage des tests.
 - **Un générateur de code C** : `codegen` traduit scalaires et matrices de
@@ -75,18 +75,22 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
   installer, et les fichiers vont dans les deux sens avec MATLAB.
 - **Un rendu graphique** en SVG, écrit à la main : courbes, barres,
   nuages, tiges, escaliers, images, sous-graphes, légendes.
-- **Aucune dépendance obligatoire.** LAPACK, BLAS et FFTW sont utilisés
-  s'ils sont là, uniquement pour aller plus vite.
+- **Aucune dépendance obligatoire.** Un compilateur C++17 suffit ;
+  l'algèbre linéaire et la FFT sont écrites ici, sans LAPACK ni FFTW.
 
 ## Ce que ce n'est pas
 
 MATLAB, ce sont plusieurs milliers de fonctions et un environnement
 graphique complet. Ce dépôt en couvre une part utile, pas la totalité :
-pas d'éditeur de schéma Simulink (les modèles se décrivent en appelant
-`add_block` et `add_line`, mais la simulation est réelle), pas d'App
-Designer, génération de code C restreinte aux scalaires et aux matrices de
+l'éditeur de schéma Simulink du bureau pose, câble, règle et simule, mais
+n'a pas d'annotations, et la bibliothèque qu'il propose au clic
+compte quarante blocs (les deux cent cinquante-cinq types se posent par
+`add_block`) ; pas d'App Designer, génération de code C restreinte aux scalaires et aux matrices de
 taille fixe, pas d'objets ni de poignées de fonction dans les fichiers
-MAT. La liste complète des écarts est dans
+MAT. Qui vient de MATLAB lira d'abord
+[`documentation/venir-de-matlab.md`](documentation/venir-de-matlab.md) :
+ce qui diffère, ce qui manque, où chercher, en une page. La liste
+complète des écarts est dans
 [`documentation/couverture.md`](documentation/couverture.md) — elle vaut
 d'être lue avant de s'appuyer sur ce projet.
 
@@ -135,11 +139,11 @@ par temps, et le code de chacune ligne à ligne avec ses passages. Qt6 est
 la seule dépendance, et elle reste facultative — sans Qt, tout le reste se
 compile comme avant.
 
-**Les nombres s'affichent entiers.** MatLibre montre par défaut tous les
-chiffres que la valeur porte — `pi` s'écrit `3.141592653589793`, un
-`single` s'arrête à `3.1415927`, qui est tout ce qu'il porte. C'est le
-seul écart d'affichage avec MATLAB, qui démarre en `format short` ;
-`format short` le rétablit, `format` seul revient au réglage de départ.
+**Les nombres s'affichent comme dans MATLAB.** MatLibre démarre en
+`format short` : `pi` s'écrit `3.1416`. `format long` montre tous les
+chiffres que la valeur porte — `3.141592653589793`, et `3.1415927` pour
+un `single`, qui n'en porte pas davantage ; `format` seul revient au
+réglage de départ.
 
 **Quand quelque chose casse**, le message dit où : la fonction qui a
 échoué, le fichier et la ligne de chaque appel traversé, avec la ligne de
@@ -175,15 +179,17 @@ propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
 
 | Fichier | Contenu |
 |---|---|
+| [`venir-de-matlab.md`](documentation/venir-de-matlab.md) | pour qui vient de MATLAB : ce qui se fait pareil, ce qui diffère, ce qui manque, où chercher |
 | [`langage.md`](documentation/langage.md) | ce que l'interpréteur comprend, type par type |
 | [`installation.md`](documentation/installation.md) | compiler, installer, empaqueter, gérer les toolboxes |
-| [`toolboxes.md`](documentation/toolboxes.md) | les 55 modules et leur correspondance MathWorks |
-| [`reference.md`](documentation/reference.md) | les 3724 fonctions, avec leur aide — généré |
+| [`toolboxes.md`](documentation/toolboxes.md) | les 54 modules et leur correspondance MathWorks |
+| [`reference.md`](documentation/reference.md) | les 3836 fonctions, avec leur aide — généré |
 | [`architecture.md`](documentation/architecture.md) | comment l'interpréteur est bâti |
 | [`developpeur.md`](documentation/developpeur.md) | ajouter une fonction, une toolbox, un test |
 | [`couverture.md`](documentation/couverture.md) | ce qui manque, dit franchement |
 | [`manques.md`](documentation/manques.md) | l'inventaire compare a MATLAB, fonction par fonction — genere |
 | [`etat.md`](documentation/etat.md) | l'état des lieux : ce qui est fait, comment on le sait, ce qui reste |
+| [`reprise.md`](documentation/reprise.md) | reprendre le travail d'une session à l'autre : règles, commandes, derniers ajouts, la suite |
 | [`audit.md`](documentation/audit.md) | aide, exemples et couverture des tests, boîte par boîte — généré |
 
 ## Tests
@@ -192,12 +198,23 @@ propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
 make test
 ```
 
-57 vérifications C++ sur le lexeur, l'analyseur, l'indexation, l'algèbre
-et les messages d'erreur ; 46 suites en langage MATLAB dont une qui
+126 vérifications C++ sur le lexeur, l'analyseur, l'indexation, l'algèbre,
+les messages d'erreur et l'édition de la ligne de commande ; le bureau, éprouvé hors écran ; 47 suites en langage MATLAB dont une qui
 contrôle **un résultat exact par toolbox** : `blsprice(100,100,0.05,1,0.2)`
 doit rendre 10,4506 ; `butter(2,0.2)` les coefficients de la référence ;
 `atmosisa(0)` 288,15 K et 101 325 Pa ; l'encodeur convolutif suivi du
 décodeur de Viterbi doit restituer le message exact.
+
+`test_litterature.m` va plus loin : il rejoue des **cas publiés**, toolbox
+par toolbox, et les confronte à une référence indépendante — les
+coefficients certifiés du NIST pour les régressions de Longley, Misra1a
+et MGH09, les iris de Fisher contre scikit-learn, les valeurs critiques
+de MacKinnon pour Dickey-Fuller, l'exemple de Hull pour Black-Scholes, la
+décomposition db2 de PyWavelets, le seuil d'Otsu de scikit-image, les
+lignes géodésiques de Vincenty contre GeographicLib, les alignements de
+Durbin et al. contre Biopython, l'atmosphère type de 1976, la colonne à
+distiller de Skogestad, et les exemples chiffrés de la documentation de
+MathWorks (`pdepe`, `nwalign`, `varbacktest`, `atmosisa`).
 
 ## Origine
 

@@ -1,49 +1,52 @@
-function [approximation, detail] = dwt(x, nom)
+function [cA, cD] = dwt(x, varargin)
 %DWT Transformée en ondelettes discrète, un niveau.
-%   [A,D] = DWT(X,NOM) rend l'approximation et le détail, sous-échantillonnés
-%   d'un facteur deux. Les bords sont prolongés périodiquement, ce qui
-%   correspond au mode 'per' de MATLAB : A et D comptent chacun
-%   NUMEL(X)/2 échantillons.
+%   [CA,CD] = DWT(X,'wname') rend l'approximation et le détail de X,
+%   sous-échantillonnés d'un facteur deux. [CA,CD] = DWT(X,Lo_D,Hi_D)
+%   emploie des filtres de décomposition donnés.
 %
-%   L'analyse convolue le signal par les filtres de décomposition, ce qui
-%   revient à le corréler avec ces mêmes filtres renversés :
+%   Les bords sont prolongés selon le mode de DWTMODE — 'sym' (symétrie
+%   en demi-point) par défaut, comme dans MATLAB —, ou celui que donne
+%   DWT(...,'mode',MODE). L'algorithme est celui de MATLAB : X est
+%   prolongé de numel(Lo_D)-1 valeurs de chaque côté, convolué par chaque
+%   filtre, et l'on garde un coefficient sur deux à partir du deuxième ;
+%   CA et CD comptent floor((numel(X)+numel(Lo_D)-1)/2) coefficients.
+%   En mode 'per', le prolongement est périodique et CA compte
+%   ceil(numel(X)/2) coefficients.
 %
-%      A(k) = somme_j Lo_D(N+1-j) X(2k-2+j)
-%      D(k) = somme_j Hi_D(N+1-j) X(2k-2+j)
-%
-%   Pour une ondelette orthogonale, Lo_D renversé est Lo_R : c'est la
-%   forme habituelle. Pour une biorthogonale les deux diffèrent, et c'est
-%   bien le filtre d'analyse qu'il faut employer ici.
+%   CA et CD ont l'orientation de X.
 %
 %   Exemple :
-%      [a, d] = dwt([1 2 3 4], 'haar')   % a = [2.1213 4.9497]
-%                                        % d = [-0.7071 -0.7071]
+%      [a, d] = dwt([1 2 3 4], 'haar')          % a = [2.1213 4.9497]
+%      [a, d] = dwt(1:8, 'db2');  numel(a)      % 5 (mode 'sym')
+%      [a, d] = dwt(1:8, 'db2', 'mode', 'per'); numel(a)   % 4
 %
-%   Voir aussi IDWT, WAVEDEC, WFILTERS, SWT, MODWT.
+%   Voir aussi IDWT, DWTMODE, WAVEDEC, WFILTERS, WEXTEND, DWT2.
     if nargin < 2
-        nom = 'haar';
+        varargin = {'haar'};
     end
-    [Lo_D, Hi_D] = wfilters(nom, 'd');
-    Lo_R = Lo_D(end:-1:1);
-    Hi_R = Hi_D(end:-1:1);
-    x = x(:).';
-    n = numel(x);
-    if mod(n, 2) == 1
-        x = [x x(end)];
-        n = n + 1;
+    [Lo_D, Hi_D, mode] = matlibre_ondelette_arguments(varargin, 'd', 'dwt');
+    if ~(isnumeric(x) || islogical(x)) || (~isvector(x) && ~isempty(x))
+        error('Wavelet:FunctionInput:InvalidVector', ...
+              'DWT requires a vector; DWT2 handles matrices.');
     end
-    f = numel(Lo_R);
-    approximation = zeros(1, n / 2);
-    detail = zeros(1, n / 2);
-    for k = 1:n/2
-        sa = 0;
-        sd = 0;
-        for j = 1:f
-            indice = mod(2 * k - 2 + j - 1, n) + 1;
-            sa = sa + Lo_R(j) * x(indice);
-            sd = sd + Hi_R(j) * x(indice);
-        end
-        approximation(k) = sa;
-        detail(k) = sd;
+    colonne = size(x, 1) > 1;
+    x = double(x(:)).';
+    lf = numel(Lo_D);
+    lx = numel(x);
+    if strcmp(mode, 'per')
+        prolongement = lf / 2;
+        dernier = 2 * ceil(lx / 2);
+    else
+        prolongement = lf - 1;
+        dernier = lx + lf - 1;
+    end
+    y = wextend('1D', mode, x, prolongement);
+    z = conv(y, Lo_D, 'valid');
+    cA = z(2:2:dernier);
+    z = conv(y, Hi_D, 'valid');
+    cD = z(2:2:dernier);
+    if colonne
+        cA = cA(:);
+        cD = cD(:);
     end
 end

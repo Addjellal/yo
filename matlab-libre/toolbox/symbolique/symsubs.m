@@ -4,17 +4,16 @@ function r = symsubs(e, variable, valeur)
 %   variable nommée par VALEUR, qui peut être un nombre ou une autre
 %   expression.
 %
-%   La substitution ne simplifie pas : remplacer x par 2 dans x + x donne
-%   « 2 + 2 », non « 4 ». C'est voulu — SYMSIMPLIFY fait ce travail, et
-%   les séparer permet de voir ce que chaque étape produit.
+%   Le résultat passe par SYMSIMPLIFY : remplacer x par 2 dans x + x
+%   donne « 4 », comme SUBS dans MATLAB.
 %
 %   Substituer une expression, non un nombre, est ce qui permet de
 %   composer des fonctions symboliquement.
 %
 %   Exemple :
 %      x = sym('x');
-%      symstr(symsubs(symadd(x, x), 'x', 2))       % '2 + 2'
-%      symstr(symsimplify(symsubs(symadd(x, x), 'x', 2)))   % '4'
+%      symstr(symsubs(symadd(x, x), 'x', 2))       % '4'
+%      symstr(symsubs(symmul(x, x), 'x', symadd(x, symnum(1))))   % '(x + 1)^2'
 %
 %   Voir aussi SYMSIMPLIFY, SYMSTR, SUBS.
     if ~iscell(valeur)

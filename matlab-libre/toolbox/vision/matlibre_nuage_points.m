@@ -17,6 +17,6 @@ function points = matlibre_nuage_points(nuage)
     end
     if size(points, 2) ~= 3
         error('vision:nuage:Forme', ...
-              'Un nuage de points a trois colonnes, ou trois plans.');
+              'A point cloud must have three columns, or three planes.');
     end
 end

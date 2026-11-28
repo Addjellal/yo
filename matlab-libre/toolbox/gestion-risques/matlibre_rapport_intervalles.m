@@ -1,4 +1,4 @@
-function statistique = matlibre_rapport_intervalles(echecs, p)
+function [statistique, intervalles] = matlibre_rapport_intervalles(echecs, p)
 %MATLIBRE_RAPPORT_INTERVALLES Test de Haas sur les temps entre dépassements.
 %   Chaque intervalle entre deux dépassements donne un rapport de
 %   vraisemblance de temps d'attente ; leur somme mesure si les
@@ -6,6 +6,7 @@ function statistique = matlibre_rapport_intervalles(echecs, p)
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
     positions = find(echecs(:));
+    intervalles = [];
     if isempty(positions)
         statistique = 0;
         return

@@ -23,7 +23,7 @@ function sys = delayss(A, B, C, D, retards)
     retards = double(retards);
     if size(retards, 2) ~= 3
         error('control:delayss:Retards', ...
-              'Chaque retard s''écrit [sortie, entrée, temps].');
+              'Each delay must be [output, input, time].');
     end
     % Un seul retard commun à toutes les voies se compose avec le
     % modèle ; plusieurs retards distincts se composent voie par voie.

@@ -46,17 +46,17 @@ function e = wentropy(x, type, parametre)
             exigerParametre(nargin, type);
             if parametre < 1
                 error('wavelet:wentropy:Puissance', ...
-                      'La puissance de la norme doit valoir au moins un.');
+                      'The norm exponent must be at least one.');
             end
             e = sum(abs(x) .^ parametre);
         otherwise
-            error('wavelet:wentropy:Type', 'Critère inconnu : %s.', type);
+            error('wavelet:wentropy:Type', 'Unknown entropy type: %s.', type);
     end
 end
 
 function exigerParametre(nombreArguments, type)
     if nombreArguments < 3
         error('wavelet:wentropy:Parametre', ...
-              'Le critère ''%s'' demande un paramètre.', type);
+              'Entropy type ''%s'' requires a parameter.', type);
     end
 end

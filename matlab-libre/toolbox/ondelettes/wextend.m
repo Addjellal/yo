@@ -14,6 +14,15 @@ function y = wextend(type, mode, x, longueur, cote)
 %
 %   COTE vaut 'b' (des deux côtés, par défaut), 'l' ou 'r'.
 %
+%   Y = WEXTEND('addrow',MODE,X,L) ajoute L lignes en haut et en bas de
+%   la matrice X ('u', 'd' ou 'b' pour le côté) ; 'addcol' ajoute des
+%   colonnes. Seule cette dimension est touchée, même en mode 'per' :
+%   c'est ce que DWT2 emploie.
+%
+%   Les modes sont ceux de MATLAB, vérifiés contre PyWavelets ; en
+%   particulier 'asym' est périodique de période 2N sur [x, -x renversé],
+%   et 'asymw' enchaîne les réflexions ponctuelles 2*x(1) - x(1+k).
+%
 %   Exemples :
 %      wextend('1D', 'zpd',   [1 2 3], 2)   % [0 0 1 2 3 0 0]
 %      wextend('1D', 'sp0',   [1 2 3], 2)   % [1 1 1 2 3 3 3]
@@ -21,6 +30,7 @@ function y = wextend(type, mode, x, longueur, cote)
 %      wextend('1D', 'sym',   [1 2 3], 2)   % [2 1 1 2 3 3 2]
 %      wextend('1D', 'symw',  [1 2 3], 2)   % [3 2 1 2 3 2 1]
 %      wextend('1D', 'asym',  [1 2 3], 2)   % [-2 -1 1 2 3 -3 -2]
+%      wextend('1D', 'asymw', [1 2 3], 2)   % [-1 0 1 2 3 4 5]
 %      wextend('1D', 'ppd',   [1 2 3], 2)   % [2 3 1 2 3 1 2]
 %
 %   Voir aussi WKEEP, DWT.
@@ -33,6 +43,18 @@ function y = wextend(type, mode, x, longueur, cote)
         y = double(x);
         y = prolongerLignes(y, mode, longueur(1), cote);
         y = prolongerLignes(y.', mode, longueur(2), cote).';
+        return
+    end
+    % 'addrow' ajoute des lignes (chaque colonne est prolongée), 'addcol'
+    % des colonnes ; l'autre dimension n'est pas touchée, même en mode
+    % 'per'. Le côté vaut 'u'/'d' (haut, bas) ou 'l'/'r', ou 'b'.
+    if any(strcmp(type, {'addrow', 'ar'}))
+        cote = strrep(strrep(cote, 'u', 'l'), 'd', 'r');
+        y = prolongerLignes(double(x), mode, longueur(1), cote);
+        return
+    end
+    if any(strcmp(type, {'addcol', 'ac'}))
+        y = prolongerLignes(double(x).', mode, longueur(1), cote).';
         return
     end
     ligne = isrow(x);
@@ -89,13 +111,19 @@ function y = prolongerVecteur(v, mode, longueur, cote)
         case 'symw'
             [gauche, droite] = miroir(v, longueur, true);
         case {'asym', 'asymh'}
-            [gauche, droite] = miroir(v, longueur, false);
-            gauche = -gauche;
-            droite = -droite;
+            % Périodique de période 2N sur le motif [x, -x renversé] : la
+            % négation ne vaut que pour une période sur deux.
+            motif = [v, -v(end:-1:1)];
+            periode = 2 * n;
+            gauche = motif(mod(-(longueur:-1:1), periode) + 1);
+            droite = motif(mod(n - 1 + (1:longueur), periode) + 1);
         case 'asymw'
-            [gauche, droite] = miroir(v, longueur, true);
-            gauche = -gauche;
-            droite = -droite;
+            % Réflexions ponctuelles successives : chaque bloc de N-1
+            % valeurs est le reflet, par rapport au dernier point atteint,
+            % du bloc qui le précède — e(c+j) = 2 e(c) - e(c-j).
+            droite = reflexionsPonctuelles(v, longueur);
+            gauche = reflexionsPonctuelles(v(end:-1:1), longueur);
+            gauche = gauche(end:-1:1);
         case 'ppd'
             gauche = zeros(1, longueur);
             droite = zeros(1, longueur);
@@ -145,4 +173,21 @@ function [gauche, droite] = miroir(v, longueur, pointEntier)
             droite(k) = motif(mod(n - 1 + k, periode) + 1);
         end
     end
+end
+
+% Les LONGUEUR valeurs qui prolongent V à droite par réflexions
+% ponctuelles répétées (mode 'asymw', « antireflect » de PyWavelets).
+function droite = reflexionsPonctuelles(v, longueur)
+    n = numel(v);
+    if n == 1
+        droite = repmat(v, 1, longueur);
+        return
+    end
+    s = v;
+    while numel(s) < n + longueur
+        c = numel(s);
+        bloc = 2 * s(c) - s(c - (1:n - 1));
+        s = [s, bloc]; %#ok<AGROW>
+    end
+    droite = s(n + 1:n + longueur);
 end

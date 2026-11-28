@@ -11,7 +11,7 @@ function nom = matlibre_option_canonique(donne)
     connus = fieldnames(matlibre_options_defaut());
     position = find(strcmpi(connus, donne), 1);
     if isempty(position)
-        error('curvefit:fitoptions:Option', 'Réglage inconnu : %s.', donne);
+        error('curvefit:fitoptions:Option', 'Unknown option: %s.', donne);
     end
     nom = connus{position};
 end

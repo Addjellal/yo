@@ -54,7 +54,7 @@ function contours = matlibre_clip_booleen(contoursP, contoursQ, operation)
         end
     end
     error('MATLAB:polyshape:degenere', ...
-          'Les deux polygones sont trop imbriqués pour être combinés.');
+          'The two polygons are too intertwined to be combined.');
 end
 
 function e = etendue(P, Q)

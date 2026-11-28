@@ -31,7 +31,7 @@ function fis = ajouterVariable(fis, entree, intervalle, varargin)
     intervalle = double(intervalle(:))';
     if numel(intervalle) ~= 2 || intervalle(2) <= intervalle(1)
         error('fuzzy:addInput:Intervalle', ...
-              'L''intervalle doit être [min max], avec max plus grand.');
+              'The range must be [min max], with max greater than min.');
     end
     if entree
         fis = addvar(fis, 'input', nom, intervalle);
@@ -76,6 +76,6 @@ function p = parametresReguliers(typeMf, intervalle, nombre, rang)
             p = [largeur / 2, 2, centres];
         otherwise
             error('fuzzy:addInput:TypeMf', ...
-                  'Type de modalité inconnu pour une partition : %s.', typeMf);
+                  'Unknown membership function type for a partition: %s.', typeMf);
     end
 end

@@ -25,7 +25,7 @@ function modele = fitcecoc(X, y, varargin)
     classes = unique(y);
     k = numel(classes);
     if k < 2
-        error('stats:fitcecoc:Classes', 'Il faut au moins deux classes.');
+        error('stats:fitcecoc:Classes', 'At least two classes are required.');
     end
     codage = 'onevsone';
     apprenant = @(Xa, ya) fitcsvm(Xa, ya);
@@ -81,4 +81,7 @@ function modele = fitcecoc(X, y, varargin)
     modele = struct('type', 'ecoc', 'Classes', classes, 'Coding', codage, ...
                     'Modeles', {modeles}, 'Paires', paires, ...
                     'NumObservations', numel(y));
+    modele.ClassNames = classes;
+    modele.X = X;
+    modele.Y = y;
 end

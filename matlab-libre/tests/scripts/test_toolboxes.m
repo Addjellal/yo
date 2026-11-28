@@ -115,6 +115,12 @@ assert(isequal(classify(reseau, X).', [1 2 2 1]));
 % Text Analytics
 mots = tokenizedDocument('Le chat dort.');
 assert(numel(mots) == 3);
+% Plusieurs textes : un document par texte, comme MATLAB (rendait une
+% cellule vide).
+documents = tokenizedDocument(["Le chat dort.", "Le chien court vite."]);
+assert(isequal(size(documents), [1 2]) && numel(documents{2}) == 4);
+[effectifs, vocabulaire] = bagOfWords(documents);
+assert(isequal(sum(effectifs, 2), [3; 4]) && numel(vocabulaire) == 6);
 assert(editDistance('chat', 'chats') == 1);
 
 % Wavelet
@@ -132,8 +138,9 @@ assert(isequal(vitdec(code, [7 5], 3), [1 0 1 1 0 0]));
 assert(abs(berawgn(6, 'psk', 2) - 0.00239) < 1e-4);
 
 % Wireless
-signal = ofdmMod([1; 1i; -1; -1i], 8);
-assert(max(abs(ofdmDemod(signal, 8, 1, 4) - [1; 1i; -1; -1i])) < 1e-10);
+signal = ofdmmod([1; 1i; -1; -1i], 8, 1, [1 2 5 8].');
+assert(numel(signal) == 9);
+assert(max(abs(ofdmdemod(signal, 8, 1, 0, [1 2 5 8].') - [1; 1i; -1; -1i])) < 1e-10);
 
 % Phased Array
 assert(abs(abs(steeringVector(4, 0.5, 0)(2)) - 1) < 1e-12);
@@ -255,8 +262,9 @@ assert(isequal(sym2poly(poly2sym([2 -3 0 5], u), u), [2 -3 0 5]));
 % Les racines d'une equation polynomiale.
 racinesSym = solve(t ^ 2 - 4);
 assert(numel(racinesSym) == 2);
-assert(abs(double(racinesSym{1}) + 2) < 1e-12);
-assert(abs(double(racinesSym{2}) - 2) < 1e-12);
+assert(isequal(size(racinesSym), [2 1]));      % une colonne de SYM, comme MATLAB
+assert(abs(double(racinesSym(1)) + 2) < 1e-12);
+assert(abs(double(racinesSym(2)) - 2) < 1e-12);
 assert(abs(double(solve(3 * t - 6)) - 2) < 1e-12);
 % La variable sous-entendue est la plus proche de x.
 syms a x
@@ -335,15 +343,31 @@ session = daq();
 session = addAnalogInput(session, 'v', @(t) 2 * t);
 [donnees, temps] = readData(session, 5);
 assert(abs(donnees(3) - 2 * temps(3)) < 1e-12);
+% Deux lectures se suivent dans le temps, comme une acquisition continue
+% (la seconde rendait le meme bloc que la premiere).
+[suite, tempsSuite] = readData(session, 5);
+assert(abs(tempsSuite(1) - (temps(end) + 1 / session.frequence)) < 1e-12);
+assert(abs(suite(1) - 2 * tempsSuite(1)) < 1e-12 && session.Rate == session.frequence);
 
 % Instrument Control
 instrument = visadev('SIM::1');
 [reponse, instrument] = query(instrument, '*IDN?');
 assert(~isempty(strfind(reponse, 'MatLibre')));
+% Une poignee, comme dans MATLAB : writeline puis readline, sans reprendre
+% l'objet (la reponse etait perdue). SCPI : forme longue, file d'erreurs.
+writeline(instrument, '*IDN?');
+assert(startsWith(readline(instrument), 'MatLibre'));
+assert(~isnan(str2double(writeread(instrument, 'MEASure:VOLTage:DC?'))));
+writeline(instrument, 'FOO:BAR');
+assert(strcmp(writeread(instrument, 'SYST:ERR?'), '-113,"Undefined header"'));
+assert(strcmp(writeread(instrument, 'SYST:ERR?'), '+0,"No error"'));
 
 % Audio
 son = 0.5 * sin(2 * pi * 440 * (0:999) / 8000);
-assert(abs(spectralCentroid(son, 8000) - 440) < 5);
+% Trames de 30 ms a fenetre rectangulaire, comme MATLAB : la fuite
+% spectrale ecarte chaque centroide de quelques hertz.
+centroidesSon = spectralCentroid(son, 8000);
+assert(numel(centroidesSon) == 10 && all(abs(centroidesSon - 440) < 10));
 fichier = [tempname() '.wav'];
 audiowrite(fichier, son, 8000);
 [relu, fs] = audioread(fichier);
@@ -856,7 +880,7 @@ assert(isequal(discret.liens, edition.liens), 'le cablage n''a pas bouge');
 %% ------------------------------ SIMULINK : LES REGLAGES DU MODELE
 regle = new_system('regle');
 regle = add_block(regle, 'constant', 'c', 'Value', 3);
-regle = add_param(regle, 'StopTime', 2, 'FixedStep', 0.5);
+regle = add_param(regle, 'StopTime', 2, 'Solver', 'ode1', 'FixedStep', 0.5);
 assert(get_param(regle, 'StopTime') == 2);
 resRegle = sim(regle);
 assert(resRegle.temps(end) == 2 && numel(resRegle.temps) == 5, ...
@@ -1371,6 +1395,7 @@ schemaSource = add_line(schemaSource, 'procede', 'sortie');
 schemaSource = add_line(schemaSource, 'sortie', 'vitesse');
 schemaSource = add_line(schemaSource, 'vitesse', 'carre');
 
+schemaSource = set_param(schemaSource, 'Solver', 'ode1');
 texteProgramme = matlibre_sl_programme(schemaSource);
 assert(~isempty(strfind(texteProgramme, 'function resultat = asserviProg')));
 assert(isempty(strfind(texteProgramme, 'add_block')), ...
@@ -1427,7 +1452,8 @@ evalin('base', 'clear asserviProg');
 % traduit de travers.
 refuseEcriture = false;
 try
-    matlibre_sl_programme(add_block(new_system('x'), 'zoh', 'z', 'SampleTime', 0.1));
+    matlibre_sl_programme(add_block(set_param(new_system('x'), 'Solver', 'ode1'), 'zoh', 'z', ...
+                                    'SampleTime', 0.1));
 catch err
     refuseEcriture = strcmp(err.identifier, 'Simulink:programme:BlocNonEcrit');
 end
@@ -1451,7 +1477,7 @@ correcteurPI = add_line(correcteurPI, 'kp', 'total', 1);
 correcteurPI = add_line(correcteurPI, 'ki', 'total', 2);
 correcteurPI = add_line(correcteurPI, 'total', 's');
 
-emboite = new_system('emboite');
+emboite = set_param(new_system('emboite'), 'Solver', 'ode1');
 emboite = add_block(emboite, 'step', 'consigne', 'Time', 0, 'After', 1);
 emboite = add_block(emboite, 'sum', 'ecart', 'Signs', '+-');
 emboite = add_block(emboite, 'subsystem', 'correcteur', 'Model', correcteurPI);
@@ -1461,7 +1487,7 @@ emboite = add_line(emboite, 'sortie', 'ecart', 2);
 emboite = add_line(emboite, 'ecart', 'correcteur', 1);
 emboite = add_line(emboite, 'correcteur', 'sortie');
 
-aPlat = new_system('aPlat');
+aPlat = set_param(new_system('aPlat'), 'Solver', 'ode1');
 aPlat = add_block(aPlat, 'step', 'consigne', 'Time', 0, 'After', 1);
 aPlat = add_block(aPlat, 'sum', 'ecart', 'Signs', '+-');
 aPlat = add_block(aPlat, 'gain', 'kp', 'Gain', 2);
@@ -1494,7 +1520,7 @@ dehors = add_block(dehors, 'inport', 'e', 'Port', 1);
 dehors = add_block(dehors, 'subsystem', 'dedans', 'Model', correcteurPI);
 dehors = add_block(dehors, 'outport', 's', 'Port', 1);
 dehors = add_line(add_line(dehors, 'e', 'dedans', 1), 'dedans', 's');
-deuxNiveaux = new_system('deuxNiveaux');
+deuxNiveaux = set_param(new_system('deuxNiveaux'), 'Solver', 'ode1');
 deuxNiveaux = add_block(deuxNiveaux, 'step', 'consigne', 'Time', 0, 'After', 1);
 deuxNiveaux = add_block(deuxNiveaux, 'sum', 'ecart', 'Signs', '+-');
 deuxNiveaux = add_block(deuxNiveaux, 'subsystem', 'correcteur', 'Model', dehors);

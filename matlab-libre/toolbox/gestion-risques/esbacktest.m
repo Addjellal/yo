@@ -49,7 +49,7 @@ classdef esbacktest
             if isscalar(obj.ESData),  obj.ESData = repmat(obj.ESData, n, 1);  end
             if numel(obj.VaRData) ~= n || numel(obj.ESData) ~= n
                 error('risque:esbacktest:Tailles', ...
-                      'Il faut une valeur en risque et une perte moyenne par observation.');
+                      'There must be one VaR and one expected shortfall per observation.');
             end
             k = 1;
             while k + 1 <= numel(varargin)

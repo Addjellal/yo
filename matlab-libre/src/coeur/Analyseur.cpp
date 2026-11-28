@@ -351,6 +351,7 @@ NoeudPtr Analyseur::instructionCommande() {
 }
 
 NoeudPtr Analyseur::instruction() {
+    Descente garde(*this);
     const Jeton& t = jeton();
     if (t.genre == Genre::MotCle) {
         if (t.texte == "if") return instructionSi();
@@ -731,13 +732,24 @@ std::shared_ptr<FonctionUtilisateur> Analyseur::definitionFonction() {
     // Dans un fichier dont les fonctions sont fermées par « end », une
     // fonction écrite avant ce « end » est imbriquée : elle partage
     // l'espace de travail de celle qui l'entoure.
+    // Le corps peut reprendre après une fonction imbriquée, comme MATLAB
+    // l'admet : « function r = p(x), function y = aide(z) ... end,
+    // r = aide(x); end ». Seules les fonctions imbriquées placées à la fin
+    // étaient lues, et la suite tombait sur « Unexpected token at file
+    // level ».
     if (fonctionsTerminees_) {
-        sauterSeparateurs();
-        while (jeton().estMot("function")) {
-            auto sous = definitionFonction();
-            sous->imbriquee = true;
-            f->imbriquees[sous->nom] = sous;
+        for (;;) {
             sauterSeparateurs();
+            if (jeton().estMot("function")) {
+                auto sous = definitionFonction();
+                sous->imbriquee = true;
+                f->imbriquees[sous->nom] = sous;
+                continue;
+            }
+            if (fini() || motFin() || f->imbriquees.empty()) break;
+            NoeudPtr suite = bloc({"function"});
+            if (suite->enfants.empty()) break;
+            for (auto& n : suite->enfants) f->corps->enfants.push_back(n);
         }
     }
     if (motFin()) avancer();
@@ -885,7 +897,17 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
 
 // -------------------------------------------------------- expressions
 
-NoeudPtr Analyseur::expression() { return ouCourt(); }
+Analyseur::Descente::Descente(Analyseur& analyseur) : a(analyseur) {
+    if (++a.profondeur_ > PROFONDEUR_MAX) {
+        --a.profondeur_;
+        a.erreurSyntaxe("Nesting is too deep (more than 256 levels).");
+    }
+}
+
+NoeudPtr Analyseur::expression() {
+    Descente garde(*this);
+    return ouCourt();
+}
 
 static NoeudPtr binaire(const std::string& op, NoeudPtr a, NoeudPtr b) {
     auto n = Noeud::creer(TypeN::OpBinaire);
@@ -993,6 +1015,7 @@ NoeudPtr Analyseur::multiplicatif() {
 NoeudPtr Analyseur::unaire() {
     if (jeton().estOp("-") || jeton().estOp("+") || jeton().estOp("~") ||
         jeton().estOp("++") || jeton().estOp("--")) {
+        Descente garde(*this);
         std::string op = jeton().texte;
         avancer();
         auto n = Noeud::creer(TypeN::OpUnaire);
@@ -1031,16 +1054,34 @@ NoeudPtr Analyseur::puissance() {
     return a;
 }
 
-std::vector<NoeudPtr> Analyseur::listeArguments(const char* fermeture) {
+std::vector<NoeudPtr> Analyseur::listeArguments(const char* fermeture, bool* nomValeur) {
     std::vector<NoeudPtr> args;
     int sauveTableau = dansTableau_;
     dansTableau_ = 0;
     ++dansIndice_;
     sauterFinsLignes();
+    bool vuNomValeur = false;
     if (!jeton().estOp(fermeture)) {
         for (;;) {
             sauterFinsLignes();
-            if (jeton().estOp(":") &&
+            if (nomValeur && jeton().genre == Genre::Ident && jeton(1).estOp("=")) {
+                // « f(x, Nom=valeur) », la forme de MATLAB depuis R2021a :
+                // la fonction reçoit "Nom", valeur, le nom en chaîne.
+                auto nom = Noeud::creer(TypeN::LitteralChaine);
+                nom->texte = jeton().texte;
+                avancer();
+                avancer();
+                args.push_back(nom);
+                args.push_back(expression());
+                vuNomValeur = true;
+                *nomValeur = true;
+            } else if (vuNomValeur) {
+                // Comme MATLAB : après un nom=valeur, plus que des nom=valeur.
+                erreurSyntaxe("Unsupported use of the '=' operator. To compare values for "
+                              "equality, use '=='. To pass name-value arguments using the "
+                              "name=value format, provide these arguments after all other "
+                              "inputs.");
+            } else if (jeton().estOp(":") &&
                 (jeton(1).estOp(",") || jeton(1).estOp(fermeture))) {
                 args.push_back(Noeud::creer(TypeN::DeuxPointsSeul));
                 avancer();
@@ -1092,7 +1133,7 @@ NoeudPtr Analyseur::postfixe() {
             avancer();
             ElementAcces e;
             e.genre = '(';
-            e.args = listeArguments(")");
+            e.args = listeArguments(")", &e.nomValeur);
             ajouter(std::move(e));
         } else if (t.estOp("{") && !(dansTableau_ && t.espaceAvant)) {
             avancer();

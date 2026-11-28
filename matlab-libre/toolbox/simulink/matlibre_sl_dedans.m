@@ -36,7 +36,7 @@ function dedans = descendre(modele, nom)
     bloc = modele.blocs{indice};
     if ~strcmp(bloc.type, 'subsystem')
         error('Simulink:Commands:PasUnSousSysteme', ...
-              'Le bloc ''%s'' est de type ''%s'' : on n''y descend pas.', ...
+              'Block ''%s'' is of type ''%s'': it cannot be opened as a subsystem.', ...
               nom, bloc.type);
     end
     if isfield(bloc.parametres, 'Model')
@@ -45,6 +45,6 @@ function dedans = descendre(modele, nom)
         dedans = bloc.parametres.Modele;
     else
         error('Simulink:Commands:SousSystemeVide', ...
-              'Le sous-systeme ''%s'' ne porte pas de modele.', nom);
+              'Subsystem ''%s'' has no model.', nom);
     end
 end

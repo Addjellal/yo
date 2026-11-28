@@ -34,7 +34,7 @@ function prix = ret2price(rendements, prixInitial, methode)
             prix = repmat(prixInitial, size(facteurs, 1), 1) .* facteurs;
         otherwise
             error('econ:ret2price:Methode', ...
-                  'La méthode doit être ''Continuous'' ou ''Periodic''.');
+                  'Method must be ''Continuous'' or ''Periodic''.');
     end
     if ligne
         prix = prix.';

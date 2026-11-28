@@ -1427,8 +1427,13 @@ IMHMAX Supprime les maxima de hauteur inférieure à H.
   La reconstruction de l'image depuis elle-même abaissée de H rabote
   les sommets peu marqués et laisse les autres.
 
+  Un sommet plus haut que H perd H ; un sommet moins haut disparaît,
+  et l'image entière s'abaisse alors jusqu'à la hauteur de son fond
+  diminuée de H, comme dans MATLAB pour une image en double.
+
   Exemple :
-     imhmax([1 3 1], 5)   % [1 1 1] : le sommet ne fait que 2
+     imhmax([1 3 1], 1)   % [1 2 1] : le sommet perd 1
+     imhmax([1 3 1], 5)   % [-2 -2 -2] : le sommet (2) est sous H
 
   Voir aussi IMRECONSTRUCT, IMREGIONALMAX, WATERSHED.
 ```
@@ -1777,14 +1782,33 @@ IMSHARPEN Accentue les contours par masque flou.
 ## `imshow`
 
 ```
-IMSHOW Affiche une image dans les axes courants.
-  Le rendu se fait en SVG : « print » écrit le fichier.
+IMSHOW Affiche une image, comme MATLAB : en niveaux de gris, en couleurs
+vraies, binaire ou indexée.
+  IMSHOW(I) affiche l'image d'intensités I en niveaux de gris, sur la
+  plage de son type : [0 255] pour un uint8, [0 65535] pour un uint16,
+  [-32768 32767] pour un int16, [0 1] pour un double, un single ou un
+  logical — une image binaire est donc noire et blanche.
+  IMSHOW(I,[BAS HAUT]) fixe la plage : BAS s'affiche en noir, HAUT en
+  blanc. IMSHOW(I,[]) la prend de min(I(:)) à max(I(:)).
+  IMSHOW(RGB) affiche un tableau m x n x 3 en couleurs vraies.
+  IMSHOW(X,MAP) affiche l'image indexée X avec la palette MAP.
+  IMSHOW(NOMFICHIER) lit l'image avec IMREAD puis l'affiche.
+  IMSHOW(...,'DisplayRange',[BAS HAUT]) et 'Colormap',MAP comme
+  ci-dessus ; 'InitialMagnification', 'Border', 'Interpolation',
+  'Parent', 'XData', 'YData' et 'Reduce' sont acceptés.
+  H = IMSHOW(...) rend la poignée de l'image.
+
+  Comme MATLAB, IMSHOW donne à l'axe une palette grise (sauf pour une
+  image indexée ou en couleurs vraies), des échelles égales et serrées
+  sur l'image, et cache les graduations ; le titre reste.
 
   Exemple :
-     imshow(rand(16));
-     close all;
+     I = uint8(magic(64));
+     imshow(I);                  % plage [0 255] : une image sombre
+     imshow(I, []);              % plage [min max] : tout le contraste
+     imshow(I > 128);            % noir et blanc
 
-  Voir aussi IMREAD.
+  Voir aussi IMAGE, IMAGESC, COLORMAP, CLIM, IMREAD.
 ```
 
 ## `imsplit`
@@ -1853,9 +1877,14 @@ IMWRITE Écrit une image au format PGM (gris) ou PPM (couleur).
   Ces deux formats sont du texte : aucune bibliothèque externe n'est
   nécessaire, et tous les visionneurs les lisent.
 
+  IMWRITE(X,FICHIER) prend le format de l'extension ; IMWRITE(X,FICHIER,
+  FORMAT) le donne. Seuls 'pgm', 'ppm' et 'pnm' s'écrivent : un autre
+  format — PNG, JPEG, TIFF, BMP — est refusé en le disant, plutôt que
+  d'écrire un PGM sous un nom qui annonce autre chose.
+
   Exemple :
-     imwrite(uint8(magic(8) * 4), 'essai.pgm');
-     max(max(abs(double(imread('essai.pgm')) - magic(8) * 4)))   % 0 : rien ne se perd
+     imwrite(uint8(magic(8) * 3), 'essai.pgm');
+     max(max(abs(double(imread('essai.pgm')) - magic(8) * 3)))   % 0 : rien ne se perd
 
   Voir aussi IMREAD, IMSHOW.
 ```
@@ -1890,6 +1919,41 @@ IND2RGB Image indexée vers image en couleurs.
      size(rgb)                       % 8 8 3
 
   Voir aussi GRAY2RGB, RGB2GRAY, COLORMAP.
+```
+
+## `iradon`
+
+```
+IRADON Transformée de Radon inverse, par rétroprojection filtrée.
+  I = IRADON(R,THETA) reconstruit une image à partir des projections R
+  (une colonne par angle, comme celles de RADON) prises aux angles THETA,
+  en degrés ; THETA peut aussi être l'écart entre deux angles, pris alors
+  à partir de zéro.
+  I = IRADON(R,THETA,INTERP,FILTRE,ECHELLE,TAILLE) précise, comme
+  MATLAB :
+     INTERP   'linear' (défaut) ou 'nearest' : l'interpolation de la
+              rétroprojection
+     FILTRE   'Ram-Lak' (défaut), 'Shepp-Logan', 'Cosine', 'Hamming',
+              'Hann' ou 'None'
+     ECHELLE  la part de la bande gardée, entre 0 et 1 (1 par défaut)
+     TAILLE   le côté de l'image (2*floor(size(R,1)/(2*sqrt(2))) par défaut)
+  [I,H] = IRADON(...) rend aussi la réponse en fréquence du filtre.
+
+  Chaque projection est filtrée par la rampe |f|, construite dans le
+  domaine spatial (Kak et Slaney, Principles of Computerized Tomographic
+  Imaging, chapitre 3 : h(0) = 1/4, h(n) = -1/(n pi)^2 pour n impair,
+  zéro pour n pair) et appliquée sur des projections complétées de zéros
+  jusqu'à une puissance de deux au moins double, ce qui évite le
+  repliement circulaire et le décalage du continu. Les projections
+  filtrées sont ensuite rétroprojetées et sommées, au facteur pi/(2 N)
+  près pour N angles.
+
+  Exemple :
+     P = phantom(64);
+     I = iradon(radon(P, 0:179), 0:179, 'linear', 'Ram-Lak', 1, 64);
+     sqrt(mean((I(:) - P(:)) .^ 2))  % petit
+
+  Voir aussi RADON, PHANTOM.
 ```
 
 ## `lab2rgb`
@@ -1949,7 +2013,7 @@ LIN2RGB Applique la correction gamma de sRGB.
   Réciproque exacte de RGB2LIN.
 
   Exemple :
-     lin2rgb(0.214)   % 0.4999
+     lin2rgb(0.214)   % 0.5000
 
   Voir aussi RGB2LIN, XYZ2RGB.
 ```
@@ -2176,6 +2240,27 @@ PADARRAY Ajoute une bordure à un tableau.
   Voir aussi IMFILTER, IMRESIZE, IMTRANSLATE.
 ```
 
+## `phantom`
+
+```
+PHANTOM Fantôme de Shepp et Logan, ou image d'ellipses.
+  P = PHANTOM(N) rend le fantôme de tête de Shepp et Logan modifié (Toft,
+  1996) sur une grille N x N (256 par défaut), comme MATLAB : dix
+  ellipses dont les densités s'ajoutent.
+  P = PHANTOM(DEF,N) choisit le fantôme : 'Modified Shepp-Logan'
+  (défaut, contrastes relevés pour l'affichage) ou 'Shepp-Logan'
+  (l'original de 1974) ; DEF peut aussi être une matrice d'ellipses, une
+  ligne [A a b x0 y0 phi] par ellipse : densité, demi-axes, centre et
+  angle en degrés, sur le carré [-1,1] x [-1,1].
+  [P,E] = PHANTOM(...) rend aussi la matrice des ellipses.
+
+  Exemple :
+     P = phantom(128);
+     [max(P(:)) min(P(:))]           % 1 et 0
+
+  Voir aussi RADON, IRADON.
+```
+
 ## `poly2mask`
 
 ```
@@ -2210,6 +2295,32 @@ PSNR Rapport signal sur bruit de crête, en décibels.
   Voir aussi SSIM, IMMSE, IMNOISE.
 ```
 
+## `radon`
+
+```
+RADON Transformée de Radon : les projections d'une image.
+  R = RADON(I,THETA) rend, pour chaque angle THETA (en degrés, 0:179 par
+  défaut), la projection de l'image I : la somme de ses valeurs le long
+  des droites perpendiculaires à la direction THETA, comptée dans le sens
+  trigonométrique depuis l'axe des x. R a une colonne par angle.
+  [R,XP] = RADON(...) rend aussi les abscisses radiales, en pixels,
+  comptées depuis le pixel central floor((size(I)+1)/2).
+
+  Comme MATLAB, chaque pixel est partagé en quatre sous-pixels, et chacun
+  répartit sa valeur entre les deux casiers les plus proches de sa
+  projection, au prorata de la distance. Ce partage évite le crénelage
+  d'un simple arrondi, qui fait osciller les projections d'un casier à
+  l'autre aux angles obliques. La somme de chaque projection vaut celle
+  de l'image.
+
+  Exemple :
+     P = phantom(64);
+     [R, xp] = radon(P, 0:179);
+     max(abs(sum(R) - sum(P(:))))    % ~0 : chaque projection garde la masse
+
+  Voir aussi IRADON, PHANTOM, FANBEAM.
+```
+
 ## `rangefilt`
 
 ```
@@ -2234,8 +2345,9 @@ REGIONPROPS Mesures sur les régions d'une image étiquetée.
   'EquivDiameter', 'Extent', 'FilledArea', 'all'.
 
   Exemple :
-     s = regionprops(bwlabel([1 1 0; 1 1 0; 0 0 1]));
+     s = regionprops(bwlabel([1 1 0 0; 1 1 0 0; 0 0 0 1]));
      s(1).Area   % 4
+     s(2).Area   % 1 : le pixel isole
 
   Voir aussi BWLABEL, BWCONNCOMP, BWAREAFILT.
 ```
@@ -2313,7 +2425,7 @@ RGB2LAB Passage de sRGB à L*a*b*.
   perçues.
 
   Exemple :
-     rgb2lab([1 1 1])   % [100 0 0]
+     rgb2lab([1 1 1])   % [100.0000 0.0000 0.0000] : le blanc
 
   Voir aussi LAB2RGB, RGB2XYZ, XYZ2LAB.
 ```
@@ -2531,8 +2643,14 @@ WHITEPOINT Coordonnées XYZ d'un blanc de référence.
   XYZ = WHITEPOINT(NOM) où NOM vaut 'ICC' (par défaut), 'D50', 'D55',
   'D65', 'A' ou 'C'. Le blanc est normalisé à Y = 1.
 
+  Le D65 n'a pas une valeur unique : selon la source, sa cinquième
+  décimale change. MATLAB documente [0.9504 1.0000 1.0888] ; on prend
+  ici la somme des lignes de la matrice sRGB (BT.709), si bien que le
+  blanc sRGB tombe sur a* = b* = 0 au lieu d'en être écarté d'un
+  centième.
+
   Exemple :
-     whitepoint('d65')   % [0.9504 1.0000 1.0888]
+     whitepoint('d65')   % [0.9505 1.0000 1.0888]
 
   Voir aussi XYZ2LAB, ADAPTERBLANC, RGB2XYZ.
 ```

@@ -47,6 +47,15 @@ function varargout = matlibre_sl_signaux(action, varargin)
             varargout{1} = journal(varargin{:});
         case 'defauts'
             varargout{1} = defauts();
+        case 'numero'
+            % H = MATLIBRE_SL_SIGNAUX('numero',CLE) : la poignée d'une clé
+            % « modele|chemin|genre|rang » — un port, mais aussi un bloc,
+            % une ligne ou un modèle, pour MATLIBRE_SL_NOMME.
+            varargout{1} = registre('numero', varargin{1});
+        case 'cle'
+            % CLE = MATLIBRE_SL_SIGNAUX('cle',H) : la clé d'une poignée,
+            % '' si le nombre n'en est pas une.
+            varargout{1} = registre('cle', varargin{1});
         case 'nom'
             % NOM = MATLIBRE_SL_SIGNAUX('nom',BLOC,PORT) : le nom du signal
             % qui part du port de sortie PORT, '' s'il n'en a pas.
@@ -115,13 +124,13 @@ end
 function [nomModele, chemin, genre, port] = decoder(h)
     if ~(isnumeric(h) && isscalar(h))
         error('Simulink:Commands:InvalidPortHandle', ...
-              'Une poignee de port est un nombre, que rend GET_PARAM(M,BLOC,''PortHandles'').');
+              'A port handle is a number, as returned by GET_PARAM(M,BLOCK,''PortHandles'').');
     end
     cle = registre('cle', double(h));
     if isempty(cle)
         error('Simulink:Commands:InvalidPortHandle', ...
-              ['%s n''est pas une poignee de port : GET_PARAM(M,BLOC,''PortHandles'') ' ...
-               'les rend.'], num2str(h, 10));
+              ['%s is not a port handle: GET_PARAM(M,BLOCK,''PortHandles'') ' ...
+               'returns them.'], num2str(h, 10));
     end
     morceaux = strsplit(cle, '|');
     nomModele = morceaux{1};
@@ -169,7 +178,7 @@ function bloc = blocDe(modele, chemin)
     k = find(cellfun(@(b) strcmp(char(b.nom), feuille), systeme.blocs), 1);
     if isempty(k)
         error('Simulink:Commands:InvSimulinkObjectName', ...
-              'Nom d''objet Simulink invalide : le modele ''%s'' n''a pas de bloc ''%s''.', ...
+              'Invalid Simulink object name: model ''%s'' has no block ''%s''.', ...
               char(modele.nom), chemin);
     end
     bloc = systeme.blocs{k};
@@ -193,12 +202,12 @@ function modele = poser(modele, h, varargin)
     verifierModele(modele, nomModele, h);
     if mod(numel(varargin), 2) ~= 0 || isempty(varargin)
         error('Simulink:Commands:SetParamArguments', ...
-              'SET_PARAM(M,PORT,NOM,VALEUR,...) : les reglages vont par paires.');
+              'SET_PARAM(M,PORT,NAME,VALUE,...): parameters must be name-value pairs.');
     end
     if ~strcmp(genre, 'outport')
         error('Simulink:Commands:ParamReadOnly', ...
-              ['Le port d''entree %d du bloc ''%s/%s'' ne porte pas de reglage : un ' ...
-               'signal se regle sur le port de sortie d''ou il part.'], port, nomModele, chemin);
+              ['Input port %d of block ''%s/%s'' has no parameters: a ' ...
+               'signal is configured on the output port it comes from.'], port, nomModele, chemin);
     end
     [parent, feuille] = decouper(modele, chemin);
     if isempty(parent)
@@ -213,7 +222,7 @@ end
 function verifierModele(modele, nomModele, h)
     if ~strcmp(char(modele.nom), nomModele)
         error('Simulink:Commands:InvalidPortHandle', ...
-              'La poignee %s designe un port du modele ''%s'', pas du modele ''%s''.', ...
+              'Handle %s refers to a port of model ''%s'', not of model ''%s''.', ...
               num2str(h, 10), nomModele, char(modele.nom));
     end
 end
@@ -222,14 +231,14 @@ function systeme = poserSurBloc(systeme, feuille, port, couples, nomModele, chem
     k = find(cellfun(@(b) strcmp(char(b.nom), feuille), systeme.blocs), 1);
     if isempty(k)
         error('Simulink:Commands:InvSimulinkObjectName', ...
-              'Nom d''objet Simulink invalide : le modele ''%s'' n''a plus de bloc ''%s''.', ...
+              'Invalid Simulink object name: model ''%s'' no longer has a block ''%s''.', ...
               nomModele, chemin);
     end
     bloc = systeme.blocs{k};
     [~, ns] = matlibre_sl_ports(bloc);
     if ~isnan(ns) && port > ns
         error('Simulink:Commands:InvalidPortHandle', ...
-              'Le bloc ''%s/%s'' n''a plus que %d port(s) de sortie.', nomModele, chemin, ns);
+              'Block ''%s/%s'' now has only %d output port(s).', nomModele, chemin, ns);
     end
     reglage = reglageDe(bloc, port);
     admis = fieldnames(defauts());
@@ -241,8 +250,8 @@ function systeme = poserSurBloc(systeme, feuille, port, couples, nomModele, chem
         end
         if isempty(j)
             error('Simulink:Commands:ParamUnknown', ...
-                  ['Le port de sortie %d du bloc ''%s/%s'' n''a pas de reglage ''%s'' ; ' ...
-                   'ses reglages sont : %s.'], port, nomModele, chemin, texte(nom), ...
+                  ['Output port %d of block ''%s/%s'' has no parameter ''%s''; ' ...
+                   'its parameters are: %s.'], port, nomModele, chemin, texte(nom), ...
                   strjoin(admis.', ', '));
         end
         reglage.(admis{j}) = valider(admis{j}, couples{i + 1}, nomModele, chemin, port);
@@ -260,7 +269,7 @@ function t = texte(v)
 end
 
 function v = valider(nom, v, nomModele, chemin, port)
-    ou = sprintf('du port de sortie %d du bloc ''%s/%s''', port, nomModele, chemin);
+    ou = sprintf('of output port %d of block ''%s/%s''', port, nomModele, chemin);
     switch nom
         case {'Name', 'DataLoggingName'}
             if isstring(v) && isscalar(v)
@@ -268,7 +277,7 @@ function v = valider(nom, v, nomModele, chemin, port)
             end
             if ~(ischar(v) && (isempty(v) || isrow(v)))
                 error('Simulink:Commands:SetParamInvalidValue', ...
-                      'Le reglage %s %s est un texte.', nom, ou);
+                      '%s %s must be text.', nom, ou);
             end
         case {'DataLogging', 'DataLoggingDecimateData', 'DataLoggingLimitDataPoints', ...
               'TestPoint'}
@@ -282,7 +291,7 @@ function v = valider(nom, v, nomModele, chemin, port)
             end
             if ~(isnumeric(n) && isscalar(n) && isreal(n) && n >= 1 && n == round(n))
                 error('Simulink:Commands:SetParamInvalidValue', ...
-                      'Le reglage %s %s est un entier au moins egal a 1.', nom, ou);
+                      '%s %s must be an integer greater than or equal to 1.', nom, ou);
             end
             v = sprintf('%d', n);
     end
@@ -298,7 +307,7 @@ function v = choix(v, admis, nom, ou)
     end
     if isempty(k)
         error('Simulink:Commands:SetParamInvalidValue', ...
-              'Le reglage %s %s vaut %s.', nom, ou, strjoin(strcat('''', admis, ''''), ' ou '));
+              '%s %s must be %s.', nom, ou, strjoin(strcat('''', admis, ''''), ' or '));
     end
     v = admis{k};
 end
@@ -372,8 +381,8 @@ function valeur = lire(modele, h, nom)
     j = find(strcmpi(nom, admis), 1);
     if isempty(j)
         error('Simulink:Commands:ParamUnknown', ...
-              ['Le port %d du bloc ''%s/%s'' n''a pas de reglage ''%s'' ; ses reglages ' ...
-               'sont : %s, PortType, PortNumber, Parent, Handle.'], port, nomModele, chemin, ...
+              ['Port %d of block ''%s/%s'' has no parameter ''%s''; its parameters ' ...
+               'are: %s, PortType, PortNumber, Parent, Handle.'], port, nomModele, chemin, ...
               nom, strjoin(admis.', ', '));
     end
     if strcmp(genre, 'inport')

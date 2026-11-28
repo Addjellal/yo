@@ -26,7 +26,7 @@ function modele = etfe(donnees, M, N)
     y = jeu.OutputData;
     u = jeu.InputData;
     if isempty(u)
-        error('ident:etfe:Entree', 'ETFE demande une entrée.');
+        error('ident:etfe:Entree', 'ETFE requires input data.');
     end
     if nargin >= 2 && ~isempty(M) && isfinite(M)
         modele = spa(jeu, M);

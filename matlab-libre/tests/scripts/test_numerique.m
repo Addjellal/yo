@@ -523,6 +523,39 @@ assert(isequal(interp1([0 2], [1 10; 3 30], [0.5; 1]), [1.5 15; 2 20]));
 assert(isequal(interp1([0; 1; 2], [0 0; 1 10; 4 40], 1.5, 'previous'), [1 10]));
 assert(isequal(size(interp1([0 1], [1 2 3; 4 5 6], [0 0.5 1])), [3 3]));
 
+%% --------------------------------------------- le generateur de MATLAB
+% rng(0) doit rendre les nombres de MATLAB : ceux des exemples de sa
+% documentation. MT19937 (la graine 0 vaut 5489), doubles sur 53 bits,
+% randn par le ziggurat a 256 bandes de Marsaglia et Tsang.
+rng(0);
+assert(max(abs(rand(1, 5) - [0.8147 0.9058 0.1270 0.9134 0.6324])) < 5e-5);
+rng default;
+assert(isequal(randi(10, 1, 5), [9 10 2 10 7]));
+rng default;
+assert(isequal(randperm(8), [6 3 7 8 5 1 2 4]));
+rng(0);
+assert(max(abs(randn(1, 10) - [0.5377 1.8339 -2.2588 0.8622 0.3188 -1.3077 ...
+                               -0.4336 0.3426 3.5784 2.7694])) < 5e-5);
+rng(1);
+assert(abs(rand - 0.417022004702574) < 1e-15);
+etatAleatoire = rng;
+premiers = rand(1, 3);
+rng(etatAleatoire);
+assert(isequal(rand(1, 3), premiers) && isequal(size(etatAleatoire.State), [625 1]));
+% Les branches de rejet du ziggurat (queue, coins), que la documentation
+% ne couvre pas, donnent bien une loi normale : ecart de Kolmogorov.
+rng(5);
+tirages = sort(randn(2e5, 1));
+cdfEmpirique = (1:2e5)' / 2e5;
+assert(max(abs(cdfEmpirique - 0.5 * erfc(-tirages / sqrt(2)))) < 4e-3);
+refusGenerateur = false;
+try
+    rng(0, 'philox');
+catch
+    refusGenerateur = true;
+end
+assert(refusGenerateur);
+
 disp('numerique : toutes les verifications passent');
 
 function [valeur, arret, sens] = evenementSol(t, y)

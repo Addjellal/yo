@@ -27,7 +27,7 @@ function c = tensorprod(a, b, dimA, dimB)
     if nargin == 3 && (ischar(dimA) || isstring(dimA)) && strcmpi(char(dimA), 'all')
         if ~isequal(size(a), size(b))
             error('MATLAB:tensorprod:SizeMismatch', ...
-                  'Contracter toutes les dimensions demande des tailles égales.');
+                  'Contracting all dimensions requires equal sizes.');
         end
         c = sum(a(:) .* b(:));
         return
@@ -40,13 +40,13 @@ function c = tensorprod(a, b, dimA, dimB)
     dimB = double(dimB(:))';
     if numel(dimA) ~= numel(dimB)
         error('MATLAB:tensorprod:DimMismatch', ...
-              'Il faut autant de dimensions contractées de chaque côté.');
+              'Both inputs must have the same number of contracted dimensions.');
     end
     formeA = tailleEtendue(a, max([ndims(a), dimA]));
     formeB = tailleEtendue(b, max([ndims(b), dimB]));
     if ~isequal(formeA(dimA), formeB(dimB))
         error('MATLAB:tensorprod:SizeMismatch', ...
-              'Les dimensions contractées doivent être de mêmes tailles.');
+              'Contracted dimensions must have the same sizes.');
     end
     libresA = setdiff(1:numel(formeA), dimA);
     libresB = setdiff(1:numel(formeB), dimB);

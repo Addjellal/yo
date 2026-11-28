@@ -42,6 +42,12 @@ function [gainMarge, phaseMarge, wGain, wPhase] = margin(varargin)
             f = dB(k) / (dB(k) - dB(k+1));
             wPhase = w(k) + f * (w(k+1) - w(k));
             phaseMarge = 180 + p(k) + f * (p(k+1) - p(k));
+            if ~isempty(sys)
+                % La grille ne fait que situer la traversée : elle se
+                % lit ensuite sur la réponse exacte, par dichotomie.
+                [wPhase, ph] = matlibre_traversee(sys, 'gain', 0, w(k), w(k+1), p(k), p(k+1));
+                phaseMarge = 180 + ph;
+            end
             break;
         end
     end
@@ -53,6 +59,11 @@ function [gainMarge, phaseMarge, wGain, wPhase] = margin(varargin)
             f = (p(k) + 180) / (p(k) - p(k+1));
             wGain = w(k) + f * (w(k+1) - w(k));
             gainMarge = 10 ^ (-(dB(k) + f * (dB(k+1) - dB(k))) / 20);
+            if ~isempty(sys)
+                [wGain, ~, module] = matlibre_traversee(sys, 'phase', -180, w(k), w(k+1), ...
+                                                        p(k), p(k+1));
+                gainMarge = 1 / module;
+            end
             break;
         end
     end
@@ -66,22 +77,22 @@ function [gainMarge, phaseMarge, wGain, wPhase] = margin(varargin)
         axes(haut);
         semilogx(w, dB);
         grid on;
-        ylabel('Gain (dB)');
+        ylabel('Magnitude (dB)');
         if isfinite(gainMarge)
-            titre = sprintf('Gm = %.3g dB (a %.3g rad/s)', 20 * log10(gainMarge), wGain);
+            titre = sprintf('Gm = %.3g dB (at %.3g rad/s)', 20 * log10(gainMarge), wGain);
         else
             titre = 'Gm = Inf';
         end
         if isfinite(phaseMarge)
-            titre = sprintf('%s,  Pm = %.3g deg (a %.3g rad/s)', titre, phaseMarge, wPhase);
+            titre = sprintf('%s ,  Pm = %.3g deg (at %.3g rad/s)', titre, phaseMarge, wPhase);
         else
-            titre = [titre ',  Pm = Inf'];
+            titre = [titre ' ,  Pm = Inf'];
         end
         title(titre);
         axes(bas);
         semilogx(w, p);
         grid on;
-        xlabel('Pulsation (rad/s)');
+        xlabel('Frequency (rad/s)');
         ylabel('Phase (deg)');
         clear gainMarge phaseMarge wGain wPhase
     end

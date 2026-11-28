@@ -23,7 +23,7 @@ classdef withtol
         function w = withtol(temps, tolerance)
             if nargin < 2
                 error('MATLAB:withtol:NotEnoughInputs', ...
-                      'Il faut des instants et une tolérance.');
+                      'Not enough input arguments.');
             end
             w.Temps = temps;
             w.Tolerance = tolerance;

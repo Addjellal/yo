@@ -48,7 +48,7 @@ function f = facteurTemps(unite)
         case {'months'},                f = 2629800;
         case {'years'},                 f = 31557600;
         otherwise
-            error('control:chgTimeUnit:Unite', 'Unité inconnue : %s.', char(unite));
+            error('control:chgTimeUnit:Unite', 'Unknown unit: %s.', char(unite));
     end
 end
 

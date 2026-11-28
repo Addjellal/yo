@@ -28,6 +28,9 @@
 #include <QAction>
 #include <QToolBar>
 #include <QListWidget>
+#include <QMessageBox>
+#include <QPointer>
+#include <QAbstractButton>
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -105,6 +108,7 @@ int main(int argc, char** argv) {
 
     QTemporaryDir travail;
     if (travail.isValid()) QDir::setCurrent(travail.path());
+    const QString dossierTravail = QDir::currentPath();
 
     std::printf("--- bureau ---\n");
     FenetrePrincipale fenetre;
@@ -168,6 +172,16 @@ int main(int argc, char** argv) {
     envoyer(fenetre, QStringLiteral("undefinedThing(3)"));
     verifier(attendre([&] { return console->toPlainText().contains(QLatin1String("Error")); }),
              "une erreur s'affiche au lieu de tuer la fenetre");
+    // Une faute de frappe : comme MATLAB, la commande corrigee attend dans
+    // la saisie, et Entree l'executerait.
+    envoyer(fenetre, QStringLiteral("dispp(max(y))"));
+    verifier(attendre([&] {
+                 return console->toPlainText().contains(QLatin1String("Did you mean:"));
+             }),
+             "une faute de frappe appelle « Did you mean: »");
+    verifier(attendre([&] { return console->commandeEnCours() == QLatin1String("disp(max(y))"); }),
+             "la commande corrigee attend dans la saisie");
+    // La commande suivante remplace la proposition au lieu de s'y coller.
     envoyer(fenetre, QStringLiteral("apresErreur = 42;"));
     verifier(attendre([&] { return ligneDe(QStringLiteral("apresErreur")) >= 0; }),
              "l'interpreteur repond encore apres une erreur");
@@ -718,6 +732,13 @@ int main(int argc, char** argv) {
         int repliesLarge = nombreReplies(fenetre);
         verifier(aucunLibelleRogne(fenetre), "au large, aucun libelle du ruban n'est rogne");
 
+        // La cause de l'ancien echec : le ruban exigeait la largeur de ses
+        // groupes deployes, si bien que la fenetre ne pouvait pas devenir
+        // plus etroite que lui — et qu'il ne se repliait donc jamais.
+        if (Ruban* ruban = fenetre.findChild<Ruban*>())
+            verifier(ruban->minimumSizeHint().width() < ruban->sizeHint().width(),
+                     "le ruban se contente de ses groupes replies comme largeur minimale");
+
         fenetre.resize(760, avant.height());
         QCoreApplication::processEvents();
         int repliesEtroit = nombreReplies(fenetre);
@@ -821,10 +842,14 @@ int main(int argc, char** argv) {
         std::printf("  (premier texte apres %lld ms)\n",
                     (long long)chronoAffichage.elapsed());
         // Et la fenetre repond toujours, sous le flot : c'est ce qui
-        // permet au Ctrl-C d'arriver jusqu'au moteur.
+        // permet au Ctrl-C d'arriver jusqu'au moteur. Plus de cinq tours
+        // de la boucle d'evenements en une seconde : sur une machine
+        // chargee (l'integration continue), un tour qui insere un gros
+        // paquet de texte en prend parfois 50 ms, et une fenetre de 200 ms
+        // echouait sans que rien ne soit fige.
         tours = 0;
         patience.restart();
-        while (patience.elapsed() < 200) {
+        while (patience.elapsed() < 1000) {
             QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
             ++tours;
         }
@@ -1219,6 +1244,17 @@ int main(int argc, char** argv) {
         verifier(QString::fromUtf8(relu.readAll()).contains(QLatin1String("ne pas effacer")),
                  "un fichier existant n'est pas ecrase");
         relu.close();
+        // Revenir au dossier de travail avant que « bac » ne soit efface :
+        // sinon le bureau reste dans un dossier qui n'existe plus, getcwd
+        // echoue, et la suite ecrit ses fichiers a la racine du disque — ce
+        // que seul l'administrateur peut faire. Le conteneur de
+        // developpement l'etant, cela passait ; sur le runner de
+        // l'integration continue, « les blocs de la bibliotheque se
+        // simulent tous » echouait sur « Unable to find file
+        // '/essaiBlocs.m' ».
+        envoyer(fenetre, QStringLiteral("cd('%1')").arg(dossierTravail));
+        verifier(attendre([&] { return !fenetre.occupe(); }),
+                 "le bureau revient a son dossier de travail");
     }
 
     // --- Ctrl-F : rechercher et remplacer ---------------------------------
@@ -1335,6 +1371,10 @@ int main(int argc, char** argv) {
         console->effacer();
         envoyer(fenetre, QStringLiteral("clear resultatDeLEssai"));
         verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        // Comme plus haut : revenir au dossier de travail avant d'effacer « bac ».
+        envoyer(fenetre, QStringLiteral("cd('%1')").arg(dossierTravail));
+        verifier(attendre([&] { return !fenetre.occupe(); }),
+                 "le bureau revient a son dossier de travail");
     }
 
     // Une capture, pour qu'un humain puisse regarder ce qui a ete construit.
@@ -1401,16 +1441,27 @@ int main(int argc, char** argv) {
                  "la figure des surfaces remplies s'ouvre");
         if (vuePatch) {
             vuePatch->resize(600, 400);
-            QCoreApplication::processEvents();
             QImage image(600, 400, QImage::Format_ARGB32);
-            image.fill(Qt::white);
-            vuePatch->render(&image);
             // Le polygone blanc doit garder son contour : de l'encre
-            // sombre quelque part dans sa moitie de l'image.
+            // sombre quelque part dans sa moitie de l'image. La fenetre
+            // parait avant que son contenu n'arrive du fil de calcul : on
+            // attend qu'il soit peint. Et le trait, d'un pixel, peut tomber
+            // a cheval sur deux colonnes : lisse, il donne alors deux
+            // pixels gris a moitie (qGray ~ 128), que le seuil de 100
+            // d'avant ne comptait pas — le test echouait ou passait selon
+            // l'alignement au sous-pixel du carre. Un contour absent, ou
+            // pris sur la couleur du fond, ne laisse lui aucun pixel sous
+            // 200.
             int sombres = 0;
-            for (int y = 0; y < 400; ++y)
-                for (int x = 0; x < 300; ++x)
-                    if (qGray(image.pixel(x, y)) < 100) ++sombres;
+            attendre([&] {
+                image.fill(Qt::white);
+                vuePatch->render(&image);
+                sombres = 0;
+                for (int y = 0; y < 400; ++y)
+                    for (int x = 0; x < 300; ++x)
+                        if (qGray(image.pixel(x, y)) < 200) ++sombres;
+                return sombres > 200;
+            }, 5000);
             verifier(sombres > 200,
                      "un polygone blanc garde le contour noir qu'on lui a donne");
             // Le polygone rouge doit etre franc, non delave : au centre,
@@ -1704,6 +1755,10 @@ end
             sortie = console->toPlainText().mid(avant);
             verifier(sortie.contains(QLatin1String("TOUS LES BLOCS OK")),
                      "et se simulent tous : la bibliotheque ne propose rien qui n'existe");
+            // En cas d'echec, ce que la console a dit : sans cela, le journal
+            // d'une integration continue ne montre pas quel bloc a echoue.
+            if (!sortie.contains(QLatin1String("TOUS LES BLOCS OK")))
+                std::printf("--- console ---\n%s\n", sortie.right(3000).toUtf8().constData());
             QFile::remove(fichierTous);
             QFile::remove(fichierReseau);
 
@@ -2007,6 +2062,17 @@ end
                              contenu.contains(QLatin1String("add_block")),
                          "et il rebatit le modele, bloc par bloc");
 
+                // Comme dans Simulink, un modele neuf part du solveur
+                // automatique a pas variable. Le programme engendre integre
+                // par Euler et demande, comme Simulink Coder, un pas fixe :
+                // on choisit ode1 dans la barre, qui le pose sur le modele.
+                verifier(simulink->choixSolveur()->currentText() ==
+                             QLatin1String("VariableStepAuto"),
+                         "la barre montre le solveur d'un modele neuf, VariableStepAuto");
+                simulink->choixSolveur()->setCurrentIndex(
+                    simulink->choixSolveur()->findText(QStringLiteral("ode1")));
+                verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                         "le choix de ode1 passe");
                 simulink->genererVers(cheminProgramme);
                 verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
                          "la generation passe");
@@ -2317,8 +2383,8 @@ end
                          simulink->choixSolveur()->findText(QStringLiteral("ode5")) >= 0,
                      "la barre offre les solveurs a pas fixe, ode5 compris");
             verifier(simulink->choixSolveur()->currentText() ==
-                         QLatin1String("ode1"),
-                     "et montre celui du modele, ode1 par defaut");
+                         QLatin1String("VariableStepAuto"),
+                     "et montre celui du modele relu, VariableStepAuto comme dans Simulink");
             commandeVue.clear();
             simulink->choixSolveur()->setCurrentIndex(
                 simulink->choixSolveur()->findText(QStringLiteral("ode4")));
@@ -2903,6 +2969,57 @@ end
             verifier(simulink->cheminOuvert().isEmpty(), "et l'on remonte");
             envoyer(fenetre, QStringLiteral("clear modeleEmboite"));
             verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est net");
+        }
+    }
+
+    // La coche « Afficher le ruban » dit si le ruban est visible : elle
+    // partait decochee, ruban affiche.
+    {
+        auto* action = fenetre.findChild<QAction*>(QStringLiteral("afficherRuban"));
+        verifier(action != nullptr && action->isChecked(),
+                 "« Afficher le ruban » est coche quand le ruban est visible");
+        if (action) {
+            action->trigger();
+            verifier(!action->isChecked(), "decocher l'entree le masque");
+            action->trigger();
+            verifier(action->isChecked(), "et la recocher le rend");
+        }
+    }
+
+    // Un onglet modifie ne se ferme pas sans qu'on l'ait dit : la croix
+    // de l'onglet le supprimait, et le travail avec. « Annuler » le garde,
+    // « Ne pas enregistrer » le ferme.
+    {
+        fenetre.ouvrirNouveauScript();
+        QTabWidget* onglets = nullptr;
+        for (auto* t : fenetre.findChildren<QTabWidget*>())
+            if (qobject_cast<Editeur*>(t->currentWidget())) onglets = t;
+        verifier(onglets != nullptr, "les onglets de l'editeur se trouvent");
+        if (onglets) {
+            QPointer<Editeur> editeur = qobject_cast<Editeur*>(onglets->currentWidget());
+            editeur->insertPlainText(QStringLiteral("x = 1;"));
+            verifier(editeur->document()->isModified(), "l'editeur est modifie");
+            // Repond a la boite de dialogue des qu'elle paraît.
+            auto repondre = [](QMessageBox::StandardButton bouton) {
+                auto* minuteur = new QTimer;
+                minuteur->setInterval(10);
+                QObject::connect(minuteur, &QTimer::timeout, [minuteur, bouton] {
+                    auto* boite = qobject_cast<QMessageBox*>(QApplication::activeModalWidget());
+                    if (!boite || !boite->button(bouton)) return;
+                    minuteur->stop();
+                    minuteur->deleteLater();
+                    boite->button(bouton)->click();
+                });
+                minuteur->start();
+            };
+            const int avant = onglets->count();
+            repondre(QMessageBox::Cancel);
+            emit onglets->tabCloseRequested(onglets->indexOf(editeur));
+            verifier(!editeur.isNull() && onglets->count() == avant,
+                     "« Annuler » garde l'onglet modifie");
+            repondre(QMessageBox::Discard);
+            emit onglets->tabCloseRequested(onglets->indexOf(editeur));
+            verifier(editeur.isNull(), "« Ne pas enregistrer » ferme l'onglet");
         }
     }
 

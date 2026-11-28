@@ -18,8 +18,11 @@ namespace {
 
 using Horloge = std::chrono::steady_clock;
 
+// Propre au fil, comme chaque travailleur de MATLAB a son tic : les fils
+// d'un parfor écrivaient sinon le même instant de départ, sans verrou, et
+// le tic de l'un faussait le toc de l'autre.
 Horloge::time_point& depart() {
-    static Horloge::time_point t = Horloge::now();
+    static thread_local Horloge::time_point t = Horloge::now();
     return t;
 }
 

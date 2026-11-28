@@ -40,6 +40,13 @@ function [y, t, x] = lsim(sys, u, t, x0)
     end
     u = entreeEnColonnes(u, N, nu);
     dt = t(2) - t(1);
+    % Le calcul avance d'un pas fixe : des instants inégalement espacés
+    % donneraient une réponse fausse, sans le dire. MATLAB les refuse.
+    if ~(dt > 0) || any(abs(diff(t) - dt) > 1e-6 * dt)
+        error('Control:analysis:NonUniformTimeVector', ...
+              ['The time vector must be real, finite, and must contain monotonically ' ...
+               'increasing and evenly spaced time samples.']);
+    end
     [Ad, Bd] = discretiser(s, dt);
 
     % Les retards se decomposent voie par voie : celui d'entree retarde ce
@@ -131,7 +138,7 @@ function u = entreeEnColonnes(u, N, nu)
     if nu == 1
         if numel(u) ~= N
             error('Control:analysis:LsimInputSize', ...
-                  'U doit porter une valeur par instant : %d attendues, %d recues.', ...
+                  'U must have one value per time sample: %d expected, %d received.', ...
                   N, numel(u));
         end
         u = u(:);
@@ -145,8 +152,8 @@ function u = entreeEnColonnes(u, N, nu)
         return
     end
     error('Control:analysis:LsimInputSize', ...
-          ['U doit porter une colonne par entree et une ligne par instant : ' ...
-           '%d x %d attendu, %d x %d recu.'], N, nu, size(u, 1), size(u, 2));
+          ['U must have one column per input and one row per time sample: ' ...
+           '%d-by-%d expected, %d-by-%d received.'], N, nu, size(u, 1), size(u, 2));
 end
 
 function v = decaler(t, v, retard)

@@ -24,7 +24,7 @@ function [W, H, D] = nnmf(A, k, varargin)
 %   Voir aussi PCA, SVD, KMEANS, FACTORAN.
     A = double(A);
     if any(A(:) < 0)
-        error('stats:nnmf:Negatif', 'A ne doit porter aucune valeur négative.');
+        error('stats:nnmf:Negatif', 'A must not contain negative values.');
     end
     [n, p] = size(A);
     k = round(k);

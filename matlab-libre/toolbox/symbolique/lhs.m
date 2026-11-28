@@ -12,7 +12,7 @@ function r = lhs(equation)
     equation = sym(equation);
     if ~strcmp(equation.arbre{1}, '=')
         error('symbolic:lhs:pasUneEquation', ...
-              'LHS attend une équation, avec ses deux membres.');
+              'LHS requires an equation with two sides.');
     end
     r = sym(equation.arbre{2});
 end

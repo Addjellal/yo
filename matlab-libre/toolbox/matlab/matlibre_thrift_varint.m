@@ -17,7 +17,7 @@ function octets = matlibre_thrift_varint(n)
     n = double(n);
     if n < 0 || n ~= floor(n)
         error('MATLAB:parquet:Varint', ...
-              'Un varint code un entier positif ; %g n''en est pas un.', n);
+              'A varint encodes a nonnegative integer; %g is not one.', n);
     end
     octets = uint8([]);
     while true

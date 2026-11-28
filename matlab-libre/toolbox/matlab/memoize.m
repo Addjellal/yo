@@ -20,7 +20,7 @@ function mf = memoize(f)
 %   Voir aussi FUNCTION_HANDLE, CONTAINERS.MAP, TIC, TOC.
     if ~isa(f, 'function_handle')
         error('MATLAB:memoize:NotAFunctionHandle', ...
-              'memoize attend une poignée de fonction.');
+              'Input must be a function handle.');
     end
     mf = MemoizedFunction(f);
 end

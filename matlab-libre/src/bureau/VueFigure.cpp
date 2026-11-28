@@ -1,104 +1,172 @@
-// VueFigure.cpp — le rendu des tracés.
+// VueFigure.cpp — la figure peinte dans la fenêtre.
+//
+// Le dessin est celui du SVG (dessinerFigure, voir Toile.h) : ici, une
+// toile qui peint avec QPainter. La fenêtre montre ainsi exactement ce que
+// « print » écrirait — mêmes marges, même légende, même barre de couleurs.
 #include "VueFigure.h"
 
 #include <QFontMetricsF>
 #include <QPainter>
 #include <QPainterPath>
+#include <QRegularExpression>
 #include <algorithm>
 #include <cmath>
+
+#include "matlibre/Toile.h"
 
 using namespace matlibre;
 
 namespace {
 
-// Bornes des données d'un axe, ou celles que l'utilisateur a fixées.
-void bornes(const Axes& axes, double& xmin, double& xmax, double& ymin, double& ymax) {
-    xmin = ymin = 1e308;
-    xmax = ymax = -1e308;
-    bool vu = false;
-    for (const auto& s : axes.series) {
-        // Une droite « xline » suit les bornes, elle ne les impose pas ;
-        // un texte pose non plus.
-        if (s.genre == GenreTrace::Constante || s.genre == GenreTrace::Texte) continue;
-        for (double v : s.x) { xmin = std::min(xmin, v); xmax = std::max(xmax, v); vu = true; }
-        for (double v : s.y) { ymin = std::min(ymin, v); ymax = std::max(ymax, v); vu = true; }
+// Une couleur de la toile : « #RRGGBB », « #RGB », un nom (« white »),
+// « rgb(r,g,b) » ou « none ».
+QColor couleurQt(const std::string& texte) {
+    if (texte.empty() || texte == "none") return QColor(Qt::transparent);
+    if (texte.compare(0, 4, "rgb(") == 0) {
+        int r = 0, v = 0, b = 0;
+        if (std::sscanf(texte.c_str(), "rgb(%d,%d,%d)", &r, &v, &b) == 3) return QColor(r, v, b);
     }
-    if (!vu) { xmin = 0; xmax = 1; ymin = 0; ymax = 1; }
-    if (axes.limitesManuellesX) { xmin = axes.xmin; xmax = axes.xmax; }
-    if (axes.limitesManuellesY) { ymin = axes.ymin; ymax = axes.ymax; }
-    // Un axe plat reste lisible : on lui donne une hauteur.
-    if (!(xmax > xmin)) { xmin -= 0.5; xmax += 0.5; }
-    if (!(ymax > ymin)) { ymin -= 0.5; ymax += 0.5; }
-    if (!axes.limitesManuellesY) {
-        double marge = 0.05 * (ymax - ymin);
-        ymin -= marge;
-        ymax += marge;
-    }
-    // Un axe logarithmique ne porte ni le zero ni les negatifs : ses bornes
-    // sont celles des donnees strictement positives, sans la marge de cinq
-    // pour cent qui n'a de sens qu'en lineaire.
-    if (axes.logY && !axes.limitesManuellesY) {
-        double bas = 1e308, haut = -1e308;
-        bool vuPositif = false;
-        for (const auto& s : axes.series)
-            for (double v : s.y)
-                if (std::isfinite(v) && v > 0) {
-                    bas = std::min(bas, v);
-                    haut = std::max(haut, v);
-                    vuPositif = true;
-                }
-        if (vuPositif) { ymin = bas; ymax = haut; }
-    }
+    QColor c(QString::fromStdString(texte));
+    return c.isValid() ? c : QColor(Qt::black);
 }
 
-// Les graduations — lineaires ou par decades — viennent de Graphique.h :
-// le rendu SVG et la fenetre doivent porter les memes.
-
-QString etiquetteNombre(double v) {
-    if (std::fabs(v) < 1e-12) return QStringLiteral("0");
-    QString s = QString::number(v, 'g', 6);
-    return s;
+QFont police(double taille, bool gras, bool italique) {
+    QFont f;
+    // Les métriques d'Helvetica sont celles que le SVG suppose : Arial et
+    // Liberation Sans les reprennent.
+    f.setFamilies({QStringLiteral("Helvetica"), QStringLiteral("Arial"),
+                   QStringLiteral("Liberation Sans"), QStringLiteral("DejaVu Sans")});
+    f.setPixelSize(std::max(1, (int)std::lround(taille)));
+    f.setBold(gras);
+    f.setItalic(italique);
+    return f;
 }
 
-// L'etiquette d'une graduation. Sur un axe logarithmique, MATLAB porte les
-// puissances de dix en exposant : 10 puissance moins cinq, et non 1e-05.
-QString etiquetteGraduation(double v, bool log) {
-    if (log && v > 0) {
-        double e = std::log10(v);
-        double arrondi = std::round(e);
-        if (std::fabs(e - arrondi) < 1e-9) {
-            static const char* chiffres[] = {"\u2070", "\u00b9", "\u00b2", "\u00b3",
-                                             "\u2074", "\u2075", "\u2076", "\u2077",
-                                             "\u2078", "\u2079"};
-            int n = (int)arrondi;
-            QString exposant;
-            for (QChar c : QString::number(std::abs(n)))
-                exposant += QString::fromUtf8(chiffres[c.digitValue()]);
-            if (n < 0) exposant.prepend(QString::fromUtf8("\u207b"));
-            return QStringLiteral("10") + exposant;
+class ToileQt : public Toile {
+public:
+    explicit ToileQt(QPainter& peintre) : p_(peintre) {}
+
+    double largeur(const std::vector<Morceau>& texte, double taille, bool gras) const override {
+        double l = 0;
+        for (const auto& m : texte) {
+            QFontMetricsF metrique(police(taille * m.echelle, gras || m.gras, m.italique));
+            l += metrique.horizontalAdvance(QString::fromStdString(m.texte));
         }
+        return l;
     }
-    return etiquetteNombre(v);
-}
 
-QColor couleurDe(const std::string& texte, int rang) {
-    if (!texte.empty() && texte[0] == '#') {
-        QColor c(QString::fromStdString(texte));
-        if (c.isValid()) return c;
+    void ligne(double x1, double y1, double x2, double y2, const Trait& t) override {
+        p_.setPen(crayon(t));
+        p_.drawLine(QPointF(x1, y1), QPointF(x2, y2));
     }
-    // La palette par défaut de MATLAB depuis R2014b.
-    static const char* palette[] = {"#0072BD", "#D95319", "#EDB120", "#7E2F8E",
-                                    "#77AC30", "#4DBEEE", "#A2142F"};
-    return QColor(QLatin1String(palette[rang % 7]));
-}
 
-Qt::PenStyle styleDe(const std::string& style) {
-    if (style == "--") return Qt::DashLine;
-    if (style == ":") return Qt::DotLine;
-    if (style == "-.") return Qt::DashDotLine;
-    if (style == "none" || style.empty()) return Qt::NoPen;
-    return Qt::SolidLine;
-}
+    void polyligne(const std::vector<double>& x, const std::vector<double>& y,
+                   const Trait& t) override {
+        QPainterPath chemin;
+        bool coupe = true;
+        for (std::size_t k = 0; k < x.size() && k < y.size(); ++k) {
+            if (!std::isfinite(x[k]) || !std::isfinite(y[k])) {
+                coupe = true;
+                continue;
+            }
+            if (coupe) chemin.moveTo(x[k], y[k]);
+            else chemin.lineTo(x[k], y[k]);
+            coupe = false;
+        }
+        p_.setPen(crayon(t));
+        p_.setBrush(Qt::NoBrush);
+        p_.drawPath(chemin);
+    }
+
+    void polygone(const std::vector<double>& x, const std::vector<double>& y,
+                  const std::string& fond, double opacite, const Trait* bord) override {
+        QPolygonF polygone;
+        for (std::size_t k = 0; k < x.size() && k < y.size(); ++k) polygone << QPointF(x[k], y[k]);
+        p_.setPen(bord ? crayon(*bord) : QPen(Qt::NoPen));
+        p_.setBrush(remplissage(fond, opacite));
+        p_.drawPolygon(polygone);
+        p_.setBrush(Qt::NoBrush);
+    }
+
+    void rectangle(double x, double y, double l, double h, const std::string& fond,
+                   double opacite, const Trait* bord) override {
+        if (!bord) {
+            // Sans lissage : les cases voisines d'une image se touchent,
+            // et le lissage de leurs bords fractionnaires laissait des
+            // coutures claires.
+            bool lisse = p_.testRenderHint(QPainter::Antialiasing);
+            p_.setRenderHint(QPainter::Antialiasing, false);
+            p_.fillRect(QRectF(x, y, l, h), remplissage(fond, opacite));
+            p_.setRenderHint(QPainter::Antialiasing, lisse);
+            return;
+        }
+        p_.setPen(crayon(*bord));
+        p_.setBrush(remplissage(fond, opacite));
+        p_.drawRect(QRectF(x, y, l, h));
+        p_.setBrush(Qt::NoBrush);
+    }
+
+    void cercle(double cx, double cy, double r, const std::string& fond,
+                const Trait* bord) override {
+        p_.setPen(bord ? crayon(*bord) : QPen(Qt::NoPen));
+        p_.setBrush(remplissage(fond, 1.0));
+        p_.drawEllipse(QPointF(cx, cy), r, r);
+        p_.setBrush(Qt::NoBrush);
+    }
+
+    void texte(double x, double y, const std::vector<Morceau>& morceaux,
+               const StyleTexte& s) override {
+        double total = largeur(morceaux, s.taille, s.gras);
+        double depart = s.ancre == 'c' ? -total / 2 : s.ancre == 'r' ? -total : 0.0;
+        p_.save();
+        p_.translate(x, y);
+        if (s.angle != 0) p_.rotate(-s.angle);
+        const QColor couleurTexte =
+            s.couleur.empty() ? QColor(0x22, 0x22, 0x22) : couleurQt(s.couleur);
+        double curseur = depart;
+        for (const auto& m : morceaux) {
+            QFont f = police(s.taille * m.echelle, s.gras || m.gras, m.italique);
+            p_.setFont(f);
+            p_.setPen(m.couleur.empty() ? couleurTexte : couleurQt(m.couleur));
+            // Un exposant monte d'un tiers de la taille, un indice descend
+            // d'un cinquième : ce que fait « baseline-shift » en SVG.
+            double decalage = m.niveau > 0 ? -0.33 * s.taille * m.niveau
+                              : m.niveau < 0 ? 0.2 * s.taille * -m.niveau : 0.0;
+            QString texte = QString::fromStdString(m.texte);
+            p_.drawText(QPointF(curseur, decalage), texte);
+            curseur += QFontMetricsF(f).horizontalAdvance(texte);
+        }
+        p_.restore();
+    }
+
+    void decouper(double x, double y, double l, double h) override {
+        p_.save();
+        p_.setClipRect(QRectF(x, y, l, h), Qt::IntersectClip);
+    }
+    void finDecoupe() override { p_.restore(); }
+
+private:
+    QPen crayon(const Trait& t) const {
+        if (t.couleur == "none" || t.motif == "none") return QPen(Qt::NoPen);
+        // Un trait plus fin qu'un pixel en prend un à l'écran, comme dans
+        // MATLAB : un bord de 0,5 peint en demi-teinte devenait gris pâle.
+        double l = std::max(t.epaisseur, 1.0);
+        QPen crayon(couleurQt(t.couleur), l);
+        // Les motifs du SVG, en largeurs de trait comme Qt les compte.
+        if (t.motif == "--") crayon.setDashPattern({8 / l, 4 / l});
+        else if (t.motif == ":") crayon.setDashPattern({2 / l, 3 / l});
+        else if (t.motif == "-.") crayon.setDashPattern({8 / l, 3 / l, 2 / l, 3 / l});
+        return crayon;
+    }
+    static QBrush remplissage(const std::string& fond, double opacite) {
+        if (fond == "none" || fond.empty()) return QBrush(Qt::NoBrush);
+        QColor c = couleurQt(fond);
+        c.setAlphaF(std::min(std::max(opacite, 0.0), 1.0));
+        return QBrush(c);
+    }
+
+    QPainter& p_;
+};
 
 }  // namespace
 
@@ -125,384 +193,8 @@ void VueFigure::paintEvent(QPaintEvent*) {
         peintre.drawText(rect(), Qt::AlignCenter, QStringLiteral("figure vide"));
         return;
     }
-    // Chaque axe porte son propre decoupage : deux « subplot » de grilles
-    // differentes coexistent dans la meme figure sans se deplacer.
-    for (const auto& axes : figure_.figure.axes) {
-        if (!axes) continue;
-        double fx, fy, fl, fh;
-        cadreAxes(*axes, fx, fy, fl, fh);
-        QRectF cadre(fx * width(), fy * height(), fl * width(), fh * height());
-        peindreAxes(peintre, *axes, cadre);
-    }
-}
-
-void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& cadre) {
-    QFontMetricsF metrique(peintre.font());
-    double margeGauche = std::min(62.0, 0.22 * cadre.width());
-    double margeDroite = std::min(18.0, 0.10 * cadre.width());
-    double margeHaut = std::min(30.0, 0.16 * cadre.height());
-    double margeBas = std::min(44.0, 0.22 * cadre.height());
-    if (axes.titre.empty()) margeHaut = std::min(16.0, margeHaut);
-    QRectF trace(cadre.left() + margeGauche, cadre.top() + margeHaut,
-                 cadre.width() - margeGauche - margeDroite,
-                 cadre.height() - margeHaut - margeBas);
-    if (trace.width() < 10 || trace.height() < 10) return;
-
-    double xmin, xmax, ymin, ymax;
-    bornes(axes, xmin, xmax, ymin, ymax);
-    // « axis equal » et « axis square » passent par la meme fonction que
-    // le rendu SVG : les deux images doivent se ressembler.
-    if (axes.proportions != Axes::Proportions::Auto) {
-        int gauche = (int)std::lround(trace.left()), droite = (int)std::lround(trace.right());
-        int haut = (int)std::lround(trace.top()), bas = (int)std::lround(trace.bottom());
-        appliquerProportions(axes, gauche, droite, haut, bas, xmin, xmax, ymin, ymax);
-        trace = QRectF(gauche, haut, droite - gauche, bas - haut);
-        if (trace.width() < 10 || trace.height() < 10) return;
-    }
-    // « semilogx », « semilogy » et « loglog » : l'echelle est celle du
-    // logarithme decimal, et les bornes sont ramenees dans les positifs.
-    bool logX = axes.logX, logY = axes.logY;
-    if (logX && !bornesLog(xmin, xmax)) logX = false;
-    if (logY && !bornesLog(ymin, ymax)) logY = false;
-    auto place = [](double v, double bas, double haut, bool log) {
-        if (log) {
-            v = std::log10(std::max(v, 1e-300));
-            bas = std::log10(std::max(bas, 1e-300));
-            haut = std::log10(std::max(haut, 1e-300));
-        }
-        if (!(haut > bas)) return 0.5;
-        return (v - bas) / (haut - bas);
-    };
-    // Un axe inverse retourne la fraction, et rien d'autre : le trace,
-    // les graduations et la grille suivent tous versEcran.
-    auto versEcranX = [&](double x) {
-        double f = place(x, xmin, xmax, logX);
-        if (axes.xInverse) f = 1 - f;
-        return trace.left() + f * trace.width();
-    };
-    auto versEcranY = [&](double y) {
-        double f = place(y, ymin, ymax, logY);
-        if (axes.yInverse) f = 1 - f;
-        return trace.bottom() - f * trace.height();
-    };
-
-    // Grille et graduations.
-    // « ax.XTick = [15 40 60] » l'emporte sur les graduations calculees.
-    std::vector<double> gx =
-        axes.ticksX.empty() ? graduationsAxe(xmin, xmax, 6, logX) : axes.ticksX;
-    std::vector<double> gy =
-        axes.ticksY.empty() ? graduationsAxe(ymin, ymax, 6, logY) : axes.ticksY;
-    peintre.setPen(QPen(QColor("#d8d8d8"), 1));
-    if (axes.grille) {
-        for (double v : gx) peintre.drawLine(QPointF(versEcranX(v), trace.top()),
-                                             QPointF(versEcranX(v), trace.bottom()));
-        for (double v : gy) peintre.drawLine(QPointF(trace.left(), versEcranY(v)),
-                                             QPointF(trace.right(), versEcranY(v)));
-    }
-    peintre.setPen(QPen(QColor("#303030"), 1));
-    // « axis off » : ni cadre, ni graduations, ni nombres — les courbes
-    // seules, comme sous MATLAB.
-    if (!axes.axesVisibles) {
-        gx.clear();
-        gy.clear();
-    } else if (axes.boite) {
-        peintre.drawRect(trace);
-    } else {
-        peintre.drawLine(trace.bottomLeft(), trace.bottomRight());
-        peintre.drawLine(trace.bottomLeft(), trace.topLeft());
-    }
-    for (std::size_t k = 0; k < gx.size(); ++k) {
-        double v = gx[k];
-        double x = versEcranX(v);
-        if (x < trace.left() - 1 || x > trace.right() + 1) continue;
-        peintre.drawLine(QPointF(x, trace.bottom()), QPointF(x, trace.bottom() - 5));
-        QString texte = k < axes.etiquettesTicksX.size()
-                            ? QString::fromStdString(axes.etiquettesTicksX[k])
-                            : etiquetteGraduation(v, logX);
-        peintre.drawText(QRectF(x - 40, trace.bottom() + 4, 80, metrique.height() + 2),
-                         Qt::AlignHCenter | Qt::AlignTop, texte);
-    }
-    for (std::size_t k = 0; k < gy.size(); ++k) {
-        double v = gy[k];
-        double y = versEcranY(v);
-        if (y < trace.top() - 1 || y > trace.bottom() + 1) continue;
-        peintre.drawLine(QPointF(trace.left(), y), QPointF(trace.left() + 5, y));
-        peintre.drawText(QRectF(cadre.left() + 4, y - metrique.height() / 2,
-                                margeGauche - 12, metrique.height()),
-                         Qt::AlignRight | Qt::AlignVCenter,
-                         k < axes.etiquettesTicksY.size()
-                             ? QString::fromStdString(axes.etiquettesTicksY[k])
-                             : etiquetteGraduation(v, logY));
-    }
-
-    // Les séries. Le tracé est découpé au cadre : une limite manuelle ne
-    // doit pas laisser une courbe déborder sur les étiquettes.
-    peintre.save();
-    peintre.setClipRect(trace);
-    int rang = 0;
-    for (const auto& serie : axes.series) {
-        QColor couleur = couleurDe(serie.couleur, rang);
-        std::size_t n = std::min(serie.x.size(), serie.y.size());
-        QPen crayon(couleur, serie.epaisseur);
-        crayon.setStyle(styleDe(serie.style));
-        switch (serie.genre) {
-            case GenreTrace::Constante: {
-                if (serie.x.empty()) break;
-                peintre.setPen(crayon);
-                if (serie.axeConstante == 'x') {
-                    double x = versEcranX(serie.x[0]);
-                    peintre.drawLine(QPointF(x, trace.top()), QPointF(x, trace.bottom()));
-                    if (!serie.legendeConstante.empty())
-                        peintre.drawText(QPointF(x + 4, trace.top() + 14),
-                                         QString::fromStdString(serie.legendeConstante));
-                } else {
-                    double y = versEcranY(serie.x[0]);
-                    peintre.drawLine(QPointF(trace.left(), y), QPointF(trace.right(), y));
-                    if (!serie.legendeConstante.empty())
-                        peintre.drawText(QPointF(trace.right() - 60, y - 4),
-                                         QString::fromStdString(serie.legendeConstante));
-                }
-                break;
-            }
-            case GenreTrace::Texte: {
-                if (serie.x.empty() || serie.y.empty()) break;
-                peintre.setPen(QPen(couleur));
-                QFont police = peintre.font();
-                if (serie.taillePoliceTexte > 0)
-                    police.setPointSizeF(serie.taillePoliceTexte);
-                peintre.setFont(police);
-                QString texte = QString::fromStdString(serie.legendeConstante);
-                double x = versEcranX(serie.x[0]);
-                double y = versEcranY(serie.y[0]);
-                if (serie.alignement != 'l') {
-                    int largeur = peintre.fontMetrics().horizontalAdvance(texte);
-                    x -= serie.alignement == 'c' ? largeur / 2.0 : largeur;
-                }
-                peintre.drawText(QPointF(x, y), texte);
-                break;
-            }
-            case GenreTrace::Barres: {
-                double largeur = n > 1 ? (versEcranX(serie.x[1]) - versEcranX(serie.x[0])) * 0.7
-                                       : trace.width() / 3;
-                peintre.setPen(Qt::NoPen);
-                peintre.setBrush(couleur);
-                for (std::size_t k = 0; k < n; ++k) {
-                    double x = versEcranX(serie.x[k]);
-                    double y = versEcranY(serie.y[k]);
-                    double zero = versEcranY(std::max(ymin, std::min(ymax, 0.0)));
-                    peintre.drawRect(QRectF(x - largeur / 2, std::min(y, zero),
-                                            std::fabs(largeur), std::fabs(zero - y)));
-                }
-                peintre.setBrush(Qt::NoBrush);
-                break;
-            }
-            case GenreTrace::Points: {
-                peintre.setPen(QPen(couleur, 1));
-                peintre.setBrush(couleur);
-                std::vector<std::size_t> visibles =
-                    indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width());
-                for (std::size_t indice : visibles) {
-                    if (indice >= n) continue;
-                    peintre.drawEllipse(
-                        QPointF(versEcranX(serie.x[indice]), versEcranY(serie.y[indice])), 3, 3);
-                }
-                peintre.setBrush(Qt::NoBrush);
-                break;
-            }
-            case GenreTrace::Tige: {
-                peintre.setPen(QPen(couleur, serie.epaisseur));
-                double zero = versEcranY(std::max(ymin, std::min(ymax, 0.0)));
-                if ((double)n > trace.width() * 2) {
-                    // Plus de deux tiges par pixel : elles ne se distinguent
-                    // plus, on trace l'enveloppe.
-                    std::vector<std::size_t> visibles =
-                        indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width());
-                    for (std::size_t indice : visibles) {
-                        if (indice >= n) continue;
-                        double x = versEcranX(serie.x[indice]);
-                        peintre.drawLine(QPointF(x, zero),
-                                         QPointF(x, versEcranY(serie.y[indice])));
-                    }
-                    break;
-                }
-                for (std::size_t k = 0; k < n; ++k) {
-                    double x = versEcranX(serie.x[k]);
-                    double y = versEcranY(serie.y[k]);
-                    peintre.drawLine(QPointF(x, zero), QPointF(x, y));
-                    peintre.drawEllipse(QPointF(x, y), 3, 3);
-                }
-                break;
-            }
-            case GenreTrace::Escalier: {
-                peintre.setPen(crayon);
-                QPainterPath chemin;
-                for (std::size_t k = 0; k < n; ++k) {
-                    double x = versEcranX(serie.x[k]), y = versEcranY(serie.y[k]);
-                    if (k == 0) chemin.moveTo(x, y);
-                    else { chemin.lineTo(x, chemin.currentPosition().y()); chemin.lineTo(x, y); }
-                }
-                peintre.drawPath(chemin);
-                break;
-            }
-            case GenreTrace::Polygone: {
-                if (n < 2) break;
-                QPainterPath chemin;
-                chemin.moveTo(versEcranX(serie.x[0]), versEcranY(serie.y[0]));
-                for (std::size_t k = 1; k < n; ++k)
-                    chemin.lineTo(versEcranX(serie.x[k]), versEcranY(serie.y[k]));
-                chemin.closeSubpath();
-                // Le remplissage suit « FaceAlpha », et le contour
-                // « EdgeColor ». Une opacite figee a 0,4 et un contour pris
-                // sur la couleur de fond donnaient, ici, un tout autre
-                // dessin que le SVG : un triangle blanc au bord blanc
-                // disparaissait, et un fond opaque paraissait delave.
-                QColor remplissage = couleur;
-                remplissage.setAlphaF(serie.opacite);
-                QPen contour = crayon;
-                if (!serie.couleurBord.empty())
-                    contour.setColor(couleurDe(serie.couleurBord, rang));
-                peintre.setPen(contour);
-                peintre.setBrush(remplissage);
-                peintre.drawPath(chemin);
-                peintre.setBrush(Qt::NoBrush);
-                break;
-            }
-            case GenreTrace::Image: {
-                // Sans ce cas, une image tombait dans le trace par
-                // defaut : la fenetre montrait une diagonale la ou le
-                // SVG montrait la carte.
-                int lImage = serie.hauteurImage, cImage = serie.largeurImage;
-                if (lImage <= 0 || cImage <= 0) break;
-                double mn = 1e308, mx = -1e308;
-                for (double v : serie.z) {
-                    mn = std::min(mn, v);
-                    mx = std::max(mx, v);
-                }
-                if (!std::isfinite(mn) || mx == mn) { mn = 0; mx = 1; }
-                double x0 = serie.x.size() > 1 ? serie.x[0] : 0.5;
-                double x1 = serie.x.size() > 1 ? serie.x[1] : cImage + 0.5;
-                double y0 = serie.y.size() > 1 ? serie.y[0] : 0.5;
-                double y1 = serie.y.size() > 1 ? serie.y[1] : lImage + 0.5;
-                for (int i = 0; i < lImage; ++i)
-                    for (int j = 0; j < cImage; ++j) {
-                        double v = serie.z[(std::size_t)i + (std::size_t)j * lImage];
-                        int r, vert, b;
-                        couleurCarte((v - mn) / (mx - mn), r, vert, b);
-                        double gx0 = versEcranX(x0 + (x1 - x0) * j / cImage);
-                        double gx1 = versEcranX(x0 + (x1 - x0) * (j + 1) / cImage);
-                        double gy0 = versEcranY(y0 + (y1 - y0) * i / lImage);
-                        double gy1 = versEcranY(y0 + (y1 - y0) * (i + 1) / lImage);
-                        QRectF case_(QPointF(std::min(gx0, gx1), std::min(gy0, gy1)),
-                                     QSizeF(std::fabs(gx1 - gx0) + 0.5,
-                                            std::fabs(gy1 - gy0) + 0.5));
-                        peintre.fillRect(case_, QColor(r, vert, b));
-                    }
-                break;
-            }
-            case GenreTrace::Aire: {
-                QPainterPath chemin;
-                double zero = versEcranY(std::max(ymin, std::min(ymax, 0.0)));
-                for (std::size_t k = 0; k < n; ++k) {
-                    double x = versEcranX(serie.x[k]), y = versEcranY(serie.y[k]);
-                    if (k == 0) chemin.moveTo(x, zero);
-                    chemin.lineTo(x, y);
-                }
-                if (n) chemin.lineTo(versEcranX(serie.x[n - 1]), zero);
-                chemin.closeSubpath();
-                QColor remplissage = couleur;
-                remplissage.setAlpha(90);
-                peintre.fillPath(chemin, remplissage);
-                peintre.setPen(crayon);
-                peintre.drawPath(chemin);
-                break;
-            }
-            default: {
-                peintre.setPen(crayon);
-                QPainterPath chemin;
-                bool commence = false;
-                // Un million de points sur mille pixels : neuf cent
-                // quatre-vingt-dix-neuf sur mille se superposent, et
-                // QPainterPath les garde tous. La fenetre gelait. On ne
-                // trace que l'enveloppe visible de chaque colonne — le
-                // dessin est le meme, le nombre de segments s'effondre.
-                std::vector<std::size_t> visibles =
-                    indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width());
-                for (std::size_t indice : visibles) {
-                    if (indice >= n) continue;
-                    double x = versEcranX(serie.x[indice]), y = versEcranY(serie.y[indice]);
-                    if (!std::isfinite(x) || !std::isfinite(y)) { commence = false; continue; }
-                    if (!commence) { chemin.moveTo(x, y); commence = true; }
-                    else chemin.lineTo(x, y);
-                }
-                peintre.drawPath(chemin);
-                // Les marqueurs ne se dessinent que s'ils se distinguent :
-                // au-dela d'un point par pixel ils forment un trait plein.
-                if (!serie.marqueur.empty() && serie.marqueur != "none" &&
-                    (double)n < trace.width()) {
-                    peintre.setBrush(couleur);
-                    for (std::size_t k = 0; k < n; ++k)
-                        peintre.drawEllipse(
-                            QPointF(versEcranX(serie.x[k]), versEcranY(serie.y[k])), 2.5, 2.5);
-                    peintre.setBrush(Qt::NoBrush);
-                }
-                break;
-            }
-        }
-        ++rang;
-    }
-    peintre.restore();
-
-    // Titres et étiquettes.
-    peintre.setPen(QColor("#101010"));
-    if (!axes.titre.empty()) {
-        QFont gras = peintre.font();
-        gras.setBold(true);
-        // « set(get(gca,'Title'),'FontSize',16) » : la taille imposée.
-        if (axes.taillePoliceTitre > 0) gras.setPointSizeF(axes.taillePoliceTitre);
-        peintre.save();
-        peintre.setFont(gras);
-        peintre.drawText(QRectF(trace.left(), cadre.top() + 4, trace.width(), margeHaut - 6),
-                         Qt::AlignCenter, QString::fromStdString(axes.titre));
-        peintre.restore();
-    }
-    if (!axes.etiquetteX.empty() && axes.axesVisibles)
-        peintre.drawText(QRectF(trace.left(), cadre.bottom() - 20, trace.width(), 18),
-                         Qt::AlignCenter, QString::fromStdString(axes.etiquetteX));
-    if (!axes.etiquetteY.empty() && axes.axesVisibles) {
-        peintre.save();
-        peintre.translate(cadre.left() + 14, trace.center().y());
-        peintre.rotate(-90);
-        peintre.drawText(QRectF(-trace.height() / 2, -9, trace.height(), 18), Qt::AlignCenter,
-                         QString::fromStdString(axes.etiquetteY));
-        peintre.restore();
-    }
-
-    // Légende.
-    if (axes.legendeVisible && !axes.legende.empty()) {
-        double hauteurLigne = metrique.height() + 4;
-        double largeur = 40;
-        // 32 px pour le trait et sa marge, 10 pour la marge de droite : sans
-        // cette derniere, la derniere lettre etait rognee.
-        for (const auto& e : axes.legende)
-            largeur = std::max(largeur, 42 + metrique.horizontalAdvance(
-                                                 QString::fromStdString(e)));
-        QRectF boite(trace.right() - largeur - 10, trace.top() + 10, largeur,
-                     hauteurLigne * (double)axes.legende.size() + 8);
-        peintre.setBrush(QColor(255, 255, 255, 225));
-        peintre.setPen(QColor("#909090"));
-        peintre.drawRect(boite);
-        peintre.setBrush(Qt::NoBrush);
-        for (std::size_t k = 0; k < axes.legende.size(); ++k) {
-            double y = boite.top() + 4 + hauteurLigne * (double)k + hauteurLigne / 2;
-            QColor couleur = k < axes.series.size() ? couleurDe(axes.series[k].couleur, (int)k)
-                                                    : couleurDe("", (int)k);
-            peintre.setPen(QPen(couleur, 2));
-            peintre.drawLine(QPointF(boite.left() + 6, y), QPointF(boite.left() + 26, y));
-            peintre.setPen(QColor("#101010"));
-            peintre.drawText(QRectF(boite.left() + 32, y - hauteurLigne / 2,
-                                    boite.width() - 40, hauteurLigne),
-                             Qt::AlignVCenter | Qt::AlignLeft,
-                             QString::fromStdString(axes.legende[k]));
-        }
-    }
+    // La figure se dessine à la taille de la fenêtre : elle suit quand on
+    // la redimensionne.
+    ToileQt toile(peintre);
+    dessinerFigure(figure_.figure, toile, width(), height());
 }

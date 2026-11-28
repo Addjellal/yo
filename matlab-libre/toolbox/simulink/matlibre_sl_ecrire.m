@@ -23,7 +23,7 @@ function chemin = matlibre_sl_ecrire(modele, chemin)
     identifiant = fopen(chemin, 'w');
     if identifiant < 0
         error('Simulink:programme:EcritureImpossible', ...
-              'Impossible d''ecrire ''%s''.', chemin);
+              'Unable to write file ''%s''.', chemin);
     end
     fprintf(identifiant, '%s', texte);
     fclose(identifiant);

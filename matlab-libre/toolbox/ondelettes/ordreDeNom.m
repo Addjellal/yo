@@ -18,11 +18,11 @@ function ordre = ordreDeNom(nom, prefixe)
     n = numel(prefixe);
     if numel(nom) <= n || ~strcmp(nom(1:n), prefixe)
         error('wavelet:ordreDeNom:Famille', ...
-              '''%s'' n''appartient pas à la famille ''%s''.', nom, prefixe);
+              '''%s'' does not belong to the ''%s'' family.', nom, prefixe);
     end
     ordre = str2double(nom(n+1:end));
     if isnan(ordre) || ordre < 1 || ordre ~= round(ordre)
         error('wavelet:ordreDeNom:Ordre', ...
-              '''%s'' ne porte pas d''ordre entier.', nom);
+              '''%s'' has no integer order.', nom);
     end
 end

@@ -25,8 +25,8 @@ function [RF, DF] = filtresSplines(Nr, Nd)
 %   conjuguée, son inverse et l'inverse de sa conjuguée. C'est ce qui
 %   garde chaque filtre réel et symétrique.
 %
-%   Les deux filtres sortent de même longueur, complétés de zéros comme
-%   le fait MATLAB, et de somme un.
+%   Les deux filtres sortent de même longueur, complétés de zéros centrés
+%   comme le fait MATLAB, et de somme un.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
@@ -37,7 +37,7 @@ function [RF, DF] = filtresSplines(Nr, Nd)
 %   Voir aussi WFILTERS, BIORFILT, REFUSERHORSSPLINE.
     if mod(Nr + Nd, 2) ~= 0
         error('wavelet:filtresSplines:Parite', ...
-              'La somme des deux ordres doit être paire.');
+              'The sum of the two orders must be even.');
     end
     L = (Nr + Nd) / 2;
     % Le binôme (1+z)^Nr, à une normalisation près.
@@ -65,9 +65,17 @@ function [RF, DF] = filtresSplines(Nr, Nd)
     end
     RF = real(binome) / sum(real(binome));
     DF = real(autre) / sum(real(autre));
+    % Complétés de zéros à la même longueur, centrés comme le fait
+    % MATLAB : bior2.2 rend [0 1 2 1 0]/4, symétrique. L'alignement que
+    % demande la reconstruction est l'affaire de BIORFILT.
     n = max(numel(RF), numel(DF));
-    RF = completerPair(RF, n);
-    DF = completerPair(DF, n);
+    RF = centrer(RF, n);
+    DF = centrer(DF, n);
+end
+
+function v = centrer(f, n)
+    manque = n - numel(f);
+    v = [zeros(1, floor(manque / 2)), f, zeros(1, ceil(manque / 2))];
 end
 
 function [P1, P2] = partagerRacines(P, longueurBinome, longueurAutre)
@@ -177,16 +185,4 @@ function s = ajouter(a, b)
     s(debut + (1:na)) = s(debut + (1:na)) + a;
     debut = (n - nb) / 2;
     s(debut + (1:nb)) = s(debut + (1:nb)) + b;
-end
-
-function v = completerPair(f, n)
-%COMPLETERPAIR Complète un filtre de zéros sans rompre l'alignement.
-%   Un décalage d'un échantillon entre les deux filtres d'échelle change
-%   la parité du demi-bande, et le repliement ne s'annule plus : la
-%   reconstruction devient fausse alors même que la distorsion reste
-%   nulle. Le décalage ajouté à gauche est donc toujours pair ; ce qui
-%   reste va à droite.
-    manque = n - numel(f);
-    gauche = 2 * floor(manque / 4);
-    v = [zeros(1, gauche), f, zeros(1, manque - gauche)];
 end

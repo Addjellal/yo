@@ -2,7 +2,7 @@ function nuage = matlibre_nuage_grille(modele, points, pas)
 %MATLIBRE_NUAGE_GRILLE Moyenne des points par cube d'une grille.
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
     if pas <= 0
-        error('vision:pcdownsample:Pas', 'Le pas de grille doit être positif.');
+        error('vision:pcdownsample:Pas', 'The grid step must be positive.');
     end
     origine = min(points, [], 1);
     cases = floor((points - repmat(origine, size(points, 1), 1)) / pas);

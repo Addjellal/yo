@@ -1,81 +1,43 @@
-function [score, alignement] = nwalign(a, b, correspondance, difference, trou)
+function [score, alignement, debut] = nwalign(a, b, varargin)
 %NWALIGN Alignement global par l'algorithme de Needleman-Wunsch.
-%   [SCORE,ALIGNEMENT] = NWALIGN(A,B) rend le score optimal et les deux
-%   séquences alignées, empilées sur deux lignes.
+%   SCORE = NWALIGN(A,B) rend le score, en bits, de l'alignement global
+%   optimal des séquences A et B — des acides aminés, avec la matrice
+%   BLOSUM50 et une pénalité de 8 par position de trou, comme MATLAB.
+%   [SCORE,ALIGNEMENT] = NWALIGN(A,B) rend aussi l'alignement, sur trois
+%   lignes : A avec ses trous, une ligne de symboles — '|' pour deux
+%   résidus identiques, ':' pour deux résidus apparentés (score de la
+%   matrice positif ou nul) —, puis B avec ses trous.
+%   [SCORE,ALIGNEMENT,DEBUT] = NWALIGN(A,B) rend le point de départ dans
+%   chaque séquence, [1;1] pour un alignement global.
 %
-%   [SCORE,ALIGNEMENT] = NWALIGN(A,B,CORRESPONDANCE,DIFFERENCE,TROU)
-%   impose les trois coûts : le gain d'une correspondance, la pénalité
-%   d'une différence, celle d'un trou.
+%   Options, par paires nom-valeur :
+%      'Alphabet'       'AA' (acides aminés, par défaut) ou 'NT' (nucléotides)
+%      'ScoringMatrix'  'BLOSUM50' (défaut AA), 'BLOSUM45', 'BLOSUM62',
+%                       'BLOSUM80', 'BLOSUM90', 'PAM250', 'NUC44' (défaut NT),
+%                       ou une matrice, sans échelle, dans l'ordre de MATLAB
+%      'Scale'          facteur du score : log(2) le rend en nats
+%      'GapOpen'        pénalité d'ouverture d'un trou (8)
+%      'ExtendGap'      pénalité de prolongement : trous affines (Gotoh) ;
+%                       sans elle, chaque position coûte GapOpen
+%      'Glocal'         true : alignement semi-global, trous d'extrémité gratuits
+%   Le score brut est converti en bits par l'échelle de la matrice : un
+%   tiers de bit par unité pour BLOSUM50.
+%
+%   NWALIGN(A,B,CORRESPONDANCE,DIFFERENCE,TROU), trois nombres, est la forme
+%   ancienne de MatLibre : score d'identité et trou linéaire, sans échelle.
 %
 %   Needleman-Wunsch est un alignement *global* : il aligne les séquences
-%   sur toute leur longueur, quitte à ouvrir des trous aux extrémités.
-%   C'est ce qu'on veut pour comparer deux gènes homologues de longueur
-%   voisine, et ce qu'on ne veut pas pour chercher un motif court dans une
-%   longue séquence — Smith-Waterman est fait pour cela.
-%
-%   La programmation dynamique le rend exact : contrairement à une
-%   heuristique, il trouve l'alignement optimal, pas seulement un bon.
-%   Le prix en est un coût en O(n m), en temps comme en mémoire.
-%
-%   Contrairement à la distance de Hamming, l'alignement sait traiter les
-%   insertions et les suppressions : deux séquences identiques à une
-%   insertion près lui paraissent proches, alors que SEQDIST les dit
-%   totalement différentes.
+%   sur toute leur longueur, quitte à ouvrir des trous aux extrémités. La
+%   programmation dynamique le rend exact : il trouve l'alignement optimal,
+%   en O(n m).
 %
 %   Exemple :
-%      [score, alignement] = nwalign('ACGTACGT', 'ACGACGT');
-%      disp(alignement)                % le trou apparait
+%      % L'exemple de la documentation de MATLAB :
+%      [score, alignement] = nwalign('VSPAGMASGYD', 'IPGKASYD')
+%      % score = 7.3333 (22 unités de BLOSUM50), 'I-P-GKAS-YD'
+%      % Durbin et al. (1998), figure 2.5 : un score brut de 1.
+%      nwalign('HEAGAWGHEE', 'PAWHEAE') * 3
 %
-%   Voir aussi SWALIGN, SEQDIST, EDITDISTANCE.
-    if nargin < 3, correspondance = 1; end
-    if nargin < 4, difference = -1; end
-    if nargin < 5, trou = -2; end
-    a = upper(char(a));
-    b = upper(char(b));
-    n = numel(a);
-    m = numel(b);
-    F = zeros(n + 1, m + 1);
-    F(:, 1) = (0:n).' * trou;
-    F(1, :) = (0:m) * trou;
-    for i = 1:n
-        for j = 1:m
-            if a(i) == b(j)
-                diagonale = F(i, j) + correspondance;
-            else
-                diagonale = F(i, j) + difference;
-            end
-            F(i+1, j+1) = max([diagonale, F(i, j+1) + trou, F(i+1, j) + trou]);
-        end
-    end
-    score = F(n+1, m+1);
-    ligneA = '';
-    ligneB = '';
-    i = n;
-    j = m;
-    while i > 0 || j > 0
-        if i > 0 && j > 0
-            if a(i) == b(j)
-                attendu = F(i, j) + correspondance;
-            else
-                attendu = F(i, j) + difference;
-            end
-        else
-            attendu = -inf;
-        end
-        if i > 0 && j > 0 && F(i+1, j+1) == attendu
-            ligneA = [a(i), ligneA];
-            ligneB = [b(j), ligneB];
-            i = i - 1;
-            j = j - 1;
-        elseif i > 0 && F(i+1, j+1) == F(i, j+1) + trou
-            ligneA = [a(i), ligneA];
-            ligneB = ['-', ligneB];
-            i = i - 1;
-        else
-            ligneA = ['-', ligneA];
-            ligneB = [b(j), ligneB];
-            j = j - 1;
-        end
-    end
-    alignement = [ligneA; ligneB];
+%   Voir aussi SWALIGN, BLOSUM, PAM, NUC44, SEQDIST.
+    [score, alignement, debut] = matlibre_aligner(a, b, 'global', varargin, 'nwalign');
 end

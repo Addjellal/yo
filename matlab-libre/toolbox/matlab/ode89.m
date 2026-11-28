@@ -83,7 +83,7 @@ function [t, y] = ode89(f, intervalle, y0, options)
         end
         if numel(t) > 1e6
             error('MATLAB:ode89:TooManySteps', ...
-                  'Trop de pas : le probleme est peut-etre raide.');
+                  'Too many steps: the problem may be stiff.');
         end
     end
 end

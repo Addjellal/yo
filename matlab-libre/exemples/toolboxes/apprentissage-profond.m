@@ -107,7 +107,8 @@ sortie = dlconv(image, noyau, 0);
 fprintf('\nConvolution 3x3 sur une image 5x5 :\n');
 fprintf('  taille de sortie : %s (attendu 3 3)\n', ...
         mat2str(size(extractdata(sortie))));
-% Elle coincide avec CONV2 en mode « valid ».
+% Comme dans MATLAB, c'est une correlation (FILTER2) ; le noyau etant
+% symetrique, elle coincide ici avec CONV2 en mode « valid ».
 attendu = conv2(reshape(1:25, 5, 5), ones(3, 3) / 9, 'valid');
 fprintf('  ecart a conv2(...,''valid'') : %.3e\n', ...
         max(max(abs(extractdata(sortie) - attendu))));

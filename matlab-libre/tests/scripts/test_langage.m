@@ -584,19 +584,35 @@ assert(isequal(fillmissing([1 NaN 3], 'constant', 0), [1 0 3]));
 % L'orientation est preservee.
 assert(isrow(fillmissing([1 NaN 3], 'constant', 0)));
 assert(iscolumn(fillmissing([1; NaN; 3], 'constant', 0)));
-% Les bouts n'ont pas de voisin des deux cotes : par defaut on prolonge,
-% « none » les laisse.
-assert(isequal(fillmissing([NaN 2 3], 'previous'), [2 2 3]));
-manquantEnBout = fillmissing([NaN 2 3], 'previous', 'EndValues', 'none');
+% Les bouts n'ont pas de voisin des deux cotes : par defaut (« extrap »)
+% la methode elle-meme les comble, comme dans MATLAB. « previous » n'a
+% rien a mettre avant la premiere valeur, « next » apres la derniere.
+rienAvant = fillmissing([NaN 2 3], 'previous');
+assert(isnan(rienAvant(1)) && isequal(rienAvant(2:3), [2 3]));
+assert(isequal(fillmissing([1 NaN NaN], 'previous'), [1 1 1]));
+rienApres = fillmissing([1 2 NaN], 'next');
+assert(isnan(rienApres(3)) && isequal(rienApres(1:2), [1 2]));
+assert(isequal(fillmissing([NaN NaN 3], 'next'), [3 3 3]));
+assert(isequal(fillmissing([NaN 2 NaN], 'nearest'), [2 2 2]));
+% « linear » extrapole lineairement, aux deux bouts.
+assert(isequal(fillmissing([NaN 2 3 NaN], 'linear'), [1 2 3 4]));
+% Les bouts peuvent suivre une autre methode, ou rester.
+assert(isequal(fillmissing([NaN 2 3], 'previous', 'EndValues', 'nearest'), [2 2 3]));
+lineaireBouts = fillmissing([NaN 2 3 NaN], 'linear', 'EndValues', 'previous');
+assert(isnan(lineaireBouts(1)) && isequal(lineaireBouts(2:4), [2 3 3]));
+manquantEnBout = fillmissing([NaN 2 3], 'linear', 'EndValues', 'none');
 assert(isnan(manquantEnBout(1)));
 assert(isequal(fillmissing([NaN 2 3], 'previous', 'EndValues', 0), [0 2 3]));
+% Seules les positions effectivement comblees sont marquees.
+[~, combleesBout] = fillmissing([NaN 2 NaN], 'previous');
+assert(isequal(combleesBout, [false false true]));
 % Les positions comblees sont rendues.
 [rempli, ou] = fillmissing([1 NaN 3], 'linear');
 assert(isequal(ou, [false true false]));
 assert(isequal(rempli, [1 2 3]));
 % Une matrice se comble colonne par colonne.
 combleeMatrice = fillmissing([1 NaN; NaN 4; 3 6], 'linear');
-assert(isequal(combleeMatrice, [1 4; 2 4; 3 6]));
+assert(isequal(combleeMatrice, [1 2; 2 4; 3 6]));
 % Les methodes mobiles moyennent le voisinage.
 assert(isequal(fillmissing([1 NaN 3 NaN 5], 'movmean', 3), [1 2 3 4 5]));
 % Rien a combler : le tableau ressort intact.
@@ -610,6 +626,65 @@ catch
 end
 assert(refuseComble);
 disp('fillmissing : ok');
+
+% NORMALIZE : colonne par colonne, et toutes les methodes de MATLAB.
+procheN = @(a, b) isequal(size(a), size(b)) && all(abs(a(:) - b(:)) < 1e-12 | ...
+                                                 (isnan(a(:)) & isnan(b(:))));
+assert(procheN(normalize([1 2 3]), [-1 0 1]));
+assert(procheN(normalize([1; 2; 3]), [-1; 0; 1]));
+% Une matrice : chaque colonne a sa moyenne et son ecart type.
+normeMatrice = normalize([1 10; 2 20; 3 30]);
+assert(procheN(normeMatrice, [-1 -1; 0 0; 1 1]));
+% Le long de la dimension demandee.
+assert(procheN(normalize([1 2 3; 10 20 30], 2), [-1 0 1; -1 0 1]));
+% Les methodes.
+assert(procheN(normalize([1 2 3], 'range'), [0 0.5 1]));
+assert(procheN(normalize([1 2 3], 'range', [-1 1]), [-1 0 1]));
+assert(procheN(normalize([3 4], 'norm'), [0.6 0.8]));
+assert(procheN(normalize([3 -4], 'norm', 1), [3 -4] / 7));
+assert(procheN(normalize([3 -4], 'norm', Inf), [0.75 -1]));
+assert(procheN(normalize([2 4 6], 'center'), [-2 0 2]));
+assert(procheN(normalize([1 2 10], 'center', 'median'), [-1 0 8]));
+assert(procheN(normalize([2 4 6], 'center', 1), [1 3 5]));
+assert(procheN(normalize([2 4 6], 'scale'), [1 2 3]));
+assert(procheN(normalize([2 4 8], 'scale', 'first'), [1 2 4]));
+assert(procheN(normalize([1 2 3 100], 'scale', 'mad'), [1 2 3 100]));
+assert(procheN(normalize([2 4 6], 'scale', 2), [1 2 3]));
+assert(procheN(normalize([1 2 3 100], 'zscore', 'robust'), [-1.5 -0.5 0.5 97.5]));
+assert(procheN(normalize(1:8, 'medianiqr'), ((1:8) - 4.5) / 4));
+assert(procheN(normalize([2 4 6], 'center', 'median', 'scale', 2), [-1 0 1]));
+% N = (A - C) ./ S, avec C et S reduits le long de la dimension.
+donneesN = [1 5; 2 7; 6 9];
+[nN, cN, sN] = normalize(donneesN);
+assert(isequal(size(cN), [1 2]) && isequal(size(sN), [1 2]));
+assert(procheN((donneesN - cN) ./ sN, nN));
+assert(procheN(cN, mean(donneesN)) && procheN(sN, std(donneesN)));
+[~, cR, sR] = normalize([2 4 6], 'range', [0 2]);
+assert(procheN(([2 4 6] - cR) ./ sR, [0 1 2]));
+% Les NaN sont laisses de cote et restent NaN.
+assert(procheN(normalize([1 NaN 3]), [-1 NaN 1] / sqrt(2)));
+% Une colonne constante devient nulle plutot que NaN.
+assert(isequal(normalize([5 5 5]), [0 0 0]));
+assert(isequal(normalize([5 5 5], 'range', [2 3]), [2 2 2]));
+% Un tableau a trois dimensions garde sa forme.
+cubeN = reshape(1:24, 2, 3, 4);
+cubeNormalise = normalize(cubeN, 3);
+assert(isequal(size(cubeNormalise), [2 3 4]));
+% Chaque vecteur le long de la troisieme dimension est traite seul.
+assert(procheN(squeeze(cubeNormalise(2, 3, :)), normalize(squeeze(cubeN(2, 3, :)))));
+% Les combinaisons interdites et les methodes inconnues sont refusees.
+refusN = {};
+for essai = {{'range', 'scale'}, {'norm', 'center'}, {'bidule'}}
+    try
+        normalize([1 2 3], essai{1}{:});
+    catch err
+        refusN{end + 1} = err.identifier;   %#ok<SAGROW>
+    end
+end
+assert(isequal(refusN, {'MATLAB:normalize:InvalidMethodCombination', ...
+                        'MATLAB:normalize:InvalidMethodCombination', ...
+                        'MATLAB:normalize:InvalidMethod'}));
+disp('normalize : ok');
 
 
 % ISOUTLIER et compagnie : reperer, remplacer, retirer.
@@ -665,6 +740,46 @@ assert(isequal(strlength(prealloue), [0 0 0]));
 assert(all(ismissing(prealloue)));
 assert(isequal(size(strings(2)), [2 2]));
 assert(isequal(size(strings()), [1 1]));
+% dir comme MATLAB : « . » et « .. » en tete d'un dossier (l'idiome
+% d(3:end) en depend), plusieurs etoiles, « ** » recursif (il rendait une
+% liste vide), et les champs date et datenum.
+racineDir = tempname();
+mkdir(fullfile(racineDir, 'sous', 'profond'));
+for nomDir = {'a_1_x.csv', 'a_2_y.csv', 'b.txt', 'sous/c_3_z.csv', 'sous/profond/d_4_w.csv'}
+    f = fopen(fullfile(racineDir, nomDir{1}), 'w'); fprintf(f, '1'); fclose(f);
+end
+listeDir = dir(racineDir);
+assert(isequal({listeDir(1:2).name}, {'.', '..'}) && numel(listeDir) == 6);
+assert(all(isfield(listeDir, {'name', 'folder', 'date', 'bytes', 'isdir', 'datenum'})));
+assert(abs(listeDir(3).datenum - now) < 1);
+etoiles = dir(fullfile(racineDir, 'a_*_*.csv'));
+assert(isequal({etoiles.name}, {'a_1_x.csv', 'a_2_y.csv'}));
+recursif = dir(fullfile(racineDir, '**', '*.csv'));
+assert(isequal({recursif.name}, {'a_1_x.csv', 'a_2_y.csv', 'c_3_z.csv', 'd_4_w.csv'}));
+assert(endsWith(recursif(4).folder, fullfile('sous', 'profond')));
+assert(numel(dir(fullfile(racineDir, '*.m'))) == 0);
+rmdir(racineDir, 's');
+% Copie sur ecriture : b = a, un argument, une cellule ou un champ ne
+% recopient rien tant qu'on n'ecrit pas, et seul ce qu'on modifie se
+% detache. La semantique par valeur reste entiere.
+tableauCow = 1:5; copieCow = tableauCow; copieCow(2) = 0;
+assert(isequal(tableauCow, 1:5) && copieCow(2) == 0);
+complexeCow = [1 2 3] + 1i; autreCow = complexeCow; autreCow(2) = 5;
+assert(imag(complexeCow(2)) == 1 && imag(autreCow(2)) == 0);
+celluleCow = {tableauCow}; celluleCow{1}(1) = 9; assert(tableauCow(1) == 1);
+structureCow.f = tableauCow; structureCow.f(1) = 9; assert(tableauCow(1) == 1);
+grandCow = zeros(2e6, 1);
+tic;
+for k = 1:200
+    lireCow = numel(grandCow(1:2)); %#ok<NASGU>
+    lireCow = premierCow(grandCow); %#ok<NASGU>
+end
+assert(toc < 0.5, 'passer un grand tableau a une fonction ne doit pas le recopier');
+clear grandCow
+% char d'une chaine vide est un tableau de caracteres vide, non un double
+% vide : ischar(char("")) etait faux.
+assert(ischar(char("")) && isequal(size(char("")), [0 0]));
+assert(ischar(char({'', ''})) && isequal(size(char({'', ''})), [2 0]));
 disp('join et strings : ok');
 
 % DISCRETIZE en categorielle : l'ordre est celui des bornes, non
@@ -1038,9 +1153,14 @@ rehash;
 cd(ancienRelatif);
 rmdir(dossierAilleurs, 's');
 assert(exist('compteurPersistant', 'file') == 2, 'le dossier relatif reste sur le chemin');
-assert(any(strcmp(strsplit(path, pathsep), dossierPersistant)), 'et il y est en absolu');
-rmpath(dossierPersistant);
-assert(~any(strcmp(strsplit(path, pathsep), dossierPersistant)), 'rmpath le retire');
+% Le chemin absolu est celui que rend pwd : sous macOS, le dossier
+% temporaire passe par un lien symbolique (/var -> /private/var).
+cd(dossierPersistant);
+dossierAbsolu = pwd();
+cd(ancienRelatif);
+assert(any(strcmp(strsplit(path, pathsep), dossierAbsolu)), 'et il y est en absolu');
+rmpath(dossierAbsolu);
+assert(~any(strcmp(strsplit(path, pathsep), dossierAbsolu)), 'rmpath le retire');
 
 % Les fonctions d'un fichier vivent ensemble : une poignée vers l'une
 % d'elles garde le fichier entier, même quand le cache du chemin l'a
@@ -1144,6 +1264,98 @@ texteAffiche = evalc('elementAffiche');
 assert(~isempty(strfind(texteAffiche, 'BusElement with properties:')) && ...
        ~isempty(strfind(texteAffiche, sprintf('              Name: ''a''\n'))), ...
        'un objet : « X with properties: », les proprietes alignees');
+
+%% ------------------------------------ nom=valeur dans un appel (R2021a)
+% « f(x, Nom=valeur) » est la forme que MATLAB donne depuis R2021a aux
+% arguments nom-valeur : la fonction reçoit "Nom", valeur, le nom en
+% chaîne, exactement comme si on l'avait écrit ainsi. Elle ne vaut que
+% dans les parenthèses d'un appel, et seulement après tous les autres
+% arguments.
+recoit = @(varargin) varargin;
+nv = recoit(1, Tol=1e-3, Methode="lin");
+assert(numel(nv) == 5 && nv{1} == 1 && isstring(nv{2}) && nv{2} == "Tol" && ...
+       nv{3} == 1e-3 && nv{4} == "Methode" && nv{5} == "lin", ...
+       'nom=valeur : le nom en chaine, puis la valeur');
+nv = recoit(Seul = 2 + 3);
+assert(isequal(nv, {"Seul", 5}), 'des espaces autour du =, une expression en valeur');
+nv = recoit(1, "Avant", 2, Apres=3);
+assert(isequal(nv, {1, "Avant", 2, "Apres", 3}), 'apres des paires ecrites a la virgule');
+nv = recoit(a == 1);
+assert(isequal(nv, {false}), '« == » reste une comparaison');
+assert(isequal(nomValeurLocal(3, Gain=2), 6) && isequal(nomValeurLocal(3), 3), ...
+       'une fonction a varargin, en instruction comme en expression');
+s1 = struct(a=1, b="deux");
+assert(isequal(fieldnames(s1), {'a'; 'b'}) && s1.a == 1, 'struct, par nom=valeur');
+nv = recoit(1, Imbrique=recoit(x=1));
+assert(isequal(nv{3}, {"x", 1}), 'un appel imbrique');
+% ce qui se refuse : un argument ordinaire apres un nom=valeur, et
+% l'indexation d'une valeur
+refusNV = {'recoit(Tol=1, 2)', 'MATLAB:parseError'; ...
+           'recoit(Tol=1, "Gain", 2)', 'MATLAB:parseError'; ...
+           'vecteurNV = [1 2 3]; vecteurNV(a=1)', 'MATLAB:index:nameValueSyntax'; ...
+           'vecteurNV = [1 2 3]; vecteurNV(a=1) = 4;', 'MATLAB:index:nameValueSyntax'; ...
+           'sNV.v = [1 2 3]; sNV.v(a=1)', 'MATLAB:index:nameValueSyntax'};
+for q = 1:size(refusNV, 1)
+    vuNV = '';
+    try
+        eval(refusNV{q, 1});
+    catch err
+        vuNV = err.identifier;
+        if q == 1
+            assert(~isempty(strfind(err.message, 'after all other inputs')), ...
+                   'le message de MATLAB');
+        end
+    end
+    assert(strcmp(vuNV, refusNV{q, 2}), sprintf('nom=valeur refuse %d : %s', q, vuNV));
+end
+disp('nom=valeur : ok');
+
+%% ------------------------------------------- vides dans une concatenation
+% Dès qu'un opérande a des éléments, MATLAB omet les vides, quelles que
+% soient leurs dimensions ; s'ils sont tous vides, leurs tailles comptent.
+assert(isequal([ones(2, 1); zeros(1, 0)], [1; 1]));
+assert(isequal([zeros(0, 3), 5], 5));
+assert(isequal(size([zeros(1, 0), zeros(1, 0)]), [1 0]));
+assert(isequal(size([zeros(1, 0); zeros(2, 0)]), [3 0]));
+assert(isequal(size([zeros(1, 0); zeros(0, 3)]), [0 0]));
+assert(isequal(class([int8(5), zeros(1, 0)]), 'int8'));
+
+%% ------------------------------------------- affichage des zeros exacts
+% Un zéro exact s'écrit 0 parmi des décimaux, et -0 s'écrit 0.
+format short
+assert(~isempty(regexp(evalc('disp([1.5 0])'), '1\.5000\s+0\s*$', 'once')));
+assert(strcmp(strtrim(evalc('disp(-0)')), '0'));
+assert(contains(evalc('z = [1.5+2i 0]'), '0.0000 + 0.0000i'));
+format
+% Les nombres d'une table : cinq chiffres significatifs, comme MATLAB.
+affichageTable = evalc('disp(table([0.0016297; 15.0618722713733], [-3482258.6346; 1.13], ''VariableNames'', {''a'', ''b''}))');
+assert(contains(affichageTable, '0.0016297') && contains(affichageTable, '15.062'));
+assert(contains(affichageTable, '-3.4823e+06') && contains(affichageTable, '1.13'));
+
+%% ------------------------------------- capture des fonctions anonymes
+% Comme MATLAB, une fonction anonyme ne capture que les variables que son
+% corps cite, à leur valeur du moment. Elle capturait tout l'espace de
+% travail et le recopiait à chaque appel : après un tableau d'un million
+% d'éléments, deux mille appels prenaient plusieurs secondes.
+grosTableau = rand(1e6, 1);
+anonymeLegere = @(x) x + 1;
+anonymeCitant = @(k) grosTableau(k);
+tic;
+for k = 1:2000
+    anonymeLegere(k);
+    anonymeCitant(k);
+end
+assert(toc < 1, 'un appel ne doit pas recopier l''espace de travail');
+clear grosTableau
+assert(anonymeCitant(3) > 0, 'la capture survit a la variable');
+facteurCapture = 2;
+doubleur = @(x) facteurCapture * x;
+facteurCapture = 10;
+assert(doubleur(3) == 6, 'la valeur capturee est celle de la creation');
+imbriquee = @(x) @(y) facteurCapture * x + y;
+assert(imbriquee(2)(1) == 21, 'une anonyme dans une anonyme capture aussi');
+parametreMasque = @(facteurCapture) facteurCapture + 1;
+assert(parametreMasque(1) == 2, 'un parametre masque la variable capturee');
 
 disp('langage : toutes les verifications passent');
 
@@ -1273,4 +1485,19 @@ end
 function nettoyageInterne()
     c = onCleanup(@() noterNettoyage('interne'));   %#ok<NASGU>
     noterNettoyage('dans interne');
+end
+
+% Un appel nom=valeur vers une fonction locale : la valeur nommee Gain,
+% multipliee.
+function y = nomValeurLocal(x, varargin)
+    y = x;
+    for k = 1:2:numel(varargin)
+        if strcmpi(varargin{k}, 'Gain')
+            y = y * varargin{k + 1};
+        end
+    end
+end
+
+function y = premierCow(x)
+    y = x(1);
 end

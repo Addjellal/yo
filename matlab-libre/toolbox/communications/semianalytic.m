@@ -43,7 +43,7 @@ function [ber, moyenne] = semianalytic(emis, recu, modulation, M, surechantillon
     modulation = lower(char(modulation));
     if ~any(strcmp(modulation, {'psk', 'qam', 'pam'}))
         error('comm:semianalytic:Modulation', ...
-              'La modulation doit être ''psk'', ''qam'' ou ''pam''.');
+              'Modulation must be ''psk'', ''qam'', or ''pam''.');
     end
     % Le filtre de réception, puis l'échantillonnage au rythme symbole.
     if ~isequal(numerateur, 1) || ~isequal(denominateur, 1)
@@ -56,11 +56,11 @@ function [ber, moyenne] = semianalytic(emis, recu, modulation, M, surechantillon
     emis = emis(1:n);
     recu = recu(1:n);
     if n < 1
-        error('comm:semianalytic:Vide', 'Il faut au moins un symbole.');
+        error('comm:semianalytic:Vide', 'At least one symbol is required.');
     end
     moyenne = mean(abs(recu) .^ 2);
     if moyenne <= 0
-        error('comm:semianalytic:Nul', 'Le signal reçu est nul.');
+        error('comm:semianalytic:Nul', 'The received signal is zero.');
     end
     k = log2(M);
     EbNo = 10 .^ (double(EbNodB(:)).' / 10);

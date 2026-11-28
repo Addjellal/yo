@@ -26,7 +26,7 @@ function c = matlibre_sym_croissants(arbre, nom)
                 c = [0 1];
             else
                 error('symbolic:sym2poly:AutreVariable', ...
-                      'L''expression dépend aussi de %s.', arbre{2});
+                      'The expression also depends on %s.', arbre{2});
             end
         case '+'
             c = matlibre_sym_somme(matlibre_sym_croissants(arbre{2}, nom), ...
@@ -41,14 +41,14 @@ function c = matlibre_sym_croissants(arbre, nom)
             diviseur = matlibre_sym_croissants(arbre{3}, nom);
             if numel(diviseur) > 1
                 error('symbolic:sym2poly:Fraction', ...
-                      'La division par une expression en %s n''est pas polynomiale.', nom);
+                      'Division by an expression in %s is not polynomial.', nom);
             end
             c = matlibre_sym_croissants(arbre{2}, nom) / diviseur;
         case '^'
             exposant = matlibre_sym_croissants(arbre{3}, nom);
             if numel(exposant) > 1 || exposant ~= round(exposant) || exposant < 0
                 error('symbolic:sym2poly:Exposant', ...
-                      'L''exposant doit être un entier positif.');
+                      'The exponent must be a nonnegative integer.');
             end
             base = matlibre_sym_croissants(arbre{2}, nom);
             c = 1;
@@ -57,7 +57,7 @@ function c = matlibre_sym_croissants(arbre, nom)
             end
         otherwise
             error('symbolic:sym2poly:Fonction', ...
-                  '''%s'' n''est pas polynomiale.', arbre{1});
+                  '''%s'' is not polynomial.', arbre{1});
     end
 end
 

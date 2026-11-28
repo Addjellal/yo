@@ -139,6 +139,34 @@ std::string argNom(const Valeur& v, const char* quoi) {
     return v.versTexte();
 }
 
+// Une poignee de fonction ne s'ecrit pas dans un fichier MAT : MATLAB la
+// range dans un sous-systeme du fichier dont le format n'est pas public.
+// Elle s'ecrivait en double, sans rien dire, et revenait au chargement
+// comme un nombre. Une variable qui en porte une — seule, ou dans une
+// cellule, une structure, un objet — est laissee de cote, avec un
+// avertissement.
+bool contientPoignee(const Valeur& v) {
+    if (v.classe == Classe::Fonction) return true;
+    for (const Valeur& c : v.cellules)
+        if (contientPoignee(c)) return true;
+    if (v.st)
+        for (const auto& champ : v.st->champs)
+            for (const Valeur& c : champ.second)
+                if (contientPoignee(c)) return true;
+    return false;
+}
+
+void avertirPoigneeNonEcrite(Interpreteur& it, const std::string& nom) {
+    const std::string id = "MatLibre:save:PoigneeNonEcrite";
+    const std::string message = "Variable '" + nom +
+                                "' was not saved: MatLibre cannot write function handles "
+                                "to a MAT-file.";
+    it.dernierAvertissement = message;
+    it.dernierAvertissementId = id;
+    if (!it.avertissementsActifs || it.avertissementsEteints.count(id)) return;
+    it.erreurSortie() << "Warning: " << message << "\n";
+}
+
 FONCTION(fnSave) {
     INUTILISE
     if (args.empty())
@@ -184,11 +212,11 @@ FONCTION(fnSave) {
         std::set<std::string> voulus(motifs.begin() + 1, motifs.end());
         for (const std::string& champ : s.st->ordre) {
             if (!voulus.empty() && !voulus.count(champ)) continue;
-            aEcrire.push_back({champ, s.champ(champ, 0), false});
+            aEcrire.push_back({champ, s.champ(champ, 0), false, {}});
         }
     } else if (motifs.empty()) {
         for (const std::string& nom : it.nomsVariables())
-            aEcrire.push_back({nom, it.lireVariable(nom), false});
+            aEcrire.push_back({nom, it.lireVariable(nom), false, {}});
     } else {
         std::vector<std::string> noms = it.nomsVariables();
         std::set<std::string> deja;
@@ -199,14 +227,23 @@ FONCTION(fnSave) {
                     erreur("MATLAB:save:variableNotFound",
                            "Variable '" + motif + "' not found.");
                 if (deja.insert(motif).second)
-                    aEcrire.push_back({motif, it.lireVariable(motif), false});
+                    aEcrire.push_back({motif, it.lireVariable(motif), false, {}});
                 continue;
             }
             std::regex r = parRegex ? std::regex(motif) : motifVersRegex(motif);
             for (const std::string& nom : noms)
                 if (std::regex_search(nom, r) && deja.insert(nom).second)
-                    aEcrire.push_back({nom, it.lireVariable(nom), false});
+                    aEcrire.push_back({nom, it.lireVariable(nom), false, {}});
         }
+    }
+
+    {
+        std::vector<VariableMat> ecrivables;
+        for (VariableMat& v : aEcrire) {
+            if (contientPoignee(v.valeur)) avertirPoigneeNonEcrite(it, v.nom);
+            else ecrivables.push_back(std::move(v));
+        }
+        aEcrire.swap(ecrivables);
     }
 
     if (ascii) {
@@ -235,6 +272,13 @@ FONCTION(fnLoad) {
     std::string demande = argNom(args[0], "filename");
     std::string fichier = demande;
     if (!fs::exists(fichier)) fichier = avecExtension(demande);
+    // « load fisheriris » : un nom sans dossier se cherche aussi sur le
+    // chemin, comme dans MATLAB, qui y range ses jeux de données.
+    if (!fs::exists(fichier)) {
+        std::string trouve = fichierSurChemin(it, demande);
+        if (trouve.empty()) trouve = fichierSurChemin(it, avecExtension(demande));
+        if (!trouve.empty()) fichier = trouve;
+    }
     if (!fs::exists(fichier))
         erreur("MATLAB:load:couldNotReadFile",
                "Unable to read file '" + demande + "'. No such file or directory.");

@@ -21,6 +21,6 @@ function [innovations, variances, logL] = infer(modele, y, varargin)
         [innovations, variances, logL] = matlibre_garch_inferer(modele, y, varargin{:});
     else
         error('econ:infer:Modele', ...
-              'INFER attend un modèle ARIMA ou GARCH.');
+              'INFER requires an ARIMA or GARCH model.');
     end
 end

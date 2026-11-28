@@ -17,7 +17,7 @@ function series = matlibre_colonnes_marche(premier, reste, attendus)
             colonne = find(strcmp(ordreMatrice, attendus{k}));
             if isempty(colonne) || colonne > size(premier, 2)
                 error('finance:colonnes:Matrice', ...
-                      'La matrice de cotations n''a pas de colonne « %s ».', attendus{k});
+                      'The price matrix has no ''%s'' column.', attendus{k});
             end
             series{k} = double(premier(:, colonne));
         end
@@ -26,7 +26,7 @@ function series = matlibre_colonnes_marche(premier, reste, attendus)
     liste = [{premier}, reste];
     if numel(liste) < numel(attendus)
         error('finance:colonnes:Nombre', ...
-              'Il faut %d séries, ou une matrice de cotations.', numel(attendus));
+              '%d series, or a price matrix, are required.', numel(attendus));
     end
     for k = 1:numel(attendus)
         series{k} = double(liste{k}(:));

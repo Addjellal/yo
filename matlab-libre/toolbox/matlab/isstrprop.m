@@ -49,7 +49,7 @@ function masque = isstrprop(texte, propriete)
             masque = codes >= 32 & codes ~= 127;
         otherwise
             error('MATLAB:isstrprop:Propriete', ...
-                  'Propriété inconnue : %s.', char(propriete));
+                  'Unknown property: %s.', char(propriete));
     end
     masque = reshape(logical(masque), size(codes));
 end

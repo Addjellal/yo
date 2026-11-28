@@ -81,7 +81,7 @@ function [valeur, position] = matlibre_thrift_lire(octets, position, type)
             end
         otherwise
             error('MATLAB:parquet:Thrift', ...
-                  'Type de protocole compact inconnu : %d.', type);
+                  'Unknown compact protocol type: %d.', type);
     end
 end
 

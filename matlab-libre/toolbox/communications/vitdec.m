@@ -40,7 +40,7 @@ function message = vitdec(code, treillis, tblen, opmode, dectype)
     nEntrees = treillis.numInputSymbols;
     if mod(numel(code), n) ~= 0
         error('comm:vitdec:BadLength', ...
-              'La longueur du code doit être un multiple de %d.', n);
+              'The code length must be a multiple of %d.', n);
     end
     pas = numel(code) / n;
     sortiesDecimales = oct2dec(treillis.outputs);

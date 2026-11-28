@@ -36,8 +36,9 @@ function [valeur, contexte] = matlibre_dl_convoluer(x, poids, biais, pas, bords,
     patchs = etendue(indicesTous);
     % Le retournement du filtre est ce qui distingue la convolution de la
     % corrélation ; il se fait une fois, sur les poids.
-    poidsRetournes = poids(end:-1:1, end:-1:1, :, :);
-    poidsMatrice = reshape(poidsRetournes, [], filtres);
+    % Comme les couches de MATLAB : le produit scalaire des poids et de la
+    % fenêtre d'entrée, sans retourner le filtre (une corrélation).
+    poidsMatrice = reshape(poids, [], filtres);
     produit = poidsMatrice.' * patchs;
     produit = produit + reshape(double(biais(:)), filtres, 1);
     valeur = permute(reshape(produit, filtres, tailleSortie(1), tailleSortie(2), observations), ...

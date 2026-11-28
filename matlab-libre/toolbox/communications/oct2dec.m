@@ -19,7 +19,7 @@ function d = oct2dec(o)
             chiffre = mod(valeur, 10);
             if chiffre > 7
                 error('comm:oct2dec:BadDigit', ...
-                      'Le chiffre %d n''existe pas en octal.', chiffre);
+                      'Digit %d is not an octal digit.', chiffre);
             end
             somme = somme + chiffre * puissance;
             puissance = puissance * 8;

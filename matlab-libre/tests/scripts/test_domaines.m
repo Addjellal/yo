@@ -831,8 +831,10 @@ assert(max(abs(o3 - [1 1]/sqrt(2))) < 1e-15);
 assert(max(abs(o4 - [1 -1]/sqrt(2))) < 1e-15);
 assert(isequal(qmf([1 2 3 4]), [4 -3 2 -1]));
 assert(isequal(wrev([1 2 3]), [3 2 1]));
-assert(isequal(dyadup([1 2 3]), [1 0 2 0 3]));
-assert(isequal(dyadup([1 2 3], 0), [0 1 0 2 0 3 0]));
+% Le sens de MATLAB : par défaut (EVENODD = 1, impair), les zéros
+% occupent les rangs impairs ; EVENODD pair les met aux rangs pairs.
+assert(isequal(dyadup([1 2 3]), [0 1 0 2 0 3 0]));
+assert(isequal(dyadup([1 2 3], 0), [1 0 2 0 3]));
 assert(isequal(dyaddown([1 2 3 4 5]), [2 4]));
 
 % Niveau maximal : floor(log2(L/(Lf-1))).
@@ -854,15 +856,21 @@ assert(numel(appcoef(c, l, 'db1')) == 2);
 d1 = detcoef(c, l, 1);
 assert(max(abs(d1 - d1(1))) < 1e-12);
 
-% Aller-retour et conservation de l'énergie : la transformée est
-% orthogonale, donc la somme des carrés se conserve.
+% Aller-retour, et conservation de l'énergie en mode 'per' : la
+% transformée y est orthogonale, donc la somme des carrés se conserve. En
+% mode 'sym', le défaut de MATLAB, elle est redondante — plus de
+% coefficients que d'échantillons — et l'énergie ne se conserve pas.
 signal = cos((1:64) / 5) + (1:64) / 40;
 for nom = {'haar', 'db2', 'db4', 'db6', 'sym4', 'sym8'}
     [cc, ll] = wavedec(signal, 3, nom{1});
     assert(max(abs(waverec(cc, ll, nom{1}) - signal)) < 1e-10);
-    assert(abs(sum(cc .^ 2) - sum(signal .^ 2)) < 1e-9);
     [unNiveauA, unNiveauD] = dwt(signal, nom{1});
     assert(max(abs(idwt(unNiveauA, unNiveauD, nom{1}) - signal)) < 1e-10);
+    dwtmode('per', 'nodisp');
+    [cc, ll] = wavedec(signal, 3, nom{1});
+    dwtmode('sym', 'nodisp');
+    assert(numel(cc) == numel(signal));
+    assert(abs(sum(cc .^ 2) - sum(signal .^ 2)) < 1e-9);
 end
 % Les familles de filtres se construisent au lieu d'etre recopiees, et
 % chacune se verifie sur ce qui la definit.
@@ -909,14 +917,19 @@ for k = 1:numel(famille)
     assert(max(abs(waverec(cBior, lBior, famille{k}) - signalLong)) < 1e-9, famille{k});
 end
 % Les filtres biorthogonaux sont symetriques ; aucun filtre orthogonal a
-% support compact ne l'est, sauf Haar. Les zeros de complement, eux, ne
-% sont pas repartis symetriquement : c'est l'alignement des deux filtres
-% qui commande leur place, non l'esthetique.
+% support compact ne l'est, sauf Haar. BIORWAVF les complete de zeros
+% centres, comme MATLAB : bior2.2 rend [0 1 2 1 0]/4, symetrique jusque
+% dans ses zeros. C'est BIORFILT qui les aligne pour la reconstruction,
+% en les completant a une meme longueur paire.
 utile = @(v) v(find(abs(v) > 1e-12, 1):find(abs(v) > 1e-12, 1, 'last'));
 [rfBior, dfBior] = biorwavf('bior2.2');
-assert(max(abs(utile(rfBior) - fliplr(utile(rfBior)))) < 1e-15);
-assert(max(abs(utile(dfBior) - fliplr(utile(dfBior)))) < 1e-15);
+assert(isequal(rfBior, [0 1 2 1 0] / 4));
+assert(max(abs(rfBior - fliplr(rfBior))) < 1e-15);
+assert(max(abs(dfBior - fliplr(dfBior))) < 1e-15);
 assert(numel(utile(rfBior)) == 3 && numel(utile(dfBior)) == 5);
+% Le banc reste celui de MATLAB : Lo_R = [0 1 2 1 0 0] sqrt(2)/4.
+[~, ~, loRBior] = wfilters('bior2.2');
+assert(max(abs(loRBior - [0 1 2 1 0 0] * sqrt(2) / 4)) < 1e-15);
 % bior4.4 est le couple 9/7 de JPEG 2000 : neuf et sept coefficients.
 [rf44, df44] = biorwavf('bior4.4');
 assert(sum(abs(rf44) > 1e-12) == 7 && sum(abs(df44) > 1e-12) == 9);
@@ -998,19 +1011,26 @@ assert(abs(psnrEssai - 10 * log10(255 ^ 2 / 0.25)) < 1e-12);
 assert(ratioEssai > 1);
 assert(isinf(measerr(0:255, 0:255)));
 
-% Le mode de prolongement se lit et se pose ; MatLibre n'analyse qu'en
-% periodique, et refuse les autres au lieu de faire semblant.
-assert(strcmp(dwtmode('status'), 'per'));
-dwtmode('per', 'nodisp');
-for modeRefuse = {'sym', 'zpd', 'inconnu'}
-    refuse = false;
-    try
-        dwtmode(modeRefuse{1});
-    catch
-        refuse = true;
-    end
-    assert(refuse, modeRefuse{1});
+% Le mode de prolongement se lit et se pose : 'sym' par defaut, comme
+% dans MATLAB, et tous ses modes sont acceptes ; un mode inconnu est
+% refuse.
+assert(strcmp(dwtmode('status'), 'sym'));
+for modeAdmis = {'per', 'zpd', 'sp0', 'sp1', 'symw', 'asym', 'asymw', 'ppd', 'sym'}
+    dwtmode(modeAdmis{1}, 'nodisp');
+    assert(strcmp(dwtmode('status', 'nodisp'), modeAdmis{1}));
 end
+refuse = false;
+try
+    dwtmode('inconnu');
+catch
+    refuse = true;
+end
+assert(refuse);
+% Le mode change les longueurs : floor((N+lf-1)/2) hors 'per',
+% ceil(N/2) en 'per'.
+[aSym, ~] = dwt(1:9, 'db2');
+[aPer, ~] = dwt(1:9, 'db2', 'mode', 'per');
+assert(numel(aSym) == 6 && numel(aPer) == 5);
 
 % Debruitage par l'interface d'origine : les quatre regles et les deux
 % seuillages ramenent tous le bruit.
@@ -1061,12 +1081,17 @@ assert(max(max(abs(idwt2(a2, h2, v2, d2, 'db1') - x))) < 1e-10);
 
 % Décomposition bidimensionnelle multiniveaux et reconstructions partielles.
 image16 = magic(16);
+% En mode 'sym' (le defaut), chaque niveau garde floor((N+lf-1)/2)
+% coefficients par dimension : 16 -> 9 -> 6 pour db2.
 for nom = {'haar', 'db2', 'sym4'}
+    lf = numel(wfilters(nom{1}));
+    n1 = floor((16 + lf - 1) / 2);
+    n2 = floor((n1 + lf - 1) / 2);
     [c2, s2] = wavedec2(image16, 2, nom{1});
     assert(max(max(abs(waverec2(c2, s2, nom{1}) - image16))) < 1e-9);
-    assert(isequal(size(appcoef2(c2, s2, nom{1}, 2)), [4 4]));
+    assert(isequal(size(appcoef2(c2, s2, nom{1}, 2)), [n2 n2]));
     [hd, vd, dd] = detcoef2('all', c2, s2, 1);
-    assert(isequal(size(hd), [8 8]) && isequal(size(vd), [8 8]) && isequal(size(dd), [8 8]));
+    assert(isequal(size(hd), [n1 n1]) && isequal(size(vd), [n1 n1]) && isequal(size(dd), [n1 n1]));
 end
 % Energie d'une image decomposee : elle se repartit et somme a cent.
 [cEnergie, sEnergie] = wavedec2(image16, 2, 'haar');
@@ -1278,7 +1303,8 @@ assert(isequal(leaves(arbrePaquet)', 7:14));
 assert(isequal(leaves(arbrePaquet, 'dp'), [3 * ones(8, 1), (0:7)']));
 assert(isequal(tnodes(arbrePaquet), leaves(arbrePaquet)));
 [~, taillesFeuilles] = leaves(arbrePaquet);
-assert(all(taillesFeuilles(:, 2) == 8));
+% 64 -> 33 -> 18 -> 10 coefficients en mode 'sym' avec db2 (filtre de 4).
+assert(all(taillesFeuilles(:, 2) == 10));
 assert(isequal(wpcoef(arbrePaquet, 5), wpcoef(arbrePaquet, [2 2])));
 
 % Scinder et refermer : l'arbre change de forme sans rien perdre.
@@ -1450,7 +1476,11 @@ assert(isequal(wextend('1D', 'spd',   [1 2 3], 2), [-1 0 1 2 3 4 5]));
 assert(isequal(wextend('1D', 'sym',   [1 2 3], 2), [2 1 1 2 3 3 2]));
 assert(isequal(wextend('1D', 'symw',  [1 2 3], 2), [3 2 1 2 3 2 1]));
 assert(isequal(wextend('1D', 'asym',  [1 2 3], 2), [-2 -1 1 2 3 -3 -2]));
-assert(isequal(wextend('1D', 'asymw', [1 2 3], 2), [-3 -2 1 2 3 -2 -1]));
+% 'asymw' : reflexion ponctuelle autour du bord, 2*x(1) - x(1+k), comme
+% MATLAB et PyWavelets (« antireflect ») ; 'asym' reste periodique de
+% periode 2N sur [x, -x renverse] au-dela d'une periode.
+assert(isequal(wextend('1D', 'asymw', [1 2 3], 2), [-1 0 1 2 3 4 5]));
+assert(isequal(wextend('1D', 'asym',  [1 2 3], 5), [2 3 -3 -2 -1 1 2 3 -3 -2 -1 1 2]));
 assert(isequal(wextend('1D', 'ppd',   [1 2 3], 2), [2 3 1 2 3 1 2]));
 assert(isequal(wextend('1D', 'per',   [1 2 3], 2), [3 3 1 2 3 3 1 2]));
 assert(isequal(wextend('1D', 'zpd',   [1 2 3], 2, 'l'), [0 0 1 2 3]));

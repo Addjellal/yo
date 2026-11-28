@@ -9,24 +9,33 @@ function largeur = beamwidth(theta, diagramme)
 %   l'ouverture par deux. C'est la résolution angulaire, et elle ne
 %   s'achète qu'en étendue physique.
 %
-%   La mesure se fait sur l'échantillonnage fourni : un maillage trop
-%   grossier la surestime.
+%   Les deux points à mi-puissance sont interpolés linéairement entre
+%   les échantillons qui les encadrent : l'erreur décroît comme le carré
+%   du pas de THETA. S'ils sortent du domaine échantillonné, l'ouverture
+%   n'est pas mesurable et BEAMWIDTH le dit.
 %
 %   Exemple :
 %      theta = linspace(1e-6, pi - 1e-6, 20001);
-%      rad2deg(beamwidth(theta, dipolePattern(theta, 0.5)))   % 78
+%      rad2deg(beamwidth(theta, dipolePattern(theta, 0.5)))   % 78.08
 %
 %   Voir aussi DIRECTIVITY, DIPOLEPATTERN, ARRAYFACTOR.
     p = diagramme .^ 2;
     [maxi, imax] = max(p);
     seuil = maxi / 2;
-    gauche = imax;
-    while gauche > 1 && p(gauche) > seuil
-        gauche = gauche - 1;
+    gauche = find(p(1:imax) <= seuil, 1, 'last');
+    droite = imax - 1 + find(p(imax:end) <= seuil, 1, 'first');
+    if isempty(gauche) || isempty(droite)
+        error('antenna:beamwidth:Domaine', ...
+              'The pattern does not fall to half power on both sides of the maximum.');
     end
-    droite = imax;
-    while droite < numel(p) && p(droite) > seuil
-        droite = droite + 1;
+    largeur = croisement(theta, p, droite - 1, droite, seuil) ...
+              - croisement(theta, p, gauche, gauche + 1, seuil);
+end
+
+function t = croisement(theta, p, i, j, seuil)
+    if p(j) == p(i)
+        t = theta(i);
+    else
+        t = theta(i) + (seuil - p(i)) * (theta(j) - theta(i)) / (p(j) - p(i));
     end
-    largeur = theta(droite) - theta(gauche);
 end

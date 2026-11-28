@@ -50,7 +50,7 @@ function exclus = excludedata(x, y, methode, valeur)
                      residus > quartiles(2) + 1.5 * interquartile;
         otherwise
             error('curvefit:excludedata:Methode', ...
-                  'Méthode inconnue : %s.', char(methode));
+                  'Unknown method: %s.', char(methode));
     end
     exclus = reshape(logical(exclus), n, 1);
 end

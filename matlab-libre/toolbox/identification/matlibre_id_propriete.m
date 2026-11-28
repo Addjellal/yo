@@ -11,7 +11,7 @@ function nom = matlibre_id_propriete(donne)
               'Name', 'OutputName', 'InputName', 'ExperimentName'};
     position = find(strcmpi(connus, donne), 1);
     if isempty(position)
-        error('ident:iddata:Propriete', 'Propriété inconnue : %s.', donne);
+        error('ident:iddata:Propriete', 'Unknown property: %s.', donne);
     end
     nom = connus{position};
 end

@@ -19,7 +19,7 @@ function [correlations, decalages] = modwtxcorr(w1, w2, nom, decalageMax)
     if nargin < 3, nom = ''; end %#ok<INUSA>
     if ~isequal(size(w1), size(w2))
         error('wavelet:modwtxcorr:Tailles', ...
-              'Les deux transformées doivent avoir la même taille.');
+              'The two transforms must be the same size.');
     end
     [lignes, n] = size(w1);
     if nargin < 4 || isempty(decalageMax)

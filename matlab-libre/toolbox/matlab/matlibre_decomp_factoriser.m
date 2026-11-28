@@ -25,7 +25,7 @@ function f = matlibre_decomp_factoriser(A, type)
             [R, echec] = chol(A);
             if echec ~= 0
                 error('MATLAB:decomposition:NotPositiveDefinite', ...
-                      'La matrice n''est pas définie positive.');
+                      'Matrix must be positive definite.');
             end
             f.R = R;
             f.malConditionne = rapportPivots(diag(R)) < sqrt(eps);

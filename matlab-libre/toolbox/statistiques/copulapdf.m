@@ -63,6 +63,6 @@ end
 function exigerDeux(d)
     if d ~= 2
         error('stats:copulapdf:Dimension', ...
-              'Les copules archimédiennes ne sont traitées qu''à deux variables.');
+              'Archimedean copulas are supported only for two variables.');
     end
 end

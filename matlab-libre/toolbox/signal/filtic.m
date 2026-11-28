@@ -27,7 +27,7 @@ function z = filtic(b, a, y, x)
     a = double(a(:)).';
     if isempty(a), a = 1; end
     if a(1) == 0
-        error('signal:filtic:NullLeading', 'A(1) ne peut pas être nul.');
+        error('signal:filtic:NullLeading', 'A(1) cannot be zero.');
     end
     b = b / a(1);
     a = a / a(1);

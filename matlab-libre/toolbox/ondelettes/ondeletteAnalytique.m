@@ -51,7 +51,7 @@ function [nom, parametres] = normaliserOndeletteAnalytique(nom, parametres)
             if isscalar(parametres), parametres = [3 parametres]; end
             if parametres(1) <= 0 || parametres(2) <= 0
                 error('wavelet:ondeletteAnalytique:Morse', ...
-                      'Gamma et bêta doivent être strictement positifs.');
+                      'Gamma and beta must be strictly positive.');
             end
         case {'amor', 'morl'}
             nom = 'amor';

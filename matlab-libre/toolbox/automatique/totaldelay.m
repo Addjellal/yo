@@ -32,7 +32,7 @@ function v = lireRetard(sys, nom)
     if isempty(v), v = 0; end
     if any(v(:) < 0)
         error('Control:ltiobject:setDelay', ...
-              'La propriete %s doit etre positive ou nulle.', nom);
+              'Property %s must be nonnegative.', nom);
     end
 end
 
@@ -60,6 +60,6 @@ function m = etendre(v, ny, nu, nom)
         return
     end
     error('Control:ltiobject:setDelay', ...
-          ['La propriete %s porte %d valeur(s) pour %d voie(s) : donnez un ' ...
-           'scalaire, ou une valeur par voie.'], nom, numel(v), ny * nu);
+          ['Property %s has %d value(s) for %d channel(s): give a ' ...
+           'scalar, or one value per channel.'], nom, numel(v), ny * nu);
 end

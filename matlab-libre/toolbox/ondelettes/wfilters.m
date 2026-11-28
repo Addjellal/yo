@@ -80,7 +80,7 @@ function [Lo_D, Hi_D, Lo_R, Hi_R] = wfilters(nom, genre)
                 Hi_D = Hi_R;
             otherwise
                 error('wavelet:wfilters:BadType', ...
-                      'Le type doit être ''d'', ''r'', ''l'' ou ''h''.');
+                      'Type must be ''d'', ''r'', ''l'', or ''h''.');
         end
     end
 end

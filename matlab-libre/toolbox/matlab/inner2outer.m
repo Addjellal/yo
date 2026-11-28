@@ -24,11 +24,11 @@ function T2 = inner2outer(T1)
 %
 %   Voir aussi TABLE, SPLITVARS, MERGEVARS, ROWS2VARS, STACK.
     if nargin < 1
-        error('MATLAB:minrhs', 'INNER2OUTER attend une table.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     if ~isa(T1, 'table') && ~isa(T1, 'timetable')
         error('MATLAB:inner2outer:InvalidInput', ...
-              'INNER2OUTER attend une table ou un tableau chronologique.');
+              'Input must be a table or a timetable.');
     end
     nomsExterieurs = T1.Properties.VariableNames;
     if isempty(nomsExterieurs)
@@ -38,8 +38,8 @@ function T2 = inner2outer(T1)
     for k = 1:numel(nomsExterieurs)
         if ~isa(T1.(nomsExterieurs{k}), 'table')
             error('MATLAB:inner2outer:NestedTablesRequired', ...
-                  ['INNER2OUTER attend que chaque variable soit une table ; ' ...
-                   '« %s » est de classe %s.'], ...
+                  ['INNER2OUTER requires every variable to be a table; ' ...
+                   '''%s'' is of class %s.'], ...
                   nomsExterieurs{k}, class(T1.(nomsExterieurs{k})));
         end
     end

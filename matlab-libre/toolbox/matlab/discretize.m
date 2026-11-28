@@ -63,7 +63,7 @@ function [bins, bords] = discretize(x, repartition, varargin)
         bords = double(repartition(:))';
     end
     if numel(bords) < 2
-        error('discretize:Bords', 'Il faut au moins deux bords.');
+        error('discretize:Bords', 'EDGES must have at least two elements.');
     end
     bins = NaN(size(x));
     n = numel(bords) - 1;

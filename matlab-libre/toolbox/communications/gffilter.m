@@ -29,7 +29,7 @@ function y = gffilter(b, a, x, p)
     x = mod(double(x(:)).', p);
     if isempty(a) || a(1) == 0
         error('comm:gffilter:Pivot', ...
-              'Le premier coefficient de A doit être non nul dans GF(%d).', p);
+              'The leading coefficient of A must be nonzero in GF(%d).', p);
     end
     inverse = gfdiv(1, a(1), p);
     n = numel(x);

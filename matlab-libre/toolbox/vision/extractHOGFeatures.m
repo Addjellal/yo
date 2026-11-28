@@ -93,7 +93,7 @@ function [descripteur, disposition] = extractHOGFeatures(I, varargin)
     pas = tailleBloc - recouvrement;
     if any(pas < 1)
         error('vision:extractHOGFeatures:BadOverlap', ...
-              'Le recouvrement doit rester strictement sous la taille du bloc.');
+              'The overlap must be strictly less than the block size.');
     end
     blocs = floor((cellules - tailleBloc) ./ pas) + 1;
     blocs = max(blocs, 0);

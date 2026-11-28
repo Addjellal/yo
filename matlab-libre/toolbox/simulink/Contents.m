@@ -35,6 +35,25 @@
 %   getfullname   - Le chemin « modele/bloc » d'un bloc
 %   save_system   - Écrit un .m qui rebâtit le modèle
 %   load_system   - Relit ce .m
+%   getSimulinkBlockHandle - La poignée d'un bloc, ou -1
+%
+% Restructurer un modèle
+%   Simulink.BlockDiagram.createSubsystem   - Range des blocs dans un sous-système
+%   Simulink.BlockDiagram.expandSubsystem   - Remplace un sous-système par son contenu
+%   Simulink.BlockDiagram.arrangeSystem     - Range les blocs d'un système
+%   Simulink.BlockDiagram.deleteContents    - Vide un modèle
+%   Simulink.BlockDiagram.copyContentsToSubsystem  - Copie un modèle dans un sous-système
+%   Simulink.SubSystem.deleteContents       - Vide un sous-système
+%   Simulink.SubSystem.copyContentsToBlockDiagram  - Copie un sous-système dans un modèle
+%
+% Jeux de configuration
+%   getActiveConfigSet  - Le jeu de configuration actif
+%   getConfigSets       - Les noms des jeux d'un modèle
+%   getConfigSet        - Un jeu, par son nom
+%   attachConfigSet     - Attache un jeu à un modèle
+%   attachConfigSetCopy - Attache la copie d'un jeu
+%   setActiveConfigSet  - Rend un jeu actif
+%   detachConfigSet     - Détache un jeu
 %
 % Du schéma au programme
 %   Deux chemins, qu'il ne faut pas confondre. SAVE_SYSTEM écrit le
@@ -125,3 +144,5 @@
 %   linmod        - Linéarise autour d'un point de fonctionnement
 %   dlinmod       - Linéarise et échantillonne
 %   trim          - Cherche un point d'équilibre
+%   linio         - Un point d'analyse : entrée, sortie, coupure
+%   linearize     - Linéarise entre des points d'analyse

@@ -33,7 +33,7 @@ function [q, qd, qdd, pp] = bsplinepolytraj(controle, intervalle, echantillons)
     ordre = min(4, nControle);
     if nControle < 2
         error('robotics:bsplinepolytraj:Points', ...
-              'Il faut au moins deux points de contrôle.');
+              'At least two control points are required.');
     end
     % Vecteur de nœuds serré : l'ordre est répété aux deux bouts, ce qui
     % force la courbe à passer par le premier et le dernier point.

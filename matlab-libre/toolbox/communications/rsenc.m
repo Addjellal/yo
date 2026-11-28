@@ -22,20 +22,20 @@ function code = rsenc(message, n, k, varargin)
 %   Voir aussi RSDEC, RSGENPOLY, BCHENC, GF.
     if ~isa(message, 'gf')
         error('comm:rsenc:Corps', ...
-              'Le message doit être un tableau de corps de Galois : gf(x, m).');
+              'The message must be a Galois field array: gf(x, m).');
     end
     m = message.m;
     prim = message.prim_poly;
     if 2 ^ m - 1 ~= n
         error('comm:rsenc:Longueur', ...
-              'La longueur %d ne va pas avec un corps GF(2^%d).', n, m);
+              'Codeword length %d does not match field GF(2^%d).', n, m);
     end
     valeurs = message.x;
     if isvector(valeurs)
         valeurs = valeurs(:).';
     end
     if size(valeurs, 2) ~= k
-        error('comm:rsenc:Dimension', 'Le message doit compter %d colonnes.', k);
+        error('comm:rsenc:Dimension', 'The message must have %d columns.', k);
     end
     position = 'end';
     generateur = [];

@@ -11,7 +11,7 @@ function contraintes = pcpval(valeurPortefeuille, nombreActifs)
 %
 %   Voir aussi PCALIMS, PCGLIMS, PORTCONS, PORTOPT.
     if nargin < 2 || isempty(nombreActifs)
-        error('finance:pcpval:Arguments', 'Il faut le nombre d''actifs.');
+        error('finance:pcpval:Arguments', 'The number of assets is required.');
     end
     n = round(nombreActifs);
     A = [ones(1, n); -ones(1, n); -eye(n)];

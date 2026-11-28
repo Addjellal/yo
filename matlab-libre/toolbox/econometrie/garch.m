@@ -83,7 +83,7 @@ classdef garch
                     case 'leverage',     obj.Leverage = matlibre_cellule(valeur);
                     otherwise
                         error('econ:garch:Option', ...
-                              'Propriété inconnue : %s.', char(varargin{k}));
+                              'Unknown property: %s.', char(varargin{k}));
                 end
                 k = k + 2;
             end

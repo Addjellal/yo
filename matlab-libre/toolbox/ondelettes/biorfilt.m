@@ -26,7 +26,8 @@ function [Lo_D, Hi_D, Lo_R, Hi_R] = biorfilt(DF, RF, sansSortie)
 %   d'échelle soient alignés à un décalage pair près, faute de quoi le
 %   demi-bande change de parité et le repliement subsiste — la distorsion
 %   restant nulle, l'erreur ne se voit qu'à la reconstruction. C'est
-%   pourquoi les zéros de complètement s'ajoutent par paires à gauche.
+%   pourquoi les deux filtres se complètent, comme dans MATLAB, à une même
+%   longueur paire.
 %
 %   Exemple :
 %      [df, rf] = biorwavf('bior2.2');
@@ -38,9 +39,14 @@ function [Lo_D, Hi_D, Lo_R, Hi_R] = biorfilt(DF, RF, sansSortie)
     if nargin < 3, sansSortie = false; end
     DF = double(DF(:))';
     RF = double(RF(:))';
+    % Les deux filtres se complètent à une même longueur paire, les zéros
+    % répartis comme dans MATLAB (le plus petit nombre à gauche) : c'est la
+    % parité de cette longueur qui met les centres des deux filtres à la
+    % distance qui annule le repliement.
     n = max(numel(DF), numel(RF));
-    DF = completerPair(DF, n);
-    RF = completerPair(RF, n);
+    n = n + mod(n, 2);
+    DF = completer(DF, n);
+    RF = completer(RF, n);
     analyse = DF / sum(DF) * sqrt(2);
     synthese = RF / sum(RF) * sqrt(2);
     Lo_D = analyse(end:-1:1);
@@ -70,18 +76,11 @@ function [Lo_D, Hi_D, Lo_R, Hi_R] = biorfilt(DF, RF, sansSortie)
         % La forme à huit sorties de MATLAB n'est pas reprise : elle rend
         % les mêmes filtres découpés en deux bancs.
         error('wavelet:biorfilt:HuitSorties', ...
-              'La forme à huit sorties n''est pas gérée.');
+              'The eight-output syntax is not supported.');
     end
 end
 
-function v = completerPair(f, n)
-%COMPLETERPAIR Complète un filtre de zéros sans rompre l'alignement.
-%   Un décalage d'un échantillon entre les deux filtres d'échelle change
-%   la parité du demi-bande, et le repliement ne s'annule plus : la
-%   reconstruction devient fausse alors même que la distorsion reste
-%   nulle. Le décalage ajouté à gauche est donc toujours pair ; ce qui
-%   reste va à droite.
+function v = completer(f, n)
     manque = n - numel(f);
-    gauche = 2 * floor(manque / 4);
-    v = [zeros(1, gauche), f, zeros(1, manque - gauche)];
+    v = [zeros(1, floor(manque / 2)), f, zeros(1, ceil(manque / 2))];
 end

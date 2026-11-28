@@ -23,7 +23,7 @@ function [indices, tailleSortie] = matlibre_dl_indices_patchs(tailleEtendue, noy
     largeurSortie = floor((largeur - (noyau(2) - 1) * dilatation(2) - 1) / pas(2)) + 1;
     if hauteurSortie < 1 || largeurSortie < 1
         error('nnet:dlconv:Taille', ...
-              'Le filtre est plus grand que l''entrée, remplissage compris.');
+              'The filter is larger than the input, including padding.');
     end
     tailleSortie = [hauteurSortie, largeurSortie];
     [decalageLigne, decalageColonne] = ndgrid(0:(noyau(1) - 1), 0:(noyau(2) - 1));

@@ -179,7 +179,7 @@ ADDRULE Ajoute des règles.
      fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
      fis = addrule(fis, [1 1 1 1; 2 2 1 1]);
-     numel(fis.regles)           % 2
+     size(fis.regles, 1)         % 2 : une ligne par règle
 
   Voir aussi ADDMF, ADDINPUT, ADDOUTPUT, SHOWRULE.
 ```

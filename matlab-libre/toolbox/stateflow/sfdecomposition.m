@@ -25,11 +25,11 @@ function machine = sfdecomposition(machine, parent, genre)
     genre = lower(char(genre));
     if ~any(strcmp(genre, {'parallel', 'exclusive'}))
         error('Stateflow:DecompositionInconnue', ...
-              'La decomposition est ''parallel'' ou ''exclusive'' ; pas ''%s''.', genre);
+              'The decomposition must be ''parallel'' or ''exclusive'', not ''%s''.', genre);
     end
     parent = char(parent);
     if ~isempty(parent) && ~any(cellfun(@(e) strcmp(e.nom, parent), machine.etats))
-        error('Stateflow:EtatInconnu', 'La machine n''a pas d''etat ''%s''.', parent);
+        error('Stateflow:EtatInconnu', 'The chart has no state ''%s''.', parent);
     end
     if ~isfield(machine, 'paralleles')
         machine.paralleles = {};

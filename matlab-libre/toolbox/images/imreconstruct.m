@@ -20,7 +20,7 @@ function sortie = imreconstruct(marqueur, masque, connexite)
     masque = double(masque);
     if ~isequal(size(marqueur), size(masque))
         error('images:imreconstruct:SizeMismatch', ...
-              'Le marqueur et le masque doivent avoir la même taille.');
+              'MARKER and MASK must be the same size.');
     end
     sortie = min(marqueur, masque);
     [h, l] = size(sortie);

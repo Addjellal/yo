@@ -200,6 +200,39 @@ assert(strcmp(matlibre_web_requete('http://x', {'q', 'un chat'}), ...
 assert(strcmp(matlibre_web_requete('http://x?a=1', {'b', '2'}), ...
               'http://x?a=1&b=2'));
 assert(strcmp(matlibre_web_requete('http://x', {}), 'http://x'));
+
+% Les arguments de curl passent par le shell : entre guillemets doubles,
+% « $(...) » y etait execute, et un « $ » d'une adresse ou d'un mot de
+% passe, remplace. Ils sont desormais entre apostrophes.
+if isunix && system('command -v curl > /dev/null 2>&1') == 0
+    dossierWeb = tempname();
+    mkdir(dossierWeb);
+    temoin = fullfile(dossierWeb, 'temoin');
+    try
+        webread(['file://' dossierWeb '/absent$(touch ' temoin ')']);
+    catch
+    end
+    assert(~isfile(temoin), 'une adresse ne doit pas executer de commande');
+    nomBizarre = fullfile(dossierWeb, 'a$HOME''b.json');
+    fid = fopen(nomBizarre, 'w');
+    fprintf(fid, '{"a": 1}');
+    fclose(fid);
+    lu = webread(['file://' nomBizarre]);
+    assert(isstruct(lu) && lu.a == 1, 'un $ et une apostrophe passent tels quels');
+    % Un .txt est du texte : il devenait [] en passant par READMATRIX.
+    nomTexte = fullfile(dossierWeb, 'note.txt');
+    fid = fopen(nomTexte, 'w');
+    fprintf(fid, 'bonjour le monde\n');
+    fclose(fid);
+    lu = webread(['file://' nomTexte]);
+    assert(ischar(lu) && strcmp(strtrim(lu), 'bonjour le monde'), 'un .txt reste du texte');
+    nomCsv = fullfile(dossierWeb, 'mesures.csv');
+    fid = fopen(nomCsv, 'w');
+    fprintf(fid, '1,2\n3,4\n');
+    fclose(fid);
+    assert(isequal(webread(['file://' nomCsv]), [1 2; 3 4]), 'un .csv de nombres se lit');
+    rmdir(dossierWeb, 's');
+end
 refuseImpair = false;
 try
     matlibre_web_requete('http://x', {'q'});

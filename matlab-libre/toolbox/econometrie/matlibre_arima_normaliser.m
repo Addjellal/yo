@@ -28,10 +28,10 @@ function [retards, coefficients] = accorder(retards, coefficients, nom)
     end
     if numel(retards) ~= numel(coefficients)
         error('econ:arima:Retards', ...
-              'Il faut autant de coefficients %s que de retards.', nom);
+              'The number of %s coefficients must match the number of lags.', nom);
     end
     if any(retards < 1)
         error('econ:arima:Retards', ...
-              'Les retards %s doivent être des entiers positifs.', nom);
+              'The %s lags must be positive integers.', nom);
     end
 end

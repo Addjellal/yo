@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "matlibre/Aleatoire.h"
 #include "matlibre/Arbre.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Deboguage.h"
@@ -52,9 +53,13 @@ struct Portee {
     // Portée de la fonction englobante : une fonction imbriquée lit et écrit
     // les variables de son parent à travers ce chaînage.
     std::shared_ptr<Portee> englobante;
-    // Vraie pour l'activation d'une fonction anonyme : sa table n'est qu'une
-    // copie de la capture, ce n'est pas là que vivent les variables partagées.
+    // Vraie pour l'activation d'une fonction anonyme : sa table ne porte
+    // que ses paramètres, ce n'est pas là que vivent les variables partagées.
     bool anonyme = false;
+    // Les variables capturées par une fonction anonyme, lues en place : une
+    // activation ne les recopie pas — un tableau d'un million d'éléments
+    // cité dans le corps coûterait sinon sa copie à chaque appel.
+    std::shared_ptr<const std::unordered_map<std::string, Valeur>> capture;
 };
 
 enum class Format { Court, Long, CourtE, LongE, CourtG, LongG, Hex, Rationnel, Plus, Banque };
@@ -99,6 +104,9 @@ public:
     // --- mise en route ---
     void installerBibliotheque();
     void ajouterChemin(const std::string& dossier, bool enTete = true);
+    // Plusieurs dossiers d'un coup, dans l'ordre donné, pour une seule
+    // réindexation : ajoutés un à un, chacun réindexait tout le chemin.
+    void ajouterChemins(const std::vector<std::string>& dossiers, bool enTete = true);
     void retirerChemin(const std::string& dossier);
     const std::vector<std::string>& chemin() const { return chemin_; }
     void reindexerChemin();
@@ -107,9 +115,18 @@ public:
 
     // --- exécution ---
     void executerTexte(const std::string& source, const std::string& origine);
-    void executerFichier(const std::string& fichier);
+    // ARGUMENTS va à la fonction principale d'un fichier de fonctions,
+    // comme une application compilée par MATLAB reçoit sa ligne de commande.
+    void executerFichier(const std::string& fichier,
+                         const std::vector<Valeur>& arguments = {});
     void executerBloc(const NoeudPtr& b);
     void executerInstruction(const NoeudPtr& n);
+    // Le corps d'executerInstruction : celle-ci n'y ajoute que la
+    // conversion d'un manque de mémoire en erreur MATLAB.
+    void executerInstructionBrute(const NoeudPtr& n);
+    // Un opérateur sur des opérandes déjà évalués, objets compris.
+    std::vector<Valeur> appliquerBinaire(const std::string& op, const Valeur& a, const Valeur& b);
+    std::vector<Valeur> appliquerUnaire(const std::string& op, const Valeur& a);
 
     // --- évaluation ---
     Valeur evaluer(const NoeudPtr& n);
@@ -164,6 +181,17 @@ public:
     // ni indexé : le faire d'abord coûterait un appel système à chaque
     // appel de fonction, ce qui se paierait sur tout le reste.
     std::string fichierDossierCourant(const std::string& nom) const;
+
+    // --- proposition sur une faute de frappe (Suggestion.cpp) ---
+    // Le nom connu le plus proche de NOM — variable visible, fonction
+    // native, fichier .m du chemin ou du dossier courant, classe —, vide
+    // s'il n'y en a aucun d'assez proche.
+    std::string nomProche(const std::string& nom) const;
+    // La commande corrigée que la console propose quand COMMANDE, tapée
+    // telle quelle, a échoué sur un nom inconnu (« Did you mean: ») ; vide
+    // s'il n'y a rien à proposer, ou si l'erreur est née plus loin, dans
+    // un fichier que la commande appelait.
+    std::string correctionCommande(const ErreurMatlab& e, const std::string& commande) const;
     // Inscrit une tache de nettoyage dans la portee courante.
     void inscrireNettoyage(const Valeur& tache);
     // Execute les taches d'ONCLEANUP d'une portee qui se ferme.
@@ -246,13 +274,13 @@ public:
     void fermerJournal();
 
     // --- état visible par l'utilisateur ---
-    // MatLibre montre par défaut tous les chiffres que la valeur porte —
-    // « pi » s'écrit 3.141592653589793, un single 3.1415927. MATLAB, lui,
-    // démarre en « format short » et n'en montre que quatre décimales :
-    // c'est le seul écart, et « format short » le rétablit.
-    Format format = Format::Long;
+    // L'affichage démarre en « format short », comme MATLAB : « pi »
+    // s'écrit 3.1416. « format long » montre tous les chiffres portés.
+    Format format = Format::Court;
     bool formatCompact = false;
-    std::mt19937_64 generateur{5489u};
+    // Le générateur de rand, randn, randi et randperm : celui de MATLAB,
+    // si bien que rng(0) donne les mêmes nombres (voir Aleatoire.h).
+    GenerateurMatlab generateur{0};
     std::string dernierIdentifiant;
     std::string dernierMessage;
     // Le dernier avertissement émis, message et identifiant : ce que

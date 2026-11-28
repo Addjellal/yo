@@ -10,6 +10,9 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <deque>
+#include <functional>
 #include <future>
 #include <exception>
 #include <limits>
@@ -307,6 +310,25 @@ Valeur elementNeutre(const std::string& op) {
     return Valeur::vide();
 }
 
+// Les fonctions locales du fichier qui lance le travail : comme sous
+// MATLAB, le corps d'un parfor ou d'un spmd peut appeler une sous-fonction
+// du script ou de la fonction qui le contient. Le travailleur, interprète
+// neuf, ne les connaîtrait pas ; on lui en donne la table. Les références
+// sont faibles ; l'hôte fait vivre leurs groupes.
+std::shared_ptr<FonctionUtilisateur> fonctionsDeLAppelant(const Interpreteur& it) {
+    const Portee& p = it.portee();
+    if (!p.fonction || p.fonction->voisines.empty()) return nullptr;
+    auto hote = std::make_shared<FonctionUtilisateur>();
+    hote->nom = p.fonction->nom;
+    hote->fichier = p.fonction->fichier;
+    hote->voisines = p.fonction->voisines;
+    // parfeval n'attend pas : l'hôte fait vivre les groupes de fonctions
+    // tant qu'un travailleur peut encore les appeler.
+    if (auto groupe = p.fonction->groupe.lock()) hote->groupesPossedes.push_back(groupe);
+    for (const auto& g : p.fonction->groupesPossedes) hote->groupesPossedes.push_back(g);
+    return hote;
+}
+
 struct ResultatTravailleur {
     std::map<std::string, std::vector<std::pair<std::size_t, Valeur>>> tranches;
     std::map<std::string, Valeur> reductions;
@@ -332,6 +354,7 @@ bool executerParforParallele(Interpreteur& it, const NoeudPtr& boucle,
 
     std::string racine = it.racineToolbox();
     std::vector<std::string> chemins = it.chemin();
+    auto hote = fonctionsDeLAppelant(it);
 
     std::vector<ResultatTravailleur> resultats((std::size_t)travailleurs);
     std::vector<std::thread> fils;
@@ -343,8 +366,8 @@ bool executerParforParallele(Interpreteur& it, const NoeudPtr& boucle,
             Interpreteur ouvrier;
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
-            for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
-                ouvrier.ajouterChemin(*p, true);
+            if (hote) ouvrier.porteeBase().fonction = hote;
+            ouvrier.ajouterChemins(chemins, true);   // une seule indexation
             std::ostringstream muet;
             ouvrier.definirSortie(&muet);
             for (const auto& kv : diffusees) ouvrier.ecrireVariable(kv.first, kv.second);
@@ -446,6 +469,7 @@ std::vector<std::vector<Valeur>> appliquerEnParallele(
     }
     std::string racine = it.racineToolbox();
     std::vector<std::string> chemins = it.chemin();
+    auto hote = fonctionsDeLAppelant(it);
     std::atomic<std::size_t> prochaine{0};
     std::vector<std::string> erreurs((std::size_t)travailleurs);
     std::vector<std::thread> fils;
@@ -454,8 +478,8 @@ std::vector<std::vector<Valeur>> appliquerEnParallele(
             Interpreteur ouvrier;
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
-            for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
-                ouvrier.ajouterChemin(*p, true);
+            if (hote) ouvrier.porteeBase().fonction = hote;
+            ouvrier.ajouterChemins(chemins, true);   // une seule indexation
             std::ostringstream muet;
             ouvrier.definirSortie(&muet);
             for (;;) {
@@ -511,6 +535,7 @@ bool executerSpmd(Interpreteur& it, const NoeudPtr& bloc) {
     for (const auto& nom : diffusees) valeursDiffusees.emplace_back(nom, it.lireVariable(nom));
     std::string racine = it.racineToolbox();
     std::vector<std::string> chemins = it.chemin();
+    auto hote = fonctionsDeLAppelant(it);
     std::vector<std::map<std::string, Valeur>> sorties((std::size_t)travailleurs);
     std::vector<std::string> erreurs((std::size_t)travailleurs);
     std::vector<std::thread> fils;
@@ -519,8 +544,8 @@ bool executerSpmd(Interpreteur& it, const NoeudPtr& bloc) {
             Interpreteur ouvrier;
             ouvrier.installerBibliotheque();
             ouvrier.definirRacineToolbox(racine);
-            for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
-                ouvrier.ajouterChemin(*p, true);
+            if (hote) ouvrier.porteeBase().fonction = hote;
+            ouvrier.ajouterChemins(chemins, true);   // une seule indexation
             std::ostringstream muet;
             ouvrier.definirSortie(&muet);
             for (const auto& kv : valeursDiffusees) ouvrier.ecrireVariable(kv.first, kv.second);
@@ -560,7 +585,55 @@ struct Travail {
     std::future<std::vector<Valeur>> resultat;
     std::string erreur;
     bool recupere = false;
+    std::atomic<bool> annule{false};
 };
+
+// La file des travaux de parfeval, servie par un pool borné : autant de
+// travailleurs que le pool ouvert, ou que de cœurs. Lancer un fil et un
+// interpréteur par appel faisait monter pararrayfun, qui passe par un
+// parfeval par élément, à plus de mille fils à la fois. Les fils sont
+// détachés et la file n'est jamais détruite : elle vit jusqu'à la fin du
+// processus, sans ordre de destruction à craindre.
+struct FileTravaux {
+    std::mutex verrou;
+    std::condition_variable signal;
+    std::deque<std::function<void()>> taches;
+    int ouvriers = 0;
+};
+
+FileTravaux& fileTravaux() {
+    static FileTravaux* file = new FileTravaux;
+    return *file;
+}
+
+// Vrai dans un fil du pool : un parfeval lancé de là s'exécute sur place,
+// sans quoi des travailleurs qui attendent tous des sous-travaux encore en
+// file ne finiraient jamais.
+thread_local bool dansOuvrier = false;
+
+void soumettre(std::function<void()> tache) {
+    FileTravaux& file = fileTravaux();
+    int voulus = std::max(1, taillePool() > 0 ? taillePool() : coeursDisponibles());
+    std::lock_guard<std::mutex> garde(file.verrou);
+    file.taches.push_back(std::move(tache));
+    while (file.ouvriers < voulus) {
+        ++file.ouvriers;
+        std::thread([&file]() {
+            dansOuvrier = true;
+            for (;;) {
+                std::function<void()> suivante;
+                {
+                    std::unique_lock<std::mutex> attente(file.verrou);
+                    file.signal.wait(attente, [&file]() { return !file.taches.empty(); });
+                    suivante = std::move(file.taches.front());
+                    file.taches.pop_front();
+                }
+                suivante();
+            }
+        }).detach();
+    }
+    file.signal.notify_one();
+}
 
 std::map<long long, std::shared_ptr<Travail>>& tableTravaux() {
     static std::map<long long, std::shared_ptr<Travail>> t;
@@ -578,18 +651,31 @@ long long lancerTravail(Interpreteur& it, const Valeur& fonction, int nargout,
                         std::vector<Valeur> args) {
     std::string racine = it.racineToolbox();
     std::vector<std::string> chemins = it.chemin();
+    auto hote = fonctionsDeLAppelant(it);
     auto travail = std::make_shared<Travail>();
-    travail->resultat = std::async(std::launch::async, [racine, chemins, fonction, nargout,
-                                                        args]() -> std::vector<Valeur> {
-        Interpreteur ouvrier;
-        ouvrier.installerBibliotheque();
-        ouvrier.definirRacineToolbox(racine);
-        for (auto p = chemins.rbegin(); p != chemins.rend(); ++p)
-            ouvrier.ajouterChemin(*p, true);
-        std::ostringstream muet;
-        ouvrier.definirSortie(&muet);
-        return ouvrier.appelerValeur(fonction, args, std::max(1, nargout));
-    });
+    auto promesse = std::make_shared<std::promise<std::vector<Valeur>>>();
+    travail->resultat = promesse->get_future();
+    auto tache = [racine, chemins, hote, fonction, nargout, args, promesse, travail]() {
+        if (travail->annule) {
+            promesse->set_value({});
+            return;
+        }
+        try {
+            Interpreteur ouvrier;
+            ouvrier.installerBibliotheque();
+            ouvrier.definirRacineToolbox(racine);
+            if (hote) ouvrier.porteeBase().fonction = hote;
+            ouvrier.ajouterChemins(chemins, true);   // une seule indexation
+            std::ostringstream muet;
+            ouvrier.definirSortie(&muet);
+            std::vector<Valeur> arguments = args;
+            promesse->set_value(ouvrier.appelerValeur(fonction, arguments, std::max(1, nargout)));
+        } catch (...) {
+            promesse->set_exception(std::current_exception());
+        }
+    };
+    if (dansOuvrier) tache();
+    else soumettre(std::move(tache));
     std::lock_guard<std::mutex> garde(verrouTravaux());
     long long id = prochainTravail++;
     tableTravaux()[id] = travail;
@@ -632,6 +718,8 @@ std::vector<Valeur> recupererTravail(long long id) {
 
 void annulerTravail(long long id) {
     std::lock_guard<std::mutex> garde(verrouTravaux());
+    auto p = tableTravaux().find(id);
+    if (p != tableTravaux().end()) p->second->annule = true;
     tableTravaux().erase(id);
 }
 

@@ -30,7 +30,7 @@ function [valeursSingulieres, indices, proportions] = collintest(X, varargin)
 %   Voir aussi OLS, REGRESS, SVD, COND.
     X = double(X);
     if ndims(X) > 2 || isempty(X)   %#ok<ISMAT>
-        error('econ:collintest:Donnees', 'X doit être une matrice non vide.');
+        error('econ:collintest:Donnees', 'X must be a nonempty matrix.');
     end
     nombre = size(X, 2);
     noms = cell(1, nombre);
@@ -59,7 +59,7 @@ function [valeursSingulieres, indices, proportions] = collintest(X, varargin)
     end
     if numel(noms) ~= nombre
         error('econ:collintest:Noms', ...
-              'Il faut %d noms de colonnes.', nombre);
+              '%d variable names are required.', nombre);
     end
     % Mise à la norme un, colonne par colonne.
     normes = sqrt(sum(X .^ 2, 1));

@@ -179,7 +179,7 @@ FONCTION(fnStrip) {
         std::string caractere = args[rang].versTexte();
         if (caractere.size() != 1)
             throw ErreurMatlab("MATLAB:strip:InvalidPadCharacter",
-                               "strip : le caractere de remplissage tient sur un seul caractere.");
+                               "Pad character must be a single character.");
         remplissage = caractere[0];
         surBlancs = false;
         ++rang;
@@ -410,7 +410,7 @@ FONCTION(fnReplace) {
     ListeTextes nouveaux = listeDe(args[2]);
     if (nouveaux.valeurs.size() != 1 && nouveaux.valeurs.size() != anciens.valeurs.size())
         throw ErreurMatlab("MATLAB:replace:SizeMismatch",
-                           "Il faut un remplacement, ou autant que de motifs.");
+                           "NEW must be one text, or have as many elements as OLD.");
     std::vector<std::string> r;
     for (auto s : l.valeurs) {
         for (std::size_t k = 0; k < anciens.valeurs.size(); ++k) {
@@ -572,7 +572,7 @@ static std::vector<std::string> entreBornes(const ListeTextes& l, const Argument
             long b = (long)args[2].scal();
             if (a < 1 || b < a - 1 || (std::size_t)a > s.size() + 1)
                 throw ErreurMatlab(std::string("MATLAB:") + nom + ":InvalidPositions",
-                                   std::string(nom) + " : les positions sortent du texte.");
+                                   "Positions must lie within the text.");
             debutMorceau = (std::size_t)(a - 1);
             finMorceau = std::min((std::size_t)b, s.size());
             if (finMorceau < debutMorceau) finMorceau = debutMorceau;
@@ -986,8 +986,8 @@ std::regex compilerMotif(const std::string& motif, bool ignorerCasse) {
         // qui n'existe pas. La regression arriere en est le seul cas.
         if (nu.find("(?<=") != std::string::npos || nu.find("(?<!") != std::string::npos)
             erreur("MATLAB:regexp:unsupported",
-                   "La regression arriere « (?<= » n'est pas traitee par le moteur "
-                   "d'expressions regulieres employe ici.");
+                   "Lookbehind '(?<=' is not supported by the regular expression "
+                   "engine used here.");
         erreur("MATLAB:regexp:badPattern",
                std::string("Invalid regular expression: ") + e.what());
     }
@@ -1116,8 +1116,8 @@ std::vector<Valeur> regexpInterne(std::vector<Valeur>& args, int nargout, bool i
                 if (!(c.classe == Classe::Caractere && c.nlignes() <= 1) &&
                     !(c.classe == Classe::Chaine && c.nelem() == 1))
                     erreur("MATLAB:regexp:InvalidInput",
-                           std::string("Chaque element de la cellule ") + role + " de " + nom +
-                               " doit etre un texte (vecteur de caracteres ou chaine).");
+                           std::string("Each element of the ") + role + " cell array of " + nom +
+                               " must be a character vector or a string.");
                 l.push_back(c.versTexte());
             }
         } else {
@@ -1126,14 +1126,14 @@ std::vector<Valeur> regexpInterne(std::vector<Valeur>& args, int nargout, bool i
         return l;
     };
     std::vector<std::string> textes, motifs;
-    if (tableauTextes) textes = elements(args[0], "des textes");
+    if (tableauTextes) textes = elements(args[0], "text");
     else textes.push_back(args[0].versTexte());
-    if (tableauMotifs) motifs = elements(args[1], "des motifs");
+    if (tableauMotifs) motifs = elements(args[1], "pattern");
     else motifs.push_back(args[1].versTexte());
     if (tableauTextes && tableauMotifs && textes.size() != motifs.size())
         erreur("MATLAB:regexp:CellArraySizeMismatch",
-               std::string(nom) + " : la cellule des textes et celle des motifs doivent avoir "
-               "autant d'elements (" + std::to_string(textes.size()) + " et " +
+               std::string(nom) + ": the text and pattern cell arrays must have the same "
+               "number of elements (" + std::to_string(textes.size()) + " and " +
                std::to_string(motifs.size()) + ").");
     std::vector<int> dims = tableauTextes ? args[0].dims : args[1].dims;
     std::size_t n = tableauTextes ? textes.size() : motifs.size();

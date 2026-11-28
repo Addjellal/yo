@@ -19,7 +19,7 @@ function [b, a] = besself(n, Wo)
     if nargin < 2 || isempty(Wo), Wo = 1; end
     n = round(n);
     if n < 1
-        error('signal:besself:BadOrder', 'L''ordre doit être au moins 1.');
+        error('signal:besself:BadOrder', 'The order must be at least 1.');
     end
     % La récurrence theta_n = (2n-1) theta_(n-1) + s^2 theta_(n-2) garde
     % des entiers exacts, là où la formule factorielle passe par des

@@ -19,7 +19,7 @@ function y = pammod(x, M, phaseInitiale, ordreSymboles)
     x = double(x);
     if any(x(:) < 0) || any(x(:) > M - 1) || any(x(:) ~= round(x(:)))
         error('comm:pammod:BadSymbol', ...
-              'Les symboles doivent être des entiers entre 0 et %d.', M - 1);
+              'Symbols must be integers between 0 and %d.', M - 1);
     end
     if strncmpi(char(ordreSymboles), 'gray', 4)
         x = gray2bin(x, 'pam', M);

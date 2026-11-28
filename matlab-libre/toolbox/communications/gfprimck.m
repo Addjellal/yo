@@ -24,7 +24,7 @@ function verdict = gfprimck(a, p)
     a = mod(double(gftrunc(a(:).')), p);
     m = numel(a) - 1;
     if m < 1
-        error('comm:gfprimck:Degre', 'Le polynôme doit être de degré au moins un.');
+        error('comm:gfprimck:Degre', 'The polynomial must have degree at least one.');
     end
     if a(1) == 0
         verdict = -1;           % x divise A : il n'est pas irréductible

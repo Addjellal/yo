@@ -20,7 +20,7 @@ function options = poserOptions(options, nomFonction, varargin)
     end
     if mod(numel(varargin), 2) ~= 0
         error('fuzzy:options:Couples', ...
-              '%s attend des couples nom-valeur.', nomFonction);
+              '%s requires name-value pairs.', nomFonction);
     end
     for k = 1:2:numel(varargin)
         options = poserUn(options, nomFonction, char(varargin{k}), varargin{k+1});
@@ -36,5 +36,5 @@ function options = poserUn(options, nomFonction, nom, valeur)
         end
     end
     error('fuzzy:options:Inconnue', ...
-          '%s ne connaît pas l''option ''%s''.', nomFonction, nom);
+          '%s has no option ''%s''.', nomFonction, nom);
 end

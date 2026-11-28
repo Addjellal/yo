@@ -331,10 +331,10 @@ fauxRejets = 0; vusOptimiste = 0;
 for essai = 1:40
     X = randn(n, 1);
     VaR = repmat(seuil, n, 1);
-    if strcmp(pof(varbacktest(X, VaR, 'VaRLevel', niveau)).TestResult, 'reject')
+    if pof(varbacktest(X, VaR, 'VaRLevel', niveau)).POF == 'reject'
         fauxRejets = fauxRejets + 1;
     end
-    if strcmp(pof(varbacktest(X, VaR / 2, 'VaRLevel', niveau)).TestResult, 'reject')
+    if pof(varbacktest(X, VaR / 2, 'VaRLevel', niveau)).POF == 'reject'
         vusOptimiste = vusOptimiste + 1;
     end
 end
@@ -348,8 +348,8 @@ VaR = repmat(seuil, n, 1);
 v = varbacktest(X, VaR, 'VaRLevel', niveau);
 mauvais = varbacktest(X, VaR / 2, 'VaRLevel', niveau);
 fprintf('feu du modele juste : %s ; du modele optimiste : %s\n', ...
-        tl(v).TL, tl(mauvais).TL);
-assert(strcmp(tl(mauvais).TL, 'red'));
+        char(tl(v).TL), char(tl(mauvais).TL));
+assert(tl(mauvais).TL == 'red');
 assert(tl(mauvais).Increase > tl(v).Increase - 1e-12);
 % Un modele deux fois trop prudent ne depasse jamais.
 prudent = varbacktest(X, VaR * 2, 'VaRLevel', niveau);
@@ -357,33 +357,36 @@ fprintf('modele prudent : %d depassements\n', summary(prudent).Failures);
 assert(summary(prudent).Failures == 0);
 % Le resume compte ce qu'il faut.
 s = summary(v);
-fprintf('%d observations, %d depassements, attendus %.1f\n', s.N, s.Failures, s.Expected);
-assert(s.N == n && abs(s.Expected - n * p) < 1e-12);
+fprintf('%d observations, %d depassements, attendus %.1f\n', s.Observations, ...
+        s.Failures, s.Expected);
+assert(s.Observations == n && abs(s.Expected - n * p) < 1e-12);
 assert(abs(s.ObservedLevel - (1 - s.Failures / n)) < 1e-15);
 % Identite : la couverture conditionnelle est la somme de ses deux morceaux.
-assert(abs(cc(v).LRatio - (pof(v).LRatio + cci(v).LRatio)) < 1e-12);
+assert(abs(cc(v).LRatioCC - (pof(v).LRatioPOF + cci(v).LRatioCCI)) < 1e-12);
 % Et les temps entre depassements contiennent la proportion.
-assert(abs(tbf(v).LRatio - (pof(v).LRatio + tbfi(v).LRatio)) < 1e-12);
+assert(abs(tbf(v).LRatioTBF - (pof(v).LRatioPOF + tbfi(v).LRatioTBFI)) < 1e-12);
 % Le carre de la statistique binomiale approche celle de Kupiec : les deux
 % mesurent le meme ecart, l'une par une normale, l'autre par un rapport de
 % vraisemblance.
 fprintf('binomial z^2 = %.4f, Kupiec LR = %.4f\n', ...
-        bin(v).TestStatistic ^ 2, pof(v).LRatio);
-assert(abs(bin(v).TestStatistic ^ 2 - pof(v).LRatio) < 1.5);
+        bin(v).ZScoreBin ^ 2, pof(v).LRatioPOF);
+assert(abs(bin(v).ZScoreBin ^ 2 - pof(v).LRatioPOF) < 1.5);
 % Des depassements groupes sont rejetes par l'independance, alors que leur
 % nombre seul ne le serait pas.
 groupe = randn(n, 1);
 groupe(200:209) = -5;
 groupeModele = varbacktest(groupe, VaR, 'VaRLevel', niveau);
 fprintf('groupes : %d depassements, cci %s\n', ...
-        summary(groupeModele).Failures, cci(groupeModele).TestResult);
-assert(strcmp(cci(groupeModele).TestResult, 'reject'));
-% RUNTESTS passe les huit tests.
+        summary(groupeModele).Failures, char(cci(groupeModele).CCI));
+assert(cci(groupeModele).CCI == 'reject');
+% RUNTESTS passe les huit tests : une table, un verdict par colonne.
 r = runtests(v);
-assert(numel(r) == 8);
-for k = 1:numel(r)
-    assert(isfield(r{k}, 'Test'));
-end
+assert(istable(r) && isequal(r.Properties.VariableNames, ...
+       {'PortfolioID', 'VaRID', 'VaRLevel', 'TL', 'Bin', 'POF', 'TUFF', 'CC', 'CCI', ...
+        'TBF', 'TBFI'}));
+% Une valeur manquante est retiree, et comptee.
+avecTrou = varbacktest([X; NaN], [VaR; seuil], 'VaRLevel', niveau);
+assert(summary(avecTrou).Observations == n && summary(avecTrou).Missing == 1);
 % Perte moyenne au-dela : un modele juste passe, un modele qui la
 % sous-estime est rejete.
 ES = repmat(exp(-norminv(p) ^ 2 / 2) / (p * sqrt(2 * pi)), n, 1);

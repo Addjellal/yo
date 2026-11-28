@@ -23,7 +23,7 @@ function v = jsondecode(texte)
     position = sauterBlancs(texte, position);
     if position <= numel(texte)
         error('MATLAB:json:ExpectedEOF', ...
-              'Texte en trop après la valeur JSON, à la position %d.', position);
+              'Unexpected text after the JSON value at position %d.', position);
     end
 end
 
@@ -45,13 +45,15 @@ function [v, p] = lireValeur(t, p)
         case '"'
             [v, p] = lireChaine(t, p);
         otherwise
-            if strncmp(t(p:end), 'true', 4)
+            % Lire quatre ou cinq caractères, non tout le reste du texte :
+            % recopier la fin à chaque valeur rendait le décodage quadratique.
+            if motIci(t, p, 'true')
                 v = true;
                 p = p + 4;
-            elseif strncmp(t(p:end), 'false', 5)
+            elseif motIci(t, p, 'false')
                 v = false;
                 p = p + 5;
-            elseif strncmp(t(p:end), 'null', 4)
+            elseif motIci(t, p, 'null')
                 v = [];
                 p = p + 4;
             else
@@ -71,13 +73,13 @@ function [s, p] = lireObjet(t, p)
         p = sauterBlancs(t, p);
         if p > numel(t) || t(p) ~= '"'
             error('MATLAB:json:ExpectedName', ...
-                  'Nom de champ attendu à la position %d.', p);
+                  'Expected a field name at position %d.', p);
         end
         [nom, p] = lireChaine(t, p);
         p = sauterBlancs(t, p);
         if p > numel(t) || t(p) ~= ':'
             error('MATLAB:json:ExpectedColon', ...
-                  'Deux-points attendus à la position %d.', p);
+                  'Expected '':'' at position %d.', p);
         end
         p = sauterBlancs(t, p + 1);
         [valeur, p] = lireValeur(t, p);
@@ -92,7 +94,7 @@ function [s, p] = lireObjet(t, p)
             return;
         end
         error('MATLAB:json:ExpectedBrace', ...
-              'Virgule ou accolade attendue à la position %d.', p);
+              'Expected '','' or ''}'' at position %d.', p);
     end
 end
 
@@ -117,7 +119,7 @@ function [v, p] = lireTableau(t, p)
             break;
         end
         error('MATLAB:json:ExpectedBracket', ...
-              'Virgule ou crochet attendu à la position %d.', p);
+              'Expected '','' or '']'' at position %d.', p);
     end
     v = rassembler(elements);
 end
@@ -217,7 +219,7 @@ function [s, p] = lireChaine(t, p)
         s(end+1) = c;   %#ok<AGROW>
         p = p + 1;
     end
-    error('MATLAB:json:UnterminatedString', 'Chaîne JSON non fermée.');
+    error('MATLAB:json:UnterminatedString', 'Unterminated JSON string.');
 end
 
 function [v, p] = lireNombre(t, p)
@@ -234,6 +236,10 @@ function [v, p] = lireNombre(t, p)
     v = str2double(t(debut:p-1));
     if isnan(v) && ~strcmpi(strtrim(t(debut:p-1)), 'nan')
         error('MATLAB:json:BadNumber', ...
-              'Nombre attendu à la position %d.', debut);
+              'Expected a number at position %d.', debut);
     end
+end
+
+function oui = motIci(t, p, mot)
+    oui = p + numel(mot) - 1 <= numel(t) && strcmp(t(p:p + numel(mot) - 1), mot);
 end

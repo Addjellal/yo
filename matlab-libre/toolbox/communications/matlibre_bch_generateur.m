@@ -9,7 +9,7 @@ function [generateur, t, kEffectif] = matlibre_bch_generateur(n, k, m, prim)
     redondance = n - k;
     if redondance < 1 || k < 1
         error('comm:bch:Dimension', ...
-              'La dimension doit rester entre un et %d.', n - 1);
+              'The message length must be between 1 and %d.', n - 1);
     end
     [journal, exponentielle] = matlibre_gf_journal(m, prim);
     dejaPrise = false(1, n);
@@ -20,7 +20,7 @@ function [generateur, t, kEffectif] = matlibre_bch_generateur(n, k, m, prim)
     while numel(produit) - 1 < redondance
         if racine > n
             error('comm:bch:Impossible', ...
-                  'Aucun code BCH de longueur %d et de dimension %d.', n, k);
+                  'No BCH code with codeword length %d and message length %d.', n, k);
         end
         if ~dejaPrise(racine)
             classe = racine;
@@ -42,8 +42,8 @@ function [generateur, t, kEffectif] = matlibre_bch_generateur(n, k, m, prim)
     end
     if numel(produit) - 1 ~= redondance
         error('comm:bch:Dimension', ...
-              ['Il n''y a pas de code BCH de longueur %d et de dimension ' ...
-               '%d ; la plus proche est %d.'], n, k, n - (numel(produit) - 1));
+              ['There is no BCH code with codeword length %d and message length ' ...
+               '%d; the nearest is %d.'], n, k, n - (numel(produit) - 1));
     end
     kEffectif = n - (numel(produit) - 1);
     generateur = fliplr(produit);

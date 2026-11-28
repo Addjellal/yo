@@ -10,7 +10,7 @@ function c = divide(T, a, b)
 %   Voir aussi FI, NUMERICTYPE.
     if ~isnumerictype(T)
         error('fixed:fi:divideType', ...
-              'DIVIDE demande d''abord le type du quotient, un NUMERICTYPE.');
+              'DIVIDE requires the type of the quotient first, a NUMERICTYPE.');
     end
     F = embedded.fimath();
     locale = false;

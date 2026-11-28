@@ -205,6 +205,10 @@ vf = varfun(@sum, t2(:, 'n'));
 assert(vf.sum_n == 6);
 
 % Lecture et écriture d'un fichier délimité.
+% tempdir finit par un séparateur, comme dans MATLAB : [tempdir 'f'] est
+% un fichier du dossier temporaire, non '/tmpf' à la racine du disque.
+dossierTemporaire = tempdir;
+assert(any(dossierTemporaire(end) == '/\'));
 chemin = [tempdir 'matlibre_test_table.csv'];
 writetable(t2, chemin);
 relu = readtable(chemin);

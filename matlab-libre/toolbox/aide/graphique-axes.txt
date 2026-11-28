@@ -139,6 +139,45 @@ YTICKLABELS  Étiquettes des graduations en ordonnée.
 
     Voir aussi YTICKS, XTICKLABELS, YLIM.
 
+### zticks
+ZTICKS  Graduations de l'axe des z.
+    ZTICKS(V) pose les graduations de l'axe des z ; ZTICKS rend celles
+    que montre le tracé, même choisies d'office ; ZTICKS('auto') revient
+    au choix automatique.
+
+    Syntaxe
+       zticks(v)
+       zticks('auto')
+       v = zticks
+
+    Exemples
+       figure
+       surf(peaks(20));
+       zticks([-5 0 5]);
+       zticks                          % [-5 0 5]
+       close
+
+    Voir aussi XTICKS, YTICKS, ZTICKLABELS, ZLIM.
+
+### zticklabels
+ZTICKLABELS  Textes des graduations de l'axe des z.
+    ZTICKLABELS(C) écrit les textes de la cellule C sous les graduations
+    de l'axe des z, dans l'ordre ; ZTICKLABELS les rend ;
+    ZTICKLABELS('auto') rend les nombres.
+
+    Syntaxe
+       zticklabels(c)
+       c = zticklabels
+
+    Exemples
+       figure
+       surf(peaks(20));
+       zticks([-5 0 5]);
+       zticklabels({'bas', 'zero', 'haut'});
+       close
+
+    Voir aussi ZTICKS, XTICKLABELS, YTICKLABELS.
+
 ### cla
 CLA  Vide l'axe courant.
     CLA efface les courbes, le titre, les étiquettes, la légende et les
@@ -233,50 +272,78 @@ LINE  Ajoute une courbe sans effacer ce qui est tracé.
 
 ### zlim
 ZLIM  Bornes de l'axe des cotes.
-    ZLIM(V) pose les bornes de l'axe des z ; ZLIM sans argument les rend.
-
-    Le rendu de MatLibre est plan : les surfaces sont dessinées par leurs
-    niveaux, sans perspective. La fonction est acceptée pour que les
-    scripts tridimensionnels passent sans être réécrits, mais elle ne
-    change pas l'image.
+    ZLIM([BAS HAUT]) pose les bornes de l'axe des z ; ZLIM sans argument
+    les rend : celles qu'on a posées, ou l'étendue des z des tracés de
+    l'espace, arrondie aux graduations. ZLIM('auto') revient au choix
+    automatique, ZLIM('manual') fige les bornes du moment.
+    ZLIM(AX,...) agit sur l'axe AX.
 
     Syntaxe
-       zlim(v)
+       zlim([bas haut])
+       zlim('auto')
        v = zlim
 
     Exemples
        figure
-       plot(1:10);
-       zlim([0 1]);
-       numel(zlim)                     % 2
+       surf(peaks(20));
+       zlim([-10 10]);
+       zlim                            % [-10 10]
        close
 
     Voir aussi XLIM, YLIM, AXIS, VIEW.
 
 ### view
 VIEW  Point de vue d'un tracé tridimensionnel.
-    VIEW(AZ,EL) pose l'azimut et l'élévation ; VIEW(2) demande la vue de
-    dessus, VIEW(3) la vue standard. VIEW sans argument rend l'angle
-    courant.
-
-    Le rendu de MatLibre est plan : la fonction est acceptée pour que les
-    scripts tridimensionnels passent, et rend la vue de dessus, mais elle
-    ne change pas l'image.
+    VIEW(AZ,EL) ou VIEW([AZ EL]) pose l'azimut — la rotation autour de
+    l'axe des z, comptée depuis l'axe des y négatifs — et l'élévation, en
+    degrés. VIEW(2) demande la vue de dessus (0, 90), celle d'un tracé
+    plan ; VIEW(3) la vue par défaut de MATLAB (-37,5, 30). VIEW([X Y Z])
+    regarde depuis la direction donnée. [AZ,EL] = VIEW rend la vue.
+    La projection est orthographique, celle de VIEWMTX ; la boîte est
+    étirée pour remplir l'axe, sauf sous AXIS EQUAL.
 
     Syntaxe
        view(az,el)
+       view([az el])
        view(2)
+       view(3)
        [az,el] = view
 
     Exemples
        figure
-       plot(1:10);
+       surf(peaks(20));
+       view(45, 25);
+       [az, el] = view                 % 45 et 25
        view(2);
-       angles = view;
-       angles(2)                       % 90 : la vue de dessus
        close
 
-    Voir aussi ZLIM, SURF, MESH, AXIS.
+    Voir aussi ZLIM, SURF, MESH, PLOT3, AXIS.
+
+### yyaxis
+YYAXIS  Second axe des ordonnées, à droite.
+    YYAXIS LEFT et YYAXIS RIGHT choisissent le côté actif de l'axe
+    courant : les tracés qui suivent s'y rangent, et YLIM, YLABEL, YTICKS
+    et YTICKLABELS le visent. Le premier appel range à gauche ce qui est
+    déjà tracé. Chaque côté a ses bornes, ses graduations, son étiquette
+    et sa couleur — la première de MATLAB à gauche, la deuxième à droite
+    —, que prennent ses courbes et son axe. Un tracé sans HOLD ON ne
+    remplace que les courbes de son côté.
+    YYAXIS(AX,...) agit sur l'axe AX ; CLA revient à un seul axe.
+
+    Syntaxe
+       yyaxis left
+       yyaxis right
+       yyaxis(ax, ...)
+
+    Exemples
+       figure
+       x = 0:0.1:10;
+       yyaxis left;  plot(x, sin(x));  ylabel('sinus');
+       yyaxis right; plot(x, 1000 * exp(-x)); ylabel('exponentielle');
+       ylim                              % [0 1000], celles de droite
+       close
+
+    Voir aussi PLOTYY, YLIM, YLABEL, HOLD.
 
 ### ishold
 ISHOLD  L'état de « hold » sur l'axe courant.

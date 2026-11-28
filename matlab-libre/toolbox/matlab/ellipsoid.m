@@ -10,7 +10,7 @@ function [Xe, Ye, Ze] = ellipsoid(xc, yc, zc, rx, ry, rz, n)
 %   les racines des valeurs propres, à un facteur près qui fixe la
 %   probabilité couverte.
 %
-%   Le rendu de MatLibre est plan, comme pour SPHERE.
+%   ELLIPSOID sans sortie trace l'ellipsoïde avec SURF, en perspective.
 %
 %   Exemples :
 %      ellipsoid(0, 0, 0, 3, 1, 2);

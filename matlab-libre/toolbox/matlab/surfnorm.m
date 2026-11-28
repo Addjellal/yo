@@ -15,7 +15,7 @@ function [Nx, Ny, Nz] = surfnorm(X, Y, Z)
 %      [X, Y] = meshgrid(-2:0.5:2);
 %      Z = X .* exp(-X.^2 - Y.^2);
 %      [nx, ny, nz] = surfnorm(X, Y, Z);
-%      max(max(abs(nx.^2 + ny.^2 + nz.^2 - 1)))     % 1 : elles sont unitaires
+%      max(max(abs(nx.^2 + ny.^2 + nz.^2 - 1)))     % 0 : elles sont unitaires
 %
 %      surfnorm(X, Y, Z);
 %

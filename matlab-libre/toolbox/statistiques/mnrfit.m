@@ -114,7 +114,7 @@ function [Y, k] = comptesCategories(Y, n)
         categories = round(Y(:));
         k = max(categories);
         if k < 2
-            error('stats:mnrfit:Categories', 'Il faut au moins deux catégories.');
+            error('stats:mnrfit:Categories', 'At least two categories are required.');
         end
         indicatrices = zeros(n, k);
         for i = 1:n

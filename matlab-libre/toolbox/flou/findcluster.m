@@ -30,7 +30,7 @@ function [centres, U] = findcluster(donnees, nClusters, methode)
             U = appartenancesAuxCentres(donnees, centres);
         otherwise
             error('fuzzy:findcluster:Methode', ...
-                  'Méthode inconnue : %s.', methode);
+                  'Unknown method: %s.', methode);
     end
     if nargout == 0
         if size(donnees, 2) >= 2

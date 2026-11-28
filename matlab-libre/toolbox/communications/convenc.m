@@ -31,7 +31,7 @@ function [code, etatFinal] = convenc(message, treillis, arg3)
     n = round(log2(treillis.numOutputSymbols));
     if mod(numel(message), k) ~= 0
         error('comm:convenc:BadLength', ...
-              'La longueur du message doit être un multiple de %d.', k);
+              'The message length must be a multiple of %d.', k);
     end
     pas = numel(message) / k;
     code = zeros(1, pas * n);

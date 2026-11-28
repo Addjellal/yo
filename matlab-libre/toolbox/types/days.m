@@ -23,8 +23,8 @@ function d = days(x)
         % selon le mois, et l'on ne sait pas lequel.
         if any([x.Mois] ~= 0)
             error('MATLAB:days:moisIndetermine', ...
-                  ['Un mois n''a pas de longueur fixe : DAYS ne sait pas ' ...
-                   'le convertir. Employez SPLIT ou une date de depart.']);
+                  ['A month has no fixed length: DAYS cannot ' ...
+                   'convert it. Use SPLIT or a start date.']);
         end
         d = zeros(size(x));
         for k = 1:numel(x)

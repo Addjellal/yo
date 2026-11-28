@@ -68,46 +68,67 @@ FFTFILT Filtrage RIF par recouvrement-addition dans le domaine fréquentiel.
 
 ```
 FIRLS Filtre RIF à phase linéaire, au sens des moindres carrés.
-  B = FIRLS(N,F,M) rend un filtre d'ordre N approchant le gabarit
-  défini par les couples (F,M). F est normalisé entre 0 et 1, un pour
-  Nyquist, et se donne par paires : chaque paire ouvre et ferme une
-  bande. M donne l'amplitude voulue aux deux bouts de chaque bande.
-  B = FIRLS(N,F,M,POIDS) pondère les bandes, un poids par bande.
+  B = FIRLS(N,F,A) rend les N+1 coefficients du filtre d'ordre N dont la
+  réponse en amplitude approche le gabarit (F,A) au sens des moindres
+  carrés intégrés. F est normalisé entre 0 et 1, un pour Nyquist, et se
+  donne par paires : chaque paire ouvre et ferme une bande, où le
+  gabarit est le segment qui joint les amplitudes A des deux bords.
+  B = FIRLS(N,F,A,W) pondère les bandes, un poids par bande.
+  B = FIRLS(N,F,A,'hilbert') ou FIRLS(N,F,A,W,'hilbert') conçoit un
+  filtre antisymétrique (types III et IV) : B(k) = -B(N+2-k), et la
+  réponse vaut j A(w) exp(-j w N/2), comme celle de FIRPM.
 
-  Ce qui sépare deux bandes n'est pas contraint : ce sont les bandes de
-  transition, et c'est là que le filtre fait ce qu'il veut. Les inclure
-  dans l'ajustement forcerait un compromis inutile — un filtre ne peut
-  pas passer de un à zéro instantanément, et lui demander de le faire
-  dégrade les deux bandes utiles.
+  L'erreur minimisée est l'intégrale, sur les bandes seulement, du
+  carré de l'écart pondéré : les intégrales des produits de cosinus (ou
+  de sinus) sont calculées en forme fermée, comme MATLAB, puis le
+  système normal est résolu. Ce qui sépare deux bandes n'est pas
+  contraint : ce sont les bandes de transition, où le filtre fait ce
+  qu'il veut.
 
-  Le filtre est symétrique, donc à phase linéaire : toutes les
-  fréquences subissent le même retard, de N/2 échantillons. C'est ce
-  qu'on ne peut pas obtenir d'un filtre récursif, et la raison
-  principale de préférer un filtre à réponse finie.
+  Le filtre est symétrique (ou antisymétrique), donc à phase linéaire :
+  toutes les fréquences subissent le même retard de N/2 échantillons.
+  À ordre impair (type II), la réponse s'annule forcément à Nyquist ; à
+  ordre pair antisymétrique (type III), à zéro et à Nyquist.
+
+  L'option 'differentiator' de MATLAB, qui pondère l'erreur en 1/f²,
+  n'est pas encore là : FIRLS la refuse en le disant ; FIRPM la connaît.
 
   Exemple :
      b = firls(40, [0 0.3 0.4 1], [1 1 0 0]);
      max(abs(b - fliplr(b)))         % nul : le filtre est symetrique
      [h, w] = freqz(b, 1, 512);
      max(abs(h(w / pi > 0.4)))       % petit : la bande est bien coupee
+     bh = firls(30, [0.1 0.9], [1 1], 'hilbert');   % transformateur de Hilbert
 
-  Voir aussi FIR1, FIR2, FIRPM, FREQZ.
+  Voir aussi FIRPM, FIR1, FIR2, FREQZ.
 ```
 
 ## `levinson`
 
 ```
 LEVINSON Récursion de Levinson-Durbin.
-  [A,E] = LEVINSON(R,P) résout les équations de Yule-Walker pour la
-  suite d'autocorrélation R et l'ordre P. A(1) vaut toujours 1 et E est
-  la puissance de l'erreur de prédiction.
+  A = LEVINSON(R,P) résout le système de Toeplitz hermitien
+     toeplitz(R(1:P)) * A(2:P+1).' = -R(2:P+1).'
+  en O(P²) opérations, et rend le polynôme de prédiction
+  A = [1 A(2) ... A(P+1)] d'ordre P, R étant une autocorrélation
+  (réelle ou complexe). P vaut par défaut numel(R) - 1.
+  [A,E] = LEVINSON(R,P) rend aussi la variance de l'erreur de
+  prédiction d'ordre P, et [A,E,K] les P coefficients de réflexion, en
+  colonne.
+  Si R est une matrice, chacune de ses colonnes est une autocorrélation :
+  A a alors une ligne par colonne, E et K une colonne par colonne.
+
+  La récursion monte d'un ordre à la fois : le coefficient de réflexion
+  K(m) mesure ce que l'ordre m apporte, et l'erreur se multiplie à
+  chaque pas par 1 - |K(m)|². Tant que |K(m)| < 1, le filtre 1/A est
+  stable : c'est la garantie de la méthode d'autocorrélation.
 
   Exemple :
-     r = [1 0.5 0.2];
-     [a, e] = levinson(r, 2);
-     all(abs(roots(a)) < 1)      % 1 : Levinson rend un modele stable
+     % AR(2) de coefficients 0.75 et -0.5, autocorrélation exacte.
+     r = [16 8 -2] / 9;              % gamma(0), gamma(1), gamma(2)
+     [a, e] = levinson(r, 2)          % a = [1 -0.75 0.5], e = 1
 
-  Voir aussi LPC, ARYULE, AC2POLY, POLY2AC.
+  Voir aussi LPC, RLEVINSON, TOEPLITZ, ARYULE.
 ```
 
 ## `lpc`
@@ -115,7 +136,8 @@ LEVINSON Récursion de Levinson-Durbin.
 ```
 LPC Coefficients de prédiction linéaire.
   [A,E] = LPC(X,P) rend le prédicteur d'ordre P qui minimise l'erreur
-  quadratique, et E la variance de cette erreur.
+  quadratique, et E la variance de cette erreur. P vaut par défaut
+  numel(X) - 1, comme dans MATLAB.
 
   A est le polynôme du filtre inverse : FILTER(A,1,X) rend l'erreur de
   prédiction, et FILTER(1,A,E) reconstruit le signal à partir d'elle.
@@ -143,29 +165,21 @@ LPC Coefficients de prédiction linéaire.
 ## `upfirdn`
 
 ```
-UPFIRDN Sur-échantillonne d'un facteur P, filtre par H, décime par Q.
-  Y = UPFIRDN(X,H,P,Q) enchaîne les trois opérations d'un changement de
-  cadence rationnel, dans cet ordre : insérer P-1 zéros entre les
-  échantillons, filtrer par H, ne garder qu'un échantillon sur Q.
+UPFIRDN Sur-échantillonne, filtre, puis décime.
+  Y = UPFIRDN(X,H,P,Q) insère P-1 zéros entre les échantillons de X,
+  filtre par le RIF H, puis garde un échantillon sur Q, en une seule
+  opération polyphase dans MATLAB. P et Q valent un par défaut.
+  La sortie a ceil(((numel(X) - 1) * P + numel(H)) / Q) échantillons,
+  comme dans MATLAB : les zéros insérés après le dernier échantillon
+  ne sont pas filtrés. Une matrice X est traitée colonne par colonne ;
+  un vecteur garde son orientation.
 
-  L'ordre importe. Sur-échantillonner d'abord crée des images du spectre
-  qu'il faut supprimer ; décimer ensuite replierait ce qui reste
-  au-dessus de la nouvelle demi-bande. Le même filtre H fait donc deux
-  choses à la fois, et sa coupure doit être la plus basse des deux :
-  pi/max(P,Q).
-
-  Faire les trois d'un coup évite aussi de calculer des échantillons
-  qu'on jetterait : c'est pourquoi la fonction existe au lieu d'une
-  composition de trois autres.
-
-  Le gain du filtre doit valoir P pour conserver l'amplitude : insérer
-  des zéros divise l'énergie par P.
+  C'est l'opération de base du changement de cadence : RESAMPLE
+  l'emploie avec un filtre passe-bas conçu pour P/Q.
 
   Exemple :
-     x = sin(2*pi*0.05*(0:99));
-     h = 3 * fir1(30, 1/3);          % gain P = 3, coupure pi/3
-     y = upfirdn(x, h, 3, 2);        % cadence multipliee par 3/2
+     y = upfirdn([1 2 3], [1 1 1], 2)     % 1 1 3 2 5 3 3 : 7 échantillons
 
-  Voir aussi RESAMPLE, DECIMATE, INTERP, FFTFILT.
+  Voir aussi RESAMPLE, INTERP, DECIMATE, FILTER.
 ```
 

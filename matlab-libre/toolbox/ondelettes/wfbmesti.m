@@ -26,7 +26,7 @@ function estimations = wfbmesti(x)
     x = double(x(:)).';
     n = numel(x);
     if n < 16
-        error('wavelet:wfbmesti:Longueur', 'Le signal est trop court.');
+        error('wavelet:wfbmesti:Longueur', 'The signal is too short.');
     end
     estimations = zeros(1, 3);
     % 1. Différences secondes : pour un mouvement fractionnaire, la

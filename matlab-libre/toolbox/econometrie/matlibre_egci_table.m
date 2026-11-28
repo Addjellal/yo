@@ -1,4 +1,5 @@
-function [pValeur, valeurCritique] = matlibre_egci_table(statistique, creg, regresseurs, forme, alpha)
+function [pValeur, valeurCritique] = matlibre_egci_table(statistique, creg, ...
+                                                         regresseurs, forme, alpha, taille)
 %MATLIBRE_EGCI_TABLE Quantiles du test de cointégration d'Engle-Granger.
 %   Les résidus testés viennent d'une régression estimée : les moindres
 %   carrés ayant déjà cherché la combinaison la plus stationnaire, la
@@ -21,7 +22,11 @@ function [pValeur, valeurCritique] = matlibre_egci_table(statistique, creg, regr
             case 'ctt', modele = 'ts';
             otherwise,  modele = 'ard';
         end
-        [pValeur, valeurCritique] = matlibre_dickey_table(statistique, modele, alpha, forme);
+        if nargin < 6
+            taille = [];
+        end
+        [pValeur, valeurCritique] = ...
+            matlibre_dickey_table(statistique, modele, alpha, forme, taille);
         return;
     end
     switch lower(forme)
@@ -71,7 +76,7 @@ function [pValeur, valeurCritique] = matlibre_egci_table(statistique, creg, regr
                 ];
         otherwise
             error('econ:egciTable:Forme', ...
-                  'La forme du test vaut ''t1'' ou ''t2'', pas ''%s''.', forme);
+                  'Test must be ''t1'' or ''t2'', not ''%s''.', forme);
     end
     switch lower(creg)
         case 'nc',  table = quantilesNc;

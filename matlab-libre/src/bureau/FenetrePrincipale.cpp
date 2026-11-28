@@ -132,6 +132,8 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &Moteur::nomsConnus, this,
             [this](const QStringList& noms) { nomsConnus_ = noms; });
     connect(moteur_, &Moteur::commandeFinie, this, &FenetrePrincipale::surCommandeFinie);
+    connect(moteur_, &Moteur::correctionProposee, this,
+            [this](const QString& commande) { correctionEnAttente_ = commande; });
     connect(moteur_, &Moteur::effacementDemande, this,
             &FenetrePrincipale::effacerCommandes);
     connect(moteur_, &Moteur::arreteSur, this, &FenetrePrincipale::surArret);
@@ -184,6 +186,9 @@ void FenetrePrincipale::construirePanneaux() {
     onglets_->setDocumentMode(true);
     onglets_->setMovable(true);
     connect(onglets_, &QTabWidget::tabCloseRequested, this, [this](int index) {
+        // Un onglet modifié ne se ferme pas sans qu'on l'ait dit : la
+        // croix le supprimait, et le travail avec.
+        if (!peutFermerOnglet(index)) return;
         QWidget* w = onglets_->widget(index);
         onglets_->removeTab(index);
         delete w;
@@ -489,9 +494,19 @@ void FenetrePrincipale::construireMenus() {
                     &FenetrePrincipale::aPropos);
 
     QMenu* affichage = menuBar()->addMenu(QStringLiteral("&Affichage"));
-    affichage->addAction(QStringLiteral("Afficher le &ruban"), this, [this](bool) {
-        if (ruban_) ruban_->setVisible(!ruban_->isVisible());
-    })->setCheckable(true);
+    // La coche dit si le ruban est visible. Elle partait décochée, ruban
+    // affiché, si bien qu'elle disait l'inverse de ce qu'on voyait ; elle
+    // est relue à chaque ouverture du menu, le ruban ayant pu changer.
+    QAction* afficherRuban = affichage->addAction(QStringLiteral("Afficher le &ruban"));
+    afficherRuban->setObjectName(QStringLiteral("afficherRuban"));
+    afficherRuban->setCheckable(true);
+    afficherRuban->setChecked(true);
+    connect(afficherRuban, &QAction::triggered, this, [this](bool coche) {
+        if (ruban_) ruban_->setVisible(coche);
+    });
+    connect(affichage, &QMenu::aboutToShow, this, [this, afficherRuban] {
+        if (ruban_) afficherRuban->setChecked(ruban_->isVisible());
+    });
     affichage->addAction(QStringLiteral("Rétablir la disposition par défaut"), this, [this] {
         for (QDockWidget* d : findChildren<QDockWidget*>()) d->show();
         QSettings().remove(QStringLiteral("fenetre/etat"));
@@ -735,6 +750,8 @@ void FenetrePrincipale::enregistrer() {
         etat_->setText(QStringLiteral("enregistré : %1").arg(editeur->fichier()));
         rafraichirListeFichiers();
         QMetaObject::invokeMethod(moteur_, "reindexer", Qt::QueuedConnection);
+    } else {
+        etat_->setText(QStringLiteral("impossible d'écrire %1").arg(editeur->fichier()));
     }
 }
 
@@ -751,6 +768,8 @@ void FenetrePrincipale::enregistrerSous() {
         etat_->setText(QStringLiteral("enregistré : %1").arg(chemin));
         rafraichirListeFichiers();
         QMetaObject::invokeMethod(moteur_, "reindexer", Qt::QueuedConnection);
+    } else {
+        etat_->setText(QStringLiteral("impossible d'écrire %1").arg(chemin));
     }
 }
 
@@ -952,7 +971,9 @@ void FenetrePrincipale::envoyer(const QString& commande) {
         return;
     }
     console_->poserInvite();
-    console_->insertPlainText(commande);
+    // La commande remplace la saisie : une correction proposée (« Did you
+    // mean: ») ou un début de frappe s'y colleraient sinon.
+    console_->proposerSaisie(commande);
     QKeyEvent entree(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
     QCoreApplication::sendEvent(console_, &entree);
 }
@@ -993,6 +1014,10 @@ void FenetrePrincipale::poserOccupe(bool occupe) {
 void FenetrePrincipale::surCommandeFinie() {
     poserOccupe(false);
     console_->poserInvite();
+    if (!correctionEnAttente_.isEmpty()) {
+        console_->proposerSaisie(correctionEnAttente_);
+        correctionEnAttente_.clear();
+    }
 }
 
 void FenetrePrincipale::surEspaceTravail(const QVector<LigneEspaceTravail>& lignes) {
@@ -1607,18 +1632,34 @@ void FenetrePrincipale::closeEvent(QCloseEvent* evenement) {
     reglages.setValue(QStringLiteral("fenetre/geometrie"), saveGeometry());
     reglages.setValue(QStringLiteral("fenetre/etat"), saveState());
     for (int k = 0; k < onglets_->count(); ++k) {
-        auto* e = qobject_cast<Editeur*>(onglets_->widget(k));
-        if (!e || !e->document()->isModified()) continue;
-        auto reponse = QMessageBox::question(
-            this, QStringLiteral("MatLibre"),
-            QStringLiteral("« %1 » a été modifié. Enregistrer avant de quitter ?")
-                .arg(onglets_->tabText(k)),
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-        if (reponse == QMessageBox::Cancel) { evenement->ignore(); return; }
-        if (reponse == QMessageBox::Save) {
-            onglets_->setCurrentIndex(k);
-            enregistrer();
+        if (!peutFermerOnglet(k)) {
+            evenement->ignore();
+            return;
         }
     }
     evenement->accept();
+}
+
+// « Enregistrer » ne suffisait pas à dire que c'était fait : un script
+// sans nom ouvre « Enregistrer sous », que l'on peut annuler, et
+// l'écriture peut échouer. On relit donc l'état du document après coup —
+// la fenêtre se fermait sinon sur un travail qui n'était nulle part.
+bool FenetrePrincipale::peutFermerOnglet(int index) {
+    auto* e = qobject_cast<Editeur*>(onglets_->widget(index));
+    if (!e || !e->document()->isModified()) return true;
+    auto reponse = QMessageBox::question(
+        this, QStringLiteral("MatLibre"),
+        QStringLiteral("« %1 » a été modifié. Enregistrer les modifications ?")
+            .arg(onglets_->tabText(index)),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    if (reponse == QMessageBox::Discard) return true;
+    if (reponse != QMessageBox::Save) return false;
+    onglets_->setCurrentIndex(index);
+    enregistrer();
+    if (e->document()->isModified()) {
+        etat_->setText(QStringLiteral("« %1 » n'a pas été enregistré")
+                           .arg(onglets_->tabText(index)));
+        return false;
+    }
+    return true;
 }

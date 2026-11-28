@@ -35,7 +35,7 @@ function L = ichol(A, options)
     A = full(double(A));
     n = size(A, 1);
     if size(A, 2) ~= n
-        error('MATLAB:ichol:NotSquare', 'La matrice doit être carrée.');
+        error('MATLAB:ichol:NotSquare', 'Matrix must be square.');
     end
     alpha = 0;
     if nargin >= 2 && isstruct(options) && isfield(options, 'diagcomp')
@@ -50,8 +50,8 @@ function L = ichol(A, options)
         somme = A(j, j) - L(j, 1:j-1) * L(j, 1:j-1)';
         if somme <= 0
             error('MATLAB:ichol:NotPositiveDefinite', ...
-                  ['La factorisation incomplète a rencontré une racine ' ...
-                   'négative en colonne %d. Essayez l''option diagcomp.'], j);
+                  ['Encountered nonpositive pivot ' ...
+                   'in column %d. Try the diagcomp option.'], j);
         end
         L(j, j) = sqrt(somme);
         for i = j+1:n

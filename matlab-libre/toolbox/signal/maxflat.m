@@ -41,25 +41,25 @@ function [b, a, b1, b2] = maxflat(n, m, Wn, affichage)
 %   Voir aussi BUTTER, FIRLS, FIRPM, FREQZ.
     if nargin < 4, affichage = ''; end
     if nargin < 3
-        error('signal:maxflat:Arguments', 'MAXFLAT demande N, M et WN.');
+        error('signal:maxflat:Arguments', 'MAXFLAT requires N, M, and WN.');
     end
     n = round(double(n));
     Wn = double(Wn);
     if Wn <= 0 || Wn >= 1
         error('signal:maxflat:Coupure', ...
-              'La fréquence de coupure doit être dans ]0,1[.');
+              'The cutoff frequency must be in (0,1).');
     end
     if ischar(m) || isstring(m)
         if ~strcmpi(char(m), 'sym')
             error('signal:maxflat:Genre', ...
-                  'Le second argument vaut un degré ou ''sym''.');
+                  'The second argument must be a degree or ''sym''.');
         end
         [b, a, b1, b2] = maxflatSymetrique(n, Wn);
     else
         m = round(double(m));
         if n < 1 || m < 1
             error('signal:maxflat:Degres', ...
-                  'Les degrés doivent valoir au moins un.');
+                  'Degrees must be at least one.');
         end
         [b, a, b1, b2] = maxflatButterworth(n, m, Wn);
     end
@@ -84,14 +84,14 @@ function [b, a, b1, b2] = maxflatButterworth(n, m, Wn)
         [bas, haut] = intervalleMaxflat(n, m);
         if isempty(bas)
             error('signal:maxflat:Impossible', ...
-                  ['Aucune coupure ne convient pour N = %d et M = %d : ' ...
-                   'le module au carré demandé deviendrait négatif. ' ...
-                   'Augmentez M ou diminuez N.'], n, m);
+                  ['No cutoff is valid for N = %d and M = %d: ' ...
+                   'the requested squared magnitude would become negative. ' ...
+                   'Increase M or decrease N.'], n, m);
         end
         error('signal:maxflat:Coupure', ...
-              ['Pour N = %d et M = %d la coupure doit être entre %.4f et ' ...
-               '%.4f : au-delà, le module au carré demandé deviendrait ' ...
-               'négatif, et aucun filtre ne le réalise.'], n, m, bas, haut);
+              ['For N = %d and M = %d the cutoff must be between %.4f and ' ...
+               '%.4f: beyond that, the requested squared magnitude would become ' ...
+               'negative, and no filter achieves it.'], n, m, bas, haut);
     end
     % D(x) devient un polynôme de Laurent en z par x = (2 - z - 1/z)/4,
     % puis on garde les racines de module inférieur à un : c'est la
@@ -170,12 +170,12 @@ end
 function [b, a, b1, b2] = maxflatSymetrique(n, Wn)
     if mod(n, 2) ~= 0
         error('signal:maxflat:Pair', ...
-              'Pour un filtre symétrique, N doit être pair.');
+              'For a symmetric filter, N must be even.');
     end
     d = n / 2;
     if d < 2
         error('signal:maxflat:Ordre', ...
-              'Un filtre symétrique demande N au moins égal à quatre.');
+              'A symmetric filter requires N of at least 4.');
     end
     % La réponse en phase nulle d'un filtre symétrique d'ordre N est un
     % polynôme M(x) de degré N/2, avec x = sin(w/2)^2. On lui impose K
@@ -209,8 +209,8 @@ function [b, a, b1, b2] = maxflatSymetrique(n, Wn)
     enX = conv(coefficients, facteur);
     if min(polyval(enX(end:-1:1), linspace(0, 1, 2001))) < -1e-9
         error('signal:maxflat:Intervalle', ...
-              ['Pour N = %d la coupure d''un filtre symétrique va de ' ...
-               '%.4f à %.4f.'], n, min(naturelles), max(naturelles));
+              ['For N = %d the cutoff of a symmetric filter must be from ' ...
+               '%.4f to %.4f.'], n, min(naturelles), max(naturelles));
     end
     b = polynomeEnZ(enX);
     a = 1;

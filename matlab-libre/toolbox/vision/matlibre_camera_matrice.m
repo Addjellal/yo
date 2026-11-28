@@ -9,6 +9,6 @@ function K = matlibre_camera_matrice(parametres)
         K = double(parametres);
     end
     if ~isequal(size(K), [3 3])
-        error('vision:camera:Matrice', 'La matrice interne est 3x3.');
+        error('vision:camera:Matrice', 'The intrinsic matrix must be 3-by-3.');
     end
 end

@@ -22,7 +22,7 @@ function y = vco(x, fc, fs)
         ecart = fc;
     end
     if max(abs(x)) > 1
-        error('signal:vco:OutOfRange', 'X doit rester entre -1 et 1.');
+        error('signal:vco:OutOfRange', 'X must be between -1 and 1.');
     end
     % La phase est l'intégrale de la fréquence instantanée.
     phase = 2 * pi * cumsum(centre + ecart * x) / fs;

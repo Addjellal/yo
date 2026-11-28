@@ -26,7 +26,7 @@ function couleurs = matlibre_carte_etiquettes(specification, nombre)
     end
     couleurs = double(specification);
     if size(couleurs, 2) ~= 3
-        error('vision:carte:Forme', 'Une carte de couleurs a trois colonnes.');
+        error('vision:carte:Forme', 'A colormap must have three columns.');
     end
     if any(couleurs(:) > 1)
         couleurs = couleurs / 255;

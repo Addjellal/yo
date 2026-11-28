@@ -34,15 +34,29 @@ function h = open_system(modele)
 %
 %   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, CLOSE_SYSTEM, GCS, SIM.
     if nargin < 1
-        error('MATLAB:minrhs', 'OPEN_SYSTEM attend un modèle.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
+    end
+    if isnumeric(modele) && isscalar(modele) && ...
+       ~isempty(matlibre_sl_signaux('cle', double(modele)))
+        % une poignée : l'objet qu'elle désigne
+        modele = matlibre_sl_nomme('getfullname', 1, modele);
+    end
+    if (ischar(modele) || isstring(modele)) && any(char(modele) == '/') && ...
+       matlibre_sl_ouverts('connu', bdroot(modele))
+        % Un bloc ou un sous-système d'un modèle ouvert : dans Simulink,
+        % sa fenêtre ou son dialogue. Il n'y en a pas ici, et rien à faire.
+        if nargout > 0
+            h = [];
+        end
+        return
     end
     if ischar(modele) || isstring(modele)
         modele = matlibre_sl_modele(modele);
     end
     if ~isstruct(modele) || ~isfield(modele, 'blocs')
         error('Simulink:openSystem:Modele', ...
-              ['OPEN_SYSTEM attend le modèle que rend NEW_SYSTEM, son nom, ou un ' ...
-               'fichier .slx ou .mdl.']);
+              ['OPEN_SYSTEM requires the model returned by NEW_SYSTEM, its name, or a ' ...
+               '.slx or .mdl file.']);
     end
 
     % Une seule mise en place, partagée avec l'éditeur du bureau : c'est
@@ -124,7 +138,7 @@ function h = open_system(modele)
         xlim(bornesX);
         ylim(bornesY);
     end
-    title(modele.nom);
+    title(modele.nom, 'Interpreter', 'none');
     poignee = gcf;
     matlibre_sl_ouverts('inscrire', modele.nom, modele, poignee);
     if nargout > 0

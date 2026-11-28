@@ -4,6 +4,8 @@
 #include "matlibre/Parallele.h"
 
 #include <algorithm>
+#include <new>
+#include <stdexcept>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -11,6 +13,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <unordered_set>
 
 #include "matlibre/Affichage.h"
 #include "matlibre/Analyseur.h"
@@ -186,6 +189,19 @@ std::shared_ptr<Portee> Interpreteur::trouverPortee(const Portee* brut) const {
     return nullptr;
 }
 
+// Les noms qu'une expression cite : identificateurs, bases des accès,
+// jusque dans les fonctions anonymes qu'elle contient.
+static void nomsCites(const NoeudPtr& n, std::unordered_set<std::string>& noms) {
+    if (!n) return;
+    if (n->type == TypeN::Ident) noms.insert(n->texte);
+    for (const auto& e : n->enfants) nomsCites(e, noms);
+    for (const auto& e : n->cibles) nomsCites(e, noms);
+    for (const auto& r : n->rangees)
+        for (const auto& e : r) nomsCites(e, noms);
+    for (const auto& a : n->acces)
+        for (const auto& e : a.args) nomsCites(e, noms);
+}
+
 // Cherche une variable dans une portée, puis dans celles qui l'englobent :
 // c'est le partage d'espace de travail des fonctions imbriquées.
 static const Valeur* chercherDansChaine(const Portee& depart, const std::string& nom) {
@@ -203,6 +219,10 @@ const Valeur* Interpreteur::trouverVariable(const std::string& nom) const {
     if (p.globales.empty() && p.liensPersistants.empty()) {
         auto it = p.variables.find(nom);
         if (it != p.variables.end()) return &it->second;
+        if (p.capture) {
+            auto ic = p.capture->find(nom);
+            if (ic != p.capture->end()) return &ic->second;
+        }
         return p.englobante ? chercherDansChaine(p, nom) : nullptr;
     }
     if (p.globales.count(nom)) {
@@ -216,6 +236,10 @@ const Valeur* Interpreteur::trouverVariable(const std::string& nom) const {
     }
     auto it = p.variables.find(nom);
     if (it != p.variables.end()) return &it->second;
+    if (p.capture) {
+        auto ic = p.capture->find(nom);
+        if (ic != p.capture->end()) return &ic->second;
+    }
     return p.englobante ? chercherDansChaine(p, nom) : nullptr;
 }
 
@@ -226,8 +250,7 @@ bool Interpreteur::existeVariable(const std::string& nom) const {
 Valeur Interpreteur::lireVariable(const std::string& nom) const {
     const Valeur* v = trouverVariable(nom);
     if (!v)
-        erreur("MATLAB:UndefinedFunction",
-               "Unrecognized function or variable '" + nom + "'.");
+        erreurNomInconnu(nom);
     return *v;
 }
 
@@ -332,6 +355,19 @@ void Interpreteur::ajouterChemin(const std::string& dossier, bool enTete) {
     if (it != chemin_.end()) chemin_.erase(it);
     if (enTete) chemin_.insert(chemin_.begin(), d);
     else chemin_.push_back(d);
+    reindexerChemin();
+}
+
+void Interpreteur::ajouterChemins(const std::vector<std::string>& dossiers, bool enTete) {
+    std::vector<std::string> absolus;
+    for (const auto& dossier : dossiers) {
+        const std::string d = dossierAbsolu(dossier);
+        if (std::find(absolus.begin(), absolus.end(), d) != absolus.end()) continue;
+        auto it = std::find(chemin_.begin(), chemin_.end(), d);
+        if (it != chemin_.end()) chemin_.erase(it);
+        absolus.push_back(d);
+    }
+    chemin_.insert(enTete ? chemin_.begin() : chemin_.end(), absolus.begin(), absolus.end());
     reindexerChemin();
 }
 
@@ -841,7 +877,7 @@ std::shared_ptr<Fonction> Interpreteur::resoudrePoignee(const std::string& nom) 
         f->native = it->second.fonction;
         return f;
     }
-    erreur("MATLAB:UndefinedFunction", "Unrecognized function or variable '" + nom + "'.");
+    erreurNomInconnu(nom);
 }
 
 std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Valeur> args,
@@ -1005,8 +1041,7 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
                 return {membreEnumeration(defC, membre)};
         }
     }
-    erreur("MATLAB:UndefinedFunction",
-           "Unrecognized function or variable '" + nom + "'.");
+    erreurNomInconnu(nom);
 }
 
 std::vector<Valeur> Interpreteur::appelerValeur(const Valeur& poignee, std::vector<Valeur> args,
@@ -1044,8 +1079,13 @@ std::vector<Valeur> Interpreteur::appelerValeur(const Valeur& poignee, std::vect
     portee->fonction = f.contexte;
     portee->englobante = f.porteeEnglobante;
     portee->anonyme = true;
-    if (f.capture)
-        for (const auto& kv : *f.capture) portee->variables[kv.first] = kv.second;
+    portee->capture = f.capture;
+    // Un argument de trop est refusé, comme dans MATLAB et comme pour une
+    // fonction écrite dans un fichier : « f = @(x) x; f(1,2) » rendait 1,
+    // l'argument en trop passant sans rien dire.
+    if (args.size() > f.parametres.size() &&
+        (f.parametres.empty() || f.parametres.back() != "varargin"))
+        erreur("MATLAB:TooManyInputs", "Too many input arguments.");
     for (std::size_t k = 0; k < f.parametres.size(); ++k) {
         if (f.parametres[k] == "~") continue;
         if (k < args.size()) portee->variables[f.parametres[k]] = args[k];
@@ -1226,7 +1266,8 @@ void Interpreteur::executerTexte(const std::string& source, const std::string& o
     }
 }
 
-void Interpreteur::executerFichier(const std::string& fichier) {
+void Interpreteur::executerFichier(const std::string& fichier,
+                                   const std::vector<Valeur>& arguments) {
     suivreInterruption();
     std::string source = lireFichier(fichier);
     // mfilename doit pouvoir nommer le fichier en cours d'exécution.
@@ -1267,7 +1308,7 @@ void Interpreteur::executerFichier(const std::string& fichier) {
             throw;
         }
     } else if (!u.fonctions.empty()) {
-        std::vector<Valeur> args;
+        std::vector<Valeur> args = arguments;
         appelerUtilisateur(u.fonctions[0], args, 0);
     }
 }
@@ -1351,7 +1392,7 @@ bool Interpreteur::affecterEnPlace(const NoeudPtr& cible, const Valeur& v) {
                x->classe != Classe::Structure && !x->estCreux();
     };
     if (acces.size() == 1 && (acces[0].genre == '(' || acces[0].genre == '{') &&
-        !acces[0].args.empty()) {
+        !acces[0].args.empty() && !acces[0].nomValeur) {
         const Valeur* trouve = trouverVariable(nom);
         if (!ordinaire(trouve)) return false;
         const ElementAcces& e = acces[0];
@@ -1472,7 +1513,22 @@ void Interpreteur::affecter(const NoeudPtr& cible, const Valeur& v) {
     ecrireVariable(nom, std::move(nouvelle));
 }
 
+// Un tableau trop grand pour la mémoire — « x = 1:1e18 », « zeros(1e10) » —
+// levait std::bad_alloc, qu'aucun try/catch du langage n'attrapait : la
+// console s'arrêtait sur « Erreur interne », l'espace de travail perdu.
+// C'est une erreur comme une autre, que MATLAB lève et laisse attraper.
+// La demande n'a pas eu lieu : la mémoire n'est pas épuisée pour autant.
 void Interpreteur::executerInstruction(const NoeudPtr& n) {
+    try {
+        executerInstructionBrute(n);
+    } catch (const std::bad_alloc&) {
+        erreur("MATLAB:nomem", "Out of memory. The requested array is too large.");
+    } catch (const std::length_error&) {
+        erreur("MATLAB:nomem", "Out of memory. The requested array is too large.");
+    }
+}
+
+void Interpreteur::executerInstructionBrute(const NoeudPtr& n) {
     if (!n) return;
     // Ctrl-C : un test de booléen atomique par instruction. C'est ce qui
     // permet de sortir d'une boucle qui ne finit pas, et de couper
@@ -1888,6 +1944,10 @@ Valeur Interpreteur::evaluer(const NoeudPtr& n) {
             if (v) return *v;
             break;
         }
+        // Les opérandes ne s'évaluent qu'une fois. Quand l'un d'eux était
+        // un objet, on retombait sur evaluerMulti, qui les évaluait de
+        // nouveau : « f() + objet » appelait f deux fois — deux tirages au
+        // hasard, deux affichages, un objet handle modifié deux fois.
         case TypeN::OpBinaire: {
             const std::string& op = n->texte;
             if (op != "&&" && op != "||") {
@@ -1895,14 +1955,22 @@ Valeur Interpreteur::evaluer(const NoeudPtr& n) {
                 Valeur b = evaluer(n->enfants[1]);
                 if (a.classe != Classe::Objet && b.classe != Classe::Objet)
                     return operationBinaire(op, a, b);
-                break;
+                auto r = appliquerBinaire(op, a, b);
+                if (r.empty())
+                    erreur("MATLAB:emptyOutput",
+                           "Too many output arguments: the expression produced no value.");
+                return r[0];
             }
             break;
         }
         case TypeN::OpUnaire: {
             Valeur a = evaluer(n->enfants[0]);
             if (a.classe != Classe::Objet) return operationUnaire(n->texte, a);
-            break;
+            auto r = appliquerUnaire(n->texte, a);
+            if (r.empty())
+                erreur("MATLAB:emptyOutput",
+                       "Too many output arguments: the expression produced no value.");
+            return r[0];
         }
         case TypeN::OpPostfixe: {
             Valeur a = evaluer(n->enfants[0]);
@@ -1925,6 +1993,38 @@ Valeur Interpreteur::evaluer(const NoeudPtr& n) {
                "Too many output arguments: the expression produced no value.");
     }
     return r[0];
+}
+
+// Un opérateur appliqué à des opérandes déjà évalués : la méthode de la
+// classe s'il y en a une (plus, minus, mtimes...), le calcul sur les
+// valeurs d'une énumération, ou l'opération ordinaire.
+std::vector<Valeur> Interpreteur::appliquerBinaire(const std::string& op, const Valeur& a,
+                                                   const Valeur& b) {
+    if (a.classe == Classe::Objet || b.classe == Classe::Objet) {
+        std::string methode = nomMethodeOperateur(op);
+        const Valeur& obj = a.classe == Classe::Objet ? a : b;
+        auto def = classeDefinie(obj.nomObjet);
+        if (def && def->methodes.count(methode)) {
+            std::vector<Valeur> args = {a, b};
+            return appelerUtilisateur(def->methodes[methode], args, 1);
+        }
+        if (estEnumeration(a) || estEnumeration(b)) return {operationEnumeration(op, a, b)};
+    }
+    return {operationBinaire(op, a, b)};
+}
+
+std::vector<Valeur> Interpreteur::appliquerUnaire(const std::string& op, const Valeur& a) {
+    if (a.classe == Classe::Objet) {
+        std::string methode = op == "-" ? "uminus" : (op == "+" ? "uplus" : "not");
+        auto def = classeDefinie(a.nomObjet);
+        if (def && def->methodes.count(methode)) {
+            std::vector<Valeur> args = {a};
+            return appelerUtilisateur(def->methodes[methode], args, 1);
+        }
+        if (estEnumeration(a))
+            return {operationUnaire(op, valeursEnumeration(a, methode.c_str()))};
+    }
+    return {operationUnaire(op, a)};
 }
 
 std::vector<Valeur> Interpreteur::evaluerIndices(const std::vector<NoeudPtr>& args,
@@ -2007,12 +2107,15 @@ std::size_t Interpreteur::lireSansCopie(const std::string& nom, const NoeudPtr& 
         courant.push_back(*cur);
         return k;
     }
+    if (e.nomValeur)
+        erreur("MATLAB:index:nameValueSyntax",
+               "Name=value syntax is only valid in function calls; here the "
+               "parentheses index a value.");
     auto idx = evaluerIndices(e.args, cur, 0, (int)e.args.size());
     if (k == 0) {
         cur = trouverVariable(nom);
         if (!cur)
-            erreur("MATLAB:UndefinedFunction",
-                   "Unrecognized function or variable '" + nom + "'.");
+            erreurNomInconnu(nom);
         if (cur->classe == Classe::Objet || cur->classe == Classe::Fonction) {
             courant.push_back(*cur);
             return 0;
@@ -2114,7 +2217,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     }
                     courant = appelerUtilisateur(
                         defPaquet->methodes[membre], args,
-                        debut < n->acces.size() ? 1 : std::max(nargout, 1));
+                        debut < n->acces.size() ? 1 : (nargout < 0 ? 1 : nargout));
                     statique = true;
                 } else {
                     auto itd = defPaquet->defauts.find(membre);
@@ -2126,6 +2229,9 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                 }
             }
             if (!statique) {
+                // En instruction (nargout nul), aucune sortie n'est exigée,
+                // comme pour toute fonction : « pkg.f(x); » n'échoue pas si f
+                // ne pose sa sortie que lorsqu'on la demande.
                 std::vector<Valeur> args;
                 debut = segments;
                 if (n->acces.size() > segments && n->acces[segments].genre == '(') {
@@ -2133,7 +2239,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     debut = segments + 1;
                 }
                 courant = appeler(compose, args,
-                                  debut < n->acces.size() ? 1 : std::max(nargout, 1));
+                                  debut < n->acces.size() ? 1 : (nargout < 0 ? 1 : nargout));
             }
         } else if (!n->acces.empty() && n->acces[0].genre == '.' &&
                    n->acces[0].nom == "empty" && classeVide(nom) &&
@@ -2178,7 +2284,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                 }
                 courant = appelerUtilisateur(def->methodes[membre], args,
                                              debut < n->acces.size() ? 1
-                                                                     : std::max(nargout, 1));
+                                                                     : (nargout < 0 ? 1 : nargout));
             } else {
                 auto itd = def->defauts.find(membre);
                 if (itd == def->defauts.end() || !itd->second)
@@ -2271,8 +2377,8 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                         if (nb.empty() || nb[0].nelem() != 1 || !(nb[0].scal() >= 0) ||
                             nb[0].scal() != std::floor(nb[0].scal()))
                             erreur("MATLAB:index:numArgumentsFromSubscript",
-                                   "numArgumentsFromSubscript de la classe '" + base.nomObjet +
-                                   "' doit rendre un entier positif ou nul.");
+                                   "numArgumentsFromSubscript of class '" + base.nomObjet +
+                                   "' must return a nonnegative integer.");
                         voulues = (int)nb[0].scal();
                     }
                     auto r = appelerMethode(base, "subsref", {s}, voulues);
@@ -2291,6 +2397,10 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                     for (auto& x : r) suivant.push_back(x);
                     continue;
                 }
+                if (e.nomValeur)
+                    erreur("MATLAB:index:nameValueSyntax",
+                           "Name=value syntax is only valid in function calls; here the "
+                           "parentheses index a value.");
                 auto idx = evaluerIndices(e.args, &base, 0, (int)e.args.size());
                 suivant.push_back(indexer(base, idx, '('));
             } else if (e.genre == '{') {
@@ -2311,7 +2421,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                         std::vector<Valeur> args = {base};
                         if (dernier || n->acces[k + 1].genre != '(') {
                             auto r = appelerUtilisateur(def->methodes[nom], args,
-                                                        dernier ? std::max(nargout, 1) : 1);
+                                                        dernier ? (nargout < 0 ? 1 : nargout) : 1);
                             for (auto& x : r) suivant.push_back(x);
                             continue;
                         }
@@ -2319,7 +2429,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                         for (auto& x : extra) args.push_back(x);
                         auto r = appelerUtilisateur(
                             def->methodes[nom], args,
-                            (k + 2 == n->acces.size()) ? std::max(nargout, 1) : 1);
+                            (k + 2 == n->acces.size()) ? (nargout < 0 ? 1 : nargout) : 1);
                         for (auto& x : r) suivant.push_back(x);
                         ++k;
                         continue;
@@ -2446,33 +2556,11 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
             }
             Valeur a = evaluer(n->enfants[0]);
             Valeur b = evaluer(n->enfants[1]);
-            if (a.classe == Classe::Objet || b.classe == Classe::Objet) {
-                std::string methode = nomMethodeOperateur(op);
-                const Valeur& obj = a.classe == Classe::Objet ? a : b;
-                auto def = classeDefinie(obj.nomObjet);
-                if (def && def->methodes.count(methode)) {
-                    std::vector<Valeur> args = {a, b};
-                    return appelerUtilisateur(def->methodes[methode], args, 1);
-                }
-                if (estEnumeration(a) || estEnumeration(b))
-                    return {operationEnumeration(op, a, b)};
-            }
-            return {operationBinaire(op, a, b)};
+            return appliquerBinaire(op, a, b);
         }
         case TypeN::OpUnaire: {
             Valeur a = evaluer(n->enfants[0]);
-            if (a.classe == Classe::Objet) {
-                std::string methode = n->texte == "-" ? "uminus"
-                                                      : (n->texte == "+" ? "uplus" : "not");
-                auto def = classeDefinie(a.nomObjet);
-                if (def && def->methodes.count(methode)) {
-                    std::vector<Valeur> args = {a};
-                    return appelerUtilisateur(def->methodes[methode], args, 1);
-                }
-                if (estEnumeration(a))
-                    return {operationUnaire(n->texte, valeursEnumeration(a, methode.c_str()))};
-            }
-            return {operationUnaire(n->texte, a)};
+            return appliquerUnaire(n->texte, a);
         }
         case TypeN::OpPostfixe: {
             Valeur a = evaluer(n->enfants[0]);
@@ -2509,8 +2597,21 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
             f->genre = Fonction::Anonyme;
             f->parametres = n->noms;
             f->corps = n->enfants[0];
-            f->capture = std::make_shared<std::unordered_map<std::string, Valeur>>(
-                portee().variables);
+            // Comme MATLAB, la capture ne retient que les variables que le
+            // corps cite, avec leur valeur du moment : copier tout l'espace
+            // de travail rendait chaque appel aussi lent que la plus grosse
+            // variable qui s'y trouvait.
+            {
+                std::unordered_set<std::string> cites;
+                nomsCites(n->enfants[0], cites);
+                auto capture = std::make_shared<std::unordered_map<std::string, Valeur>>();
+                for (const auto& nom : cites) {
+                    if (std::find(n->noms.begin(), n->noms.end(), nom) != n->noms.end())
+                        continue;
+                    if (const Valeur* v = trouverVariable(nom)) (*capture)[nom] = *v;
+                }
+                f->capture = capture;
+            }
             f->contexte = portee().fonction;
             // Si la fonction courante a des imbriquées, ou en est une, la
             // poignée garde sa portée : le rappel appelé plus tard y

@@ -5,7 +5,7 @@ function lab = rgb2lab(rgb, varargin)
 %   perçues.
 %
 %   Exemple :
-%      rgb2lab([1 1 1])   % [100 0 0]
+%      rgb2lab([1 1 1])   % [100.0000 0.0000 0.0000] : le blanc
 %
 %   Voir aussi LAB2RGB, RGB2XYZ, XYZ2LAB.
     lab = xyz2lab(rgb2xyz(rgb), varargin{:});

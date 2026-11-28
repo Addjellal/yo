@@ -81,6 +81,22 @@ void exigerDimension(int dimension);
 void exigerNumerique(const Valeur& v, const char* nom);
 // Idem, cellules admises : « sort » et « setdiff » les acceptent.
 void exigerSansObjet(const Valeur& v, const char* nom);
+// Un fichier nommé sans dossier — « fisheriris.mat » —, cherché dans le
+// dossier courant puis dans les dossiers du chemin, comme MATLAB le fait
+// pour LOAD et WHICH. Rend son chemin, ou une chaîne vide.
+std::string fichierSurChemin(Interpreteur& it, const std::string& nom);
+
+// Applique F élément par élément à des arguments numériques qui ont tous
+// la même taille ou sont scalaires — la règle des fonctions de loi de
+// MATLAB (normcdf, betainc...). Un scalaire vaut pour chaque élément ;
+// deux tailles différentes lèvent « nom:InputSizeMismatch ». F reçoit
+// les valeurs dans l'ordre des arguments.
+Valeur appliquerParElements(const std::vector<Valeur>& arguments, const char* nom,
+                            const std::function<double(const double*)>& f);
+
+// Quantile de la loi normale centrée réduite (AS 241 de Wichura, poli
+// par un pas de Newton) : juste sur tout ]0,1[, queues comprises.
+double quantileNormal(double p);
 // Une taille : finie, positive, representable.
 int argTaille(double x, const char* nom);
 // L'ordre de PERMUTE doit etre une permutation de 1..N.

@@ -32,7 +32,7 @@ function trellis = poly2trellis(contrainte, generateurs, retour)
             generateurs = generateurs(:)';
         else
             error('comm:poly2trellis:BadSize', ...
-                  'GENERATEURS doit avoir autant de lignes que CONTRAINTE d''éléments.');
+                  'CODEGENERATOR must have as many rows as CONSTRAINTLENGTH has elements.');
         end
     end
     n = size(generateurs, 2);

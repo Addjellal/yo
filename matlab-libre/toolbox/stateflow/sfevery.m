@@ -15,7 +15,7 @@ function vrai = sfevery(contexte, n)
     vrai = false;
     if ~isstruct(contexte) || ~isfield(contexte, 'sf_ticks')
         error('Stateflow:TempsInconnu', ...
-              'La logique temporelle lit le champ sf_ticks du contexte, que pose SFSTEP.');
+              'Temporal logic reads context field sf_ticks, which SFSTEP sets.');
     end
     if contexte.sf_ticks > 0
         vrai = mod(contexte.sf_ticks, n) == 0;

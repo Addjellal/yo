@@ -7,9 +7,10 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
 
-Rien n'est obligatoire hors un compilateur C++17. Si LAPACK, BLAS ou FFTW
-sont présents, ils sont détectés et liés ; sinon les algorithmes internes
-prennent le relais, sans que rien ne manque.
+Rien n'est obligatoire hors un compilateur C++17 (et Qt6 pour le bureau).
+Aucune bibliothèque de calcul n'est cherchée : l'algèbre linéaire, la
+FFT, les matrices creuses sont écrites dans `src/coeur` et
+`src/bibliotheque`.
 
 Le `Makefile` de la racine enveloppe ces deux commandes :
 
@@ -69,7 +70,7 @@ l'édition de liens.
 include/matlibre/   en-têtes publics du cœur
 src/coeur/          lexeur, analyseur, interpréteur, indexation, algèbre,
                     format MAT et décompression DEFLATE
-src/bibliotheque/   les 682 fonctions natives, par domaine
+src/bibliotheque/   les 690 fonctions natives, par domaine
 src/graphique/      rendu SVG
 src/console/        l'exécutable
 toolbox/            53 toolboxes écrites en langage MATLAB
@@ -115,6 +116,12 @@ Un fichier `.m` dans le dossier de la toolbox, portant le nom de la
 fonction, avec son bloc d'aide juste après la ligne `function`. Rien à
 recompiler. Ajoutez la ligne correspondante au `Contents.m`.
 
+Deux noms qui ne diffèrent que par la casse — `addmf`, la fonction
+historique, à côté de `addMF` — ne peuvent pas partager un dossier :
+sous Windows et macOS, l'un écraserait l'autre au clonage du dépôt. Le
+second va dans le sous-dossier `homonymes/` du module, que le chargeur
+met lui aussi au chemin. `test_aide` refuse toute collision de casse.
+
 ## Ajouter une toolbox
 
 Un dossier sous `toolbox/`, un `Contents.m` qui nomme la toolbox
@@ -124,10 +131,17 @@ chemin de recherche au démarrage, sans autre déclaration.
 ## Tests
 
 ```bash
-./build/bin/matlibre_tests                       # 57 vérifications C++
+./build/bin/matlibre_tests                       # les vérifications C++
 ./build/bin/matlibre tests/scripts/test_langage.m
+ctest --test-dir build -LE lent -j4          # sans les tests de plus d'une minute
 ctest --test-dir build --output-on-failure   # tout
 ```
+
+L'intégration continue (`installation.md`) refait à chaque poussée la
+passe `-LE lent` sur une construction qui ne doit écrire aucun
+avertissement, et chaque nuit la batterie entière, sous ASan, TSan et en
+couverture, sur macOS et Windows aussi. Un script de test qui dépasse la
+minute s'ajoute à `MATLIBRE_TESTS_LENTS` dans `CMakeLists.txt`.
 
 Une suite en langage MATLAB est un fichier `test_*.m` qui appelle
 `assert`. La règle est de comparer à une valeur exacte connue, pas de
@@ -174,5 +188,17 @@ bonne partie de l'interpréteur tourne aussi.
 - Un commentaire dit pourquoi, pas quoi. Les commentaires qui paraphrasent
   la ligne suivante sont retirés en revue.
 - Les messages d'erreur reprennent l'identifiant et le texte de MATLAB :
-  c'est ce qui permet à un `try/catch` existant de fonctionner.
+  c'est ce qui permet à un `try/catch` existant de fonctionner. Toute
+  erreur ou tout avertissement d'une fonction de MATLAB ou d'une toolbox
+  s'écrit donc en anglais, même quand MATLAB n'a pas d'équivalent exact
+  (une limite de MatLibre se dit aussi en anglais) ; restent en français
+  l'aide, l'interface du bureau et les identifiants `MatLibre:`. Un test
+  qui vérifie un message cherche un fragment de ce texte anglais, ou
+  mieux, l'identifiant.
+- Une valeur annoncée en commentaire d'un exemple d'aide
+  (`pi   % 3.1416`) est vérifiée par le test `aide_valeurs`
+  (`outils/verifierValeurs.m`) : un nombre à la précision où il est
+  écrit, un tableau de nombres (`[1 0.5; 2 3]`, chaque élément à sa
+  précision), un texte exactement, `true` ou `false`. Écrire la valeur
+  que rend la ligne, arrondie comme MATLAB l'afficherait.
 - Quatre espaces d'indentation, lignes de 90 colonnes au plus.

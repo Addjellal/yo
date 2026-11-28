@@ -33,11 +33,11 @@ function esperance = emaxdrawdown(derive, diffusion, duree)
     duree = double(duree);
     if any(diffusion(:) <= 0)
         error('finance:emaxdrawdown:Diffusion', ...
-              'La diffusion doit être strictement positive.');
+              'Sigma must be strictly positive.');
     end
     if any(duree(:) < 0)
         error('finance:emaxdrawdown:Duree', ...
-              'La durée ne peut pas être négative.');
+              'The time period cannot be negative.');
     end
     abscisses = [ ...
           -8.000000   -6.000000   -5.000000   -4.000000   -3.500000   -3.000000   -2.500000 ...

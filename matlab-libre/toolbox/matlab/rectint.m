@@ -19,7 +19,7 @@ function A = rectint(a, b)
     b = double(b);
     if size(a, 2) ~= 4 || size(b, 2) ~= 4
         error('MATLAB:rectint:forme', ...
-              'Chaque rectangle s''écrit [X Y LARGEUR HAUTEUR].');
+              'Each rectangle must be [X Y WIDTH HEIGHT].');
     end
     A = zeros(size(a, 1), size(b, 1));
     for i = 1:size(a, 1)

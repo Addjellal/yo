@@ -98,7 +98,7 @@ classdef arima
                     case 'sma',          obj.SMA = matlibre_cellule(valeur);
                     otherwise
                         error('econ:arima:Option', ...
-                              'Propriété inconnue : %s.', char(varargin{k}));
+                              'Unknown property: %s.', char(varargin{k}));
                 end
                 k = k + 2;
             end

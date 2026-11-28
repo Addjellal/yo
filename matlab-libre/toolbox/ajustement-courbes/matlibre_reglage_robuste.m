@@ -15,6 +15,6 @@ function reglage = matlibre_reglage_robuste(nom)
         case 'lar'
             reglage = struct('genre', 'lar', 'constante', 1);
         otherwise
-            error('curvefit:robuste:Nom', 'Méthode robuste inconnue : %s.', char(nom));
+            error('curvefit:robuste:Nom', 'Unknown robust method: %s.', char(nom));
     end
 end

@@ -42,7 +42,7 @@ FONCTION(fnBuiltin) {
     const EntreeNative* n = it.natif(nom);
     if (!n || !n->fonction)
         erreur("MATLAB:builtin:badFunction",
-               "'" + nom + "' n'est pas une fonction native.");
+               "Cannot find builtin function '" + nom + "'.");
     std::vector<Valeur> reste(args.begin() + 1, args.end());
     Arguments passees(reste);
     return n->fonction(it, passees, std::max(nargout, 1));
@@ -63,7 +63,7 @@ FONCTION(fnOnCleanup) {
     exigerArguments(args, 1, 1, "onCleanup");
     if (args[0].classe != Classe::Fonction || !args[0].fn)
         erreur("MATLAB:onCleanup:BadInput",
-               "ONCLEANUP attend une poignee de fonction.");
+               "Input must be a function handle.");
     it.inscrireNettoyage(args[0]);
     // On rend un objet qui se laisse ranger dans une variable, comme le
     // fait MATLAB : c'est par lui que le lecteur voit qu'un nettoyage est

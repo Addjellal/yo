@@ -4,8 +4,8 @@ function w = flattopwin(n)
 %   0,083578947 ; 0,006947368.
 %
 %   Exemple :
-%      w = flattopwin(64);
-%      max(w)                      % 1 : elle sert a mesurer une amplitude
+%      w = flattopwin(65);
+%      max(w)                      % 1.0000 : elle sert a mesurer une amplitude
 %
 %   Voir aussi BLACKMANHARRIS, NUTTALLWIN, WINDOW.
     n = round(n);

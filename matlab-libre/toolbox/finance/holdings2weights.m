@@ -14,7 +14,7 @@ function poids = holdings2weights(quantites, prix, valeur)
     prix = double(prix(:)).';
     if size(quantites, 2) ~= numel(prix)
         error('finance:holdings2weights:Tailles', ...
-              'Il faut un prix par actif.');
+              'One price per asset is required.');
     end
     montants = quantites .* repmat(prix, size(quantites, 1), 1);
     if nargin < 3 || isempty(valeur)

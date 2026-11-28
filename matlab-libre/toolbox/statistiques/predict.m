@@ -34,7 +34,7 @@ function [etiquettes, scores] = predict(modele, X)
     end
     if ~isstruct(modele) || ~isfield(modele, 'type')
         error('stats:predict:Modele', ...
-              'PREDICT attend un modèle ajusté par une fonction fitc… ou fitr…, ou un réseau.');
+              'PREDICT requires a model fitted by a fitc... or fitr... function, or a network.');
     end
     X = double(X);
     scores = [];
@@ -62,6 +62,6 @@ function [etiquettes, scores] = predict(modele, X)
         case 'melange-gaussien'
             [etiquettes, scores] = clusterMelange(modele, X);
         otherwise
-            error('stats:predict:Type', 'Modèle inconnu : %s.', modele.type);
+            error('stats:predict:Type', 'Unknown model: %s.', modele.type);
     end
 end

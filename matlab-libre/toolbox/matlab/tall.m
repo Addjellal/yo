@@ -41,7 +41,7 @@ classdef tall
             if nargin >= 2
                 if ~isa(source, 'function_handle') || ~strcmp(char(interne), 'differe')
                     error('MATLAB:tall:InvalidInput', ...
-                          'La forme à deux arguments est réservée aux calculs différés.');
+                          'The two-argument form is reserved for deferred evaluation.');
                 end
                 obj.Calcul = source;
                 return
@@ -52,7 +52,7 @@ classdef tall
             end
             if isa(source, 'function_handle')
                 error('MATLAB:tall:InvalidInput', ...
-                      'TALL prend un tableau ou un magasin de données, non une fonction.');
+                      'TALL requires an array or a datastore, not a function.');
             end
             if isobject(source) && ismethod(source, 'readall')
                 magasin = source;
@@ -142,8 +142,8 @@ classdef tall
 
         function r = double(t)   %#ok<STOUT,MANU>
             error('MATLAB:tall:UseGather', ...
-                  ['Un tableau différé ne se convertit pas directement : ' ...
-                   'GATHER l''exécute et rend un tableau ordinaire.']);
+                  ['A tall array cannot be converted directly: ' ...
+                   'use GATHER to evaluate it into an ordinary array.']);
         end
 
         function disp(t)   %#ok<MANU>
@@ -176,7 +176,7 @@ classdef tall
                     varargout{1} = r;
                 otherwise
                     error('MATLAB:tall:badSubscript', ...
-                          'Un tableau différé ne s''indexe pas avec des accolades.');
+                          'A tall array cannot be indexed with braces.');
             end
         end
     end

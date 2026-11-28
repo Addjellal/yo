@@ -127,7 +127,7 @@ function r = appliquerMode(Q, T, F, mode, w, fr, wMax, locale)
         case 'FullPrecision'
             if T.WordLength > wMax
                 error('fixed:fi:maxWordLengthExceeded', ...
-                      ['Le resultat demanderait %d bits, au-dela des %d que permet ' ...
+                      ['The result would need %d bits, beyond the %d allowed by ' ...
                        'FIMATH.'], T.WordLength, wMax);
             end
             r = faire(Q, T, F, locale);
@@ -188,7 +188,7 @@ function r = produit(a, b, matriciel)
     if matriciel && ~scalaire
         if size(a.Entiers, 2) ~= size(b.Entiers, 1)
             error('MATLAB:innerdim', ...
-                  'Les dimensions interieures du produit matriciel doivent s''accorder.');
+                  'Inner matrix dimensions must agree.');
         end
         Q = a.Entiers * b.Entiers;
         n = size(a.Entiers, 2);
@@ -220,7 +220,7 @@ function r = puissance(a, n)
     n = valeur(n);
     if ~(isnumeric(n) && isscalar(n) && n >= 1 && n == round(n))
         error('fixed:fi:powerExponent', ...
-              'A.^N ne se calcule en virgule fixe que pour un entier N positif.');
+              'A.^N is supported in fixed point only for a nonnegative integer N.');
     end
     r = emballer(a);
     for i = 2:n
@@ -334,7 +334,7 @@ function varargout = lire(a, s, objet)
             end
         otherwise
             error('fixed:fi:braceIndexing', ...
-                  'Un nombre a virgule fixe ne s''indexe pas par accolades.');
+                  'Brace indexing is not supported for fixed-point values.');
     end
     if numel(s) > 1
         r = suite(r, s(2:end));
@@ -404,12 +404,12 @@ function a = ecrire(a, s, v)
                         a.MathsLocale = true;
                     else
                         error('fixed:fi:invalidProperty', ...
-                              'FI n''a pas de propriete ''%s''.', nom);
+                              'FI has no property ''%s''.', nom);
                     end
             end
         otherwise
             error('fixed:fi:braceIndexing', ...
-                  'Un nombre a virgule fixe ne s''indexe pas par accolades.');
+                  'Brace indexing is not supported for fixed-point values.');
     end
 end
 

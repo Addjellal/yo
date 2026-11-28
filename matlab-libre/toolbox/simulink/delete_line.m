@@ -11,6 +11,10 @@ function modele = delete_line(modele, source, destination, entree, sortie)
 %   Un lien qui n'existe pas lève une erreur qui nomme les deux blocs,
 %   plutôt que de laisser croire à une suppression qui n'a pas eu lieu.
 %
+%   La forme de MATLAB : DELETE_LINE(SYSTEME,SORTIE,ENTREE) sur un modèle
+%   de la session désigné par son nom, et DELETE_LINE(H), H la poignée
+%   d'une ligne, qui retire tous les liens partant de ce port.
+%
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'constant', 'c', 'Value', 1);
@@ -20,6 +24,16 @@ function modele = delete_line(modele, source, destination, entree, sortie)
 %      isempty(m.liens)                 % vrai
 %
 %   Voir aussi ADD_LINE, DELETE_BLOCK, NEW_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        if nargin < 3
+            matlibre_sl_nomme('delete_line', nargout, modele);
+        else
+            matlibre_sl_nomme('delete_line', nargout, modele, source, destination);
+        end
+        clear modele
+        return
+    end
     physique = @(t) (ischar(t) || isstring(t)) && ...
                     ~isempty(regexp(char(t), '/(LConn|RConn)\d+$', 'once', 'ignorecase'));
     if physique(source) && physique(destination) && isfield(modele, 'connexions')
@@ -31,7 +45,8 @@ function modele = delete_line(modele, source, destination, entree, sortie)
                  (c(:, 1) == b & c(:, 2) == pb & c(:, 3) == a & c(:, 4) == pa);
         if ~any(trouve)
             error('Simulink:Commands:DeleteLineNoLine', ...
-                  'Aucune connexion ne relie ''%s'' a ''%s''.', char(source), char(destination));
+                  ['No connection exists between ''%s'' and ' ...
+                   '''%s''.'], char(source), char(destination));
         end
         modele.connexions(trouve, :) = [];
         return
@@ -56,7 +71,7 @@ function modele = delete_line(modele, source, destination, entree, sortie)
     end
     if isempty(candidats)
         error('Simulink:Commands:DeleteLineNoLine', ...
-              'Aucun lien ne va de ''%s'' a ''%s''.', char(source), char(destination));
+              'No line goes from ''%s'' to ''%s''.', char(source), char(destination));
     end
     liens(candidats, :) = [];
     modele.liens = liens;
@@ -66,8 +81,8 @@ function [k, port] = portPhysique(modele, texte)
     jetons = regexp(char(texte), '^(.*)/(LConn|RConn)(\d+)$', 'tokens', 'once', 'ignorecase');
     k = chercher(modele, jetons{1});
     if k == 0
-        error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
-              'aucun bloc ne s''appelle ''%s''.'], jetons{1});
+        error('Simulink:Commands:InvSimulinkObjectName', ['Invalid Simulink object name: ' ...
+              'no block is named ''%s''.'], jetons{1});
     end
     port = str2double(jetons{3});
     if strcmpi(jetons{2}, 'RConn')

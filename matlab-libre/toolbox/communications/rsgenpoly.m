@@ -26,15 +26,15 @@ function [genpoly, t] = rsgenpoly(n, k, prim, b, sortie)
     m = round(log2(n + 1));
     if 2 ^ m - 1 ~= n || m < 2 || m > 16
         error('comm:rsgenpoly:Longueur', ...
-              'La longueur doit valoir 2^m - 1, avec m entre deux et seize.');
+              'The codeword length must be 2^m - 1, with m between 2 and 16.');
     end
     if k < 1 || k >= n
         error('comm:rsgenpoly:Dimension', ...
-              'La dimension doit rester entre un et %d.', n - 1);
+              'The message length must be between 1 and %d.', n - 1);
     end
     if mod(n - k, 2) ~= 0
         error('comm:rsgenpoly:Parite', ...
-              'La redondance N-K doit être paire.');
+              'N-K must be even.');
     end
     if isempty(prim)
         prim = matlibre_gf_primitif(m);

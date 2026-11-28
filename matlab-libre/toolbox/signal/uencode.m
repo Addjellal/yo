@@ -18,7 +18,7 @@ function y = uencode(u, n, v, signe)
     if nargin < 4, signe = 'unsigned'; end
     n = round(n);
     if n < 2 || n > 32
-        error('signal:uencode:BitCount', 'N doit être entre 2 et 32.');
+        error('signal:uencode:BitCount', 'N must be between 2 and 32.');
     end
     signee = strncmpi(char(signe), 's', 1);
     niveaux = 2 ^ n;

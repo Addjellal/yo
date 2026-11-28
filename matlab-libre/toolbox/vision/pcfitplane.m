@@ -23,7 +23,7 @@ function [modele, dedans, dehors, erreurMoyenne] = pcfitplane(entree, distanceMa
     points = matlibre_nuage_points(entree);
     n = size(points, 1);
     if n < 3
-        error('vision:pcfitplane:Points', 'Il faut au moins trois points.');
+        error('vision:pcfitplane:Points', 'At least three points are required.');
     end
     if nargin < 3, vecteurReference = []; end
     if nargin < 4 || isempty(angleMax), angleMax = 5; end
@@ -55,18 +55,24 @@ function [modele, dedans, dehors, erreurMoyenne] = pcfitplane(entree, distanceMa
     end
     if isempty(meilleurModele)
         error('vision:pcfitplane:Aucun', ...
-              'Aucun plan ne respecte la direction demandée.');
+              'No plane satisfies the requested orientation.');
     end
     distances = abs(points * meilleurModele(1:3).' + meilleurModele(4));
     dedans = find(distances <= distanceMax);
     dehors = find(distances > distanceMax);
     % Le consensus trouvé, on réajuste par moindres carrés sur ses seuls
     % points : le tirage donne le bon sous-ensemble, non le meilleur plan.
+    % Le réajustement doit respecter la direction imposée : sans contrôle,
+    % il pouvait faire pivoter la normale au-delà de l'angle permis.
     if numel(dedans) >= 3
-        meilleurModele = matlibre_plan_moindres_carres(points(dedans, :));
-        distances = abs(points * meilleurModele(1:3).' + meilleurModele(4));
-        dedans = find(distances <= distanceMax);
-        dehors = find(distances > distanceMax);
+        reajuste = matlibre_plan_moindres_carres(points(dedans, :));
+        if isempty(vecteurReference) || ...
+                abs(reajuste(1:3) * vecteurReference) >= cos(angleMax * pi / 180)
+            meilleurModele = reajuste;
+            distances = abs(points * meilleurModele(1:3).' + meilleurModele(4));
+            dedans = find(distances <= distanceMax);
+            dehors = find(distances > distanceMax);
+        end
     end
     erreurMoyenne = mean(distances(dedans));
     modele = struct('Parameters', meilleurModele, ...

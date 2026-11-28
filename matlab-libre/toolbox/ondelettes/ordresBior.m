@@ -13,19 +13,19 @@ function [premier, second] = ordresBior(nom, prefixe)
     n = numel(prefixe);
     if numel(nom) <= n || ~strcmp(nom(1:n), prefixe)
         error('wavelet:ordresBior:Famille', ...
-              '''%s'' n''appartient pas à la famille ''%s''.', nom, prefixe);
+              '''%s'' does not belong to the ''%s'' family.', nom, prefixe);
     end
     reste = nom(n+1:end);
     point = strfind(reste, '.');
     if numel(point) ~= 1
         error('wavelet:ordresBior:Nom', ...
-              '''%s'' doit s''écrire %sNr.Nd.', nom, prefixe);
+              '''%s'' must be written %sNr.Nd.', nom, prefixe);
     end
     premier = str2double(reste(1:point-1));
     second = str2double(reste(point+1:end));
     if any(isnan([premier second])) || any([premier second] < 1) || ...
             any([premier second] ~= round([premier second]))
         error('wavelet:ordresBior:Ordre', ...
-              '''%s'' ne porte pas deux ordres entiers.', nom);
+              '''%s'' does not have two integer orders.', nom);
     end
 end

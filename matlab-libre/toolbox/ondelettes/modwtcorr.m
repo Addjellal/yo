@@ -21,7 +21,7 @@ function [correlations, bornes] = modwtcorr(w1, w2, nom, niveauConfiance)
     if nargin < 4 || isempty(niveauConfiance), niveauConfiance = 0.95; end
     if ~isequal(size(w1), size(w2))
         error('wavelet:modwtcorr:Tailles', ...
-              'Les deux transformées doivent avoir la même taille.');
+              'The two transforms must be the same size.');
     end
     [lignes, n] = size(w1);
     correlations = zeros(lignes, 1);

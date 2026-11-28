@@ -14,7 +14,7 @@ function y = intdump(x, facteur)
 %   Voir aussi RCOSDESIGN, PAMDEMOD, UPSAMPLE, DOWNSAMPLE.
     facteur = round(facteur);
     if facteur < 1
-        error('comm:intdump:Facteur', 'Le facteur doit valoir au moins un.');
+        error('comm:intdump:Facteur', 'The factor must be at least one.');
     end
     ligne = isrow(x);
     if isvector(x)
@@ -23,7 +23,7 @@ function y = intdump(x, facteur)
     [n, colonnes] = size(x);
     if mod(n, facteur) ~= 0
         error('comm:intdump:Longueur', ...
-              'Le nombre d''échantillons doit être un multiple de %d.', facteur);
+              'The number of samples must be a multiple of %d.', facteur);
     end
     y = zeros(n / facteur, colonnes);
     for c = 1:colonnes

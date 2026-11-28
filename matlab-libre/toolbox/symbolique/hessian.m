@@ -11,8 +11,8 @@ function H = hessian(f, variables)
 %   Exemple :
 %      syms x y
 %      H = hessian(x ^ 2 * y, {x, y});
-%      char(H{1, 1})                  % '2 * y'
-%      char(H{1, 2})                  % '2 * x'
+%      char(H{1, 1})                  % '2*y'
+%      char(H{1, 2})                  % '2*x'
 %
 %   Voir aussi JACOBIAN, GRADIENT, DIFF.
     if nargin < 2 || isempty(variables)

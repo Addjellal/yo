@@ -15,12 +15,12 @@ function matlibre_ui_appliquer(id, arguments)
     end
     if mod(numel(arguments), 2) ~= 0
         error('MATLAB:ui:Paire', ...
-              'Les propriétés se donnent par couples nom-valeur.');
+              'Properties must be name-value pairs.');
     end
     for k = 1:2:numel(arguments)
         nom = char(arguments{k});
         if isempty(nom) || ~ischar(nom)
-            error('MATLAB:ui:Nom', 'Un nom de propriété est attendu.');
+            error('MATLAB:ui:Nom', 'Expected a property name.');
         end
         matlibre_ui_poser(id, nom, arguments{k + 1});
     end

@@ -88,13 +88,18 @@ CLC  Efface la fenêtre de commandes.
 ```
 CLEAR  Efface des variables de l'espace de travail.
     CLEAR efface tout.
-    CLEAR A B efface les variables nommées.
-    CLEAR ALL efface aussi les fonctions en cache.
+    CLEAR A B efface les variables nommées. Un nom de fonction décharge
+    la fonction : ses variables persistantes repartent de zéro au
+    prochain appel.
+    CLEAR ALL efface aussi les fonctions en cache et leurs variables
+    persistantes ; CLEAR FUNCTIONS, les fonctions seules.
 
     Syntaxe
        clear
        clear a b
+       clear nomDeFonction
        clear all
+       clear functions
 
     Exemples
        aEffacer = 1;
@@ -509,6 +514,12 @@ matlibre_executable  Chemin de l'interpreteur en cours.
 
 ```
 matlibre_fonctions  Liste des fonctions natives et de leur groupe.
+```
+
+## `matlibre_persistantes`
+
+```
+matlibre_persistantes  Lit ou remet les variables persistantes d'une fonction.
 ```
 
 ## `matlibre_racine`

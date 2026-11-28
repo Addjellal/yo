@@ -32,7 +32,7 @@ function C = normxcorr2(motif, image)
     [mi, ni] = size(image);
     if mp > mi || np > ni
         error('images:normxcorr2:Taille', ...
-              'Le motif ne doit pas dépasser l''image.');
+              'The template must not be larger than the image.');
     end
     motifCentre = motif - mean(motif(:));
     normeMotif = sqrt(sum(motifCentre(:) .^ 2));

@@ -32,12 +32,12 @@ function [T, echelleDouble] = fixdt(varargin)
     end
     for i = 1:nargin
         if ~(isnumeric(varargin{i}) || islogical(varargin{i})) || ~isscalar(varargin{i})
-            error('fixed:fixdt:invalidArgument', 'L''argument %d de FIXDT doit etre un nombre.', i);
+            error('fixed:fixdt:invalidArgument', 'Argument %d of FIXDT must be a number.', i);
         end
     end
     if nargin < 2 || nargin > 5
         error('fixed:fixdt:invalidArgument', ...
-              'FIXDT prend (S,W), (S,W,F), (S,W,PENTE,BIAIS) ou (S,W,AJUSTEMENT,EXPOSANT,BIAIS).');
+              'FIXDT takes (S,W), (S,W,F), (S,W,SLOPE,BIAS), or (S,W,ADJUSTMENT,EXPONENT,BIAS).');
     end
     T = Simulink.NumericType();
     T = matlibre_fixe_type('positionnel', T, varargin);
@@ -56,7 +56,7 @@ function T = depuisNom(nom)
     if strncmp(nom, 'fixdt(', 6) && nom(end) == ')'
         valeurs = str2num(nom(7:end - 1)); %#ok<ST2NM>
         if isempty(valeurs)
-            error('fixed:fixdt:invalidName', 'Le type ''%s'' est mal ecrit.', nom);
+            error('fixed:fixdt:invalidName', 'Data type ''%s'' is malformed.', nom);
         end
         args = num2cell(valeurs);
         T = fixdt(args{:});
@@ -65,8 +65,8 @@ function T = depuisNom(nom)
     jetons = regexp(nom, '^([su])fix(\d+)(_.*)?$', 'tokens', 'once');
     if isempty(jetons)
         error('fixed:fixdt:invalidName', ...
-              ['Le type ''%s'' est inconnu : les noms sont double, single, boolean, int8 ' ...
-               '... uint32, sfixW_EnF, ufixW, sfixW_EF, sfixW_SpenteBbiais.'], nom);
+              ['Unknown data type ''%s'': valid names are double, single, boolean, int8 ' ...
+               '... uint32, sfixW_EnF, ufixW, sfixW_EF, sfixW_SslopeBbias.'], nom);
     end
     signe = jetons{1} == 's';
     w = str2double(jetons{2});
@@ -88,7 +88,7 @@ function T = depuisNom(nom)
         pente = regexp(suite, '_S([0-9pn]+)', 'tokens', 'once');
         biais = regexp(suite, '_B([0-9pn]+)', 'tokens', 'once');
         if isempty(pente) && isempty(biais)
-            error('fixed:fixdt:invalidName', 'Le type ''%s'' est mal ecrit.', nom);
+            error('fixed:fixdt:invalidName', 'Data type ''%s'' is malformed.', nom);
         end
         lire = @(t) str2double(strrep(strrep(t, 'p', '.'), 'n', '-'));
         valeurPente = 1;

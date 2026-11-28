@@ -147,7 +147,7 @@ function eta = appliquerLien(mu, lien)
         case 'loglog',     eta = log(-log(min(max(mu, eps), 1 - eps)));
         case 'reciprocal', eta = 1 ./ max(mu, eps);
         otherwise
-            error('stats:fitglm:Lien', 'Lien inconnu : %s.', lien);
+            error('stats:fitglm:Lien', 'Unknown link: %s.', lien);
     end
 end
 

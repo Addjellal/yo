@@ -20,7 +20,7 @@ function [base, sens] = optionsChiffres(arguments)
             mot = lower(char(c));
             if ~any(strcmp(mot, {'left-msb', 'right-msb'}))
                 error('comm:de2bi:BadFlag', ...
-                      'Le sens doit être ''left-msb'' ou ''right-msb''.');
+                      'The flag must be ''left-msb'' or ''right-msb''.');
             end
             sens = mot;
         else

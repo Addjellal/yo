@@ -36,7 +36,7 @@ function [bandes, nombres] = confidenceBands(modele, varargin)
     end
     if ~matlibre_est_copule(modele) || isempty(modele.PortfolioLosses)
         error('risque:confidenceBands:Modele', ...
-              'CONFIDENCEBANDS attend un modèle de crédit déjà simulé.');
+              'CONFIDENCEBANDS requires a credit model that has been simulated.');
     end
     pertes = modele.PortfolioLosses;
     n = numel(pertes);

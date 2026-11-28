@@ -28,7 +28,7 @@ function H = swarmchart(varargin)
         entrees = entrees(1:end - 2);
     end
     if numel(entrees) < 2
-        error('MATLAB:swarmchart:Arguments', 'SWARMCHART attend au moins X et Y.');
+        error('MATLAB:swarmchart:Arguments', 'SWARMCHART requires at least X and Y.');
     end
     x = double(entrees{1}(:));
     y = double(entrees{2}(:));

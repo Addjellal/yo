@@ -40,8 +40,10 @@ assert(niveaux(1) < 0.1, 'un sinus pleine echelle est proche de zero dBFS');
 %% 3. Le centroïde spectral
 % Le « centre de gravité » du spectre. C'est le descripteur qui
 % correspond le mieux à ce qu'on appelle la brillance d'un son.
-centroides = [spectralCentroid(grave, Fe), spectralCentroid(aigu, Fe), ...
-              spectralCentroid(souffle, Fe)];
+% Comme dans MATLAB, il se calcule trame par trame (30 ms, recouvertes de
+% 20 ms) : on en prend ici la moyenne sur la seconde de signal.
+centroides = [mean(spectralCentroid(grave, Fe)), mean(spectralCentroid(aigu, Fe)), ...
+              mean(spectralCentroid(souffle, Fe))];
 fprintf('\nCentroide spectral :\n');
 fprintf('  grave   : %8.1f Hz (fondamentale 220)\n', centroides(1));
 fprintf('  aigu    : %8.1f Hz (fondamentale 3000)\n', centroides(2));

@@ -296,20 +296,18 @@ AUTUMN Carte de couleurs rouge - jaune.
 
 ```
 BAR3 Diagramme en barres à trois dimensions.
-  BAR3(Z) trace une barre par élément de Z, rangées en lignes et en
-  colonnes. BAR3(Y,Z) place les rangées aux ordonnées Y.
-  BAR3(...,LARGEUR) donne aux barres une largeur relative.
+  BAR3(Z) trace une barre par élément de Z : la colonne J et la ligne I
+  de Z donnent une barre posée en (J, I), haute de Z(I,J). Chaque
+  colonne prend sa couleur dans l'ordre des couleurs de MATLAB.
+  BAR3(Y,Z) place les lignes aux ordonnées Y.
+  BAR3(...,LARGEUR) donne aux barres une largeur relative (0,8 par
+  défaut).
 
-  H = BAR3(...) rend les poignées.
-
-  Le rendu de MatLibre est plan : les colonnes de Z sont tracées côte à
-  côte en groupes de barres, ce qui montre la même chose sans la
-  perspective — laquelle, sur un diagramme en barres, cache
-  régulièrement les barres du fond.
+  H = BAR3(...) rend une poignée par colonne de Z, comme MATLAB.
 
   Exemples :
      bar3(magic(4));
-     bar3(rand(5, 3));
+     bar3(rand(5, 3), 0.5);
 
   Voir aussi BAR, BARH, BAR3H, WATERFALL, HEATMAP.
 ```
@@ -322,7 +320,8 @@ BAR3H Diagramme en barres horizontales à trois dimensions.
 
   H = BAR3H(...) rend les poignées.
 
-  Le rendu de MatLibre est plan, comme pour BAR3.
+  Dans MatLibre, les barres restent verticales comme celles de BAR3,
+  rangées et colonnes échangées ; MATLAB les couche le long des x.
 
   Exemples :
      bar3h(magic(4));
@@ -628,33 +627,6 @@ CALENDAR Calendrier d'un mois.
   Voir aussi EOMDAY, WEEKDAY, DATENUM, DATESTR.
 ```
 
-## `caxis`
-
-```
-CAXIS Bornes de l'échelle de couleurs.
-  CAXIS([CMIN CMAX]) fixe les valeurs qui correspondent aux deux bouts
-  de la carte de couleurs : tout ce qui est sous CMIN prend la première
-  couleur, tout ce qui est au-dessus de CMAX la dernière.
-
-  CAXIS('auto') revient au choix automatique, qui prend le minimum et
-  le maximum des données.
-
-  BORNES = CAXIS rend les bornes courantes.
-
-  Depuis R2022a, MATLAB nomme cette fonction CLIM ; CAXIS reste valable.
-
-  Fixer les bornes sert quand on compare plusieurs images : sans cela,
-  chacune emploie toute l'échelle et deux couleurs identiques
-  représentent des valeurs différentes.
-
-  Exemples :
-     subplot(1,2,1); imagesc(peaks(30)); caxis([-8 8]);
-     subplot(1,2,2); imagesc(2 * peaks(30)); caxis([-8 8]);
-     % les deux images se comparent maintenant couleur pour couleur
-
-  Voir aussi CLIM, COLORMAP, COLORBAR, IMAGESC, XLIM, YLIM.
-```
-
 ## `celldisp`
 
 ```
@@ -750,30 +722,6 @@ CLEARALLMEMOIZEDCACHES Vide les caches de toutes les fonctions mémoïsées.
   Voir aussi MEMOIZE, CLEARCACHE, STATS.
 ```
 
-## `clim`
-
-```
-CLIM Bornes de l'échelle de couleurs.
-  CLIM([CMIN CMAX]) fixe les valeurs qui correspondent aux deux bouts
-  de la carte de couleurs.
-
-  CLIM('auto') revient au choix automatique.
-
-  BORNES = CLIM rend les bornes courantes.
-
-  C'est le nom que MATLAB donne à CAXIS depuis R2022a. MatLibre garde
-  les deux ; les bornes sont retenues et rendues, mais son rendu des
-  images emploie encore l'étendue des données, si bien que les fixer ne
-  change pas encore les couleurs.
-
-  Exemples :
-     imagesc(peaks(30));
-     clim([-8 8]);
-     clim
-
-  Voir aussi CAXIS, COLORMAP, COLORBAR, IMAGESC.
-```
-
 ## `colamd`
 
 ```
@@ -849,9 +797,8 @@ COMET3 Trace une courbe de l'espace comme si elle se dessinait.
   COMET3(Z) place les points aux indices.
   COMET3(X,Y,Z,P) donne à la traînée la longueur P.
 
-  Le rendu de MatLibre est plan : la courbe est projetée en laissant
-  tomber la troisième coordonnée, comme le fait PLOT3, et l'animation
-  n'est pas jouée — voir COMET.
+  L'animation n'est pas jouée — voir COMET : la courbe est montrée dans
+  son état final, en perspective, sa queue appuyée et sa tête marquée.
 
   Exemples :
      t = linspace(0, 10*pi, 500);
@@ -1100,8 +1047,7 @@ CYLINDER Coordonnées d'un cylindre, ou d'un solide de révolution.
   [X,Y,Z] = CYLINDER(...) rend les trois grilles de coordonnées, sans
   rien tracer. Z va de 0 à 1 ; on le met ensuite à l'échelle voulue.
 
-  Le rendu de MatLibre est plan : CYLINDER sans sortie montre la
-  hauteur en couleurs.
+  CYLINDER sans sortie trace le cylindre avec SURF, en perspective.
 
   Exemples :
      cylinder;
@@ -1480,7 +1426,7 @@ ELLIPSOID Coordonnées d'un ellipsoïde.
   les racines des valeurs propres, à un facteur près qui fixe la
   probabilité couverte.
 
-  Le rendu de MatLibre est plan, comme pour SPHERE.
+  ELLIPSOID sans sortie trace l'ellipsoïde avec SURF, en perspective.
 
   Exemples :
      ellipsoid(0, 0, 0, 3, 1, 2);
@@ -1605,8 +1551,8 @@ EZCONTOUR Lignes de niveau d'une fonction (nom historique).
 
 ```
 EZMESH Trace le maillage d'une surface (nom historique).
-  EZMESH(F) fait ce que fait EZSURF, en dessinant le quadrillage. Le
-  rendu de MatLibre étant plan, les deux donnent la même image.
+  EZMESH(F) fait ce que fait EZSURF, en dessinant le maillage — faces
+  blanches, arêtes colorées, comme MESH — plutôt que la surface pleine.
 
   EZMESH(F,[A B]) ou EZMESH(F,[A B C D]) fixe le domaine.
 
@@ -1747,28 +1693,6 @@ FILEMARKER Le caractère qui sépare un fichier de sa sous-fonction.
   Voir aussi WHICH, PATHSEP, FILESEP, DBSTACK.
 ```
 
-## `fill3`
-
-```
-FILL3 Polygones remplis dans l'espace.
-  FILL3(X,Y,Z,C) trace le polygone dont les sommets sont (X,Y,Z),
-  rempli de la couleur C. Si X, Y et Z sont des matrices, chaque
-  colonne donne un polygone.
-
-  FILL3(...,'Name',valeur) accepte les mêmes propriétés que FILL.
-
-  H = FILL3(...) rend les poignées.
-
-  Le rendu de MatLibre est plan : Z est laissé de côté, et le polygone
-  est dessiné dans le plan des X et des Y, comme le fait PLOT3.
-
-  Exemples :
-     fill3([0 1 1 0], [0 0 1 1], [0 0 1 1], 'c');
-     fill3([0 1 0.5], [0 0 1], [0 0 1], [0.9 0.7 0.2]);
-
-  Voir aussi FILL, PATCH, PLOT3, SURF, AREA.
-```
-
 ## `fillmissing`
 
 ```
@@ -1793,9 +1717,14 @@ FILLMISSING Comble les valeurs manquantes.
   B = FILLMISSING(A,'movmean',K) donne la largeur de fenêtre.
   B = FILLMISSING(...,'EndValues',E) dit quoi faire des trous en bout,
   là où l'interpolation n'a pas de voisin des deux côtés : 'extrap'
-  (défaut) prolonge, 'none' les laisse, ou une constante les comble.
+  (défaut) les comble par la méthode elle-même ; 'previous', 'next',
+  'nearest', 'linear', 'spline' ou 'pchip' par cette autre méthode ;
+  'none' les laisse ; une constante les comble. 'previous' n'a rien à
+  mettre avant la première valeur connue, ni 'next' après la dernière :
+  ces trous-là restent.
 
-  [B,MARQUE] = FILLMISSING(...) rend aussi les positions comblées.
+  [B,MARQUE] = FILLMISSING(...) rend aussi les positions comblées — non
+  celles restées manquantes.
 
   Un trou en bout n'est pas un trou comme un autre : il n'est pas
   encadré. C'est pourquoi il a son option à lui — et pourquoi la
@@ -1806,6 +1735,8 @@ FILLMISSING Comble les valeurs manquantes.
      fillmissing([1 NaN 3], 'linear')        % [1 2 3]
      fillmissing([1 NaN 3], 'constant', 0)   % [1 0 3]
      fillmissing([NaN 2 3], 'previous')      % [NaN 2 3] : rien avant
+     fillmissing([NaN 2 3], 'linear')        % [1 2 3] : prolongée
+     fillmissing([NaN 2 3], 'previous', 'EndValues', 'nearest')   % [2 2 3]
 
   Voir aussi ISMISSING, RMMISSING, STANDARDIZEMISSING, INTERP1.
 ```
@@ -1813,6 +1744,25 @@ FILLMISSING Comble les valeurs manquantes.
 ## `filloutliers`
 
 _Pas de bloc d'aide._
+
+## `filter2`
+
+```
+FILTER2 Filtrage bidimensionnel par corrélation.
+  Y = FILTER2(H,X) filtre la matrice X par le noyau H, au sens de la
+  corrélation : chaque sortie est la somme des produits de H et de la
+  fenêtre de X qui lui fait face, sans retourner H. C'est CONV2 avec le
+  noyau tourné d'un demi-tour, conv2(X, rot90(H,2), FORME), comme
+  MATLAB. Y a la taille de X.
+  Y = FILTER2(H,X,FORME) choisit la partie rendue : 'same' (défaut),
+  'valid' (les fenêtres entièrement dans X) ou 'full'.
+
+  Exemple :
+     filter2([1 2; 3 4], magic(3), 'valid')      % [1*8+2*1+3*3+4*5 ...]
+     isequal(filter2([1 2; 3 4], magic(3), 'valid'), conv2(magic(3), [4 3; 2 1], 'valid'))   % 1
+
+  Voir aussi CONV2, FILTER, XCORR2, IMFILTER.
+```
 
 ## `fimplicit`
 
@@ -1911,7 +1861,7 @@ FINDOBJ Cherche des objets graphiques par leurs propriétés.
   que les textes.
 
   H = FINDOBJ('Nom',VALEUR) ne garde que les objets dont la propriété
-  nommée vaut VALEUR — par exemple FINDOBJ('Color','#D95319') ou
+  nommée vaut VALEUR — par exemple FINDOBJ('Color','#FF0000') ou
   FINDOBJ('LineWidth',2).
 
   H = FINDOBJ(AX,...) cherche dans l'axe AX plutôt que dans l'axe
@@ -1923,7 +1873,7 @@ FINDOBJ Cherche des objets graphiques par leurs propriétés.
 
   Exemples :
      plot(1:10, 'r'); hold on; plot((1:10).^2, 'b'); hold off
-     rouges = findobj('Color', '#D95319');
+     rouges = findobj('Color', '#FF0000');
      set(rouges, 'LineWidth', 3);
 
      textes = findobj('Type', 'text');
@@ -1949,9 +1899,8 @@ FLAG Carte de couleurs alternant rouge, blanc, bleu et noir.
 
 ```
 FMESH Trace le maillage d'une surface donnée par une poignée.
-  FMESH(F) fait ce que fait FSURF, en dessinant le quadrillage plutôt
-  que la surface pleine. Le rendu de MatLibre étant plan, les deux
-  donnent la même image.
+  FMESH(F) fait ce que fait FSURF, en dessinant le maillage — faces
+  blanches, arêtes colorées, comme MESH — plutôt que la surface pleine.
 
   FMESH(F,[A B]) et FMESH(F,[A B C D]) fixent le domaine, comme FSURF.
   FMESH(...,'MeshDensity',N) change la finesse de la grille.
@@ -2032,9 +1981,8 @@ FSURF Trace une surface donnée par une poignée.
 
   H = FSURF(...) rend la poignée.
 
-  Le rendu de MatLibre est plan : la surface est montrée comme un champ
-  coloré, à la façon de PCOLOR. FCONTOUR en donne les lignes de niveau,
-  souvent plus lisible.
+  La surface est tracée par SURF, en perspective ; FCONTOUR en donne les
+  lignes de niveau.
 
   Exemples :
      fsurf(@(x, y) x .* exp(-x.^2 - y.^2), [-2 2]);
@@ -2545,13 +2493,14 @@ HEATMAP Carte de chaleur d'une matrice.
 ## `hidden`
 
 ```
-HIDDEN Élimination des parties cachées (acceptée, sans effet).
-  HIDDEN ON cache, dans MATLAB, les lignes d'un maillage qui passent
+HIDDEN Élimination des parties cachées d'un maillage.
+  HIDDEN ON cache les lignes d'un maillage qui passent
   derrière la surface ; HIDDEN OFF les laisse voir ; HIDDEN sans
   argument bascule.
 
-  Le rendu de MatLibre est plan : il n'y a pas de parties cachées, et
-  l'appel ne change rien à l'image.
+  HIDDEN OFF rend transparentes les faces des maillages (MESH) de l'axe
+  courant, si bien que les arêtes de derrière se voient ; HIDDEN ON leur
+  rend leur fond blanc, qui les cache.
 
   Exemple :
      mesh(peaks(30)); hidden('off');
@@ -2891,6 +2840,85 @@ INPUTDLG Demande des valeurs à l'utilisateur.
      r = inputdlg({'Nom', 'Âge'}, 'Fiche', 1, {'', '30'});
 
   Voir aussi INPUT, LISTDLG, UIEDITFIELD, KEYBOARD.
+```
+
+## `interp2`
+
+```
+INTERP2 Interpolation sur une grille du plan.
+  VQ = INTERP2(X,Y,V,XQ,YQ) interpole les valeurs V, données sur la
+  grille de MESHGRID — X varie le long des colonnes, Y le long des
+  lignes —, aux points (XQ,YQ). X et Y sont les vecteurs de la grille ou
+  ses tableaux ; un vecteur ligne XQ et un vecteur colonne YQ décrivent
+  une grille, que MESHGRID déplie.
+  VQ = INTERP2(V,XQ,YQ) prend X = 1:size(V,2) et Y = 1:size(V,1).
+  VQ = INTERP2(V,K) raffine la grille de V K fois, en insérant à chaque
+  fois un point au milieu de chaque intervalle ; VQ = INTERP2(V) le fait
+  une fois.
+
+  VQ = INTERP2(...,METHODE) : 'linear' (le défaut, bilinéaire),
+  'nearest', 'cubic', 'makima' ou 'spline'. VQ = INTERP2(...,METHODE,
+  EXTRAPVAL) : la valeur hors de la grille, NaN par défaut.
+
+  Exemple :
+     [X, Y] = meshgrid(0:2, 0:1);
+     V = X + 10 * Y;
+     interp2(X, Y, V, 1.5, 0.5)                  % 6.5
+     interp2(X, Y, V, 3, 0)                      % NaN : hors de la grille
+
+  Voir aussi INTERP1, INTERP3, INTERPN, MESHGRID, GRIDDEDINTERPOLANT.
+```
+
+## `interp3`
+
+```
+INTERP3 Interpolation sur une grille de l'espace.
+  VQ = INTERP3(X,Y,Z,V,XQ,YQ,ZQ) interpole les valeurs V, données sur la
+  grille de MESHGRID — X varie le long des colonnes, Y le long des
+  lignes, Z le long des pages —, aux points (XQ,YQ,ZQ). X, Y et Z sont
+  les vecteurs de la grille ou ses tableaux ; des vecteurs XQ, YQ, ZQ de
+  tailles différentes décrivent une grille, que MESHGRID déplie.
+  VQ = INTERP3(V,XQ,YQ,ZQ) prend X = 1:size(V,2), Y = 1:size(V,1),
+  Z = 1:size(V,3).
+
+  VQ = INTERP3(...,METHODE) : 'linear' (le défaut) ou 'nearest' ;
+  VQ = INTERP3(...,METHODE,EXTRAPVAL) : la valeur hors de la grille, NaN
+  par défaut.
+
+  Exemple :
+     [X, Y, Z] = meshgrid(0:2, 0:1, 0:3);
+     V = X + 10 * Y + 100 * Z;
+     interp3(X, Y, Z, V, 1.5, 0.5, 2)            % 206.5
+
+  Voir aussi INTERPN, INTERP2, MESHGRID.
+```
+
+## `interpn`
+
+```
+INTERPN Interpolation sur une grille à N dimensions.
+  VQ = INTERPN(X1,X2,...,XN,V,XQ1,XQ2,...,XQN) interpole les valeurs V,
+  données sur la grille de NDGRID — X1 à XN sont ses vecteurs, ou les
+  tableaux qu'en fait NDGRID —, aux points (XQ1(k),...,XQN(k)). Les XQ
+  ont une même taille, qui est celle de VQ ; des vecteurs de tailles ou
+  d'orientations différentes décrivent une grille, que NDGRID déplie.
+  VQ = INTERPN(V,XQ1,...,XQN) prend la grille 1:size(V,D).
+
+  VQ = INTERPN(...,METHODE) choisit 'linear' (le défaut, multilinéaire),
+  'nearest' (le point le plus proche), 'pchip', 'makima', 'spline' ou
+  'cubic' — ces quatre-là appliquent l'interpolation de même nom
+  dimension après dimension ; 'cubic' est la convolution cubique sur une
+  grille à pas constant, la spline sinon. VQ = INTERPN(...,METHODE,
+  EXTRAPVAL) donne la valeur des points hors de la grille, NaN par
+  défaut.
+
+  Exemple :
+     [x1, x2, x3] = ndgrid(0:1, 0:2, 0:3);
+     V = x1 + 10 * x2 + 100 * x3;
+     interpn(0:1, 0:2, 0:3, V, 0.5, 1.5, 2)      % 215.5 : V est affine
+     interpn(0:1, 0:2, 0:3, V, 2, 0, 0)          % NaN : hors de la grille
+
+  Voir aussi INTERP1, INTERP2, INTERP3, NDGRID, GRIDDEDINTERPOLANT.
 ```
 
 ## `invhilb`
@@ -3488,10 +3516,10 @@ LIGHT Source de lumière (acceptée, sans effet).
   couleur et son genre — 'infinite' pour une source à l'infini, 'local'
   pour une source ponctuelle.
 
-  Le rendu de MatLibre est plan et ne calcule pas d'éclairage. LIGHT
-  est acceptée pour qu'un programme écrit pour MATLAB tourne sans
-  retouche ; elle ne change rien à l'image. LIGHTING et MATERIAL sont
-  dans le même cas.
+  MatLibre ne calcule pas d'éclairage : les surfaces gardent les couleurs
+  de leur palette. LIGHT est acceptée pour qu'un programme écrit pour
+  MATLAB tourne sans retouche ; elle ne change rien à l'image. LIGHTING et
+  MATERIAL sont dans le même cas.
 
   Ce qui manque est documenté dans documentation/manques.md, au
   chapitre du rendu tridimensionnel.
@@ -3510,7 +3538,7 @@ LIGHTING Modèle d'éclairage (accepté, sans effet).
   LIGHTING FLAT, LIGHTING GOURAUD et LIGHTING NONE choisissent, dans
   MATLAB, comment la lumière est répartie sur une surface.
 
-  Le rendu de MatLibre est plan et ne calcule pas d'éclairage :
+  MatLibre ne calcule pas d'éclairage :
   l'appel est accepté pour qu'un programme tourne sans retouche, et
   ne change rien à l'image.
 
@@ -3561,7 +3589,7 @@ MATERIAL Propriétés de réflexion d'une surface (acceptées, sans effet).
   MATERIAL SHINY, MATERIAL DULL, MATERIAL METAL et MATERIAL DEFAULT
   règlent, dans MATLAB, la façon dont une surface renvoie la lumière.
 
-  Le rendu de MatLibre est plan et ne calcule pas d'éclairage :
+  MatLibre ne calcule pas d'éclairage :
   l'appel est accepté et ne change rien à l'image.
 
   Exemple :
@@ -3888,6 +3916,21 @@ MATLIBRE_COULEUR_SECTEUR La k-ième couleur de la palette des secteurs.
   dépendre de la palette des courbes, qui n'a que sept tons.
 ```
 
+## `matlibre_courbes_dessous`
+
+```
+MATLIBRE_COURBES_DESSOUS Lignes de niveau dans le plan du bas.
+  Fonction interne : elle n'existe pas dans MATLAB. MESHC et SURFC
+  tracent la surface, puis appellent MATLIBRE_COURBES_DESSOUS avec les
+  mêmes données pour poser ses lignes de niveau dans le plan du bas de
+  l'axe (sa borne inférieure en z), chacune de la couleur de son niveau.
+
+  Exemple :
+     mesh(peaks(20)); hold on; matlibre_courbes_dessous({peaks(20)}); hold off;
+
+  Voir aussi MESHC, SURFC, CONTOURC.
+```
+
 ## `matlibre_datastore_deviner`
 
 ```
@@ -4207,6 +4250,21 @@ MATLIBRE_EXTREMA_LOCAUX Rouage commun d'ISLOCALMAX et d'ISLOCALMIN.
      matlibre_extrema_locaux([1 3 2], {}, true)     % [0 1 0]
 
   Voir aussi ISLOCALMAX, ISLOCALMIN.
+```
+
+## `matlibre_fichiers_module`
+
+```
+MATLIBRE_FICHIERS_MODULE Les fichiers .m d'un module de toolbox.
+  F = MATLIBRE_FICHIERS_MODULE(DOSSIER) rend, comme DIR, les fichiers .m
+  du module DOSSIER et ceux de son sous-dossier « homonymes », où vivent
+  les fonctions dont le nom ne diffère d'une autre que par la casse
+  (addmf à côté de addMF) : sous Windows et macOS, deux tels fichiers ne
+  peuvent pas partager un dossier. Le chargeur met les deux au chemin.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Voir aussi DIR, WHAT.
 ```
 
 ## `matlibre_fleche`
@@ -5976,7 +6034,8 @@ MATLIBRE_VALIDER Lève l'erreur d'un validateur quand la condition échoue.
 MATLIBRE_WEB_CONTENU Interprétation du corps d'une réponse web.
   C = MATLIBRE_WEB_CONTENU(TEXTE,URL) rend le contenu décodé : un
   document JSON devient structure ou cellule, un fichier délimité
-  devient une matrice, le reste reste du texte.
+  (.csv, .tsv) fait de nombres devient une matrice, le reste — un .txt
+  compris — reste du texte.
 
   C = MATLIBRE_WEB_CONTENU(TEXTE,URL,TYPE) impose l'interprétation :
   'auto' devine, 'json' décode, 'text' et 'raw' rendent le texte tel
@@ -6246,14 +6305,11 @@ MEMOIZE Garde les résultats d'une fonction.
 
 ```
 MESHC Maillage d'une surface, avec ses lignes de niveau en dessous.
-  MESHC(X,Y,Z) trace le maillage de la surface et, dans le plan du bas,
-  ses lignes de niveau. MESHC(Z) prend une grille entière.
+  MESHC(X,Y,Z) trace le maillage de la surface (MESH) et, dans le plan
+  du bas de l'axe, ses lignes de niveau, chacune de la couleur de son
+  niveau. MESHC(Z) prend une grille entière.
 
-  H = MESHC(...) rend les poignées.
-
-  Le rendu de MatLibre est plan : la surface est montrée en couleurs,
-  et les lignes de niveau par-dessus, ce qui met exactement la même
-  information sous les yeux.
+  H = MESHC(...) rend la poignée du maillage.
 
   Exemples :
      meshc(peaks(30));
@@ -6268,15 +6324,14 @@ MESHC Maillage d'une surface, avec ses lignes de niveau en dessous.
 ```
 MESHZ Maillage d'une surface, avec un rideau sur les bords.
   MESHZ(X,Y,Z) trace le maillage et y ajoute, sur tout le pourtour, un
-  rideau vertical qui descend jusqu'au plan du bas. C'est ce qui fait
-  qu'une surface ne paraît pas flotter.
+  rideau vertical qui descend jusqu'au plus bas de la surface. C'est ce
+  qui fait qu'une surface ne paraît pas flotter. Comme dans MATLAB, le
+  rideau est fait en bordant la grille d'une rangée de sommets au plus
+  bas.
 
   MESHZ(Z) prend une grille entière.
 
   H = MESHZ(...) rend la poignée.
-
-  Le rendu de MatLibre est plan : le rideau ne se voit pas, et MESHZ
-  donne la même image que MESH.
 
   Exemples :
      meshz(peaks(30));
@@ -6327,6 +6382,27 @@ MINRES Résolution itérative par méthode de Krylov.
      norm(A * x - b) / norm(b) < 1e-9
 
   Voir aussi PCG, GMRES, MINRES, BICG, MLDIVIDE.
+```
+
+## `mkpp`
+
+```
+MKPP Construit un polynôme par morceaux.
+  PP = MKPP(BREAKS,COEFS) assemble les L morceaux d'ordre K définis sur
+  les L+1 points de rupture croissants BREAKS : la ligne i de COEFS
+  (L x K) porte les coefficients du morceau i, puissances décroissantes,
+  en la variable x - BREAKS(i).
+  PP = MKPP(BREAKS,COEFS,D) assemble un polynôme à valeurs dans R^D :
+  COEFS a D*L lignes, la ligne D*(i-1)+c portant la composante c du
+  morceau i ; un tableau D x L x K est aussi accepté. PP est la structure
+  de MATLAB, de champs form, breaks, coefs, pieces, order et dim, que
+  PPVAL évalue et UNMKPP défait.
+
+  Exemple :
+     pp = mkpp([0 1 3], [1 0 0; -1 2 1]);   % x^2 sur [0,1], puis -(x-1)^2 + 2(x-1) + 1
+     ppval(pp, [0.5 2])                     % 0.25 et 2
+
+  Voir aussi UNMKPP, PPVAL, SPLINE, PCHIP.
 ```
 
 ## `months`
@@ -6868,6 +6944,52 @@ NEXTTILE Passe à la case suivante d'un TILEDLAYOUT.
   Voir aussi TILEDLAYOUT, SUBPLOT, AXES, GCA.
 ```
 
+## `normalize`
+
+```
+NORMALIZE Centre et met à l'échelle des données, vecteur par vecteur.
+  N = NORMALIZE(A) centre et réduit A : chaque vecteur, pris le long de
+  la première dimension non singleton (chaque colonne d'une matrice),
+  devient de moyenne nulle et d'écart type un.
+  N = NORMALIZE(A, DIM) travaille le long de la dimension DIM.
+
+  N = NORMALIZE(..., METHODE) ou NORMALIZE(..., METHODE, OPTION) :
+     'zscore'      centrage et réduction ; OPTION 'std' (défaut) ou
+                   'robust' (médiane et écart absolu médian)
+     'norm'        division par la norme P (OPTION, 2 par défaut, Inf
+                   pour le maximum des valeurs absolues)
+     'scale'       division seule ; OPTION 'std' (défaut), 'mad',
+                   'first', 'iqr' ou un nombre
+     'range'       ramène dans [A B] (OPTION, [0 1] par défaut)
+     'center'      soustraction seule ; OPTION 'mean' (défaut),
+                   'median' ou un nombre
+     'medianiqr'   retranche la médiane, divise par l'écart
+                   interquartile
+  'center' et 'scale' se combinent : NORMALIZE(A, 'center', 'median',
+  'scale', 'mad').
+
+  [N, C, S] = NORMALIZE(...) rend aussi le centre C et l'échelle S
+  appliqués, de sorte que N = (A - C) ./ S. C et S ont la taille de A,
+  réduite à un le long de DIM ; ils servent à appliquer la même
+  transformation à d'autres données, celles d'un jeu de test par exemple.
+
+  Les NaN sont laissés de côté dans le calcul des statistiques et restent
+  NaN dans le résultat. Un vecteur constant a une échelle nulle : elle
+  est prise égale à un, si bien qu'il devient nul (ou la borne basse de
+  'range') plutôt qu'une suite de NaN.
+
+  Exemple :
+     z = normalize([1 2 3], 'range');
+     [min(z) max(z)]                         % [0 1]
+     normalize([1 2 3])                      % [-1 0 1]
+     normalize([1 2; 3 6])                   % [-0.7071 -0.7071; 0.7071 0.7071]
+     normalize([3 4], 'norm')                % [0.6 0.8]
+     [n, c, s] = normalize([2 4 6], 'center', 'median', 'scale', 2);
+     n                                       % [-1 0 1]
+
+  Voir aussi ZSCORE, RESCALE, MEAN, STD, MEDIAN, IQR.
+```
+
 ## `normest`
 
 ```
@@ -7310,25 +7432,33 @@ PASCAL Matrice de Pascal.
 ## `patch`
 
 ```
-PATCH Polygones remplis.
+PATCH Polygones remplis, dans le plan ou dans l'espace.
   PATCH(X,Y,C) trace le polygone dont les sommets sont (X,Y), rempli de
-  la couleur C. C est une lettre, un nom, ou un triplet [r v b].
+  la couleur C : une lettre, un nom, un triplet [r v b], ou une valeur
+  que la palette met à l'échelle (CLIM).
 
-  Si X et Y sont des matrices, chaque colonne donne un polygone.
+  Si X et Y sont des matrices, chaque colonne donne un polygone ; C peut
+  alors donner une valeur ou un triplet par polygone, ou une valeur par
+  sommet (le polygone prend leur moyenne).
 
-  PATCH(X,Y,Z,C) accepte des sommets à trois dimensions ; le rendu de
-  MatLibre étant plan, Z ne change rien au dessin.
+  PATCH(X,Y,Z,C) pose les sommets dans l'espace : la vue en perspective
+  (VIEW(3)) les montre, triés du plus lointain au plus proche.
 
   PATCH('Faces',F,'Vertices',V) décrit les polygones par une liste de
-  sommets V — un par ligne — et une liste de faces F, chaque ligne
-  donnant les indices des sommets d'une face. C'est la forme compacte,
-  celle qu'emploient les maillages : un sommet partagé n'est écrit
-  qu'une fois.
+  sommets V — un par ligne, deux ou trois colonnes — et une liste de
+  faces F, chaque ligne donnant les indices des sommets d'une face (NaN
+  complète les faces plus courtes). C'est la forme compacte des
+  maillages. 'FaceVertexCData' donne la couleur : une valeur ou un
+  triplet par face, ou une valeur par sommet.
 
   PATCH(...,'FaceColor',C) et PATCH(...,'EdgeColor',C) nomment les
-  couleurs séparément ; 'none' laisse la face ou le bord vide.
+  couleurs séparément ; 'none' laisse la face ou le bord vide, 'flat'
+  prend la couleur de la face. 'FaceAlpha', 'LineWidth', 'LineStyle' et
+  'DisplayName' sont lus.
 
-  H = PATCH(...) rend les poignées des polygones.
+  Comme dans MATLAB, PATCH est de bas niveau : il ajoute ses polygones
+  sans effacer le tracé ni changer la vue. H = PATCH(...) rend la
+  poignée de l'objet, un seul pour toutes ses faces.
 
   Exemples :
      patch([0 1 1 0], [0 0 1 1], 'r');            % un carre rouge
@@ -7338,7 +7468,13 @@ PATCH Polygones remplis.
      F = [1 2 3; 1 3 4];
      patch('Faces', F, 'Vertices', V, 'FaceColor', [0.6 0.8 1]);
 
-  Voir aussi FILL, RECTANGLE, TRIMESH, TRISURF, LINE, AREA.
+     % Un tetraedre, colore face par face
+     V = [0 0 0; 1 0 0; 0 1 0; 0 0 1];
+     F = [1 2 3; 1 2 4; 1 3 4; 2 3 4];
+     clf; patch('Faces', F, 'Vertices', V, 'FaceVertexCData', (1:4)', ...
+                'FaceColor', 'flat'); view(3);
+
+  Voir aussi FILL, FILL3, RECTANGLE, TRIMESH, TRISURF, LINE, AREA.
 ```
 
 ## `pcg`
@@ -7511,8 +7647,9 @@ PIE Diagramme circulaire.
   PIE(X,DECOLLER) écarte du centre les secteurs dont l'élément de
   DECOLLER n'est pas nul : c'est ainsi qu'on met en avant une part.
 
-  PIE(X,DECOLLER,ETIQUETTES) nomme les secteurs. Sans étiquettes, ce
-  sont les pourcentages qui sont écrits.
+  PIE(X,DECOLLER,ETIQUETTES) nomme les secteurs, et PIE(X,ETIQUETTES)
+  aussi, sans en décoller aucun. Sans étiquettes, ce sont les
+  pourcentages qui sont écrits.
 
   H = PIE(...) rend les poignées des secteurs et des textes.
 
@@ -7527,8 +7664,12 @@ PIE Diagramme circulaire.
   Exemples :
      pie([3 1 1]);
      pie([30 20 50], [0 0 1], {'nord', 'sud', 'est'});
+     pie([30 20 50], {'nord', 'sud', 'est'});
 
   Voir aussi PIE3, BAR, PARETO, FILL, LEGEND.
+PIE(X,ETIQUETTES), la forme de MATLAB : une cellule ou un tableau de
+textes en second argument nomme les secteurs. Il était pris pour
+DECOLLER, et « ~= 0 » sur une cellule échouait.
 ```
 
 ## `pie3`
@@ -7631,30 +7772,25 @@ PLOTMATRIX Tableau de nuages de points, toutes les paires de colonnes.
 
 ```
 PLOTYY Deux courbes, deux échelles d'ordonnées.
-  PLOTYY(X1,Y1,X2,Y2) trace la première courbe et la seconde sur le
-  même axe, la seconde étant remise à l'échelle de la première de
-  sorte que les deux occupent la même hauteur. Les graduations de
-  droite, celles de la seconde échelle, sont écrites en légende.
+  PLOTYY(X1,Y1,X2,Y2) trace la première courbe sur l'échelle de gauche
+  et la seconde sur une échelle qui lui est propre, graduée à droite,
+  chacune de sa couleur — la première couleur de MATLAB à gauche, la
+  deuxième à droite —, comme YYAXIS.
 
   PLOTYY(X1,Y1,X2,Y2,F) emploie la fonction de tracé nommée F —
   'plot', 'semilogy', 'stem'… — pour les deux courbes.
   PLOTYY(X1,Y1,X2,Y2,F1,F2) en emploie une pour chacune.
 
-  [AX,H1,H2] = PLOTYY(...) rend l'axe et les deux poignées.
-
-  MATLAB donne à la seconde courbe un axe des ordonnées qui lui est
-  propre, gradué à droite. MatLibre n'a pas de second axe : il
-  normalise la seconde courbe pour qu'elle se superpose lisiblement à
-  la première, et nomme le facteur dans la légende. La forme des deux
-  courbes et leur comparaison restent justes ; ce sont les graduations
-  de droite qui manquent.
+  [AX,H1,H2] = PLOTYY(...) rend les deux axes — AX(1) vise la gauche,
+  AX(2) la droite : ylabel(AX(2),...) et ylim(AX(2),...) règlent
+  l'échelle de droite — et les poignées des deux courbes.
 
   Depuis R2016a, MATLAB recommande YYAXIS plutôt que PLOTYY.
 
   Exemples :
      x = 0:0.1:10;
-     plotyy(x, sin(x), x, 1000 * exp(-x));
-     legend('sin (gauche)', 'exp (droite)');
+     [ax, h1, h2] = plotyy(x, sin(x), x, 1000 * exp(-x));
+     ylabel(ax(1), 'sin'); ylabel(ax(2), 'exp');
 
   Voir aussi PLOT, YYAXIS, SUBPLOT, LEGEND, TILEDLAYOUT.
 ```
@@ -7851,17 +7987,17 @@ QUIVER Champ de vecteurs.
 ```
 QUIVER3 Champ de vecteurs en trois dimensions.
   QUIVER3(X,Y,Z,U,V,W) trace une flèche partant de chaque point
-  (X,Y,Z) et portant le vecteur (U,V,W).
+  (X,Y,Z) et portant le vecteur (U,V,W). Les flèches sont mises à
+  l'échelle d'office pour ne pas se chevaucher, comme dans MATLAB.
 
-  QUIVER3(Z,U,V,W) place les flèches sur la surface Z.
+  QUIVER3(Z,U,V,W) place les flèches sur la surface Z, aux nœuds d'une
+  grille entière.
 
-  QUIVER3(...,ECHELLE) et QUIVER3(...,STYLE) suivent la même règle que
-  QUIVER.
+  QUIVER3(...,ECHELLE) multiplie la mise à l'échelle automatique ;
+  ECHELLE = 0 garde les longueurs telles quelles. QUIVER3(...,STYLE)
+  prend une chaîne de style.
 
-  H = QUIVER3(...) rend les poignées.
-
-  Le rendu de MatLibre est plan : les flèches sont projetées en
-  laissant tomber la troisième coordonnée, comme le fait PLOT3.
+  H = QUIVER3(...) rend la poignée des flèches.
 
   Exemples :
      [X, Y] = meshgrid(-2:0.5:2);
@@ -8148,15 +8284,13 @@ RESIDUE Décomposition en éléments simples d'une fraction rationnelle.
 
 ```
 RIBBON Colonnes dessinées en rubans côte à côte.
-  RIBBON(Y) trace une bande par colonne de Y, les bandes étant rangées
-  côte à côte dans la profondeur. RIBBON(X,Y) place les points en X.
+  RIBBON(Y) trace une bande par colonne de Y : la bande K est posée en
+  X = K, large de 0,75, et suit les valeurs de sa colonne le long de
+  l'axe des Y, à la hauteur Z qu'elles donnent ; chaque bande prend sa
+  couleur dans la palette. RIBBON(X,Y) place les points en X.
   RIBBON(X,Y,LARGEUR) donne aux bandes la largeur voulue.
 
-  H = RIBBON(...) rend les poignées.
-
-  Le rendu de MatLibre est plan : chaque colonne est tracée comme une
-  aire décalée, ce qui donne la même lecture que la perspective de
-  MATLAB.
+  H = RIBBON(...) rend la poignée de la première bande.
 
   Exemples :
      ribbon(peaks(20));
@@ -8262,9 +8396,9 @@ ROTATE3D Rotation à la souris (acceptée, sans effet).
   ROTATE3D ON permet, dans MATLAB, de faire tourner une figure
   tridimensionnelle à la souris ; ROTATE3D OFF l'interdit.
 
-  Les figures de MatLibre ne sont pas manipulables à la souris et son
-  rendu est plan : l'appel est accepté pour qu'un programme tourne sans
-  retouche.
+  Les figures de MatLibre ne se tournent pas à la souris : l'appel est
+  accepté pour qu'un programme tourne sans retouche ; VIEW change le
+  point de vue.
 
   Exemple :
      surf(peaks(30)); rotate3d('on');
@@ -8293,28 +8427,6 @@ SAVEFIG Enregistre une figure dans un fichier.
      savefig('courbe');            % ecrit courbe.svg
 
   Voir aussi SAVEAS, PRINT, OPENFIG, EXPORTGRAPHICS, FIGURE.
-```
-
-## `scatter3`
-
-```
-SCATTER3 Nuage de points dans l'espace.
-  SCATTER3(X,Y,Z) place un point à chaque triplet.
-  SCATTER3(X,Y,Z,S) donne aux points la taille S.
-  SCATTER3(X,Y,Z,S,C) leur donne la couleur C.
-  SCATTER3(...,STYLE) prend une chaîne de style, comme PLOT.
-
-  H = SCATTER3(...) rend la poignée du nuage.
-
-  Le rendu de MatLibre est plan : les points sont projetés en laissant
-  tomber la troisième coordonnée, comme le fait PLOT3.
-
-  Exemples :
-     scatter3(randn(100,1), randn(100,1), randn(100,1));
-     t = linspace(0, 6*pi, 200);
-     scatter3(cos(t), sin(t), t, 20, 'r');
-
-  Voir aussi SCATTER, PLOT3, STEM3, QUIVER3.
 ```
 
 ## `scatteredInterpolant`
@@ -8448,25 +8560,28 @@ SHORTESTPATH Plus court chemin entre deux nœuds d'un graphe.
 ## `slice`
 
 ```
-SLICE Coupes d'un volume.
-  SLICE(V,SX,SY,SZ) montre, dans MATLAB, le volume V coupé par les
-  plans d'abscisses SX, d'ordonnées SY et de cotes SZ.
+SLICE Coupes d'un volume, dans l'espace.
+  SLICE(V,SX,SY,SZ) coupe le volume V par les plans d'abscisses SX,
+  d'ordonnées SY et de cotes SZ, et montre chaque coupe en perspective,
+  à sa place dans le volume, colorée par les valeurs de V (CLIM). Comme
+  pour MESHGRID, la colonne J, la ligne I et la page K de V sont au
+  point (J, I, K).
 
-  SLICE(X,Y,Z,V,SX,SY,SZ) place le volume sur la grille donnée.
+  SLICE(X,Y,Z,V,SX,SY,SZ) place le volume sur la grille donnée par
+  MESHGRID.
 
-  H = SLICE(...) rend les poignées.
+  Une coupe tombe sur le plan de grille le plus proche de la position
+  demandée ; MATLAB interpole entre deux plans.
 
-  Le rendu de MatLibre est plan : il ne montre pas un volume en
-  perspective. SLICE dessine donc les coupes les unes à côté des
-  autres, chacune comme une image — ce qui donne la même information,
-  sans le relief.
+  H = SLICE(...) rend une poignée par coupe.
 
   Exemples :
      [X, Y, Z] = meshgrid(-2:0.2:2);
      V = X .* exp(-X.^2 - Y.^2 - Z.^2);
+     slice(X, Y, Z, V, [-1.2 0.8 2], 2, [-2 -0.2]);
      slice(V, [], [], [5 11 17]);      % trois coupes en z
 
-  Voir aussi IMAGESC, CONTOURSLICE, ISOSURFACE, SURF, MESHGRID.
+  Voir aussi SURF, CONTOURSLICE, ISOSURFACE, MESHGRID, VIEW.
 ```
 
 ## `sphere`
@@ -8483,9 +8598,8 @@ SPHERE Coordonnées d'une sphère.
      [X, Y, Z] = sphere(30);
      surf(2*X + 5, 2*Y, 2*Z);        % une sphere de rayon 2 en x = 5
 
-  Le rendu de MatLibre est plan : SPHERE sans sortie montre la
-  troisième coordonnée en couleurs, ce qui donne le disque ombré qu'on
-  verrait de face.
+  SPHERE sans sortie trace la sphère avec SURF, en perspective et à
+  échelles égales (AXIS EQUAL).
 
   Exemples :
      sphere;
@@ -8639,20 +8753,19 @@ STANDARDIZEMISSING Remplace des valeurs par la marque de manquant.
 
 ```
 STEM3 Tiges dans l'espace.
-  STEM3(X,Y,Z) trace, pour chaque triplet, une tige verticale surmontée
-  d'un cercle.
-  STEM3(Z) place les tiges aux nœuds d'une grille entière.
-  STEM3(...,STYLE) prend une chaîne de style.
+  STEM3(X,Y,Z) trace, pour chaque point (X,Y,Z), une tige verticale qui
+  part du plan Z = 0, surmontée d'un cercle.
+  STEM3(Z) place les tiges aux nœuds d'une grille entière : la colonne
+  J et la ligne I de Z en (J, I).
+  STEM3(...,'filled') remplit les cercles ; STEM3(...,STYLE) prend une
+  chaîne de style (« 'r--d' »).
 
-  H = STEM3(...) rend la poignée.
-
-  Le rendu de MatLibre est plan : la tige va de zéro à Z, dessinée dans
-  le plan des X et des Z.
+  H = STEM3(...) rend la poignée des tiges.
 
   Exemples :
      t = linspace(0, 2*pi, 20);
      stem3(cos(t), sin(t), t);
-     stem3(rand(4, 4));
+     stem3(rand(4, 4), 'filled');
 
   Voir aussi STEM, PLOT3, SCATTER3, BAR3.
 ```
@@ -8729,13 +8842,11 @@ SUMMER Carte de couleurs vert - jaune.
 
 ```
 SURFC Surface, avec ses lignes de niveau en dessous.
-  SURFC(X,Y,Z) trace la surface et, dans le plan du bas, ses lignes de
-  niveau. SURFC(Z) prend une grille entière.
+  SURFC(X,Y,Z) trace la surface (SURF) et, dans le plan du bas de l'axe,
+  ses lignes de niveau, chacune de la couleur de son niveau. SURFC(Z)
+  prend une grille entière.
 
-  H = SURFC(...) rend les poignées.
-
-  Le rendu de MatLibre est plan : la surface est montrée en couleurs,
-  et les lignes de niveau par-dessus.
+  H = SURFC(...) rend la poignée de la surface.
 
   Exemples :
      surfc(peaks(30));
@@ -8789,7 +8900,7 @@ SURFNORM Normales d'une surface.
      [X, Y] = meshgrid(-2:0.5:2);
      Z = X .* exp(-X.^2 - Y.^2);
      [nx, ny, nz] = surfnorm(X, Y, Z);
-     max(max(abs(nx.^2 + ny.^2 + nz.^2 - 1)))     % 1 : elles sont unitaires
+     max(max(abs(nx.^2 + ny.^2 + nz.^2 - 1)))     % 0 : elles sont unitaires
 
      surfnorm(X, Y, Z);
 
@@ -9164,25 +9275,22 @@ TRIANGULATION Maillage de triangles ou de tétraèdres.
 ## `trimesh`
 
 ```
-TRIMESH Maillage d'une triangulation.
-  TRIMESH(T,X,Y,Z) trace les arêtes des triangles de T, dont les
-  sommets sont (X,Y,Z). C'est TRISURF sans le remplissage : on voit à
-  travers.
-
+TRIMESH Maillage défini par une triangulation.
+  TRIMESH(T,X,Y,Z) trace les arêtes des triangles de T — chaque ligne
+  donne les trois indices des sommets d'une face —, colorées par la
+  moyenne des Z de leur face, sur des faces blanches, comme MESH.
   TRIMESH(T,X,Y) trace la triangulation à plat.
+  TRIMESH(...,'EdgeColor',C,...) ou TRIMESH(...,'Color',C) règle la
+  couleur des arêtes.
 
-  TRIMESH(...,'Color',C) fixe la couleur des arêtes.
-
-  H = TRIMESH(...) rend les poignées.
-
-  Le rendu de MatLibre est plan, comme pour TRISURF.
+  H = TRIMESH(...) rend la poignée du maillage.
 
   Exemples :
-     x = rand(30, 1); y = rand(30, 1);
-     T = delaunay(x, y);
-     trimesh(T, x, y);
+     [x, y] = meshgrid(1:4);
+     T = delaunay(x(:), y(:));
+     trimesh(T, x(:), y(:), sin(x(:)) .* cos(y(:)));
 
-  Voir aussi TRISURF, DELAUNAY, VORONOI, PATCH, PLOT.
+  Voir aussi TRISURF, DELAUNAY, PATCH, MESH.
 ```
 
 ## `trisurf`
@@ -9191,23 +9299,19 @@ TRIMESH Maillage d'une triangulation.
 TRISURF Surface définie par une triangulation.
   TRISURF(T,X,Y,Z) trace la surface dont les sommets sont (X,Y,Z) et
   les faces les triangles de T : chaque ligne de T donne les trois
-  indices des sommets d'une face.
+  indices des sommets d'une face. Chaque face prend la couleur de la
+  moyenne des Z de ses sommets, par la palette ; les arêtes sont noires.
+  TRISURF(T,X,Y,Z,C) colore les sommets par C.
+  TRISURF(...,'FaceColor',C,'EdgeColor',C2,...) règle les couleurs.
 
-  TRISURF(T,X,Y) trace la triangulation à plat.
-
-  TRISURF(...,'FaceColor',C) fixe la couleur des faces.
-
-  H = TRISURF(...) rend les poignées des faces.
-
-  Le rendu de MatLibre est plan : les triangles sont dessinés dans le
-  plan des X et des Y, remplis d'une couleur unie.
+  H = TRISURF(...) rend la poignée de la surface.
 
   Exemples :
      x = rand(30, 1); y = rand(30, 1);
      T = delaunay(x, y);
      trisurf(T, x, y, x.^2 + y.^2);
 
-  Voir aussi TRIMESH, DELAUNAY, PATCH, FILL, VORONOI.
+  Voir aussi TRIMESH, DELAUNAY, PATCH, FILL3, SURF.
 ```
 
 ## `uicontrol`
@@ -9274,21 +9378,18 @@ UNIQUETOL Valeurs distinctes à une tolérance près.
   Voir aussi ISMEMBERTOL.
 ```
 
-## `unzip`
+## `unmkpp`
 
 ```
-UNZIP Extrait une archive ZIP.
-  UNZIP(ARCHIVE,DOSSIER) extrait dans le dossier donné, le dossier
-  courant par défaut.
+UNMKPP Les éléments d'un polynôme par morceaux.
+  [BREAKS,COEFS,L,K,D] = UNMKPP(PP) rend les points de rupture, les
+  coefficients, le nombre de morceaux, l'ordre et la dimension du
+  polynôme par morceaux PP, l'inverse de MKPP.
 
   Exemple :
-     f = fopen('a.txt', 'w'); fprintf(f, 'bonjour'); fclose(f);
-     zip('archive.zip', {'a.txt'});
-     delete('a.txt');
-     unzip('archive.zip');
-     fileread('a.txt')           % 'bonjour'
+     [b, c, l, k] = unmkpp(spline(0:3, [0 1 8 27]))   % 4 points, 3 morceaux d'ordre 4
 
-  Voir aussi ZIP.
+  Voir aussi MKPP, PPVAL, SPLINE.
 ```
 
 ## `usejava`
@@ -9391,19 +9492,17 @@ VORONOI Diagramme de Voronoï.
 ## `waterfall`
 
 ```
-WATERFALL Surface dessinée en lignes, une par rangée.
-  WATERFALL(X,Y,Z) trace une courbe par ligne de Z, décalée de sorte
-  que les courbes se suivent comme les marches d'une cascade. C'est la
-  façon de montrer une famille de signaux — un spectre au fil du temps,
-  par exemple — sans les superposer.
+WATERFALL Surface dessinée en rideaux, un par rangée.
+  WATERFALL(X,Y,Z) trace, pour chaque ligne de Z, la courbe de ses
+  valeurs le long de X, à la profondeur Y de sa ligne, et la referme
+  jusqu'au plus bas de Z : une suite de rideaux blancs aux bords
+  colorés par leur hauteur, comme dans MATLAB. C'est la façon de montrer
+  une famille de signaux — un spectre au fil du temps — sans les
+  superposer.
 
   WATERFALL(Z) prend une grille entière.
 
-  H = WATERFALL(...) rend les poignées.
-
-  Le rendu de MatLibre est plan : les courbes sont décalées
-  verticalement d'un pas constant, ce qui donne la même lecture que la
-  perspective de MATLAB.
+  H = WATERFALL(...) rend la poignée.
 
   Exemples :
      waterfall(peaks(20));
@@ -9751,6 +9850,44 @@ XMLWRITE Écrit un document XML.
   Voir aussi XMLREAD, WRITESTRUCT, READSTRUCT.
 ```
 
+## `xtickangle`
+
+```
+XTICKANGLE Incline les étiquettes de graduation des abscisses.
+  XTICKANGLE(ANGLE) incline les étiquettes de l'axe courant de ANGLE
+  degrés, dans le sens trigonométrique : 45 les fait monter vers la
+  droite, chacune se terminant sur sa graduation, 90 les écrit de bas en
+  haut. La marge du bas s'agrandit pour qu'elles tiennent.
+  XTICKANGLE(AX, ANGLE) agit sur l'axe AX.
+  A = XTICKANGLE rend l'inclinaison de l'axe courant.
+
+  Exemple :
+     bar([3 5 2 4]);
+     xticklabels({'janvier', 'fevrier', 'mars', 'avril'});
+     xtickangle(45);
+     assert(xtickangle == 45);
+
+  Voir aussi ytickangle, xticklabels, xticks.
+```
+
+## `ytickangle`
+
+```
+YTICKANGLE Incline les étiquettes de graduation des ordonnées.
+  YTICKANGLE(ANGLE) incline les étiquettes de l'axe courant de ANGLE
+  degrés, dans le sens trigonométrique, chacune se terminant sur sa
+  graduation.
+  YTICKANGLE(AX, ANGLE) agit sur l'axe AX.
+  A = YTICKANGLE rend l'inclinaison de l'axe courant.
+
+  Exemple :
+     plot(1:4);
+     ytickangle(30);
+     assert(ytickangle == 30);
+
+  Voir aussi xtickangle, yticklabels, yticks.
+```
+
 ## `yyyymmdd`
 
 ```
@@ -9763,25 +9900,6 @@ YYYYMMDD Date écrite comme un nombre AAAAMMJJ.
      yyyymmdd(datetime(2024, 2, 3))     % 20240203
 
   Voir aussi DATENUM, DATESTR, DATEVEC, YEAR, MONTH, DAY.
-```
-
-## `zip`
-
-```
-ZIP Fabrique une archive ZIP.
-  ZIP(ARCHIVE,FICHIERS) empaquette les fichiers donnés. FICHIERS peut
-  être un nom, une cellule de noms ou un motif.
-
-  L'archive est produite par la commande « zip » du système ; sans
-  elle, la fonction le dit clairement plutôt que d'écrire un fichier
-  incomplet.
-
-  Exemple :
-     f = fopen('b.txt', 'w'); fprintf(f, 'x'); fclose(f);
-     fichier = zip('archive.zip', {'b.txt'});
-     isfile(fichier)             % 1
-
-  Voir aussi UNZIP.
 ```
 
 ## `zoom`
@@ -9801,5 +9919,24 @@ ZOOM Loupe à la souris (acceptée, sans effet interactif).
      zoom('out');                  % retour a la vue d'ensemble
 
   Voir aussi XLIM, YLIM, AXIS, PAN, ROTATE3D.
+```
+
+## `ztickangle`
+
+```
+ZTICKANGLE Inclinaison des étiquettes de graduation de l'axe des z.
+  ZTICKANGLE(ANGLE) garde l'inclinaison voulue des étiquettes de l'axe
+  des z de l'axe courant, en degrés ; ZTICKANGLE la rend. MatLibre écrit
+  les étiquettes de l'espace horizontalement : l'angle se pose et se
+  relit, sans changer le dessin.
+  ZTICKANGLE(AX, ANGLE) agit sur l'axe AX.
+  A = ZTICKANGLE rend l'inclinaison de l'axe courant.
+
+  Exemple :
+     surf(peaks(20));
+     ztickangle(30);
+     assert(ztickangle == 30);
+
+  Voir aussi xtickangle, zticklabels, zticks.
 ```
 

@@ -2,14 +2,17 @@ function [niveaux, histogramme, bornes] = statelevels(x, nbins, methode, limites
 %STATELEVELS Niveaux bas et haut d'un signal à deux états.
 %   NIVEAUX = STATELEVELS(X) rend [BAS HAUT] par la méthode de
 %   l'histogramme : l'étendue est découpée en NBINS classes (100 par
-%   défaut), séparées en deux moitiés, et chaque niveau est le mode de sa
-%   moitié. METHODE vaut 'mode' (par défaut) ou 'mean'.
+%   défaut), séparées en deux moitiés, et chaque niveau est le centre de
+%   la classe la plus peuplée de sa moitié — non la valeur exacte des
+%   données : c'est la définition de la norme IEEE 181 que suit MATLAB.
+%   METHODE vaut 'mode' (par défaut) ou 'mean'.
 %
 %   [NIVEAUX,HISTOGRAMME,BORNES] = STATELEVELS(...) rend aussi le compte
 %   par classe et les bornes utilisées.
 %
 %   Exemple :
-%      statelevels([zeros(1,50) ones(1,50)])   % [0 1]
+%      statelevels([zeros(1,50) ones(1,50)])   % [0.005 0.995] : le centre des
+%                                              % classes extrêmes, comme MATLAB
 %
 %   Voir aussi MIDCROSS, RISETIME, SIGNALNIVEAUX.
     if nargin < 2 || isempty(nbins), nbins = 100; end

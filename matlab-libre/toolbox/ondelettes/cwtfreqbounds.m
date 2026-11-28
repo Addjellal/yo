@@ -36,7 +36,7 @@ function [minfreq, maxfreq] = cwtfreqbounds(N, varargin)
 %   Voir aussi CWTFILTERBANK, CWT, ONDELETTEANALYTIQUE.
     if ~isscalar(N) || N < 4 || N ~= fix(N)
         error('wavelet:cwtfreqbounds:Longueur', ...
-              'N doit être un entier supérieur ou égal à quatre.');
+              'N must be an integer greater than or equal to 4.');
     end
     pasFourni = ~isempty(varargin) && isnumeric(varargin{1}) && isscalar(varargin{1});
     if pasFourni
@@ -58,7 +58,7 @@ function [minfreq, maxfreq] = cwtfreqbounds(N, varargin)
     if isempty(coupure), coupure = defautCoupure; end
     if coupure <= 0 || coupure > 100
         error('wavelet:cwtfreqbounds:Coupure', ...
-              'CutOff doit être un pourcentage dans ]0,100].');
+              'CutOff must be a percentage in (0,100].');
     end
     [~, pic, sigmaT] = ondeletteAnalytique(nom, parametres, pic0());
     % Pulsation où le module retombe sous la coupure, du côté des hautes
@@ -72,7 +72,7 @@ function [minfreq, maxfreq] = cwtfreqbounds(N, varargin)
     if ~isempty(cadence)
         if cadence <= 0
             error('wavelet:cwtfreqbounds:Cadence', ...
-                  'La fréquence ou la période d''échantillonnage doit être positive.');
+                  'The sampling frequency or period must be positive.');
         end
         if pasFourni && cadence >= 1
             minfreq = minfreq * cadence;

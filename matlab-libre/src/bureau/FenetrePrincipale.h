@@ -67,6 +67,12 @@ public:
     // Ouvre un onglet d'editeur vide, comme le bouton « Nouveau script ».
     void ouvrirNouveauScript();
 
+    // Vrai si l'onglet INDEX peut être fermé sans rien perdre : il n'est
+    // pas modifié, ou l'utilisateur l'a enregistré, ou il a choisi de
+    // l'abandonner. Faux s'il a annulé, ou si l'enregistrement n'a pas
+    // abouti — on ne ferme alors rien.
+    bool peutFermerOnglet(int index);
+
 protected:
     void closeEvent(QCloseEvent* evenement) override;
 
@@ -174,6 +180,8 @@ private:
     // moteur connait, et ceux des variables de l'espace de travail.
     QStringList nomsConnus_;
     QStringList nomsVariables_;
+    // La commande corrigée que la prochaine invite proposera.
+    QString correctionEnAttente_;
     QStringList completions(const QString& prefixe, bool fichiers) const;
     bool occupe_ = false;
     // « MatLibre est occupé » se dit une fois par calcul, pas a chaque

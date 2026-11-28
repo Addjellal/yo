@@ -56,7 +56,7 @@ classdef controllerPurePursuit < handle
         %COMMANDER Vitesses d'avance et de rotation pour cette pose.
             if isempty(obj.Waypoints)
                 error('robotics:controllerPurePursuit:SansChemin', ...
-                      'Le regulateur demande des Waypoints.');
+                      'The controller requires Waypoints.');
             end
             pose = double(pose(:)).';
             [omegaBrut, indice] = purePursuit(pose, obj.Waypoints, ...

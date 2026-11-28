@@ -26,8 +26,8 @@ classdef AliasType
             if nargin > 0
                 if ~(ischar(base) || isstring(base))
                     error('Simulink:DataType:AliasBaseType', ...
-                          ['Le type de base d''un Simulink.AliasType est un nom de type, ' ...
-                           'en texte : ''int16'', ''fixdt(1,16,8)''.']);
+                          ['The base type of a Simulink.AliasType must be a type name, ' ...
+                           'as text: ''int16'', ''fixdt(1,16,8)''.']);
                 end
                 T.BaseType = char(base);
             end
@@ -35,8 +35,8 @@ classdef AliasType
         function T = set.BaseType(T, base)
             if ~(ischar(base) || isstring(base))
                 error('Simulink:DataType:AliasBaseType', ...
-                      ['Le type de base d''un Simulink.AliasType est un nom de type, en ' ...
-                       'texte : ''int16'', ''fixdt(1,16,8)''.']);
+                      ['The base type of a Simulink.AliasType must be a type name, as ' ...
+                       'text: ''int16'', ''fixdt(1,16,8)''.']);
             end
             T.BaseType = char(base);
         end

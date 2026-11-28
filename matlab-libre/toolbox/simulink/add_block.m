@@ -537,6 +537,22 @@ function modele = add_block(modele, type, nom, varargin)
 %      r = sim(m, 1, 0.01);                          % le gain vaut 4
 %      K = 10; r = sim(m, 1, 0.01);                  % il vaut 10
 %
+%   La forme de MATLAB : H = ADD_BLOCK(SOURCE,DESTINATION,'Param',VALEUR,...)
+%   pose dans un modèle de la session — NEW_SYSTEM('nom') l'y met — le bloc
+%   SOURCE ('simulink/Sources/Step', 'built-in/Gain', ou le chemin d'un
+%   bloc existant, qu'elle recopie) sous le chemin DESTINATION,
+%   'nom/bloc' ou 'nom/sousSysteme/bloc', et rend sa poignée. Position s'y
+%   donne en pixels, et un bloc pris à la bibliothèque y prend les défauts
+%   de Simulink là où MatLibre en a d'autres : un bloc discret hérite sa
+%   période (SampleTime -1), To Workspace range une timeseries. Un Inport
+%   ou un Outport y prend le rang suivant (Port) ; un rang donné s'insère
+%   et décale ceux qui le suivent : les ports d'un système vont de 1 à N.
+%
+%   Tout bloc porte aussi Position, Orientation, les couleurs, Tag,
+%   Description, UserData... et Commented : 'on' retire le bloc du calcul
+%   — ce qu'il alimentait lit zéro —, 'through' le fait traverser, chaque
+%   sortie rendant l'entrée de même rang.
+%
 %   Exemple :
 %      m = new_system('rampe');
 %      m = add_block(m, 'constant', 'un', 'Value', 2);
@@ -544,6 +560,20 @@ function modele = add_block(modele, type, nom, varargin)
 %      get_param(m, 'integ', 'BlockType')         % 'integrator'
 %
 %   Voir aussi NEW_SYSTEM, ADD_LINE, SET_PARAM, DELETE_BLOCK, SIM, OPEN_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        if nargin < 3
+            reste = {};
+        else
+            reste = [{nom}, varargin];
+        end
+        pose = matlibre_sl_nomme('add_block', nargout, modele, type, reste{:});
+        clear modele
+        if nargout > 0
+            modele = pose;
+        end
+        return
+    end
     nom = char(nom);
     % « bibliotheque/bloc » : un bloc d'une bibliothèque de l'utilisateur,
     % ou d'un autre modèle, recopié — et lié s'il vient d'une bibliothèque.
@@ -556,8 +586,8 @@ function modele = add_block(modele, type, nom, varargin)
     if strcmp(entree.famille, 'Interne')
         % les blocs que le dépliage fabrique ne se posent pas à la main
         error('Simulink:Commands:InvalidBlockType', ...
-              ['Le type de bloc ''%s'' est interne a MatLibre : le depliage des ' ...
-               'sous-systemes le fabrique, il ne se pose pas. Posez le sous-systeme.'], ...
+              ['Block type ''%s'' is internal to MatLibre: subsystem expansion ' ...
+               'creates it, and it cannot be added. Add the subsystem instead.'], ...
               char(type));
     end
     unique = false;
@@ -565,7 +595,7 @@ function modele = add_block(modele, type, nom, varargin)
     for k = 1:2:numel(varargin)
         if k + 1 > numel(varargin)
             error('Simulink:Commands:ParamValuePairs', ...
-                  'Les parametres du bloc ''%s'' se donnent par paires : un nom, une valeur.', ...
+                  'Parameters of block ''%s'' must be name-value pairs.', ...
                   nom);
         end
         if strcmpi(char(varargin{k}), 'MakeNameUnique')
@@ -576,7 +606,7 @@ function modele = add_block(modele, type, nom, varargin)
     end
     if ~isfield(modele, 'blocs')
         error('Simulink:Commands:InvalidModel', ...
-              'ADD_BLOCK attend un modele bati par NEW_SYSTEM.');
+              'ADD_BLOCK requires a model built by NEW_SYSTEM.');
     end
     % Les sous-systèmes conditionnels de la bibliothèque arrivent garnis,
     % comme dans Simulink : une entrée reliée à une sortie, et leurs ports
@@ -605,9 +635,9 @@ function modele = add_block(modele, type, nom, varargin)
     if existe(modele, nom)
         if ~unique
             error('Simulink:Commands:AddBlockCantAdd', ...
-                  ['Le modele ''%s'' porte deja un bloc nomme ''%s'' : deux blocs d''un ' ...
-                   'meme systeme ne portent pas le meme nom. ADD_BLOCK(..., ' ...
-                   '''MakeNameUnique'', ''on'') en choisit un libre.'], ...
+                  ['Model ''%s'' already has a block named ''%s'': two blocks of the ' ...
+                   'same system cannot have the same name. ADD_BLOCK(..., ' ...
+                   '''MakeNameUnique'', ''on'') picks a free one.'], ...
                   char(modele.nom), nom);
         end
         base = regexprep(nom, '\d+$', '');
@@ -625,9 +655,13 @@ function modele = add_block(modele, type, nom, varargin)
         canon = matlibre_sl_catalogue('parametre', entree, reglages{k});
         if isempty(canon)
             error('Simulink:Commands:ParamUnknown', ...
-                  ['Le bloc ''%s'' (%s) n''a pas de parametre nomme ''%s''. Ses ' ...
-                   'parametres sont : %s.'], nom, entree.affiche, char(reglages{k}), ...
+                  ['Block ''%s'' (%s) does not have a parameter named ''%s''. Its ' ...
+                   'parameters are: %s.'], nom, entree.affiche, char(reglages{k}), ...
                   strjoin(entree.params(:, 1).', ', '));
+        end
+        if strcmp(canon, 'Commented')
+            reglages{k + 1} = matlibre_sl_parametre('choix', reglages{k + 1}, 'Commented', ...
+                                                    {'off', 'on', 'through'});
         end
         bloc.parametres.(canon) = reglages{k + 1};
     end
@@ -845,8 +879,8 @@ end
 function modele = poserCopie(modele, source, reference, nom, reglages)
     if existe(modele, nom)
         error('Simulink:Commands:AddBlockCantAdd', ...
-              ['Le modele ''%s'' porte deja un bloc nomme ''%s'' : deux blocs d''un ' ...
-               'meme systeme ne portent pas le meme nom.'], char(modele.nom), nom);
+              ['Model ''%s'' already has a block named ''%s'': two blocks of the ' ...
+               'same system cannot have the same name.'], char(modele.nom), nom);
     end
     bloc = struct('type', source.type, 'nom', nom, 'parametres', source.parametres);
     if ~isempty(reference)

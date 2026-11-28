@@ -3,7 +3,7 @@ function v = lin2rgb(u, varargin)
 %   Réciproque exacte de RGB2LIN.
 %
 %   Exemple :
-%      lin2rgb(0.214)   % 0.4999
+%      lin2rgb(0.214)   % 0.5000
 %
 %   Voir aussi RGB2LIN, XYZ2RGB.
     u = im2double(u);

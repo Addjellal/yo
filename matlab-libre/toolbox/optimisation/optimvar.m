@@ -35,7 +35,7 @@ classdef optimvar
             v.Name = char(nom);
             if ~isvarname(v.Name)
                 error('optim:optimvar:Nom', ...
-                      'Le nom d''une variable doit être un nom valide.');
+                      'The variable name must be a valid name.');
             end
             dimensions = [];
             k = 1;
@@ -47,7 +47,7 @@ classdef optimvar
                     continue
                 end
                 if k + 1 > numel(varargin)
-                    error('optim:optimvar:Paire', 'Option sans valeur.');
+                    error('optim:optimvar:Paire', 'Value missing for option.');
                 end
                 switch lower(char(a))
                     case 'lowerbound', v.LowerBound = double(varargin{k+1});
@@ -109,7 +109,7 @@ classdef optimvar
                 indices = s(1).subs;
                 if numel(indices) ~= 1
                     error('optim:optimvar:Indice', ...
-                          'Une variable s''indexe par un seul indice.');
+                          'A variable is indexed with a single index.');
                 end
                 choix = indices{1};
                 if ischar(choix) && strcmp(choix, ':')

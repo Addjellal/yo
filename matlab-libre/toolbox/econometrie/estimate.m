@@ -30,6 +30,6 @@ function [modele, covariance, logL, information] = estimate(specification, y, va
             matlibre_garch_estimer(specification, y, varargin{:});
     else
         error('econ:estimate:Modele', ...
-              'ESTIMATE attend un modèle ARIMA ou GARCH.');
+              'ESTIMATE requires an ARIMA or GARCH model.');
     end
 end

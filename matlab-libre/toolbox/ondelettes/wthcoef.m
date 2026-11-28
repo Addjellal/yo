@@ -29,7 +29,7 @@ function Cnouveau = wthcoef(genre, C, L, niveaux, parametre, sorh)
     aParametre = nargin >= 5 && ~isempty(parametre);
     if genre == 't' && ~aParametre
         error('wavelet:wthcoef:MissingThreshold', ...
-              'Le mode ''t'' demande un seuil.');
+              'Mode ''t'' requires a threshold.');
     end
     if nargin < 6 || isempty(sorh), sorh = 'h'; end
     position = L(1);

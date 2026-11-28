@@ -19,11 +19,11 @@ function masque = shift2mask(prim, decalage)
     prim = double(prim(:)).';
     if numel(prim) < 2
         error('comm:shift2mask:Polynome', ...
-              'Le polynôme doit être de degré au moins un.');
+              'The polynomial must have degree at least one.');
     end
     if prim(1) == 0
         error('comm:shift2mask:Unitaire', ...
-              'Le polynôme de rebouclage doit être unitaire.');
+              'The feedback polynomial must be monic.');
     end
     m = numel(prim) - 1;
     decalage = round(decalage);

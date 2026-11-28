@@ -44,8 +44,8 @@ function sorties = parsim(entrees, varargin)
 %   Voir aussi SIMULINK.SIMULATIONINPUT, SIM.
     if nargin < 1 || ~isa(entrees, 'Simulink.SimulationInput')
         error('Simulink:parsim:InvalidInput', ...
-              ['PARSIM(IN) simule un tableau de Simulink.SimulationInput ; pour un ' ...
-               'modele seul, SIM(NOM) suffit.']);
+              ['PARSIM(IN) simulates an array of Simulink.SimulationInput objects; for a ' ...
+               'single model, SIM(NAME) is enough.']);
     end
     % Le modèle de chaque simulation : une variable de l'appelant qui en
     % porte le nom, comme pour SIM(NOM).

@@ -24,7 +24,7 @@ function fis = genfis2(entrees, sorties, rayons, bornes, options)
     X = double(entrees);
     Y = double(sorties);
     if size(X, 1) ~= size(Y, 1)
-        error('fuzzy:genfis2:BadData', 'X et Y doivent avoir le même nombre de lignes.');
+        error('fuzzy:genfis2:BadData', 'X and Y must have the same number of rows.');
     end
     ensemble = [X, Y];
     if isempty(bornes)

@@ -27,7 +27,7 @@ function liens = matlibre_sl_liens(modele)
         liens = [liens, ones(size(liens, 1), 1)];
     elseif size(liens, 2) ~= 4
         error('Simulink:Commands:InvalidModel', ...
-              ['La table des liens du modele doit avoir trois ou quatre colonnes ; ' ...
-               'elle en a %d.'], size(liens, 2));
+              ['The line table of the model must have three or four columns; ' ...
+               'it has %d.'], size(liens, 2));
     end
 end

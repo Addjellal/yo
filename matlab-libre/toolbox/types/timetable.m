@@ -399,7 +399,7 @@ classdef timetable
                     case 'yearly',   pas = calyears(1);
                     case 'regular'
                         error('MATLAB:timetable:PasManquant', ...
-                              'RETIME(...,''regular'',...) demande l''option TimeStep.');
+                              'RETIME(...,''regular'',...) requires the TimeStep option.');
                     otherwise
                         error('MATLAB:timetable:Cadence', ...
                               'Cadence inconnue : %s.', cadence);

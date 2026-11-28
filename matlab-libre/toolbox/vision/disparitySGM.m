@@ -50,7 +50,7 @@ function carte = disparitySGM(gauche, droite, varargin)
     D = enNiveaux(droite);
     if ~isequal(size(G), size(D))
         error('vision:disparitySGM:Taille', ...
-              'Les deux images doivent avoir la même taille.');
+              'The two images must be the same size.');
     end
     disparites = intervalle(1):intervalle(2);
     cout = matlibre_cout_recensement(G, D, disparites);

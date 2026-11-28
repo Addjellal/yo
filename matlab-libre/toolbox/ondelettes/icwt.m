@@ -41,7 +41,7 @@ function x = icwt(coefficients, echelles, nom, delta)
     echelles = double(echelles(:));
     if size(coefficients, 1) ~= numel(echelles)
         error('wavelet:icwt:Tailles', ...
-              'Il faut une ligne de coefficients par échelle.');
+              'One row of coefficients per scale is required.');
     end
     poids = pasLocal(echelles) ./ (echelles .^ 1.5);
     brut = sum(real(coefficients) .* poids, 1);
@@ -49,8 +49,8 @@ function x = icwt(coefficients, echelles, nom, delta)
     [noyau, milieu] = noyauDuBanc(n, echelles, poids, nom);
     if max(abs(noyau)) == 0
         error('wavelet:icwt:Constante', ...
-              ['Le filtre de reconstruction est nul : les échelles ' ...
-               'demandées ne couvrent pas la bande de l''ondelette.']);
+              ['The reconstruction filter is zero: the requested scales ' ...
+               'do not cover the passband of the wavelet.']);
     end
     if parConstante
         x = brut / gainMoyen(noyau, echelles, nom);

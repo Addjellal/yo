@@ -25,7 +25,7 @@ function x = pagemldivide(a, b)
     pagesB = prod(formesB(3:end));
     if pagesA ~= pagesB && pagesA ~= 1 && pagesB ~= 1
         error('MATLAB:pagemldivide:PageMismatch', ...
-              'Les nombres de pages doivent coïncider, ou l''un valoir un.');
+              'The numbers of pages must match, or one of them must be 1.');
     end
     pages = max(pagesA, pagesB);
     premier = a(:, :, 1) \ b(:, :, 1);

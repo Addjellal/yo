@@ -24,7 +24,7 @@ function [sysr, g] = balred(sys, ordre, methode)
         return
     end
     if ordre < 0
-        error('control:balred:BadOrder', 'L''ordre demandé doit être positif.');
+        error('control:balred:BadOrder', 'The requested order must be positive.');
     end
     sysr = modred(sysb, (ordre + 1):n, methode);
 end

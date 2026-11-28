@@ -10,9 +10,8 @@ function [Xs, Ys, Zs] = sphere(n)
 %      [X, Y, Z] = sphere(30);
 %      surf(2*X + 5, 2*Y, 2*Z);        % une sphere de rayon 2 en x = 5
 %
-%   Le rendu de MatLibre est plan : SPHERE sans sortie montre la
-%   troisième coordonnée en couleurs, ce qui donne le disque ombré qu'on
-%   verrait de face.
+%   SPHERE sans sortie trace la sphère avec SURF, en perspective et à
+%   échelles égales (AXIS EQUAL).
 %
 %   Exemples :
 %      sphere;

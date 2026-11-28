@@ -61,6 +61,15 @@ MPCMOVE Commande optimale à appliquer à l'instant courant.
   compte faire, et l'écart entre ce plan et ce qu'il fait vraiment
   mesure ce que la rétroaction corrige.
 
+  Le critère est la somme, sur l'horizon de prédiction, de Q fois le
+  carré de l'écart à la consigne, plus R fois le carré des commandes de
+  l'horizon de commande. Avec les bornes CONTROLEUR.umin et umax, c'est
+  un programme quadratique sous contraintes, résolu exactement par
+  QUADPROG : écrêter la solution libre ne donnerait pas l'optimum, car les
+  commandes suivantes doivent compenser celles que la borne retient.
+  Sans contrainte et sur un horizon long, la première commande tend vers
+  celle du régulateur LQR de même pondération.
+
   Exemple :
      A = [1 0.1; 0 1]; B = [0.005; 0.1]; C = [1 0];
      ctrl = mpcSetup(A, B, C, 20, 5, 1, 0.1);
@@ -89,7 +98,7 @@ MPCSIM Simulation en boucle fermée du contrôleur prédictif.
      A = [1 0.1; 0 1]; B = [0.005; 0.1]; C = [1 0];
      ctrl = mpcSetup(A, B, C, 20, 5, 1, 0.1);
      [y, u, t] = mpcsim(ctrl, 1, 100);
-     y(end)                          % 1 : la consigne est atteinte
+     y(end)                          % 1.0000 : la consigne est atteinte
      max(abs(diff(u)))               % l'a-coup de commande le plus fort
 
   Voir aussi MPCSETUP, MPCMOVE.

@@ -36,7 +36,7 @@ function X = x2fx(D, modele)
         case 'quadratic'
             X = [X, croisements(D), D .^ 2];
         otherwise
-            error('stats:x2fx:Modele', 'Modèle inconnu : %s.', char(modele));
+            error('stats:x2fx:Modele', 'Unknown model: %s.', char(modele));
     end
 end
 

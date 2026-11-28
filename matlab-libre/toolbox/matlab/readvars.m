@@ -14,7 +14,7 @@ function varargout = readvars(nomFichier, varargin)
     n = max(nargout, 1);
     if n > numel(noms)
         error('MATLAB:readvars:TooManyOutputs', ...
-              'Le fichier ne compte que %d colonnes.', numel(noms));
+              'The file has only %d variables.', numel(noms));
     end
     varargout = cell(1, n);
     for k = 1:n

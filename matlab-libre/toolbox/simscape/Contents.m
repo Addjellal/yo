@@ -16,4 +16,4 @@
 %
 % Résolution
 %   solveDC            - Point de fonctionnement continu
-%   solveTransient     - Réponse temporelle, par Euler implicite
+%   solveTransient     - Réponse temporelle, par la règle des trapèzes

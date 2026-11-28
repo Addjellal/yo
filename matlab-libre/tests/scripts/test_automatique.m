@@ -152,6 +152,32 @@ assert(max(abs(tfdata(gFilt) - [1 0 0])) < 1e-12);
 % d2d conserve le gain statique.
 gDiscret = c2d(tf(1, [1 1]), 0.1);
 assert(abs(dcgain(d2d(gDiscret, 0.2)) - dcgain(gDiscret)) < 1e-10);
+% Le bloqueur d'ordre zéro rend la réponse indicielle exacte aux instants
+% d'échantillonnage, intégrateur compris : 1/(s (s+1)^2) répond à
+% l'échelon par t - 2 + (t + 2) e^-t. A étant singulière, l'ancien calcul
+% (Bd = B Ts) perdait le premier coefficient du numérateur.
+tEch = (0:40) * 0.1;
+[numZ, denZ] = tfdata(c2d(tf(1, [1 2 1 0]), 0.1), 'v');
+assert(max(abs(filter(numZ, denZ, ones(size(tEch))) - ...
+               (tEch - 2 + (tEch + 2) .* exp(-tEch)))) < 1e-10);
+% Le bloqueur triangulaire rend exacte la réponse à une rampe, 'impulse'
+% la réponse impulsionnelle multipliée par la période.
+[numF, denF] = tfdata(c2d(tf(1, [1 1]), 0.1, 'foh'), 'v');
+assert(max(abs(filter(numF, denF, tEch) - (tEch - 1 + exp(-tEch)))) < 1e-12);
+[numI, denI] = tfdata(c2d(tf(1, [1 1]), 0.1, 'impulse'), 'v');
+assert(max(abs(filter(numI, denI, [1 zeros(1, 40)]) - 0.1 * exp(-tEch))) < 1e-12);
+% d2c défait c2d, intégrateur compris.
+[numR, denR] = tfdata(d2c(c2d(tf(1, [1 2 1 0]), 0.1)), 'v');
+assert(max(abs(numR - [0 0 0 1])) < 1e-9 && max(abs(denR - [1 2 1 0])) < 1e-9);
+% Une méthode inconnue est refusée, plutôt que remplacée sans rien dire
+% par le bloqueur d'ordre zéro.
+refusC2d = '';
+try
+    c2d(tf(1, [1 1]), 0.1, 'cubique');
+catch err
+    refusC2d = err.identifier;
+end
+assert(strcmp(refusC2d, 'Control:transformation:C2DMethod'));
 
 %% ------------------------------------------------ réponse fréquentielle
 % Pour 1/(s+1), |H(j1)| = 1/sqrt(2) et la phase vaut -45 degrés.
@@ -179,6 +205,21 @@ assert(abs(margesToutes.PhaseMargin - 21.3864) < 1e-3);
 assert(abs(margesToutes.PMFrequency - 0.6823) < 1e-3);
 assert(margesToutes.Stable);
 assert(~allmargin(tf(3, [1 2 1 0])).Stable);
+% Les traversées se lisent sur la réponse exacte, non sur la grille : la
+% marge de gain vaut 2 à la précision des nombres, et la pulsation de
+% coupure est la racine de u (1 + u)^2 = 1, u = wc^2.
+uCoupure = roots([1 2 1 -1]);
+wcExacte = sqrt(real(uCoupure(abs(imag(uCoupure)) < 1e-12 & real(uCoupure) > 0)));
+assert(abs(margesToutes.GainMargin - 2) < 1e-12 && abs(margesToutes.GMFrequency - 1) < 1e-12);
+assert(abs(margesToutes.PMFrequency - wcExacte) < 1e-12);
+assert(abs(margesToutes.PhaseMargin - (90 - 2 * atand(wcExacte))) < 1e-9);
+% Un modèle échantillonné ne se lit que jusqu'à la pulsation de Nyquist :
+% au-delà, sa réponse se répète, et chaque repli ajoutait une marge. Le
+% bloqueur retarde d'une demi-période : la marge de phase perd wc Ts / 2.
+margesDiscretes = allmargin(c2d(tf(1, [1 2 1 0]), 0.1));
+assert(isscalar(margesDiscretes.GainMargin) && isscalar(margesDiscretes.PhaseMargin));
+assert(abs(margesDiscretes.PhaseMargin - ...
+           (90 - 2 * atand(wcExacte) - wcExacte * 0.05 * 180 / pi)) < 0.05);
 
 %% ------------------------------------------- bases et formes canoniques
 sysBase = ss([0 1; -2 -3], [0; 1], [1 0], 0);
@@ -425,13 +466,42 @@ assert(abs(m2 - m) < 1e-15 && w2 == w);
 assert(numel(wBornes) == 200);
 assert(abs(wBornes(1) - 0.1) < 1e-12 && abs(wBornes(end) - 10) < 1e-12);
 
-% « margin » accepte aussi une reponse deja calculee.
-[gmSys, pmSys] = margin(tf(1, [1 2 1 0]));
+% « margin » accepte aussi une reponse deja calculee : il interpole alors
+% la grille qu'on lui donne. D'un modele, il lit les traversees sur la
+% reponse exacte, comme MATLAB : 1/(s(s+1)^2) a une marge de gain de 2,
+% exactement, a w = 1 ; sa marge de phase se lit ou w (1 + w^2) = 1.
+[gmSys, pmSys, wgSys, wpSys] = margin(tf(1, [1 2 1 0]));
+wp = roots([1 0 1 -1]);
+wp = real(wp(abs(imag(wp)) < 1e-12));
+assert(abs(gmSys - 2) < 1e-12 && abs(wgSys - 1) < 1e-12, 'margin, la marge de gain exacte');
+assert(abs(wpSys - wp) < 1e-12 && abs(pmSys - (90 - 2 * atand(wp))) < 1e-9, ...
+       'margin, la marge de phase exacte');
 [mm, pp, ww] = bode(tf(1, [1 2 1 0]), logspace(-4, 4, 4000).');
 [gmRep, pmRep] = margin(mm, pp, ww);
-assert(abs(gmSys - gmRep) < 1e-12 && abs(pmSys - pmRep) < 1e-12);
-assert(abs(gmSys - 2) < 1e-3);
+assert(abs(gmSys - gmRep) < 1e-4 && abs(pmSys - pmRep) < 1e-3, 'margin d''une grille, interpolee');
+% Ogata : K/(s(s+1)(s+2)), K = 1 -- marge de gain 6 a sqrt(2) rad/s
+[gmO, pmO, wgO, wpO] = margin(tf(1, [1 3 2 0]));
+assert(abs(gmO - 6) < 1e-12 && abs(wgO - sqrt(2)) < 1e-12 && ...
+       abs(pmO - 53.4107861777) < 1e-9 && abs(wpO - 0.4457479596) < 1e-9, ...
+       'margin, le cas d''Ogata');
 close all
+
+% Le calcul avance a pas fixe : des instants inegalement espaces sont
+% refuses, comme dans MATLAB, plutot que de rendre une reponse fausse.
+for appel = {@() step(tf(1, [1 1]), [0 0.1 0.3 1]), ...
+             @() lsim(tf(1, [1 1]), ones(4, 1), [0 0.1 0.3 1]), ...
+             @() impulse(tf(1, [1 1]), [0 1 0.5])}
+    vu = '';
+    try
+        appel{1}();
+    catch err
+        vu = err.identifier;
+    end
+    assert(strcmp(vu, 'Control:analysis:NonUniformTimeVector'), ['instants inegaux : ' vu]);
+end
+tReg = (0:0.001:1)';
+assert(max(abs(step(tf(1, [1 1]), tReg) - (1 - exp(-tReg)))) < 1e-12, ...
+       'une grille reguliere, la reponse exacte');
 
 %% ------------------------------- modeles a plusieurs entrees et sorties
 % L'algebre des schemas-blocs se fait dans l'espace d'etat : elle doit

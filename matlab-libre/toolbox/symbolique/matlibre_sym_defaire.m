@@ -58,6 +58,6 @@ function [gauche, droite] = matlibre_sym_defaire(gauche, droite, nom)
         case 'sqrt', droite = sympow(droite, symnum(2)); gauche = gauche{2};
         otherwise
             error('symbolic:isolate:operation', ...
-                  'ISOLATE ne sait pas defaire ''%s''.', operateur);
+                  'ISOLATE cannot undo ''%s''.', operateur);
     end
 end

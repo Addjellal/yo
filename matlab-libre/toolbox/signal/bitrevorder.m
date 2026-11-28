@@ -17,7 +17,7 @@ function [y, indices] = bitrevorder(x)
     n = numel(x);
     if n < 1 || bitand(n, n - 1) ~= 0
         error('signal:bitrevorder:BadLength', ...
-              'La longueur doit être une puissance de deux.');
+              'The length must be a power of two.');
     end
     bits = round(log2(n));
     indices = zeros(n, 1);

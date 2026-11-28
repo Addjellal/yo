@@ -11,7 +11,7 @@ function phat = betafit(x)
 %   Voir aussi BETAPDF, BETACDF, BETAINV, BETARND, PDF, CDF.
     x = double(x(:));
     if any(x <= 0) || any(x >= 1)
-        error('stats:betafit:BadData', 'Les données doivent être dans ]0,1[.');
+        error('stats:betafit:BadData', 'Data must be in (0,1).');
     end
     m = mean(x);
     v = var(x);

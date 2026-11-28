@@ -19,9 +19,9 @@ function textes = matlibre_parquet_textes(colonne)
             % une conversion obscure trois appels plus loin.
             if ~ischar(element) && ~(isstring(element) && isscalar(element))
                 error('MATLAB:parquet:TypeNonSupporte', ...
-                      ['Une colonne de cellules ne se range en Parquet que si ' ...
-                       'elle ne contient que du texte ; l''élément %d est de ' ...
-                       'classe %s.'], k, class(element));
+                      ['A cell column can be written to Parquet only if ' ...
+                       'it holds only text; element %d is of ' ...
+                       'class %s.'], k, class(element));
             end
             textes{k} = char(element);
         end
@@ -49,5 +49,5 @@ function textes = matlibre_parquet_textes(colonne)
         return
     end
     error('MATLAB:parquet:TypeNonSupporte', ...
-          'Colonne de texte attendue ; reçu %s.', class(colonne));
+          'Expected a text column; got %s.', class(colonne));
 end

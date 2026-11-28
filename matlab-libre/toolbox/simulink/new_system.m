@@ -26,12 +26,26 @@ function modele = new_system(nom, genre)
 %   d'un fichier .slx ou .mdl de Simulink par LOAD_SYSTEM. SAVE_SYSTEM en
 %   écrit un programme .m, ou un .slx, que LOAD_SYSTEM relit.
 %
+%   La forme de MATLAB — NEW_SYSTEM(NOM) sans reprendre la sortie — met le
+%   modèle dans la session : ADD_BLOCK, ADD_LINE, SET_PARAM, GET_PARAM,
+%   FIND_SYSTEM, SIM et SAVE_SYSTEM le désignent alors par son nom, et ses
+%   blocs par leur chemin « nom/bloc ». Un modèle de ce nom déjà ouvert
+%   est refusé ; BDCLOSE le ferme. Le modèle y part des réglages d'un
+%   modèle neuf de Simulink — le solveur automatique à pas variable
+%   (VariableStepAuto), les sorties en Dataset (SaveFormat). Le modèle par
+%   valeur part du même solveur, mais garde ses sorties en tableau.
+%
 %   Exemple :
 %      m = new_system('rampe');
 %      m = add_block(m, 'constant', 'un', 'Value', 2);
 %      m = add_block(m, 'integrator', 'integ', 'InitialCondition', 0);
 %      m = add_line(m, 'un', 'integ');
 %      r = sim(m, 5, 0.001);
+%
+%      new_system('session');
+%      add_block('simulink/Sources/Constant', 'session/c', 'Value', '3');
+%      get_param('session/c', 'Value')          % '3'
+%      bdclose('session');
 %
 %   Voir aussi ADD_BLOCK, ADD_LINE, SET_PARAM, ADD_PARAM, SIM, OPEN_SYSTEM.
     modele = struct();
@@ -50,8 +64,24 @@ function modele = new_system(nom, genre)
             case 'model'
             otherwise
                 error('Simulink:Commands:NewSystemType', ...
-                      ['NEW_SYSTEM(NOM,TYPE) : le type est ''Model'', ''Library'' ou ' ...
+                      ['NEW_SYSTEM(NAME,TYPE): the type must be ''Model'', ''Library'', or ' ...
                        '''Subsystem''.']);
         end
+    end
+    % La forme de MATLAB — NEW_SYSTEM('nom') sans rien reprendre — met le
+    % modèle dans la session, où les autres fonctions le désignent par
+    % son nom.
+    if nargout == 0
+        if matlibre_sl_ouverts('connu', char(nom))
+            error('Simulink:Commands:NewSysAlreadyExists', ...
+                  ['A block diagram named ''%s'' already exists. BDCLOSE(''%s'') ' ...
+                   'closes it.'], char(nom), char(nom));
+        end
+        % Il y part des réglages d'un modèle neuf de Simulink, comme un
+        % fichier .slx qui ne dit rien : le solveur automatique à pas
+        % variable, et les sorties rangées en Dataset.
+        modele = set_param(modele, 'Solver', 'VariableStepAuto', 'SaveFormat', 'Dataset');
+        matlibre_sl_ouverts('inscrire', char(nom), modele, 0);
+        clear modele
     end
 end

@@ -30,6 +30,10 @@ struct ErreurMatlab : std::runtime_error {
     // Nom de la fonction native qui a levé l'erreur, s'il y en a une :
     // c'est ce que MATLAB nomme dans « Error using double ».
     std::string fonctionNative;
+    // Le nom que l'interprète n'a reconnu ni comme variable ni comme
+    // fonction, quand c'est la cause de l'erreur : la console en tire sa
+    // proposition (« Did you mean: »).
+    std::string nomInconnu;
     ErreurMatlab(std::string id, std::string msg)
         : std::runtime_error(msg), identifiant(std::move(id)), message(std::move(msg)) {}
 };
@@ -41,6 +45,8 @@ std::string rapportErreur(const ErreurMatlab& e);
 
 [[noreturn]] void erreur(const std::string& identifiant, const std::string& message);
 [[noreturn]] void erreurSimple(const std::string& message);
+// « Unrecognized function or variable 'nom'. », le nom gardé à part.
+[[noreturn]] void erreurNomInconnu(const std::string& nom);
 
 // Formatage à la printf pour construire les messages.
 std::string formater(const char* format, ...);

@@ -20,7 +20,7 @@ function indice = rangDansGenre(fis, variable, entree)
     if isnumeric(variable)
         indice = round(variable);
         if indice < 1 || indice > numel(variables)
-            error('fuzzy:rangDansGenre:Rang', 'Variable %d inexistante.', indice);
+            error('fuzzy:rangDansGenre:Rang', 'Variable %d does not exist.', indice);
         end
         return
     end
@@ -32,10 +32,10 @@ function indice = rangDansGenre(fis, variable, entree)
         end
     end
     if entree
-        genre = 'entrée';
+        genre = 'input';
     else
-        genre = 'sortie';
+        genre = 'output';
     end
     error('fuzzy:rangDansGenre:Absente', ...
-          'Aucune %s ne s''appelle ''%s''.', genre, nom);
+          'No %s is named ''%s''.', genre, nom);
 end

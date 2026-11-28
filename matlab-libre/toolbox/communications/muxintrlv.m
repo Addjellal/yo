@@ -23,7 +23,7 @@ function [y, etat] = muxintrlv(donnees, retards, etatInitial)
 %   Voir aussi MUXDEINTRLV, HELSCANINTRLV, MATINTRLV, INTRLV.
     retards = round(double(retards(:))).';
     if any(retards < 0)
-        error('comm:muxintrlv:Retards', 'Les retards doivent être positifs.');
+        error('comm:muxintrlv:Retards', 'Delays must be nonnegative.');
     end
     n = numel(retards);
     if nargin < 3 || isempty(etatInitial)

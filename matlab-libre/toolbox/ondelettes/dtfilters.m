@@ -40,7 +40,7 @@ function [df, dfSuivant] = dtfilters(nom)
             dfSuivant = dtfilters(sprintf('qshift%d', str2double(nom(4))));
             if nargout < 2
                 error('wavelet:dtfilters:Sorties', ...
-                      '''%s'' rend deux étages : demandez deux sorties.', nom);
+                      '''%s'' returns two stages: request two outputs.', nom);
             end
         case {'farras', 'fsfarras'}
             df = filtresPremierEtage();

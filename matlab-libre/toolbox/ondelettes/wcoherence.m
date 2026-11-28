@@ -41,12 +41,12 @@ function [wcoh, wcs, f, coi] = wcoherence(x, y, varargin)
     y = double(y(:)).';
     if numel(x) ~= numel(y)
         error('wavelet:wcoherence:Longueurs', ...
-              'Les deux signaux doivent avoir la même longueur.');
+              'The two signals must have the same length.');
     end
     n = numel(x);
     if n < 8
         error('wavelet:wcoherence:Longueur', ...
-              'Les signaux doivent avoir au moins huit points.');
+              'The signals must have at least 8 samples.');
     end
     [cadence, enPeriode, nv, nsLisse, octaves] = lireArgumentsCoherence(varargin, n);
     nom = 'amor';
@@ -99,7 +99,7 @@ function [cadence, enPeriode, nv, nsLisse, octaves] = lireArgumentsCoherence(arg
     if k <= numel(arguments) && isnumeric(arguments{k}) && isscalar(arguments{k})
         valeur = double(arguments{k});
         if valeur <= 0
-            error('wavelet:wcoherence:Cadence', 'La cadence doit être positive.');
+            error('wavelet:wcoherence:Cadence', 'The sampling frequency must be positive.');
         end
         if valeur >= 1
             cadence = valeur;
@@ -115,7 +115,7 @@ function [cadence, enPeriode, nv, nsLisse, octaves] = lireArgumentsCoherence(arg
                 nv = round(double(arguments{k + 1}));
                 if nv < 10 || nv > 48 || mod(nv, 2) ~= 0
                     error('wavelet:wcoherence:Voix', ...
-                          'VoicesPerOctave doit être un entier pair de 10 à 48.');
+                          'VoicesPerOctave must be an even integer from 10 to 48.');
                 end
             case 'numscalestosmooth'
                 nsLisse = round(double(arguments{k + 1}));
@@ -132,7 +132,7 @@ function [cadence, enPeriode, nv, nsLisse, octaves] = lireArgumentsCoherence(arg
     end
     nsLisse = max(1, nsLisse);
     if ~isempty(octaves) && octaves < 1
-        error('wavelet:wcoherence:Octaves', 'NumOctaves doit valoir au moins un.');
+        error('wavelet:wcoherence:Octaves', 'NumOctaves must be at least one.');
     end
     if n < 8
         error('wavelet:wcoherence:Longueur', 'Signal trop court.');

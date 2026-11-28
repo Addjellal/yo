@@ -32,7 +32,7 @@ function valeur = getfis(fis, varargin)
         variables = variablesDe(fis, entree);
         indice = varargin{2};
         if indice < 1 || indice > numel(variables)
-            error('fuzzy:getfis:BadVariable', 'Variable %d inexistante.', indice);
+            error('fuzzy:getfis:BadVariable', 'Variable %d does not exist.', indice);
         end
         v = variables{indice};
         if numel(varargin) < 3
@@ -43,7 +43,7 @@ function valeur = getfis(fis, varargin)
         if strcmp(sousChamp, 'mf')
             indiceMf = varargin{4};
             if indiceMf < 1 || indiceMf > numel(v.mf)
-                error('fuzzy:getfis:BadMf', 'Fonction %d inexistante.', indiceMf);
+                error('fuzzy:getfis:BadMf', 'Membership function %d does not exist.', indiceMf);
             end
             mf = v.mf{indiceMf};
             if numel(varargin) < 5

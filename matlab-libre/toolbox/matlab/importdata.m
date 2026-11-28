@@ -30,7 +30,7 @@ function [donnees, separateur, enTete] = importdata(nomFichier, separateur, enTe
     nomFichier = char(nomFichier);
     if ~isfile(nomFichier)
         error('MATLAB:importdata:FileNotFound', ...
-              'Fichier introuvable : %s.', nomFichier);
+              'Unable to find file %s.', nomFichier);
     end
     [~, ~, ext] = fileparts(nomFichier);
     ext = lower(ext);

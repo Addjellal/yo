@@ -17,8 +17,10 @@ for N = 1:5
         d = 2 * k;
         assert(abs(sum(h(1:(L - d)) .* h((1 + d):L)) - (k == 0)) < 1e-9);
     end
-    % Moments, comptés autour du centre 4N-1.
-    j = ((0:(L - 1)) - (4 * N - 1)) / (2 * N);
+    % Moments, comptés autour du centre 2N (de 0 à 6N-1) : dans l'ordre de
+    % MATLAB, le plus gros coefficient y tombe, et coifwavf('coif1')
+    % commence par -0.0515.
+    j = ((0:(L - 1)) - 2 * N) / (2 * N);
     signes = (-1) .^ (0:(L - 1));
     for k = 0:(2 * N - 1)
         assert(abs(sum(signes .* j .^ k .* h)) < 1e-9);
@@ -265,6 +267,69 @@ wavemngr('restore');
 assert(numel(wavemngr('tfsn')) == avant);
 assert(~isempty(wavemngr('read')));
 disp('gestionnaire : ok');
+
+% ------------------------------------------------- modes de prolongement
+% Les algorithmes de MATLAB, dans chacun de ses modes. Valeurs de
+% pywt.dwt(1:7, 'db2', mode) — PyWavelets valide ses modes contre MATLAB.
+assert(strcmp(dwtmode('status', 'nodisp'), 'sym'));
+modesEssai = {'sym', 'per', 'zpd', 'asymw'};
+attendusA = {[1.76776695296637 2.31078903454115 5.13921615928734 8.09705280658479 9.93417011367217], ...
+             [4.27731586417979 3.72500259691424 6.55342972166043 10.1929891587747], ...
+             [-0.0346751770605074 2.31078903454115 5.13921615928734 9.00291946444361 3.38074039201174], ...
+             [-0.517638090205041 2.31078903454115 5.13921615928734 7.96764328403353 10.7960704087797]};
+attendusD1 = [-0.612372435695794, -0.905866657858823, -0.12940952255126, 0];
+for k = 1:numel(modesEssai)
+    [aMode, dMode] = dwt(1:7, 'db2', 'mode', modesEssai{k});
+    assert(max(abs(aMode - attendusA{k})) < 1e-13, modesEssai{k});
+    assert(abs(dMode(1) - attendusD1(k)) < 1e-13, modesEssai{k});
+    assert(max(abs(idwt(aMode, dMode, 'db2', 7, 'mode', modesEssai{k}) - (1:7))) < 1e-12);
+end
+% Le mode de la session vaut pour tous ; 'per' garde ceil(N/2) coefficients.
+dwtmode('per', 'nodisp');
+[aPer, ~] = dwt(1:7, 'db2');
+dwtmode('sym', 'nodisp');
+assert(numel(aPer) == 4);
+% Une colonne donne des colonnes, comme dans MATLAB.
+[cCol, lCol] = wavedec((1:20)', 2, 'db2');
+assert(iscolumn(cCol) && iscolumn(lCol) && iscolumn(waverec(cCol, lCol, 'db2')));
+% DETCOEF : plusieurs niveaux en cellules, ou une sortie par niveau.
+[cDet, lDet] = wavedec(sin(1:40), 3, 'sym4');
+blocs = detcoef(cDet, lDet, [1 3]);
+[d1, d3] = detcoef(cDet, lDet, [1 3]);
+assert(iscell(blocs) && isequal(blocs{1}, d1) && isequal(blocs{2}, d3));
+% WRCOEF : l'approximation d'un niveau plus les détails rendent le signal.
+xr = sin((1:50) / 4) + mod(1:50, 7) / 10;
+[cR, lR] = wavedec(xr, 3, 'db4');
+somme = wrcoef('a', cR, lR, 'db4', 2) + wrcoef('d', cR, lR, 'db4', 2) + ...
+        wrcoef('d', cR, lR, 'db4', 1);
+assert(max(abs(somme - xr)) < 1e-12);
+% UPCOEF : convolution entière, sans coupe (pywt.upcoef('a', [1, 2], 'db2', level=2)).
+attenduUp = [0.233253175473055 0.40400635094611 0.512259526419165 0.637259526419165 ...
+             0.762259526419165 0.887259526419165 1.01225952641916 1.13725952641916 ...
+             0.5625 0.175240473580836 -0.024519052838329 -0.274519052838329 ...
+             -0.0580127018922193 0.0334936490538903];
+assert(max(abs(upcoef('a', [1 2], 'db2', 2) - attenduUp)) < 1e-13);
+% DYADUP au sens de MATLAB.
+assert(isequal(dyadup(1:3), [0 1 0 2 0 3 0]) && isequal(dyadup(1:3, 0), [1 0 2 0 3]));
+% Prolongements antisymétriques : au-delà d'une période et en point entier.
+assert(isequal(wextend('1D', 'asym', [1 2 3], 5), [2 3 -3 -2 -1 1 2 3 -3 -2 -1 1 2]));
+assert(isequal(wextend('1D', 'asymw', [1 2 3], 2), [-1 0 1 2 3 4 5]));
+assert(isequal(size(wextend('addrow', 'per', ones(3, 5), 1)), [6 5]));
+% DWT2 d'une image de tailles impaires, en 'per' et en 'sym'.
+image75 = reshape(1:35, 7, 5);
+[aPer2, hPer2] = dwt2(image75, 'db2', 'mode', 'per');
+assert(isequal(size(aPer2), [4 3]) && abs(aPer2(1, 1) - 24.8301270189222) < 1e-12);
+assert(abs(hPer2(2, 3)) < 1e-12);
+[aSym2, ~, ~, dSym2] = dwt2(image75, 'db2');
+assert(isequal(size(aSym2), [5 4]) && abs(aSym2(1, 1) - 6) < 1e-12 && abs(dSym2(4, 4)) < 1e-12);
+assert(max(max(abs(idwt2(aSym2, zeros(5, 4), zeros(5, 4), dSym2, 'db2', [7 5]) - ...
+                   idwt2(aSym2, [], [], dSym2, 'db2', [7 5])))) < 1e-12);
+% Paquets : la reconstruction reprend la taille de chaque parent.
+arbreImpair = wpdec(sin(1:37), 3, 'db3');
+assert(max(abs(wprec(arbreImpair) - sin(1:37))) < 1e-12);
+% Coiflettes dans l'ordre de MATLAB.
+assert(abs(coifwavf('coif1') * [1; 0; 0; 0; 0; 0] + 0.051429728470769) < 1e-12);
+disp('modes de prolongement : ok');
 
 disp('ondelettes : toutes les verifications passent');
 

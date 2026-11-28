@@ -28,8 +28,8 @@ function Vq = interp2(varargin)
             methode = lower(char(varargin{k}));
             if ~any(strcmp(methode, {'linear', 'nearest', 'cubic', 'makima', 'spline'}))
                 error('MATLAB:interp2:InvalidMethod', ...
-                      ['INTERP2 : la methode est ''linear'', ''nearest'', ''cubic'', ' ...
-                       '''makima'' ou ''spline'' ; pas ''%s''.'], char(varargin{k}));
+                      ['Method must be ''linear'', ''nearest'', ''cubic'', ' ...
+                       '''makima'', or ''spline'', not ''%s''.'], char(varargin{k}));
             end
             break
         end
@@ -57,10 +57,10 @@ function Vq = interp2(varargin)
             Yq = (1:pas:size(V, 1)).';
         otherwise
             error('MATLAB:interp2:nargin', ...
-                  'INTERP2(X,Y,V,XQ,YQ), INTERP2(V,XQ,YQ) ou INTERP2(V,K).');
+                  'Expected INTERP2(X,Y,V,XQ,YQ), INTERP2(V,XQ,YQ), or INTERP2(V,K).');
     end
     if ~ismatrix(V)
-        error('MATLAB:interp2:VNot2D', 'INTERP2 interpole un tableau V a deux dimensions.');
+        error('MATLAB:interp2:VNot2D', 'V must be a two-dimensional array.');
     end
     if isvector(Xq) && isvector(Yq) && ~isequal(size(Xq), size(Yq))
         [Xq, Yq] = meshgrid(Xq, Yq);

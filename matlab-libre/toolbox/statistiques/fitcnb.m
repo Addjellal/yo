@@ -69,4 +69,7 @@ function modele = fitcnb(X, y, varargin)
                     'Sigma', ecarts, 'Frequences', frequences, ...
                     'Prior', apriori, 'Echantillons', {echantillons}, ...
                     'NumObservations', numel(y));
+    modele.ClassNames = classes;
+    modele.X = X;
+    modele.Y = y;
 end

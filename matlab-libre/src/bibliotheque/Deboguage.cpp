@@ -112,6 +112,32 @@ FONCTION(fnProfileLignes) {
 
 // --- points d'arrêt --------------------------------------------------------
 
+// Le numéro de ligne d'un point d'arrêt, donné en nombre — dbstop('f', 3)
+// — ou en texte, comme l'écrit la forme commande : « dbstop in f at 3 »
+// passe '3', que l'on prenait pour son code de caractère (51).
+static int numeroDeLigne(const Valeur& v, const char* fonction) {
+    if (v.estNumerique()) return (int)v.scal();
+    const std::string t = v.versTexte();
+    std::size_t fin = 0;
+    int n = 0;
+    try {
+        n = std::stoi(t, &fin);
+    } catch (const std::exception&) {
+        fin = 0;
+    }
+    if (fin == 0 || t.find_first_not_of(" \t", fin) != std::string::npos || n < 1)
+        erreur(std::string("MATLAB:") + fonction + ":InvalidInput",
+               "'" + t + "' is not a valid line number.");
+    return n;
+}
+
+// Un texte qui n'est fait que de chiffres : un numéro de ligne.
+static bool texteDeChiffres(const Valeur& v) {
+    if (v.estNumerique()) return false;
+    const std::string t = v.versTexte();
+    return !t.empty() && t.find_first_not_of("0123456789") == std::string::npos;
+}
+
 FONCTION(fnDbstop) {
     INUTILISE
     if (args.empty()) {
@@ -132,11 +158,11 @@ FONCTION(fnDbstop) {
         if (a == "in" && k + 1 < args.size()) {
             fichier = args[++k].versTexte();
         } else if (a == "at" && k + 1 < args.size()) {
-            ligne = (int)args[++k].scal();
+            ligne = numeroDeLigne(args[++k], "dbstop");
         } else if (a == "if" && k + 1 < args.size()) {
             condition = args[++k].versTexte();
-        } else if (args[k].estNumerique()) {
-            ligne = (int)args[k].scal();
+        } else if (args[k].estNumerique() || (!fichier.empty() && texteDeChiffres(args[k]))) {
+            ligne = numeroDeLigne(args[k], "dbstop");
         } else if (fichier.empty()) {
             fichier = a;
         }
@@ -157,10 +183,14 @@ FONCTION(fnDbclear) {
     std::string fichier;
     int ligne = 0;
     for (std::size_t k = 0; k < args.size(); ++k) {
-        if (args[k].estNumerique()) ligne = (int)args[k].scal();
-        else if (args[k].versTexte() == "in" && k + 1 < args.size()) fichier = args[++k].versTexte();
-        else if (args[k].versTexte() == "at" && k + 1 < args.size()) ligne = (int)args[++k].scal();
-        else if (fichier.empty()) fichier = args[k].versTexte();
+        if (args[k].estNumerique() || (!fichier.empty() && texteDeChiffres(args[k])))
+            ligne = numeroDeLigne(args[k], "dbclear");
+        else if (args[k].versTexte() == "in" && k + 1 < args.size())
+            fichier = args[++k].versTexte();
+        else if (args[k].versTexte() == "at" && k + 1 < args.size())
+            ligne = numeroDeLigne(args[++k], "dbclear");
+        else if (fichier.empty())
+            fichier = args[k].versTexte();
     }
     it.debogueur.retirer(fichier, ligne);
     return {};

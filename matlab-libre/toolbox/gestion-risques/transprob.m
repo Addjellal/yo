@@ -45,7 +45,7 @@ function [matrice, totauxEchantillon, totauxIdentifiant] = transprob(donnees, va
     donnees = double(donnees);
     if size(donnees, 2) < 3
         error('risque:transprob:Donnees', ...
-              'Il faut trois colonnes : identifiant, date, notation.');
+              'Data must have three columns: ID, date, rating.');
     end
     identifiants = donnees(:, 1);
     dates = donnees(:, 2);
@@ -105,7 +105,7 @@ function [matrice, totauxEchantillon, totauxIdentifiant] = transprob(donnees, va
                                                           intervalle);
         otherwise
             error('risque:transprob:Algorithme', ...
-                  'L''algorithme vaut ''cohort'' ou ''duration''.');
+                  'Algorithm must be ''cohort'' or ''duration''.');
     end
     if nargout > 2
         totauxIdentifiant = repmat(totauxEchantillon, numel(uniques), 1);

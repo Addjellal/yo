@@ -15,11 +15,11 @@ function machine = sffunction(machine, nom, fonction)
 %   Voir aussi SFTRUTHTABLE, SFSTATE, SFTRANSITION.
     nom = char(nom);
     if ~isvarname(nom)
-        error('Stateflow:NomInvalide', 'Le nom de fonction ''%s'' n''est pas un nom valide.', nom);
+        error('Stateflow:NomInvalide', 'Function name ''%s'' is not a valid name.', nom);
     end
     if ~isa(fonction, 'function_handle')
         error('Stateflow:FonctionInvalide', ...
-              'La fonction ''%s'' se donne par une poignee de fonction, @(x) ... ou @nom.', nom);
+              'Function ''%s'' must be given as a function handle, @(x) ... or @name.', nom);
     end
     if ~isfield(machine, 'fonctions')
         machine.fonctions = struct();

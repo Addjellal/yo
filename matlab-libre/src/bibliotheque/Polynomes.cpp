@@ -109,14 +109,19 @@ FONCTION(fnRoots) {
     INUTILISE
     exigerArguments(args, 1, 1, "roots");
     exigerNumerique(args[0], "roots");
-    std::vector<double> c;
-    for (std::size_t k = 0; k < args[0].nelem(); ++k) c.push_back(args[0].re[k]);
+    // Les coefficients, complexes s'il le faut : un polynôme à
+    // coefficients complexes a ses racines propres, pas celles de sa
+    // partie réelle.
+    const Valeur& p = args[0];
+    std::vector<std::complex<double>> c;
+    for (std::size_t k = 0; k < p.nelem(); ++k)
+        c.emplace_back(p.re[k], p.im.empty() ? 0.0 : p.im[k]);
     // On retire les zéros de tête, puis on résout par la matrice compagnon.
     std::size_t debut = 0;
-    while (debut < c.size() && c[debut] == 0) ++debut;
+    while (debut < c.size() && c[debut] == 0.0) ++debut;
     c.erase(c.begin(), c.begin() + (long)debut);
     std::size_t fin = 0;
-    while (c.size() > 1 && c.back() == 0) {
+    while (c.size() > 1 && c.back() == 0.0) {
         c.pop_back();
         ++fin;
     }
@@ -125,11 +130,17 @@ FONCTION(fnRoots) {
         std::vector<double> zeros(fin, 0.0);
         return {Valeur::colonne(zeros)};
     }
+    bool complexe = p.estComplexe();
     Valeur compagnon = Valeur::matrice(n, n);
-    for (int j = 0; j < n; ++j)
-        compagnon.re[(std::size_t)0 + (std::size_t)j * n] = -c[(std::size_t)j + 1] / c[0];
+    if (complexe) compagnon.im.assign(compagnon.re.size(), 0.0);
+    for (int j = 0; j < n; ++j) {
+        std::complex<double> v = -c[(std::size_t)j + 1] / c[0];
+        compagnon.re[(std::size_t)0 + (std::size_t)j * n] = v.real();
+        if (complexe) compagnon.im[(std::size_t)0 + (std::size_t)j * n] = v.imag();
+    }
     for (int i = 1; i < n; ++i)
         compagnon.re[(std::size_t)i + (std::size_t)(i - 1) * n] = 1.0;
+    if (complexe) compagnon.compacter();
     Valeur valeurs;
     valeursPropres(compagnon, valeurs, nullptr);
     if (fin) {
@@ -192,6 +203,9 @@ FONCTION(fnPolyfit) {
     exigerNumerique(args[1], "polyfit");
     Valeur x = versDouble(args[0]);
     const Valeur& y = versDouble(args[1]);
+    if (x.estComplexe())
+        erreur("MatLibre:polyfit:XComplexe",
+               "POLYFIT : des abscisses X complexes ne sont pas gérées ; Y peut l'être.");
     int n = (int)args[2].scal();
     if (n < 0) erreur("MATLAB:polyfit:BadDegree", "The degree must be nonnegative.");
     int m = (int)x.nelem();
@@ -220,7 +234,10 @@ FONCTION(fnPolyfit) {
     for (int i = 0; i < m; ++i)
         for (int j = 0; j <= n; ++j)
             A.re[(std::size_t)i + (std::size_t)j * m] = std::pow(x.re[(std::size_t)i], n - j);
-    Valeur b = Valeur::colonne(std::vector<double>(y.re.begin(), y.re.end()));
+    // Y complexe : les coefficients le sont aussi — garder la partie
+    // imaginaire, sans quoi on ajusterait la seule partie réelle.
+    Valeur b = y;
+    b.dims = {m, 1};
     Valeur c = divisionGauche(A, b);
     Valeur r = transposer(c, false);
     if (nargout < 2) return {r};
@@ -612,9 +629,9 @@ static std::vector<Valeur> hermitePublique(Arguments args, const char* nom,
     std::vector<double> x(args[0].re.begin(), args[0].re.end());
     std::vector<double> y(args[1].re.begin(), args[1].re.end());
     if (x.size() != y.size())
-        erreur("MATLAB:pchip:Tailles", "Il faut autant d'ordonnees que d'abscisses.");
+        erreur("MATLAB:pchip:Tailles", "The number of values must match the number of data sites.");
     if (x.size() < 2)
-        erreur("MATLAB:pchip:Points", "Il faut au moins deux points.");
+        erreur("MATLAB:pchip:Points", "There must be at least two data points.");
     std::vector<double> d = akima ? pentesAkima(x, y, modifie) : pentesPchip(x, y);
     if (args.size() > 2) {
         Valeur r = versDouble(args[2]);
@@ -721,7 +738,7 @@ FONCTION(fnSpline) {
         double pivot = diag[i] - sousDiag[i] * gamma[i - 1];
         if (pivot == 0.0)
             throw ErreurMatlab("MATLAB:spline:PointsConfondus",
-                               "spline : les abscisses doivent etre distinctes et croissantes.");
+                               "The data sites should be distinct and increasing.");
         gamma[i] = surDiag[i] / pivot;
         delta[i] = (second[i] - sousDiag[i] * delta[i - 1]) / pivot;
     }
@@ -764,26 +781,73 @@ FONCTION(fnSpline) {
     return {r};
 }
 
+// PPVAL comme MATLAB : un polynome par morceaux a valeurs dans R^d range
+// ses coefficients par lignes, la composante variant la premiere (ligne
+// d*(i-1)+c pour le morceau i, composante c), puissances decroissantes.
+// Un point de rupture interieur appartient au morceau qui commence : la
+// valeur est celle de droite, ce qui compte pour un polynome discontinu.
+// Hors des ruptures, le premier et le dernier morceau prolongent.
 FONCTION(fnPpval) {
     INUTILISE
     exigerArguments(args, 2, 2, "ppval");
     const Valeur& pp = args[0];
-    std::vector<double> ruptures;
-    Valeur b = pp.champ("breaks");
-    for (std::size_t k = 0; k < b.nelem(); ++k) ruptures.push_back(b.re[k]);
-    Valeur coefs = pp.champ("coefs");
-    int morceaux = coefs.nlignes(), ordre = coefs.ncolonnes();
+    if (!pp.estStructure() || !pp.aChamp("breaks") || !pp.aChamp("coefs"))
+        throw ErreurMatlab("MATLAB:ppval:Forme",
+                           "First input must be a piecewise polynomial from MKPP, SPLINE, "
+                           "or PCHIP.");
+    Valeur b = versDouble(pp.champ("breaks"));
+    std::vector<double> ruptures(b.re.begin(), b.re.end());
+    Valeur coefs = versDouble(pp.champ("coefs"));
+    if (coefs.ndims() > 2)
+        throw ErreurMatlab("MATLAB:ppval:Coefficients",
+                           "The coefficients must form a (d*L)-by-k matrix.");
+    int dim = 1;
+    if (pp.aChamp("dim")) {
+        Valeur d = versDouble(pp.champ("dim"));
+        double produit = 1.0;
+        for (double v : d.re) produit *= v;
+        dim = (int)std::llround(produit);
+    }
+    int lignes = coefs.nlignes(), ordre = coefs.ncolonnes();
+    if (dim < 1 || lignes % dim != 0 || ruptures.size() != (std::size_t)(lignes / dim) + 1 ||
+        lignes == 0)
+        throw ErreurMatlab("MATLAB:ppval:Coherence",
+                           "The piecewise polynomial needs one row of coefficients per piece and "
+                           "component, and one more break than pieces.");
+    int morceaux = lignes / dim;
     const Valeur& cible = versDouble(args[1]);
-    Valeur r = cible;
-    for (std::size_t k = 0; k < cible.nelem(); ++k) {
+    if (cible.estComplexe())
+        throw ErreurMatlab("MATLAB:ppval:Abscisses",
+                           "Query points must be real.");
+    std::size_t n = cible.nelem();
+    Valeur r;
+    if (dim == 1) {
+        r = Valeur::matriceDims(cible.dims);
+    } else if (cible.dims.size() == 2 && (cible.dims[0] == 1 || cible.dims[1] == 1)) {
+        r = Valeur::matrice(dim, (int)n);
+    } else {
+        Dims d{dim};
+        d.insert(d.end(), cible.dims.begin(), cible.dims.end());
+        r = Valeur::matriceDims(d);
+    }
+    bool complexe = coefs.estComplexe();
+    if (complexe) r.im.assign(r.re.size(), 0.0);
+    for (std::size_t k = 0; k < n; ++k) {
         double xi = cible.re[k];
-        int i = 0;
-        while (i + 1 < morceaux && ruptures[(std::size_t)i + 1] < xi) ++i;
+        int i = (int)(std::upper_bound(ruptures.begin() + 1, ruptures.begin() + morceaux, xi) -
+                      (ruptures.begin() + 1));
         double dx = xi - ruptures[(std::size_t)i];
-        double acc = 0;
-        for (int j = 0; j < ordre; ++j)
-            acc = acc * dx + coefs.re[(std::size_t)i + (std::size_t)j * morceaux];
-        r.re[k] = acc;
+        for (int c = 0; c < dim; ++c) {
+            std::size_t ligne = (std::size_t)i * (std::size_t)dim + (std::size_t)c;
+            double acc = 0.0, accIm = 0.0;
+            for (int j = 0; j < ordre; ++j) {
+                std::size_t idx = ligne + (std::size_t)j * (std::size_t)lignes;
+                acc = acc * dx + coefs.re[idx];
+                if (complexe) accIm = accIm * dx + coefs.im[idx];
+            }
+            r.re[(std::size_t)c + k * (std::size_t)dim] = acc;
+            if (complexe) r.im[(std::size_t)c + k * (std::size_t)dim] = accIm;
+        }
     }
     return {r};
 }

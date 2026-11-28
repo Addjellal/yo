@@ -35,7 +35,7 @@ function [fis, erreurs] = anfis(donnees, fisInitial, epoques, pasInitial)
     if nargin < 4 || isempty(pasInitial), pasInitial = 0.01; end
     fis = fisInitial;
     if ~strcmp(fis.type, 'sugeno')
-        error('fuzzy:anfis:BadType', 'ANFIS ne travaille que sur un système de Sugeno.');
+        error('fuzzy:anfis:BadType', 'ANFIS supports only Sugeno systems.');
     end
     pas = pasInitial;
     erreurs = zeros(epoques, 1);

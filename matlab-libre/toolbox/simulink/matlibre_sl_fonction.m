@@ -52,7 +52,7 @@ function h = expression(texte, chemin)
     texte = strtrim(char(texte));
     if isempty(texte)
         error('Simulink:blocks:FcnExpressionEmpty', ...
-              'Le bloc ''%s'' n''a pas d''expression.', chemin);
+              'Block ''%s'' has no expression.', chemin);
     end
     % u[i] est l'écriture de Simulink pour u(i).
     texte = regexprep(texte, '(^|[^A-Za-z0-9_])u\[([^\]]*)\]', '$1u($2)');
@@ -63,7 +63,7 @@ function h = expression(texte, chemin)
         h = evalin('base', ['@(u) ' texte]);
     catch err
         error('Simulink:blocks:FcnExpressionInvalid', ...
-              'L''expression ''%s'' du bloc ''%s'' ne se lit pas : %s', texte, chemin, ...
+              'Expression ''%s'' of block ''%s'' cannot be parsed: %s', texte, chemin, ...
               err.message);
     end
 end
@@ -80,13 +80,13 @@ function [nEntrees, nSorties, entrees, sorties] = signature(script)
     end
     if isempty(entete)
         error('Simulink:blocks:MATLABFunctionNoFunction', ...
-              'Le texte d''un bloc MATLAB Function commence par une ligne « function ».');
+              'The code of a MATLAB Function block must start with a ''function'' line.');
     end
     jetons = regexp(entete, ['^function\s*(?:(\[[^\]]*\]|\w+)\s*=\s*)?' ...
                              '(\w+)\s*(?:\(([^)]*)\))?'], 'tokens', 'once');
     if isempty(jetons)
         error('Simulink:blocks:MATLABFunctionNoFunction', ...
-              'La ligne ''%s'' n''est pas une declaration de fonction.', entete);
+              'Line ''%s'' is not a function declaration.', entete);
     end
     sorties = decouper(regexprep(jetons{1}, '[\[\]]', ''));
     entrees = decouper(jetons{3});
@@ -130,7 +130,7 @@ function h = installer(script, chemin)
         f = fopen(fichier, 'w');
         if f < 0
             error('Simulink:blocks:MATLABFunctionWrite', ...
-                  'Le texte du bloc ''%s'' ne peut pas s''ecrire dans %s.', chemin, dossier);
+                  'The code of block ''%s'' cannot be written to %s.', chemin, dossier);
         end
         fprintf(f, '%s', texte);
         fclose(f);
@@ -172,30 +172,30 @@ function [tailles, x0, ts] = sfonction(nom, parametres, chemin)
     nom = char(nom);
     if ~(exist(nom) == 2 || exist(nom) == 6) %#ok<EXIST>
         error('Simulink:blocks:SFunctionNotFound', ...
-              ['La S-fonction ''%s'' du bloc ''%s'' est introuvable : il faut un ' ...
-               'fichier %s.m sur le chemin.'], nom, chemin, nom);
+              ['S-function ''%s'' of block ''%s'' cannot be found: a file ' ...
+               '%s.m is required on the path.'], nom, chemin, nom);
     end
     f = str2func(nom);
     try
         [sys, x0, ~, ts] = f(0, [], [], 0, parametres{:});
     catch err
         error('Simulink:blocks:SFunctionError', ...
-              'La S-fonction ''%s'' du bloc ''%s'' echoue au drapeau 0 : %s', nom, ...
+              'S-function ''%s'' of block ''%s'' fails at flag 0: %s', nom, ...
               chemin, err.message);
     end
     sys = double(sys(:)).';
     if numel(sys) < 6
         error('Simulink:blocks:SFunctionSizes', ...
-              ['Au drapeau 0, la S-fonction ''%s'' doit rendre au moins six tailles : ' ...
-               'etats continus, etats discrets, sorties, entrees, 0, transmission ' ...
-               'directe.'], nom);
+              ['At flag 0, S-function ''%s'' must return at least six sizes: ' ...
+               'continuous states, discrete states, outputs, inputs, 0, direct ' ...
+               'feedthrough.'], nom);
     end
     tailles = sys;
     x0 = double(x0(:));
     if numel(x0) ~= sys(1) + sys(2)
         error('Simulink:blocks:SFunctionInitialStates', ...
-              ['La S-fonction ''%s'' annonce %d etat(s) mais rend %d condition(s) ' ...
-               'initiale(s).'], nom, sys(1) + sys(2), numel(x0));
+              ['S-function ''%s'' declares %d state(s) but returns %d initial ' ...
+               'condition(s).'], nom, sys(1) + sys(2), numel(x0));
     end
     if isempty(ts)
         ts = [-1 0];

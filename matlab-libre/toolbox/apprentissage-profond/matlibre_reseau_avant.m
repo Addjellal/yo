@@ -19,7 +19,7 @@ function [sorties, etat] = matlibre_reseau_avant(reseau, entrees, apprentissage)
         reseau = matlibre_reseau_initialiser(reseau, entrees);
         if ~reseau.Initialized
             error('nnet:dlnetwork:NonInitialise', ...
-                  'Le réseau n''est pas initialisé ; appelez INITIALIZE.');
+                  'The network is not initialized; call INITIALIZE.');
         end
     end
     ordre = matlibre_reseau_ordre(reseau.Names, reseau.Connections);
@@ -34,7 +34,7 @@ function [sorties, etat] = matlibre_reseau_avant(reseau, entrees, apprentissage)
             numeroEntree = numeroEntree + 1;
             if numeroEntree > numel(entrees)
                 error('nnet:dlnetwork:Entrees', ...
-                      'Le réseau attend %d entrées.', numel(reseau.InputNames));
+                      'The network requires %d inputs.', numel(reseau.InputNames));
             end
             arrivee = {matlibre_dl_entree(entrees{numeroEntree})};
         else

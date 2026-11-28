@@ -22,11 +22,11 @@ function varargout = dlgradient(perte, varargin)
 %   Voir aussi DLFEVAL, DLARRAY, ADAMUPDATE, SGDMUPDATE.
     if ~isa(perte, 'dlarray') || perte.Noeud == 0
         error('nnet:dlgradient:HorsDlfeval', ...
-              'DLGRADIENT ne s''emploie qu''à l''intérieur de DLFEVAL.');
+              'DLGRADIENT must be called inside DLFEVAL.');
     end
     if numel(perte.Valeur) ~= 1
         error('nnet:dlgradient:Scalaire', ...
-              'La quantité dérivée doit être un scalaire.');
+              'The value to differentiate must be a scalar.');
     end
     gradients = matlibre_retropropager(perte.Noeud);
     varargout = cell(1, numel(varargin));

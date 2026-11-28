@@ -32,8 +32,8 @@ function [coursArbre, valeurArbre] = binprice(cours, exercice, taux, duree, pas,
     probabilite = (exp((taux - tauxDividende) * dt) - baisse) / (hausse - baisse);
     if probabilite < 0 || probabilite > 1
         error('finstr:binprice:Probabilite', ...
-              ['Le pas est trop grand pour cette volatilité : la ' ...
-               'probabilité risque-neutre sort de [0, 1].']);
+              ['The time step is too large for this volatility: the ' ...
+               'risk-neutral probability is outside [0, 1].']);
     end
     % Dividendes en espèces : leur valeur actuelle sort du cours, puis
     % revient nœud par nœud. C'est le modèle dit du dividende séquestré,

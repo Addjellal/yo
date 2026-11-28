@@ -36,7 +36,7 @@ function spectre = distspec(trellis, n)
     end
     if iscatastrophic(trellis)
         error('comm:distspec:Catastrophique', ...
-              'Un codeur catastrophique n''a pas de spectre de distances.');
+              'A catastrophic encoder has no distance spectrum.');
     end
     etats = trellis.numStates;
     entrees = trellis.numInputSymbols;
@@ -130,7 +130,7 @@ function spectre = distspec(trellis, n)
     premier = find(termine > 0, 1);
     if isempty(premier)
         error('comm:distspec:Aucun', ...
-              'Aucun chemin ne revient à l''état zéro.');
+              'No path returns to the zero state.');
     end
     dfree = premier - 1;
     fin = min(premier + n - 1, maximum + 1);

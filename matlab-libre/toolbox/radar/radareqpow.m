@@ -1,22 +1,33 @@
-function Pt = radareqpow(lambda, R, G, sigma, Pmin)
-%RADAREQPOW Puissance d'émission nécessaire pour une portée donnée.
-%   PT = RADAREQPOW(LAMBDA,R,G,SIGMA,PMIN) résout l'équation du radar en
-%   puissance :
+function Pt = radareqpow(lambda, portee, SNR, tau, varargin)
+%RADAREQPOW Puissance crête nécessaire, par l'équation du radar.
+%   PT = RADAREQPOW(LAMBDA,TGTRNG,SNR,TAU) rend la puissance crête (W) qui
+%   donne le rapport signal sur bruit SNR (dB) sur une cible à la portée
+%   TGTRNG (m), pour une longueur d'onde LAMBDA (m) et une durée
+%   d'impulsion TAU (s) — la signature de MATLAB :
 %
-%      Pt = Pmin (4 pi)^3 R^4 / (G^2 lambda^2 sigma)
+%      Pt = SNR (4 pi)^3 k Ts Rt^2 Rr^2 L / (tau Gt Gr lambda^2 sigma)
 %
-%   C'est l'exacte réciproque de RADAREQRNG : ce que l'une rend en portée,
-%   l'autre le rend en puissance, et les deux se recomposent.
-%
-%   La puissance croît comme la puissance quatrième de la portée : c'est
-%   ce qui rend les radars longue portée si gourmands, et c'est aussi ce
-%   qui rend une cible furtive — un SIGMA divisé par cent — si difficile,
-%   puisqu'il faut alors cent fois plus de puissance à portée égale.
+%   TGTRNG est une portée, ou [Rt Rr] pour un radar bistatique ; une
+%   colonne de J portées, ou une matrice J x 2, décrit J cibles, et SNR,
+%   'RCS', 'CustomFactor', 'AtmosphericLoss' et 'PropagationFactor'
+%   peuvent alors avoir une valeur par cible : PT est une colonne de J
+%   puissances.
+%   Options : 'RCS' (m^2, 1), 'Ts' (K, 290), 'Gain' (dB, 20, ou [Gt Gr]),
+%   'Loss' (dB, 0), 'CustomFactor' (dB, 0), 'AtmosphericLoss' et
+%   'PropagationFactor' (dB, 0 ; une valeur vaut pour un trajet aller, et
+%   compte à l'aller et au retour ; [aller retour] les distingue).
 %
 %   Exemple :
-%      Pt = radareqpow(0.03, 50e3, 1e4, 1, 1e-12);
-%      radareqrng(0.03, Pt, 1e4, 1, 1e-12)     % 50000, la portee voulue
+%      % Documentation de MATLAB.
+%      lambda = physconst('LightSpeed') / 1e9;
+%      radareqpow(lambda, 50e3, 6, 1e-6)              % 2.1996e+05 W
 %
-%   Voir aussi RADAREQRNG, DOPPLERSHIFT.
-    Pt = Pmin .* (4 * pi) ^ 3 .* R .^ 4 ./ (G .^ 2 .* lambda .^ 2 .* sigma);
+%   Voir aussi RADAREQRNG, RADAREQSNR, PHYSCONST.
+    o = matlibre_radar_options(varargin, 'radareqpow', ...
+        {'RCS', 'Ts', 'Gain', 'Loss', 'CustomFactor', 'AtmosphericLoss', 'PropagationFactor'});
+    [Rt, Rr] = matlibre_radar_portees(portee, 'radareqpow');
+    [~, pertes] = matlibre_radar_cibles('radareqpow', o, Rt, SNR(:));
+    Pt = 10 .^ ((SNR(:) + o.Loss - o.CustomFactor(:) + pertes) / 10) .* (4 * pi) ^ 3 .* ...
+         physconst('Boltzmann') .* o.Ts .* Rt .^ 2 .* Rr .^ 2 ./ ...
+         (tau .* 10 .^ ((o.Gain(1) + o.Gain(2)) / 10) .* lambda .^ 2 .* o.RCS(:));
 end

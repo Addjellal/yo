@@ -22,14 +22,14 @@ function sys = thiran(retard, Ts)
 %
 %   Voir aussi PADE, C2D, D2D, DELAYSS, ABSORBDELAY.
     if nargin < 2 || isempty(Ts)
-        error('control:thiran:Ts', 'THIRAN demande la période d''échantillonnage.');
+        error('control:thiran:Ts', 'THIRAN requires the sample time.');
     end
     if Ts <= 0
-        error('control:thiran:Ts', 'La période d''échantillonnage doit être positive.');
+        error('control:thiran:Ts', 'The sample time must be positive.');
     end
     D = retard / Ts;
     if D < 0
-        error('control:thiran:Retard', 'Le retard doit être positif.');
+        error('control:thiran:Retard', 'The delay must be positive.');
     end
     % Un retard entier est un simple décalage : rien à approcher. Le
     % quotient de deux flottants tombe rarement juste — 0,3/0,1 vaut

@@ -227,6 +227,12 @@ void ConsoleCommandes::remplacerSaisie(const QString& texte) {
     setTextCursor(c);
 }
 
+void ConsoleCommandes::proposerSaisie(const QString& texte) {
+    if (!inviteVisible_) return;
+    remplacerSaisie(texte);
+    allerEnFin();
+}
+
 void ConsoleCommandes::poserInvite(const QString& invite) {
     if (inviteVisible_ && invite == invite_) return;
     if (inviteVisible_) masquerInvite();

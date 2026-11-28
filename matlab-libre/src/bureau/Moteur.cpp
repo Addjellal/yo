@@ -390,6 +390,13 @@ void Moteur::executer(const QString& texte) {
         *flux_ << "Operation terminated by user.\n";
     } catch (const ErreurMatlab& e) {
         *flux_ << rapportErreur(e);
+        // Une faute de frappe : la commande corrigée attend dans la
+        // saisie, Entrée l'exécute — comme dans MATLAB.
+        const std::string correction = it_->correctionCommande(e, texte.toStdString());
+        if (!correction.empty()) {
+            *flux_ << "\nDid you mean:\n";
+            emit correctionProposee(QString::fromStdString(correction));
+        }
     } catch (const std::exception& e) {
         *flux_ << "Error: " << e.what() << "\n";
     } catch (...) {

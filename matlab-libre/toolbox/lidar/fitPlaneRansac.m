@@ -12,6 +12,13 @@ function [modele, inliers] = fitPlaneRansac(points, tolerance, iterations)
 %   modèle — deux pour une droite, trois pour un plan —, compter combien
 %   de points s'en approchent, et recommencer. Le meilleur tirage gagne.
 %
+%   Le meilleur modèle est ensuite réajusté sur ses points ralliés, au
+%   sens des moindres carrés orthogonaux, comme le recommandent Fischler et
+%   Bolles (1981) : le tirage de trois points porte tout leur bruit, le
+%   réajustement le moyenne. MODELE est normé : [A B] (ou [A B C]) est un
+%   vecteur unitaire, et la distance d'un point au modèle est |MODELE *
+%   [P 1]'|.
+%
 %   C'est ce qui le rend insensible aux points aberrants, là où les
 %   moindres carrés cèdent : une droite ajustée par moindres carrés sur un
 %   sol semé de parasites passe entre les deux, alors que RANSAC ignore
@@ -49,5 +56,14 @@ function [modele, inliers] = fitPlaneRansac(points, tolerance, iterations)
             modele = candidat;
             inliers = courants;
         end
+    end
+    if ~isempty(inliers) && numel(inliers) >= d
+        % Moindres carrés orthogonaux sur les points ralliés.
+        centre = mean(points(inliers, :), 1);
+        [~, ~, V] = svd(points(inliers, :) - centre, 0);
+        normale = V(:, end);
+        modele = [normale; -centre * normale];
+        distances = abs([points, ones(n, 1)] * modele);
+        inliers = find(distances < tolerance);
     end
 end

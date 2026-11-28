@@ -14,7 +14,7 @@ function varargout = intenvget(courbe, varargin)
     if ~isstruct(courbe) || ~isfield(courbe, 'FinObj') || ...
             ~strcmp(courbe.FinObj, 'RateSpec')
         error('finstr:intenvget:Courbe', ...
-              'INTENVGET attend un environnement de taux.');
+              'INTENVGET requires a rate specification.');
     end
     if isempty(varargin)
         varargout{1} = courbe;

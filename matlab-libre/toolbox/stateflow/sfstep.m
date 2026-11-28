@@ -81,7 +81,7 @@ function A = arbre(machine)
             p = find(strcmp(A.noms, A.noms{k}(1:point - 1)), 1);
             if isempty(p)
                 error('Stateflow:EtatParentAbsent', ...
-                      'L''etat ''%s'' n''a pas de parent : declarez ''%s'' d''abord.', ...
+                      'State ''%s'' has no parent: declare ''%s'' first.', ...
                       A.noms{k}, A.noms{k}(1:point - 1));
             end
             A.parent(k) = p;
@@ -130,7 +130,7 @@ function k = rang(A, nom)
     end
     k = find(strcmp(A.noms, nom), 1);
     if isempty(k)
-        error('Stateflow:EtatInconnu', 'La machine n''a pas d''etat ''%s''.', nom);
+        error('Stateflow:EtatInconnu', 'The chart has no state ''%s''.', nom);
     end
 end
 
@@ -233,8 +233,8 @@ function [parcours, contexte] = suivre(machine, tr, contexte, u, profondeur)
     parcours = {};
     if profondeur > 64
         error('Stateflow:BoucleDeJonctions', ...
-              ['Les jonctions de la machine ''%s'' bouclent : un chemin repasse sans fin ' ...
-               'par ''%s''.'], machine.nom, tr.vers);
+              ['The junctions of chart ''%s'' form a loop: a path goes endlessly ' ...
+               'through ''%s''.'], machine.nom, tr.vers);
     end
     [vrai, contexte] = garde(tr, contexte, u, machine);
     if ~vrai
@@ -284,7 +284,7 @@ function [vrai, contexte] = garde(tr, contexte, u, machine)
         vrai = true;
         return
     end
-    [evenement, condition, actionCondition] = etiquette(char(g));
+    [evenement, condition, actionCondition] = matlibre_sf_etiquette(g);
     vrai = true;
     if ~isempty(evenement)
         % l'événement que l'entrée nomme, ou celui qui réveille le
@@ -321,28 +321,6 @@ function texte = emissions(texte, machine)
     end
 end
 
-% « e[c]{a} », « [c] », « e » ou une condition nue.
-function [evenement, condition, action] = etiquette(texte)
-    evenement = '';
-    condition = '';
-    action = '';
-    texte = strtrim(texte);
-    jetons = regexp(texte, '^(\w*)\s*\[(.*)\]\s*(\{(.*)\})?\s*$', 'tokens', 'once');
-    if ~isempty(jetons)
-        evenement = jetons{1};
-        condition = jetons{2};
-        if numel(jetons) >= 4
-            action = jetons{4};
-        end
-        return
-    end
-    if ~isempty(regexp(texte, '^[A-Za-z]\w*$', 'once'))
-        evenement = texte;   % un nom seul : un événement
-        return
-    end
-    condition = texte;
-end
-
 % Une action : une poignée — @(c) pour l'entrée et la sortie, @(c, u)
 % pour le séjour — ou un texte du langage d'action.
 function contexte = agir(a, contexte, u, avecEntree, machine)
@@ -350,7 +328,11 @@ function contexte = agir(a, contexte, u, avecEntree, machine)
         return
     end
     if isa(a, 'function_handle')
-        if avecEntree
+        % Une action reçoit l'entrée si elle la déclare : @(c) ou @(c, u).
+        % Un argument de trop est refusé, comme dans MATLAB, et l'action
+        % à un seul paramètre d'un état « pendant » le recevait.
+        n = nargin(a);
+        if avecEntree && (n < 0 || n >= 2)
             contexte = a(contexte, u);
         else
             contexte = a(contexte);
@@ -389,8 +371,8 @@ function [R, contexte] = franchir(A, machine, s, c, parcours, R, contexte, t, u)
     end
     if A.parallele(commun + 1)
         error('Stateflow:TransitionEntreParalleles', ...
-              ['La transition de ''%s'' vers ''%s'' relie deux etats paralleles : ils ' ...
-               'sont actifs ensemble, on ne passe pas de l''un a l''autre.'], ...
+              ['The transition from ''%s'' to ''%s'' links two parallel states: they ' ...
+               'are active together, so one cannot go from one to the other.'], ...
               A.noms{s}, A.noms{c});
     end
     % l'enfant de COMMUN du côté de la source, actif, et tout ce qu'il porte

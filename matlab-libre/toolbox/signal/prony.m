@@ -25,7 +25,7 @@ function [b, a] = prony(h, nb, na)
         lignes = (nb + 1):(n - 1);
         if numel(lignes) < na
             error('signal:prony:TropCourt', ...
-                  'La réponse est trop courte pour un dénominateur d''ordre %d.', na);
+                  'The impulse response is too short for a denominator of order %d.', na);
         end
         M = zeros(numel(lignes), na);
         v = zeros(numel(lignes), 1);

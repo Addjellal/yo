@@ -708,6 +708,9 @@ MATLIBRE_KHI_DEUX Tirages d'une loi du khi-deux.
 
 ```
 MATLIBRE_LANCER_TESTS Passe tous les tests d'un contrôle a posteriori.
+  Pour un VARBACKTEST, la table de RUNTESTS de MATLAB : PortfolioID,
+  VaRID, VaRLevel, puis les verdicts TL, Bin, POF, TUFF, CC, CCI, TBF et
+  TBFI.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
@@ -928,17 +931,45 @@ MATLIBRE_SCORE_TRANCHE Découpage rangé pour une variable.
 
 ```
 MATLIBRE_VAR_ECHECS Dépassements d'un modèle de valeur en risque.
-  Un dépassement est une perte plus grande que la valeur en risque
-  annoncée : le rendement tombe sous l'opposé de celle-ci.
+  [ECHECS,N,X,ATTENDU,MANQUANTS] = MATLIBRE_VAR_ECHECS(MODELE) : un
+  dépassement est une perte plus grande que la valeur en risque annoncée
+  — le rendement tombe sous l'opposé de celle-ci. Les périodes où le
+  rendement ou la VaR manque (NaN) sont retirées, comme dans MATLAB, et
+  comptées dans MANQUANTS.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     v = varbacktest([-2; 1; NaN], [1; 1; 1], 'VaRLevel', 0.99);
+     [e, N, x] = matlibre_var_echecs(v)      % N = 2, x = 1
+
+  Voir aussi VARBACKTEST, SUMMARY.
 ```
 
 ## `matlibre_var_test`
 
 ```
 MATLIBRE_VAR_TEST Un test de contrôle a posteriori de la valeur en risque.
+  T = MATLIBRE_VAR_TEST(MODELE,NOM,'TestLevel',NIVEAU) fait le test NOM —
+  'tl', 'bin', 'pof', 'tuff', 'cci', 'cc', 'tbfi' ou 'tbf' — et rend une
+  table d'une ligne aux colonnes de MATLAB : PortfolioID, VaRID,
+  VaRLevel, puis le verdict (accept/reject, ou green/yellow/red pour
+  TL), la statistique et sa valeur p, et les comptes.
+
+  Le feu tricolore suit la documentation de MathWorks : F la loi
+  binomiale des dépassements, vert si F(x) <= 0,95, jaune jusqu'à
+  0,9999, rouge au-delà ; Increase vaut 0 au vert, 1 au rouge, et au
+  jaune 3*(z(niveau annoncé)/z(niveau observé) - 1), borné à [0, 1].
+
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     r = [-ones(17, 1); zeros(1026, 1)];
+     v = varbacktest(r, 0.5 * ones(1043, 1), 'VaRLevel', 0.99);
+     t = matlibre_var_test(v, 'tl');
+     t.Increase              % 0.26582, l'exemple de MathWorks
+
+  Voir aussi VARBACKTEST, RUNTESTS.
 ```
 
 ## `matlibre_verdict`
@@ -1114,9 +1145,12 @@ SCORE Note des dossiers par une grille de score.
 
 ```
 SUMMARY Résumé d'un contrôle a posteriori.
-  S = SUMMARY(V) compte les observations, les dépassements observés et
-  attendus, et le niveau effectivement atteint. Sans sortie, le résumé
-  est écrit.
+  S = SUMMARY(V), V un VARBACKTEST, rend la table de MATLAB : PortfolioID,
+  VaRID, VaRLevel, ObservedLevel (part des périodes sans dépassement),
+  Observations, Failures, Expected, Ratio (dépassements sur attendus),
+  FirstFailure (période du premier dépassement) et Missing (périodes
+  retirées pour valeur manquante). Pour un ESBACKTEST, une structure aux
+  mêmes comptes. Sans sortie, le résumé est écrit.
 
   Exemple :
      rng(1);
@@ -1289,7 +1323,11 @@ VARBACKTEST Contrôle a posteriori d'un modèle de valeur en risque.
   POF la proportion de dépassements de Kupiec, TUFF le temps jusqu'au
   premier, CCI l'indépendance de Christoffersen, CC la couverture
   conditionnelle, TBFI et TBF les temps entre dépassements de Haas.
-  RUNTESTS les passe tous, SUMMARY compte.
+  RUNTESTS les passe tous, SUMMARY compte. Chacune rend une table aux
+  colonnes de MATLAB — POF rend POF (accept/reject), LRatioPOF,
+  PValuePOF, Observations, Failures et TestLevel, par exemple — et
+  accepte 'TestLevel' (0,95 par défaut). Les périodes où une donnée
+  manque (NaN) sont retirées.
 
   Exemple :
      rng(1);

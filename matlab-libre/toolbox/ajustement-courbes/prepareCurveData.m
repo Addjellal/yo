@@ -21,7 +21,7 @@ function [xs, ys, ws] = prepareCurveData(x, y, w)
     end
     if numel(x) ~= numel(y)
         error('curvefit:prepareCurveData:Tailles', ...
-              'X et Y doivent avoir le même nombre d''éléments.');
+              'X and Y must have the same number of elements.');
     end
     if nargin < 3 || isempty(w)
         w = ones(numel(y), 1);

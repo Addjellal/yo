@@ -97,6 +97,24 @@ texteCourt = fileread(fichierCourt);
 delete(fichierCourt);
 assert(numel(strfind(texteCourt, 'L ')) >= 4);
 
+% Sur un axe logarithmique, les colonnes sont egales en decades. Le Bode
+% de 1/(s(s+1)(s+2)), de 1e-4 a 1e4 rad/s : la reduction en abscisse
+% lineaire mettait tout ce qui est sous 20 rad/s dans la premiere colonne,
+% et le trace sautait d'un trait de 1e-4 a 20 rad/s, coudes compris.
+close all;
+wl = logspace(-4, 4, 4000);
+figure; semilogx(wl, 20 * log10(abs(1 ./ (1i * wl .* (1i * wl + 1) .* (1i * wl + 2)))));
+fichierLog = [tempname() '.svg'];
+print(fichierLog);
+texteLog = fileread(fichierLog);
+delete(fichierLog);
+debut = strfind(texteLog, '<path d="');
+reste = texteLog(debut(1) + 9:end);
+cheminLog = reste(1:find(reste == '"', 1) - 1);
+xl = cellfun(@(c) str2double(c{1}), regexp(cheminLog, '[ML] ([-\d.]+) ', 'tokens'));
+assert(numel(xl) > 100 && max(diff(sort(xl))) < 3, ...
+       'axe logarithmique : aucune decade n''est sautee');
+
 %% ----------------------------- poignees : gca, gcf et leurs proprietes
 % « ax = gca ; ax.XTick = [...] » est la facon courante de regler un axe en
 % MATLAB. gca rendait un simple nombre : l'ecriture au point echouait sur
@@ -167,6 +185,67 @@ svgEgal = matlibre_svg();
 % davantage d'unites : les graduations descendent sous -1.
 assert(~isempty(strfind(svgEgal, '>-3<')));
 assert(isequal(axis, [0 10 0 1]));   % les bornes des donnees, inchangees
+% Bornes fixees ensuite : elles restent, et c'est la boite qui se resserre
+% (MATLAB ajuste alors PlotBoxAspectRatio) ; « axis image » de meme serre
+% la boite sur l'image, sans bandes blanches.
+motifBoite = ['<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="([\d.]+)" ' ...
+              'fill="white" stroke="#222"'];
+figure
+imagesc(magic(5)); axis equal; xlim([0.5 5.5]); ylim([0.5 5.5]);
+boite = regexp(matlibre_svg(), motifBoite, 'tokens', 'once');
+assert(abs(str2double(boite{1}) - str2double(boite{2})) <= 1);
+figure('Position', [0 0 800 300]);
+imagesc(ones(10, 20)); axis image;
+boite = regexp(matlibre_svg(), motifBoite, 'tokens', 'once');
+assert(abs(str2double(boite{1}) / str2double(boite{2}) - 2) < 0.02);
+assert(isequal(axis, [0.5 20.5 0.5 10.5]));
+% La couleur et la taille d'un texte doivent tenir : une regle de feuille
+% de style l'emporte sur un attribut, et « text{fill:#222} » rendait tous
+% les textes gris fonce, 'Color','w' compris.
+figure
+imagesc(1); text(1, 1, 'blanc', 'Color', 'w', 'FontSize', 20); title('titre', 'FontSize', 9);
+svgTexte = matlibre_svg();
+assert(~isempty(strfind(svgTexte, 'fill="#FFFFFF">blanc')));
+assert(isempty(regexp(svgTexte, 'text\{[^}]*(fill|font-size):', 'once')));
+assert(isempty(regexp(svgTexte, '\.titre\{[^}]*font-size:', 'once')));
+% « -. » est le tiret-point, « .- » le marqueur point relie par un trait.
+figure
+h1 = plot(1:3, 'r-.');
+hold on
+h2 = plot(1:3, 'k.-');
+h3 = plot(1:3, 'b-.o');
+assert(strcmp(get(h1, 'LineStyle'), '-.') && strcmp(get(h1, 'Marker'), 'none'));
+assert(strcmp(get(h2, 'LineStyle'), '-') && strcmp(get(h2, 'Marker'), '.'));
+assert(strcmp(get(h3, 'LineStyle'), '-.') && strcmp(get(h3, 'Marker'), 'o'));
+assert(~isempty(strfind(matlibre_svg(), 'stroke-dasharray="8,3,2,3"')));
+% Une barre part de zero, et zero compte dans les limites, comme dans
+% MATLAB : bar([1300 700 200 900]) commencait l'axe a 200, et la barre de
+% 200 disparaissait.
+figure
+bar([1300 700 200 900]);
+limitesY = get(gca, 'YLim');
+assert(limitesY(1) == 0 && limitesY(2) >= 1300);
+figure
+bar([1 2; 3 4], 'stacked');
+limitesY = get(gca, 'YLim');
+assert(limitesY(1) == 0 && limitesY(2) >= 7);
+% Sous hold on, plot garde l'echelle logarithmique posee par semilogy.
+figure
+semilogy(1:3, [1 10 100]);
+hold on
+plot(1:3, [2 20 200], 'o');
+assert(strcmp(get(gca, 'YScale'), 'log'));
+hold off
+plot(1:3, [1 2 3]);
+assert(strcmp(get(gca, 'YScale'), 'linear'));
+% Une etiquette de graduation longue elargit la marge au lieu d'etre
+% rognee au bord de la figure.
+figure
+plot(1:3);
+set(gca, 'YTick', 1:3, 'YTickLabel', {'une etiquette vraiment tres longue', 'b', 'c'});
+boite = regexp(matlibre_svg(), ['<rect x="([\d.]+)" y="[\d.]+" width="[\d.]+" ' ...
+                                'height="[\d.]+" fill="white" stroke="#222"'], 'tokens', 'once');
+assert(str2double(boite{1}) > 180);
 
 % « axis square » rend la boite carree : le cadre du trace doit l'etre.
 figure
@@ -327,7 +406,8 @@ assert(numel(xticklabels()) == 3);
 svgEtiquettes = matlibre_svg();
 assert(~isempty(strfind(svgEtiquettes, 'milieu')));
 xticks('auto');
-assert(isempty(xticks()));
+% Les graduations choisies d'office se relisent, comme dans MATLAB.
+assert(~isempty(xticks()) && ~isequal(xticks(), [1 5 10]));
 yticks([0 5 10]);
 assert(isequal(yticks(), [0 5 10]));
 
@@ -467,6 +547,11 @@ assert(ordrePareto(1) == 3);        % « c » est la plus grande
 cla;
 assert(numel(pie([3 1 1])) == 6);   % trois secteurs et trois etiquettes
 cla;
+% PIE(X,ETIQUETTES), la forme de MATLAB : la cellule etait prise pour le
+% vecteur des secteurs a decoller, et « ~= 0 » sur une cellule echouait.
+pie([3 2 1], {'x', 'y', 'z'});
+assert(~isempty(strfind(matlibre_svg(), '>y<')), 'les etiquettes sont ecrites');
+cla;
 pie([30 20 50], [0 0 1], {'nord', 'sud', 'est'});
 cla;
 pie3([3 1 1]);
@@ -474,8 +559,10 @@ cla;
 [~, effectifsRose] = rose([0 0 0 pi pi], 4);
 assert(isequal(effectifsRose, [3 0 2 0]));
 cla;
+% Un patch est un seul objet, quel que soit son nombre de faces, comme
+% dans MATLAB.
 assert(numel(patch('Faces', [1 2 3; 1 3 4], 'Vertices', [0 0; 1 0; 1 1; 0 1], ...
-                   'FaceColor', [0.6 0.8 1])) == 2);
+                   'FaceColor', [0.6 0.8 1])) == 1);
 cla;
 rectangle('Position', [0 0 2 2], 'Curvature', 1, 'FaceColor', [0.9 0.9 0.5]);
 cla;
@@ -608,7 +695,7 @@ plot(1:10, 'r');
 hold('on');
 plot((1:10) .^ 2, 'b');
 hold('off');
-rouges = findobj('Color', '#D95319');
+rouges = findobj('Color', '#FF0000');
 assert(numel(rouges) == 1);
 set(rouges, 'LineWidth', 3);
 assert(get(rouges(1), 'LineWidth') == 3);
@@ -697,7 +784,7 @@ cla; meshz(peaks(20));
 cla; surfl(peaks(20), [45 30]);
 cla; waterfall(peaks(10));
 cla; ribbon(peaks(10));
-cla; assert(numel(bar3(magic(4))) == 16);
+cla; assert(numel(bar3(magic(4))) == 4);     % une serie par colonne, comme MATLAB
 cla; bar3h(magic(4));
 cla; plotmatrix(randn(30, 2));
 cla; plotyy(1:10, sin(1:10), 1:10, 1000 * exp(-(1:10)));
@@ -734,6 +821,57 @@ surf(grilleX, grilleY, grilleY);
 assert(strcmp(get(gca, 'YDir'), 'normal'));
 cla; pcolor(magic(4));
 assert(strcmp(get(gca, 'YDir'), 'normal'));
+
+%% --------------------------------- les options, en char, en chaine, par nom=valeur
+% MATLAB accepte un nom d'option en chaine comme en char, et c'est en
+% chaine qu'il arrive de « f(Nom=valeur) ». figure refusait la chaine ;
+% surf et imagesc prenaient la derniere option pour les donnees, et
+% dessinaient les codes de caracteres de 'none' ; histogram prenait le nom
+% d'une option pour des bords, et rendait des effectifs nuls.
+close all;
+figure("Position", [0 0 640 480]);
+fOpt = gcf;
+assert(isequal(fOpt.Position(3:4), [640 480]), 'figure, un nom en chaine');
+figure(Position=[0 0 500 300]);
+fOpt = gcf;
+assert(isequal(fOpt.Position(3:4), [500 300]), 'figure, nom=valeur');
+% les options de surf sont lues, en char comme en nom=valeur, et non
+% prises pour des donnees
+cla; surf(magic(4)); svgSeul = matlibre_svg();
+cla; surf(magic(4), 'EdgeColor', 'none'); svgSansBord = matlibre_svg();
+assert(~strcmp(svgSansBord, svgSeul), 'surf : EdgeColor est lu');
+cla; surf(magic(4), EdgeColor="none");
+assert(strcmp(matlibre_svg(), svgSansBord), 'surf, nom=valeur');
+assert(numel(get(gca, 'Children')) == 1, 'surf : l''option n''est pas une donnee');
+cla; imagesc(magic(3)); svgSeul = matlibre_svg();
+cla; imagesc(magic(3), 'AlphaData', 0.5);
+assert(strcmp(matlibre_svg(), svgSeul), 'imagesc : les donnees, non l''option');
+vuOpt = '';
+try
+    surf(magic(4), 'Couleur', 'r');
+catch err
+    vuOpt = err.identifier;
+end
+assert(strcmp(vuOpt, 'MATLAB:hg:InvalidProperty'), 'une propriete inconnue est refusee');
+xOpt = [1 2 2 3 3 3 4 4 4 4];
+cla; nOpt = histogram(xOpt, BinEdges=[0.5 1.5 2.5 3.5 4.5], FaceColor="r");
+assert(isequal(nOpt, [1 2 3 4]), 'histogram : BinEdges, et FaceColor pour le dessin');
+assert(isequal(histogram(xOpt, [0.5 2.5 4.5]), [3 7]), 'histogram : des bords par position');
+assert(max(abs(histcounts(xOpt, 'Normalization', 'probability', 'NumBins', 4) - ...
+               [0.1 0.2 0.3 0.4])) < 1e-15, 'histcounts : deux couples de suite');
+refusOpt = {@() histogram(xOpt, 'BinWidth', 1), 'MATLAB:histcounts:NotSupported'; ...
+            @() histcounts(xOpt, 4, 'NumBins', 4), 'MATLAB:histcounts:BinsTwice'; ...
+            @() histcounts(xOpt, 'BinEdges', 3), 'MATLAB:histcounts:InvalidBinEdges'};
+for q = 1:size(refusOpt, 1)
+    vuOpt = '';
+    try
+        refusOpt{q, 1}();
+    catch err
+        vuOpt = err.identifier;
+    end
+    assert(strcmp(vuOpt, refusOpt{q, 2}), sprintf('histogram, refus %d : %s', q, vuOpt));
+end
+close all;
 
 %% ------------------------------------------------- histogramme a deux axes
 [comptes, bordsX, bordsY] = histcounts2([1 2 3], [1 1 2], [0 2 4], [0 1.5 3]);
@@ -898,6 +1036,18 @@ set(poigneeLegende, 'Visible', 'off');
 assert(strcmp(get(poigneeLegende, 'Visible'), 'off'));
 poigneeBarre = colorbar;
 assert(strcmp(class(poigneeBarre), 'matlab.graphics.illustration.ColorBar'));
+% La barre se dessine (elle etait acceptee sans rien tracer, malgre sa
+% fiche) : un degrade a droite de la boite, gradue sur CLim. 'off' la
+% retire. Les autres positions sont verifiees plus loin.
+figure
+imagesc([0 10; 20 30]);
+colorbar
+svgBarre = matlibre_svg();
+assert(~isempty(strfind(svgBarre, 'class="barreCouleurs"')));
+assert(~isempty(strfind(svgBarre, '>30</text>')) && ~isempty(strfind(svgBarre, '>0</text>')));
+colorbar('off');
+assert(isempty(strfind(matlibre_svg(), 'class="barreCouleurs"')));
+close all
 
 % Les enfants d'une figure sont ses axes : sans eux, un parcours de
 % l'arbre graphique s'arretait a la figure.
@@ -1011,6 +1161,410 @@ assert(refusNegatif, 'une toile de largeur negative ne se dessine pas');
 % ecrits pour MATLAB tournent.
 figure('NumberTitle', 'off', 'MenuBar', 'none', 'Position', [0 0 500 500]);
 assert(isequal(get(gcf, 'Position'), [0 0 500 500]));
+close all;
+
+%% ------------------------------------------------- palettes et CLim
+% colormap agit enfin : la figure, ou un axe ; la palette par défaut est
+% viridis (domaine public), parula étant propre à MathWorks.
+close all;
+figure;
+imagesc([1 2; 3 4]);
+carte = colormap;
+assert(isequal(size(carte), [256 3]));
+assert(max(abs(carte(1, :) - [0.267004 0.004874 0.329415])) < 1e-6);
+colormap(gray);
+assert(isequal(colormap, gray(256)));
+colormap(gca, jet(16));
+assert(isequal(size(get(gca, 'Colormap')), [16 3]));
+colormap('default');
+refuse = false;
+try
+    colormap('parula');
+catch
+    refuse = true;
+end
+assert(refuse);
+% CLim : les bornes de couleur suivent les données, ou ce qu'on fixe.
+assert(isequal(clim, [1 4]));
+clim([0 10]);
+assert(isequal(clim, [0 10]) && isequal(get(gca, 'CLim'), [0 10]));
+assert(strcmp(clim('mode'), 'manual'));
+caxis('auto');
+assert(isequal(caxis, [1 4]));
+imagesc([5 6; 7 8], [0 20]);
+assert(isequal(clim, [0 20]));
+
+%% ---------------------------------------------------------- imshow
+% Une image uint8 s'affiche en gris sur [0 255], axes masqués : la valeur
+% 128 donne le gris 128.
+close all;
+figure;
+imshow(uint8([0 128; 255 64]));
+assert(isequal(clim, [0 255]));
+assert(isequal(get(gca, 'Colormap'), gray(256)));
+dessinGris = matlibre_svg();
+assert(~isempty(strfind(dessinGris, 'rgb(128,128,128)')));
+assert(~isempty(strfind(dessinGris, 'rgb(255,255,255)')) && ~isempty(strfind(dessinGris, 'rgb(0,0,0)')));
+% Une image binaire est noire et blanche ; [] prend l'étendue des données.
+imshow([true false]);
+assert(isequal(clim, [0 1]));
+imshow(magic(4), []);
+assert(isequal(clim, [1 16]));
+% Couleurs vraies : rouge pur.
+imshow(cat(3, uint8(255), uint8(0), uint8(0)));
+assert(~isempty(strfind(matlibre_svg(), 'rgb(255,0,0)')));
+% image : les valeurs sont des rangs dans la palette.
+figure;
+image([1 2; 3 4]);
+colormap([1 0 0; 0 1 0; 0 0 1; 1 1 1]);
+dessinDirect = matlibre_svg();
+assert(~isempty(strfind(dessinDirect, 'rgb(0,255,0)')) && ~isempty(strfind(dessinDirect, 'rgb(0,0,255)')));
+
+%% ---------------------------------------------- légende et marqueurs
+% Autant d'entrées que d'étiquettes ; les textes n'en sont pas ; le style
+% et le marqueur de chaque courbe y sont repris.
+close all;
+figure;
+plot(1:3, 'b-'); hold on
+plot(1:3, 2:4, 'ro', 'MarkerSize', 9, 'MarkerFaceColor', 'r');
+plot(1:3, 3:5, 'k:');
+text(2, 2, 'note');
+legend({'un', 'deux'}, 'Location', 'southeast');
+dessinLegende = matlibre_svg();
+assert(~isempty(strfind(dessinLegende, '>un<')) && ~isempty(strfind(dessinLegende, '>deux<')));
+assert(isempty(strfind(dessinLegende, '>data3<')) && isempty(strfind(dessinLegende, '>data4<')));
+assert(strcmp(get(legend, 'Location'), 'southeast'));
+h = get(gca, 'Children');
+assert(get(h(3), 'MarkerSize') == 9);
+% legend(h, ...) désigne les courbes.
+figure;
+h1 = plot(1:3); hold on
+h2 = plot(3:-1:1);
+legend(h2, 'descente');
+assert(~isempty(strfind(matlibre_svg(), '>descente<')));
+% Les marqueurs 'x' et '*' ne sont pas des '+'.
+figure;
+plot(1, 1, 'x');
+dessinCroix = matlibre_svg();
+assert(~isempty(strfind(dessinCroix, 'M 67.00')) || ~isempty(regexp(dessinCroix, 'M [0-9.]+ [0-9.]+ L [0-9.]+ [0-9.]+ M', 'once')));
+% fill(X,Y,C) : C est une couleur, pas un second polygone ; bord noir.
+figure;
+fill([0 1 1], [0 0 1], [0.8 0.9 1]);
+assert(numel(get(gca, 'Children')) == 1);
+dessinFill = matlibre_svg();
+assert(~isempty(strfind(dessinFill, 'fill="#CCE6FF"')) && ~isempty(strfind(dessinFill, 'stroke="#000000"')));
+% contour : un seul objet dans la légende, des niveaux colorés par la palette.
+figure;
+[X, Y] = meshgrid(-2:0.25:2);
+contour(X, Y, X .^ 2 + Y .^ 2, 5);
+legend('niveaux');
+dessinContour = matlibre_svg();
+assert(~isempty(strfind(dessinContour, '>niveaux<')) && isempty(strfind(dessinContour, '>data2<')));
+
+%% ------------------------------------------------ bornes automatiques
+% Comme MATLAB, les bornes tombent sur des graduations ; « axis tight »
+% serre sur les données ; une image serre sur son étendue.
+close all;
+figure;
+plot([-3.2 3.8], [-1.3 1.4]);
+assert(isequal(xlim, [-4 4]) && isequal(ylim, [-1.5 1.5]));
+plot([30 55], [0 17]);
+assert(isequal(ylim, [0 20]));
+plot(1:64, sin(1:64));
+assert(isequal(xlim, [0 70]));
+axis tight
+assert(isequal(xlim, [1 64]));
+figure;
+imagesc(rand(5, 7));
+assert(isequal(xlim, [0.5 7.5]) && isequal(ylim, [0.5 5.5]));
+figure;
+semilogx([20 500], [1 2]);
+assert(isequal(xlim, [10 1000]));
+% Une graduation nulle s'écrit 0, non -2.78e-17.
+figure;
+plot(1:18, [-0.443 0.39 zeros(1, 16)]);
+assert(isempty(strfind(matlibre_svg(), 'e-17')));
+close all;
+
+%% ------------------------------------------------------------- barres
+% bar(x, y, largeur) : la largeur n'est pas une serie de plus. Le trace
+% generique de plot la lisait comme des donnees, et dessinait une barre
+% parasite de hauteur 0,4.
+close all;
+figure;
+bar((1:3) - 0.2, [5 6 7], 0.4);
+hold on
+bar((1:3) + 0.2, [5 6 7], 0.4);
+assert(numel(get(gca, 'Children')) == 2);
+% Une matrice : une serie par colonne, groupees ou empilees.
+figure;
+bar([1 2 3; 4 5 6]);
+assert(numel(get(gca, 'Children')) == 3);
+figure;
+bar([1 2 3; 4 5 6], 'stacked');
+assert(isequal(ylim, [0 16]));          % les piles montent a 6 et 15
+% FaceColor et EdgeColor sont lus, et dessines.
+figure;
+bar(1:5, [3 1 4 1 5], 'FaceColor', [0.2 0.7 0.2], 'EdgeColor', 'none');
+fichierBarres = [tempname() '.svg'];
+print(fichierBarres);
+texteBarres = fileread(fichierBarres);
+delete(fichierBarres);
+assert(contains(texteBarres, '#33B333') && contains(texteBarres, 'stroke="none"'));
+close all;
+
+%% ------------------------------------------- nuages, barres, graduations
+% scatter : des cercles creux par défaut, comme MATLAB ; SZ est une aire
+% par point, et non une seconde courbe ; C met chaque point à l'échelle
+% de la palette, et CLim s'étend sur ses valeurs.
+figure;
+h = scatter(1:5, [2 4 3 5 1], [10 20 40 80 160], [1 2 3 4 5]);
+assert(numel(get(gca, 'Children')) == 1, 'la taille n''est pas une seconde courbe');
+assert(isequal(get(h, 'XData'), 1:5));
+assert(isequal(clim, [1 5]));
+dessinNuage = matlibre_svg();
+assert(numel(strfind(dessinNuage, '<circle')) == 5);
+assert(numel(strfind(dessinNuage, 'fill="none"')) >= 5, 'des marqueurs creux');
+rayons = cellfun(@str2double, regexp(dessinNuage, '<circle[^>]* r="([\d.]+)"', 'tokens'));
+assert(issorted(rayons) && rayons(end) / rayons(1) > 3.5, 'l''aire suit SZ');
+% 'filled' remplit, et ôte le bord ; une couleur nommée vaut pour tous.
+figure;
+scatter([1 2 3], [3 1 2], 'filled', 'MarkerFaceColor', 'r');
+dessinPlein = matlibre_svg();
+assert(numel(strfind(dessinPlein, 'fill="#FF0000" stroke="none"')) == 3);
+refusTaille = false;
+try
+    scatter(1:3, 1:3, [1 2]);
+catch err
+    refusTaille = strcmp(err.identifier, 'MATLAB:scatter:InvalidSizeData');
+end
+assert(refusTaille, 'une taille par point, ou une seule');
+% Les lettres sont des couleurs pures, comme dans MATLAB.
+figure;
+h = plot(1:3, 'g');
+assert(strcmp(get(h, 'Color'), '#00FF00'));
+% bar : une graduation par barre, si bien que xticklabels nomme les
+% bonnes barres ; xticks rend les graduations montrées.
+figure;
+bar([3 5 2 4]);
+assert(isequal(xticks, 1:4));
+assert(isequal(get(gca, 'XTick'), 1:4));
+xticklabels({'janvier', 'fevrier', 'mars', 'avril'});
+% Les étiquettes inclinées : xtickangle, et la propriété de l'axe.
+xtickangle(45);
+assert(xtickangle == 45 && get(gca, 'XTickLabelRotation') == 45);
+dessinIncline = matlibre_svg();
+assert(~isempty(strfind(dessinIncline, 'rotate(-45')), 'les etiquettes sont inclinees');
+assert(~isempty(regexp(dessinIncline, 'text-anchor="end"[^>]*rotate\(-45[^>]*>janvier<', ...
+                       'once')), 'et se terminent sur leur graduation');
+set(gca, 'YTickLabelRotation', 30);
+assert(ytickangle == 30);
+% La barre de couleurs : ses huit positions, son étiquette, ses
+% graduations nommées.
+figure;
+imagesc(magic(4));
+cb = colorbar('southoutside');
+assert(strcmp(get(cb, 'Location'), 'southoutside'));
+cb.Label.String = 'altitude';
+assert(strcmp(cb.Label.String, 'altitude'));
+cb.Ticks = [4 8 12];
+cb.TickLabels = {'bas', 'milieu', 'haut'};
+assert(isequal(cb.Ticks, [4 8 12]));
+dessinBarre = matlibre_svg();
+assert(~isempty(strfind(dessinBarre, '>altitude<')) && ~isempty(strfind(dessinBarre, '>milieu<')));
+for position = {'north', 'south', 'east', 'west', 'northoutside', 'westoutside'}
+    colorbar(position{1});
+    assert(strcmp(get(colorbar, 'Location'), position{1}));
+    assert(~isempty(strfind(matlibre_svg(), 'class="barreCouleurs"')));
+end
+refusPosition = false;
+try
+    colorbar('ailleurs');
+catch err
+    refusPosition = strcmp(err.identifier, 'MATLAB:colorbar:InvalidLocation');
+end
+assert(refusPosition);
+close all;
+
+%% --------------------------------------------------------- l'espace
+% plot3 garde les vraies coordonnees et pose la vue de MATLAB ; les bornes
+% sont celles des donnees, non d'une projection.
+figure;
+t = linspace(0, 4 * pi, 50);
+h = plot3(cos(t), sin(t), t);
+assert(isequal(get(h, 'ZData'), t) && isequal(get(h, 'XData'), cos(t)));
+assert(isequal(view, [-37.5 30]));
+assert(isequal(xlim, [-1 1]) && isequal(zlim, [0 14]));
+assert(numel(axis) == 6, 'axis rend six bornes en perspective');
+[az, el] = view;
+assert(az == -37.5 && el == 30);
+view(2);
+assert(isequal(view, [0 90]));
+view(3);
+view([30 45]);
+assert(isequal(get(gca, 'View'), [30 45]));
+zlim([-5 20]);
+assert(isequal(zlim, [-5 20]) && isequal(get(gca, 'ZLim'), [-5 20]));
+zlabel('hauteur');
+dessinEspace = matlibre_svg();
+assert(~isempty(strfind(dessinEspace, '>hauteur<')) && ~isempty(strfind(dessinEspace, '<path')));
+assert(numel(strfind(dessinEspace, 'class="grille"')) > 10, 'la grille des plans du fond');
+set(get(gca, 'ZLabel'), 'String', 'z');
+assert(strcmp(get(get(gca, 'ZLabel'), 'String'), 'z'), 'l''etiquette z n''ecrase pas le titre');
+% Un trace plan remplace l'espace : la vue de dessus revient, sans grille.
+plot(1:3);
+assert(isequal(view, [0 90]) && strcmp(get(gca, 'XGrid'), 'off'));
+% surf : une maille par carre de la grille, les donnees en matrices.
+figure;
+h = surf(peaks(5));
+assert(isequal(size(get(h, 'ZData')), [5 5]) && isequal(get(h, 'CData'), peaks(5)));
+assert(strcmp(get(h, 'Type'), 'surface') && strcmp(get(h, 'FaceColor'), 'flat'));
+assert(numel(strfind(matlibre_svg(), 'Z" fill="#')) == 16, 'seize mailles');
+shading interp
+assert(strcmp(get(h, 'EdgeColor'), 'none') && strcmp(get(h, 'FaceColor'), 'interp'));
+mesh(peaks(5));
+assert(strcmp(get(gca().Children, 'FaceColor'), '#FFFFFF'));
+refusSurf = false;
+try
+    surf(1:5);
+catch err
+    refusSurf = strcmp(err.identifier, 'MATLAB:surf:NonMatrixData');
+end
+assert(refusSurf, 'surf veut une matrice');
+% L'ordre du peintre : vue de dessus en perspective, le carre du haut est
+% peint apres celui du bas ; vue de dessous, l'inverse.
+figure;
+fill3([0 1 1 0], [0 0 1 1], [0 0 0 0], 'r');
+hold on
+fill3([0 1 1 0], [0 0 1 1], [1 1 1 1], 'b');
+hold off
+view(-37.5, 30);
+dessinDessus = matlibre_svg();
+assert(strfind(dessinDessus, 'fill="#FF0000"') < strfind(dessinDessus, 'fill="#0000FF"'));
+view(-37.5, -30);
+dessinDessous = matlibre_svg();
+assert(strfind(dessinDessous, 'fill="#0000FF"') < strfind(dessinDessous, 'fill="#FF0000"'));
+% scatter3, stem3, bar3, patch en faces et sommets, texte de l'espace.
+figure;
+scatter3([1 2 3], [3 1 2], [2 3 1], 'filled');
+assert(numel(strfind(matlibre_svg(), '<circle')) == 3 && isequal(view, [-37.5 30]));
+stem3([1 2 3]);
+assert(numel(get(gca, 'Children')) == 2, 'les tiges et leurs tetes');
+h = bar3([1 2; 3 4]);
+assert(numel(h) == 2 && isequal(xticks, 1:2));
+cla;
+h = patch('Faces', [1 2 3; 1 2 4], 'Vertices', [0 0 0; 1 0 0; 0 1 0; 0 0 1], ...
+          'FaceVertexCData', [1; 2], 'FaceColor', 'flat');
+assert(numel(h) == 1 && strcmp(get(h, 'Type'), 'patch'));
+text(0, 0, 1, 'sommet');
+assert(~isempty(strfind(matlibre_svg(), '>sommet<')));
+close all;
+
+%% ------------------------------------------------------------- TeX
+% Les textes passent par le TeX de MATLAB : exposants, indices, lettres
+% grecques, gras, couleurs ; 'none' les laisse tels quels.
+figure;
+plot(1:3);
+title('x^2 + \alpha_1');
+dessinTex = matlibre_svg();
+assert(~isempty(strfind(dessinTex, char([206 177]))), 'alpha devient la lettre grecque');
+assert(~isempty(regexp(dessinTex, 'baseline-shift="super"[^>]*>2<', 'once')), 'un exposant');
+assert(~isempty(regexp(dessinTex, 'baseline-shift="sub"[^>]*>1<', 'once')), 'un indice');
+assert(isempty(strfind(dessinTex, '\alpha')));
+title('a_b', 'Interpreter', 'none');
+assert(~isempty(strfind(matlibre_svg(), '>a_b<')), 'sans interprete, le texte tel quel');
+assert(strcmp(get(get(gca, 'Title'), 'Interpreter'), 'none'));
+xlabel('\omega (rad/s)');
+assert(~isempty(strfind(matlibre_svg(), [char([207 137]) ' (rad/s)'])));
+ylabel('x_{max}^{2}');
+assert(~isempty(regexp(matlibre_svg(), 'baseline-shift="sub"[^>]*>max<', 'once')), 'un groupe');
+text(2, 2, '\bf gras \rm et \color{red}rouge');
+dessinTexte = matlibre_svg();
+assert(~isempty(regexp(dessinTexte, 'font-weight="bold">gras', 'once')));
+assert(~isempty(regexp(dessinTexte, 'fill="#FF0000">rouge', 'once')));
+text(1, 1, 'a\_b\^c');
+assert(~isempty(strfind(matlibre_svg(), '>a_b^c<')), 'les echappements');
+legend('\sigma^2');
+assert(~isempty(strfind(matlibre_svg(), char([207 131]))));
+title('$x^2$', 'Interpreter', 'latex');
+assert(~isempty(regexp(matlibre_svg(), 'baseline-shift="super"[^>]*>2<', 'once')), 'LaTeX simple');
+set(gca, 'XTick', 1:3, 'XTickLabel', {'t_1', 't_2', 't_3'});
+assert(~isempty(regexp(matlibre_svg(), 'baseline-shift="sub"[^>]*>3<', 'once')));
+set(gca, 'TickLabelInterpreter', 'none');
+assert(~isempty(strfind(matlibre_svg(), '>t_3<')));
+refusInterprete = false;
+try
+    title('x', 'Interpreter', 'markdown');
+catch err
+    refusInterprete = strcmp(err.identifier, 'MATLAB:hg:InvalidInterpreter');
+end
+assert(refusInterprete);
+close all;
+
+%% ------------------------------------------- deux axes des ordonnees
+% yyaxis : chaque cote a ses bornes, ses graduations, son etiquette et sa
+% couleur ; un trace ne remplace que ceux de son cote.
+figure;
+x = 0:0.1:10;
+yyaxis left
+hGauche = plot(x, sin(x));
+ylabel('sinus');
+yyaxis right
+hDroite = plot(x, 1000 * exp(-x));
+ylabel('exponentielle');
+assert(isequal(ylim, [0 1000]), 'les bornes de droite');
+assert(strcmp(get(hDroite, 'Color'), '#D95319') && strcmp(get(hGauche, 'Color'), '#0072BD'));
+dessinDeux = matlibre_svg();
+assert(~isempty(strfind(dessinDeux, '>exponentielle<')) && ...
+       ~isempty(strfind(dessinDeux, '>sinus<')));
+assert(~isempty(regexp(dessinDeux, 'fill="#D95319">1000<', 'once')), 'les graduations de droite');
+yyaxis left
+assert(isequal(ylim, [-1 1]), 'et celles de gauche');
+yyaxis right
+plot(x, 500 * exp(-x));
+assert(numel(get(gca, 'Children')) == 2, 'un trace ne remplace que son cote');
+assert(isequal(ylim, [0 500]));
+ylim([0 2000]);
+assert(isequal(get(gca, 'YLim'), [0 2000]));
+yyaxis left
+assert(isequal(get(gca, 'YLim'), [-1 1]));
+% plotyy rend deux axes, un par cote.
+cla;
+[ax, h1, h2] = plotyy(x, sin(x), x, 1000 * exp(-x));
+assert(numel(ax) == 2);
+ylabel(ax(2), 'droite');
+assert(isequal(ylim(ax(2)), [0 1000]) && isequal(ylim(ax(1)), [-1 1]));
+assert(~isempty(strfind(matlibre_svg(), '>droite<')));
+refusCote = false;
+try
+    yyaxis milieu
+catch err
+    refusCote = strcmp(err.identifier, 'MATLAB:yyaxis:InvalidSide');
+end
+assert(refusCote);
+close all;
+
+%% ------------------- l'histogramme garde des graduations ordinaires
+% Trace comme des barres, il heritait d'une graduation par barre : les
+% bords des classes, ecrits en pleine precision, se chevauchaient
+% (« -2.43202-1.82571… »). BAR, lui, garde une graduation par barre.
+figure;
+histogram(linspace(-2.43, 2.42, 500));
+graduations = xticks();
+assert(all(graduations == round(graduations)), 'des graduations rondes');
+figure;
+bar([3 5 2]);
+assert(isequal(xticks(), [1 2 3]), 'une graduation par barre sous BAR');
+close all;
+
+%% ------------------- une couleur TeX hors de [0, 1] est bornee
+% \color[rgb]{2,0,0} s'ecrivait « #1FE000 », un vert : 2 * 255 sur trois
+% chiffres hexadecimaux, tronque.
+figure;
+title('\color[rgb]{2,0,0}rouge \color[rgb]{-1,0.5,0}vert');
+svgCouleur = matlibre_svg();
+assert(~isempty(strfind(svgCouleur, 'fill="#FF0000">rouge')), 'le rouge borne');
+assert(~isempty(strfind(svgCouleur, 'fill="#008000">vert')), 'le vert borne');
 close all;
 
 disp('graphique : toutes les verifications passent');

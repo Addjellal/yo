@@ -30,7 +30,7 @@ function x = empty(varargin)
     classe = varargin{1};
     if isnumeric(classe)
         error('MATLAB:empty:Classe', ...
-              'Le premier argument doit être un nom de classe.');
+              'First argument must be a class name.');
     end
     classe = char(classe);
     dimensions = cell2mat(varargin(2:end));
@@ -42,11 +42,11 @@ function x = empty(varargin)
     dimensions = round(double(dimensions));
     if any(dimensions < 0)
         error('MATLAB:empty:Dimensions', ...
-              'Les dimensions doivent être positives ou nulles.');
+              'Dimensions must be nonnegative integers.');
     end
     if all(dimensions ~= 0)
         error('MATLAB:empty:NonVide', ...
-              'Au moins une dimension doit valoir zéro.');
+              'At least one dimension must be zero.');
     end
     switch classe
         case {'double', 'single', 'int8', 'int16', 'int32', 'int64', ...

@@ -48,6 +48,8 @@ function [a, b, c, d] = linmod(modele, x, u, para)
     if numel(para) >= 3 && para(3) > 0
         perturbation = para(3);
     end
+    % un modèle de la session se désigne aussi par son nom
+    modele = matlibre_sl_modele(modele);
     [blocsEtat, rangs, entrees, sorties, T] = matlibre_sl_etats(modele);
     refuserDerivateur(T);
 
@@ -67,11 +69,11 @@ function [a, b, c, d] = linmod(modele, x, u, para)
     u = u(:);
     if numel(x) ~= nEtats
         error('Simulink:Commands:LinmodEtat', ...
-              'Le modele porte %d etats continus ; X en donne %d.', nEtats, numel(x));
+              'The model has %d continuous states; X has %d.', nEtats, numel(x));
     end
     if numel(u) ~= nEntrees
         error('Simulink:Commands:LinmodEntree', ...
-              'Le modele porte %d entrees ; U en donne %d.', nEntrees, numel(u));
+              'The model has %d inputs; U has %d.', nEntrees, numel(u));
     end
 
     a = zeros(nEtats, nEtats);
@@ -118,11 +120,11 @@ end
 function refuserDerivateur(T)
     for k = find(strcmp(T.types, 'derivative'))
         error('Simulink:Commands:LinmodDerivateur', ...
-              ['Le bloc ''%s'' est un derivateur : sa sortie depend du pas ' ...
-               'de calcul, donc sa linearisation aussi. Remplacez-le par un ' ...
-               'derivateur filtre — une representation d''etat de N s/(s+N) ' ...
-               '— pour que le modele ait une linearisation qui lui soit ' ...
-               'propre.'], T.noms{k});
+              ['Block ''%s'' is a Derivative block: its output depends on the step ' ...
+               'size, and so does its linearization. Replace it with a ' ...
+               'filtered derivative (a state-space realization of N s/(s+N)) ' ...
+               'so that the model has a linearization of its ' ...
+               'own.'], T.noms{k});
     end
 end
 

@@ -42,7 +42,7 @@ function courbe = intenvset(varargin)
             case 'endmonthrule',  courbe.EndMonthRule = valeur;
             otherwise
                 error('finstr:intenvset:Champ', ...
-                      'Propriété inconnue : %s.', char(varargin{k}));
+                      'Unknown property: %s.', char(varargin{k}));
         end
         k = k + 2;
     end

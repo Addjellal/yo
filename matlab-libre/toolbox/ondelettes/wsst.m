@@ -97,7 +97,7 @@ end
 function [x, cadence, enPeriode, nom, parametres, nv] = lireArgumentsWsst(x, arguments)
     x = double(x(:));
     if numel(x) < 4
-        error('wavelet:wsst:Longueur', 'Le signal doit avoir au moins quatre points.');
+        error('wavelet:wsst:Longueur', 'The signal must have at least 4 samples.');
     end
     cadence = 1;
     enPeriode = false;
@@ -108,7 +108,7 @@ function [x, cadence, enPeriode, nom, parametres, nv] = lireArgumentsWsst(x, arg
     if k <= numel(arguments) && isnumeric(arguments{k}) && isscalar(arguments{k})
         valeur = double(arguments{k});
         if valeur <= 0
-            error('wavelet:wsst:Cadence', 'La cadence doit être positive.');
+            error('wavelet:wsst:Cadence', 'The sampling frequency must be positive.');
         end
         if valeur >= 1
             cadence = valeur;
@@ -129,7 +129,7 @@ function [x, cadence, enPeriode, nom, parametres, nv] = lireArgumentsWsst(x, arg
                 nv = round(double(arguments{k + 1}));
                 if nv < 10 || nv > 48 || mod(nv, 2) ~= 0
                     error('wavelet:wsst:Voix', ...
-                          'VoicesPerOctave doit être un entier pair de 10 à 48.');
+                          'VoicesPerOctave must be an even integer from 10 to 48.');
                 end
             case 'waveletparameters'
                 couple = double(arguments{k + 1});

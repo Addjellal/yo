@@ -11,7 +11,7 @@ function [y, u, t] = mpcsim(controleur, consigne, nPas)
 %      A = [1 0.1; 0 1]; B = [0.005; 0.1]; C = [1 0];
 %      ctrl = mpcSetup(A, B, C, 20, 5, 1, 0.1);
 %      [y, u, t] = mpcsim(ctrl, 1, 100);
-%      y(end)                          % 1 : la consigne est atteinte
+%      y(end)                          % 1.0000 : la consigne est atteinte
 %      max(abs(diff(u)))               % l'a-coup de commande le plus fort
 %
 %   Voir aussi MPCSETUP, MPCMOVE.

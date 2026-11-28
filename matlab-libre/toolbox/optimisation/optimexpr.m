@@ -90,7 +90,7 @@ classdef optimexpr
         function e = mrdivide(a, b)
             if ~isnumeric(b) || ~isscalar(b)
                 error('optim:optimexpr:Division', ...
-                      'On ne divise une expression que par un nombre.');
+                      'An expression can only be divided by a number.');
             end
             e = multiplier(a, 1 / b);
         end
@@ -138,7 +138,7 @@ classdef optimexpr
                 e = optimexpr(a);
             else
                 error('optim:optimexpr:Type', ...
-                      'Une expression se compose de variables et de nombres.');
+                      'An expression must be built from variables and numbers.');
             end
         end
     end
@@ -164,7 +164,7 @@ function e = multiplier(a, b)
     eb = optimexpr.depuis(b);
     if ~isempty(ea.Quadratique) || ~isempty(eb.Quadratique)
         error('optim:optimexpr:Degre', ...
-              'MatLibre ne va pas au-delà du second degré.');
+              'MatLibre supports expressions up to degree two.');
     end
     e = optimexpr();
     e.Variables = fusionner(ea.Variables, eb.Variables);

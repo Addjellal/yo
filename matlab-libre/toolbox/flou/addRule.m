@@ -100,7 +100,7 @@ function [modalite, k] = lireModalite(fis, mots, k, entree, indice)
         k = k + 1;
     end
     if k > numel(mots)
-        error('fuzzy:addRule:Modalite', 'Une règle nomme une variable sans modalité.');
+        error('fuzzy:addRule:Modalite', 'A rule names a variable without a membership function.');
     end
     variables = variablesDe(fis, entree);
     liste = variables{indice}.mf;
@@ -113,7 +113,7 @@ function [modalite, k] = lireModalite(fis, mots, k, entree, indice)
     end
     if modalite == 0
         error('fuzzy:addRule:Inconnue', ...
-              'La variable ''%s'' n''a pas de modalité ''%s''.', ...
+              'Variable ''%s'' has no membership function ''%s''.', ...
               variables{indice}.nom, mots{k});
     end
     k = k + 1;

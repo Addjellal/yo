@@ -79,9 +79,9 @@ function options = simset(varargin)
         end
         if rang == 0
             error('Simulink:Commands:SimsetInconnue', ...
-                  ['L''option ''%s'' n''est pas honoree par MatLibre : seules %s le ' ...
-                   'sont. Une option acceptee sans effet ferait croire a un reglage ' ...
-                   'qui n''a pas lieu.'], nom, strjoin(connues, ', '));
+                  ['Option ''%s'' is not supported by MatLibre: only %s ' ...
+                   'are. An option accepted without effect would suggest a setting ' ...
+                   'that does not happen.'], nom, strjoin(connues, ', '));
         end
         valeur = varargin{k + 1};
         switch connues{rang}
@@ -90,13 +90,13 @@ function options = simset(varargin)
             case 'ZeroCross'
                 if ~any(strcmpi(char(valeur), {'on', 'off'}))
                     error('Simulink:Config:InvalidValue', ...
-                          'L''option ZeroCross vaut ''on'' ou ''off''.');
+                          'ZeroCross must be ''on'' or ''off''.');
                 end
                 valeur = lower(char(valeur));
             case 'OutputPoints'
                 if ~any(strcmpi(char(valeur), {'specified', 'all'}))
                     error('Simulink:Config:InvalidValue', ...
-                          'L''option OutputPoints vaut ''specified'' ou ''all''.');
+                          'OutputPoints must be ''specified'' or ''all''.');
                 end
                 valeur = lower(char(valeur));
             case 'MaxDataPoints'
@@ -104,7 +104,7 @@ function options = simset(varargin)
                 if ~(isnumeric(valeur) && isscalar(valeur) && valeur >= 0 && ...
                      valeur == round(valeur))
                     error('Simulink:Config:InvalidValue', ...
-                          'L''option MaxDataPoints est un entier positif, ou zero.');
+                          'MaxDataPoints must be a positive integer, or zero.');
                 end
                 valeur = double(valeur);
             otherwise

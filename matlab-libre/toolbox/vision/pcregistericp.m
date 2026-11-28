@@ -41,7 +41,7 @@ function [transformation, recale, erreur] = pcregistericp(mobile, fixe, varargin
     source = matlibre_nuage_points(mobile);
     cible = matlibre_nuage_points(fixe);
     if isempty(source) || isempty(cible)
-        error('vision:pcregistericp:Vide', 'Les deux nuages doivent être non vides.');
+        error('vision:pcregistericp:Vide', 'Both point clouds must be nonempty.');
     end
     M = depart;
     normesCible = sum(cible .^ 2, 2);

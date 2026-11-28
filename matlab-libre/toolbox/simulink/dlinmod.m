@@ -43,8 +43,10 @@ function [a, b, c, d] = dlinmod(modele, Ts, x, u, para)
     if nargin < 5, para = []; end
     if ~isempty(Ts) && (~isscalar(Ts) || ~isreal(Ts) || ~(Ts >= 0) || isinf(Ts))
         error('Simulink:Commands:DlinmodPeriode', ...
-              'La periode d''echantillonnage doit etre un nombre positif.');
+              'The sample time must be a positive number.');
     end
+    % un modèle de la session se désigne aussi par son nom
+    modele = matlibre_sl_modele(modele);
     if ~isempty(Ts) && Ts > 0
         [~, ~, entrees, ~, T] = matlibre_sl_etats(modele);
         discrets = blocsDiscrets(T, Ts);
@@ -81,14 +83,15 @@ function discrets = blocsDiscrets(T, Ts)
             case 80   % delay
                 if T.retardAvance(k)
                     error('Simulink:Commands:DlinmodBloc', ...
-                          ['Le retard ''%s'' s''active, se remet ou lit sa condition initiale ' ...
-                           'sur une entree : DLINMOD ne le linearise pas.'], T.chemins{k});
+                          ['Delay ''%s'' is enabled, reset, or reads its initial condition ' ...
+                           'from an input port: DLINMOD does not linearize it.'], T.chemins{k});
                 end
             case 83   % discrete-time integrator
                 if T.zN(k) ~= w
                     error('Simulink:Commands:DlinmodBloc', ...
-                          ['L''integrateur discret ''%s'' se remet ou lit sa condition ' ...
-                           'initiale sur une entree : DLINMOD ne le linearise pas.'], T.chemins{k});
+                          ['Discrete integrator ''%s'' is reset or reads its initial ' ...
+                           'condition from an input port: DLINMOD does not linearize ' ...
+                           'it.'], T.chemins{k});
                 end
             case {84, 85, 86}   % transmittances et représentation d'état discrètes
             otherwise
@@ -96,8 +99,8 @@ function discrets = blocsDiscrets(T, Ts)
         end
         if abs(T.periodes(k) - Ts) > 1e-9 * Ts
             error('Simulink:Commands:DlinmodPeriode', ...
-                  ['Le bloc ''%s'' tourne a la periode %g, et DLINMOD echantillonne a %g : ' ...
-                   'MatLibre ne reechantillonne pas un bloc discret.'], T.chemins{k}, ...
+                  ['Block ''%s'' runs at sample time %g, and DLINMOD samples at %g: ' ...
+                   'MatLibre does not resample a discrete block.'], T.chemins{k}, ...
                   T.periodes(k), Ts);
         end
         discrets(end + 1) = k; %#ok<AGROW>
@@ -153,7 +156,7 @@ function [a, b, c, d] = hybride(T, entrees, discrets, Ts, x, u, para)
         x = x(1:nc);
     elseif numel(x) ~= nc
         error('Simulink:Commands:LinmodEtat', ...
-              'Le modele porte %d etats continus et %d discrets ; X en donne %d.', nc, nd, ...
+              'The model has %d continuous and %d discrete states; X has %d.', nc, nd, ...
               numel(x));
     end
     if isempty(u)
@@ -162,7 +165,7 @@ function [a, b, c, d] = hybride(T, entrees, discrets, Ts, x, u, para)
     u = u(:);
     if numel(u) ~= nu
         error('Simulink:Commands:LinmodEntree', ...
-              'Le modele porte %d entrees ; U en donne %d.', nu, numel(u));
+              'The model has %d inputs; U has %d.', nu, numel(u));
     end
     point0 = [x; zd; u];
     f0 = evaluer(T, discrets, Z0, rangs0, point0, nc, nd);

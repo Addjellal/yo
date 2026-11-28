@@ -23,10 +23,10 @@ classdef BlockParameter
             end
             if nargin < 3
                 error('Simulink:Simulation:InvalidNumberOfArguments', ...
-                      'Un parametre de bloc se donne par un chemin, un nom et une valeur.');
+                      'A block parameter requires a block path, a name, and a value.');
             end
-            obj.BlockPath = texte(chemin, 'Le chemin d''un bloc');
-            obj.Name = texte(nom, 'Le nom d''un parametre de bloc');
+            obj.BlockPath = texte(chemin, 'The block path');
+            obj.Name = texte(nom, 'The block parameter name');
             obj.Value = valeur;
         end
     end
@@ -34,7 +34,7 @@ end
 
 function t = texte(v, quoi)
     if ~((ischar(v) && isrow(v)) || (isstring(v) && isscalar(v))) || strlength(string(v)) == 0
-        error('Simulink:Simulation:InvalidBlockParameter', '%s est un texte non vide.', quoi);
+        error('Simulink:Simulation:InvalidBlockParameter', '%s must be nonempty text.', quoi);
     end
     t = char(v);
 end

@@ -15,7 +15,7 @@ function autre = gen2par(matrice)
     [lignes, colonnes] = size(M);
     if colonnes <= lignes
         error('comm:gen2par:BadSize', ...
-              'La matrice doit avoir plus de colonnes que de lignes.');
+              'The matrix must have more columns than rows.');
     end
     gauche = M(:, 1:lignes);
     droite = M(:, colonnes - lignes + 1:end);
@@ -29,6 +29,6 @@ function autre = gen2par(matrice)
         autre = [eye(colonnes - lignes), P'];
     else
         error('comm:gen2par:NotStandard', ...
-              'La matrice doit être sous forme normale, identité à gauche ou à droite.');
+              'The matrix must be in standard form, with the identity on the left or right.');
     end
 end

@@ -28,7 +28,7 @@
 %
 % Bras plan à deux segments
 %   fkine2R             - Cinématique directe
-%   ikine2R             - Cinématique inverse (coude haut ou bas)
+%   ikine2R             - Cinématique inverse (coude bas par défaut, ou haut)
 %   jacobian2R          - Jacobienne
 %
 % Trajectoires

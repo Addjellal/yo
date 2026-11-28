@@ -24,7 +24,7 @@ function somme = symsum(f, variable, bas, haut)
     haut = round(matlibre_sym_valeur(haut));
     if ~isfinite(bas) || ~isfinite(haut)
         error('symbolic:symsum:Bornes', ...
-              'MatLibre somme terme à terme : les bornes doivent être finies.');
+              'MatLibre sums term by term: the bounds must be finite.');
     end
     arbre = matlibre_sym_arbre(f);
     total = 0;

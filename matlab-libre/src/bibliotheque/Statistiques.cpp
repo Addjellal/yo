@@ -430,23 +430,46 @@ FONCTION(fnHistcounts) {
     // des effectifs bruts sans que rien ne le dise.
     std::string normalisation = "count";
     std::size_t finPositionnels = args.size();
+    bool classesNommees = false;
     for (std::size_t k = 1; k + 1 < args.size(); ++k) {
         if (!(args[k].estTexte() || args[k].estChaine())) continue;
         std::string nom = args[k].versTexte();
         for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+        finPositionnels = std::min(finPositionnels, k);
+        const Valeur& valeur = args[k + 1];
         if (nom == "normalization") {
-            normalisation = args[k + 1].versTexte();
+            normalisation = valeur.versTexte();
             for (auto& c : normalisation) c = (char)std::tolower((unsigned char)c);
-            finPositionnels = std::min(finPositionnels, k);
-        } else if (nom == "binlimits" || nom == "numbins" || nom == "binwidth" ||
-                   nom == "binmethod") {
+        } else if (nom == "numbins") {
+            // la forme nommee de « histcounts(x,n) »
+            exigerNumerique(valeur, "histcounts");
+            if (valeur.nelem() != 1 || !(valeur.scal() >= 1) ||
+                valeur.scal() != std::floor(valeur.scal()))
+                erreur("MATLAB:histcounts:InvalidNumBins",
+                       "NumBins must be a positive integer.");
+            nbClasses = (int)valeur.scal();
+            classesNommees = true;
+        } else if (nom == "binedges") {
+            // la forme nommee de « histcounts(x,bords) »
+            exigerNumerique(valeur, "histcounts");
+            if (valeur.nelem() < 2)
+                erreur("MATLAB:histcounts:InvalidBinEdges",
+                       "BinEdges must contain at least two edges.");
+            bords.assign(valeur.re.begin(), valeur.re.end());
+            classesNommees = true;
+        } else if (nom == "binlimits" || nom == "binwidth" || nom == "binmethod") {
             erreur("MATLAB:histcounts:NotSupported",
-                   "L'option '" + args[k].versTexte() + "' n'est pas encore traitee.");
+                   "Option '" + args[k].versTexte() + "' is not supported yet.");
         } else {
             erreur("MATLAB:histcounts:InvalidName",
                    "Option inconnue : '" + args[k].versTexte() + "'.");
         }
+        // la valeur du couple n'est pas un nom : on la saute
+        ++k;
     }
+    if (classesNommees && finPositionnels > 1 && args.size() > 1)
+        erreur("MATLAB:histcounts:BinsTwice",
+               "Specify the bins only once: by position, or with NumBins or BinEdges.");
     static const char* normalisationsConnues[] = {"count",      "probability", "pdf",
                                                   "countdensity", "cumcount",  "cdf"};
     bool normalisationConnue = false;
@@ -477,6 +500,11 @@ FONCTION(fnHistcounts) {
         }
         for (int k = 0; k <= nbClasses; ++k)
             bords.push_back(mn + (mx - mn) * k / nbClasses);
+        // mn + (mx - mn) ne redonne pas toujours mx en virgule flottante :
+        // il lui manquait parfois un ulp, et le maximum tombait hors de la
+        // dernière classe — histcounts(randn(1,1000)) comptait 999 valeurs
+        // une fois sur deux. Le dernier bord est le maximum, exactement.
+        bords.back() = mx;
     }
     std::vector<double> compte(bords.size() - 1, 0.0);
     for (double x : v.re) {
@@ -525,49 +553,57 @@ double normpdfFn(double x, double mu, double sigma) {
     double z = (x - mu) / sigma;
     return std::exp(-0.5 * z * z) / (sigma * std::sqrt(2 * PI));
 }
-double normcdfFn(double x, double mu, double sigma) {
-    return 0.5 * std::erfc(-(x - mu) / (sigma * std::sqrt(2.0)));
-}
 
-double erfinvLocal(double y) {
-    if (y <= -1) return -INFINITY;
-    if (y >= 1) return INFINITY;
-    double x = 0;
-    for (int k = 0; k < 60; ++k) {
-        double err = std::erf(x) - y;
-        double d = 2.0 / std::sqrt(PI) * std::exp(-x * x);
-        if (d == 0) break;
-        double pas = err / d;
-        x -= pas;
-        if (std::fabs(pas) < 1e-15) break;
-    }
-    return x;
+// Les paramètres de la loi normale : X, MU, SIGMA de même taille ou
+// scalaires, comme dans MATLAB ; SIGMA <= 0 donne NaN.
+static std::vector<Valeur> argumentsNormaux(const std::vector<Valeur>& args, std::size_t nombre) {
+    std::vector<Valeur> r;
+    r.push_back(args[0]);
+    r.push_back(nombre > 1 && args.size() > 1 ? args[1] : Valeur::scalaire(0.0));
+    r.push_back(nombre > 2 && args.size() > 2 ? args[2] : Valeur::scalaire(1.0));
+    return r;
 }
 
 FONCTION(fnNormpdf) {
     INUTILISE
     exigerArguments(args, 1, 3, "normpdf");
-    double mu = args.size() > 1 ? args[1].scal() : 0.0;
-    double sigma = args.size() > 2 ? args[2].scal() : 1.0;
-    return {appliquerReel(versDouble(args[0]),
-                          [mu, sigma](double x) { return normpdfFn(x, mu, sigma); })};
+    return {appliquerParElements(argumentsNormaux(args, args.size()), "normpdf",
+                                 [](const double* v) {
+                                     if (!(v[2] > 0)) return std::nan("");
+                                     return normpdfFn(v[0], v[1], v[2]);
+                                 })};
 }
 FONCTION(fnNormcdf) {
     INUTILISE
-    exigerArguments(args, 1, 3, "normcdf");
-    double mu = args.size() > 1 ? args[1].scal() : 0.0;
-    double sigma = args.size() > 2 ? args[2].scal() : 1.0;
-    return {appliquerReel(versDouble(args[0]),
-                          [mu, sigma](double x) { return normcdfFn(x, mu, sigma); })};
+    exigerArguments(args, 1, 4, "normcdf");
+    // « normcdf(x,'upper') », « normcdf(x,mu,sigma,'upper') » : la queue
+    // supérieure, calculée par erfc sans soustraction.
+    std::vector<Valeur> numeriques = args;
+    bool superieure = false;
+    if (!numeriques.empty() && (numeriques.back().estTexte() || numeriques.back().estChaine())) {
+        std::string t = numeriques.back().versTexte();
+        if (t == "upper") superieure = true;
+        else if (t != "lower")
+            erreur("stats:normcdf:BadTail", "Tail must be \"lower\" or \"upper\".");
+        numeriques.pop_back();
+    }
+    if (numeriques.empty() || numeriques.size() > 3)
+        erreur("stats:normcdf:TooManyInputs", "normcdf(X,MU,SIGMA,'upper') at most.");
+    return {appliquerParElements(argumentsNormaux(numeriques, numeriques.size()), "normcdf",
+                                 [superieure](const double* v) {
+                                     if (!(v[2] > 0)) return std::nan("");
+                                     double z = (v[0] - v[1]) / (v[2] * std::sqrt(2.0));
+                                     return 0.5 * std::erfc(superieure ? z : -z);
+                                 })};
 }
 FONCTION(fnNorminv) {
     INUTILISE
     exigerArguments(args, 1, 3, "norminv");
-    double mu = args.size() > 1 ? args[1].scal() : 0.0;
-    double sigma = args.size() > 2 ? args[2].scal() : 1.0;
-    return {appliquerReel(versDouble(args[0]), [mu, sigma](double p) {
-        return mu + sigma * std::sqrt(2.0) * erfinvLocal(2 * p - 1);
-    })};
+    return {appliquerParElements(argumentsNormaux(args, args.size()), "norminv",
+                                 [](const double* v) {
+                                     if (!(v[2] > 0)) return std::nan("");
+                                     return v[1] + v[2] * quantileNormal(v[0]);
+                                 })};
 }
 FONCTION(fnNormrnd) {
     INUTILISE
@@ -576,8 +612,8 @@ FONCTION(fnNormrnd) {
     Dims d = dimsDepuisArguments(args, 2, args.size());
     if (args.size() <= 2) d = Dims{1, 1};
     Valeur r = Valeur::matriceDims(d);
-    std::normal_distribution<double> loi(mu, sigma);
-    for (auto& x : r.re) x = loi(it.generateur);
+    // Comme MATLAB : mu + sigma .* randn.
+    for (auto& x : r.re) x = mu + sigma * it.generateur.normale();
     return {r};
 }
 
@@ -588,8 +624,8 @@ FONCTION(fnUnifrnd) {
     Dims d = dimsDepuisArguments(args, 2, args.size());
     if (args.size() <= 2) d = Dims{1, 1};
     Valeur r = Valeur::matriceDims(d);
-    std::uniform_real_distribution<double> loi(a, b);
-    for (auto& x : r.re) x = loi(it.generateur);
+    // Comme MATLAB : a + (b - a) .* rand.
+    for (auto& x : r.re) x = a + (b - a) * it.generateur.uniforme();
     return {r};
 }
 
@@ -764,7 +800,7 @@ std::vector<Valeur> glissante(Arguments args, const char* nom, Glisse g) {
     if (fenetre.nelem() == 1) {
         long k = (long)fenetre.scal();
         if (k < 1) erreur("MATLAB:movfun:badWindow",
-                          std::string(nom) + " : la fenetre doit valoir au moins 1.");
+                          std::string(nom) + ": window length must be at least 1.");
         // Fenetre impaire : centree. Fenetre paire : elle penche du cote
         // du passe, comme dans MATLAB.
         avant = k % 2 ? (k - 1) / 2 : k / 2;
@@ -774,10 +810,10 @@ std::vector<Valeur> glissante(Arguments args, const char* nom, Glisse g) {
         apres = (long)fenetre.re[1];
         if (avant < 0 || apres < 0)
             erreur("MATLAB:movfun:badWindow",
-                   std::string(nom) + " : les deux largeurs doivent etre positives.");
+                   std::string(nom) + ": both window lengths must be nonnegative.");
     } else {
         erreur("MATLAB:movfun:badWindow",
-               std::string(nom) + " : la fenetre est un scalaire ou deux largeurs.");
+               std::string(nom) + ": window must be a scalar or a two-element vector.");
     }
     int dimension = liste.size() > 2 ? (int)liste[2].scal() - 1 : dimensionParDefaut(v);
     exigerDimension(dimension);
@@ -858,17 +894,6 @@ FONCTION(fnMovvar) {
     return glissante(args, "movvar", Glisse::Variance);
 }
 
-FONCTION(fnNormalize) {
-    INUTILISE
-    exigerArguments(args, 1, 3, "normalize");
-    Valeur v = versDouble(args[0]);
-    std::vector<double> t(v.re.begin(), v.re.end());
-    double m = moyenneDe(t), s = std::sqrt(varianceDe(t, 0));
-    Valeur r = v;
-    for (auto& x : r.re) x = s == 0 ? 0 : (x - m) / s;
-    return {r};
-}
-
 }  // namespace
 
 void enregistrerStatistiques(Interpreteur& it) {
@@ -903,7 +928,6 @@ void enregistrerStatistiques(Interpreteur& it) {
     it.enregistrer("movmin", fnMovmin, "statistiques", "movmin  Minimum glissant.");
     it.enregistrer("movstd", fnMovstd, "statistiques", "movstd  Ecart type glissant.");
     it.enregistrer("movvar", fnMovvar, "statistiques", "movvar  Variance glissante.");
-    it.enregistrer("normalize", fnNormalize, "statistiques", "normalize  Centrage et reduction.");
 }
 
 }  // namespace matlibre

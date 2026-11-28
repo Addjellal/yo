@@ -4,12 +4,13 @@
 % WLAN / LTE Toolbox — communications sans fil.
 %
 % Propagation
+%   fspl              - Affaiblissement en espace libre, borné à 0 dB (MATLAB)
 %   pathLoss          - Affaiblissement de parcours, exposant réglable
 %   rayleighChannel   - Canal à évanouissements, plat ou sélectif
 %
-% Modulation multiporteuse
-%   ofdmMod           - Modulation OFDM, avec préfixe cyclique
-%   ofdmDemod         - Démodulation
+% Modulation multiporteuse (signatures de MATLAB)
+%   ofdmmod           - Modulation OFDM : préfixe cyclique, porteuses nulles, pilotes
+%   ofdmdemod         - Démodulation OFDM, décalage de fenêtre compensé
 %
 % Mesures
 %   evm               - Amplitude du vecteur d'erreur
@@ -43,67 +44,136 @@ EVM Amplitude du vecteur d'erreur, en pour cent.
   Voir aussi OFDMMOD, OFDMDEMOD.
 ```
 
-## `ofdmDemod`
+## `fspl`
 
 ```
-OFDMDEMOD Démodulation OFDM.
-  SYMBOLES = OFDMDEMOD(SIGNAL,NFFT,PREFIXE,NPORTEUSES) retire le préfixe
-  cyclique de chaque symbole, applique la transformée de Fourier et rend
-  les NPORTEUSES premières sous-porteuses.
+FSPL Affaiblissement de propagation en espace libre, en décibels.
+  L = FSPL(R,LAMBDA) = 20 log10(4 pi R / LAMBDA) pour une distance R et
+  une longueur d'onde LAMBDA en mètres, comme MATLAB. Pour M distances
+  et N longueurs d'onde, L est M x N ; avec une seule longueur d'onde,
+  L a la forme de R.
 
-  Sans canal, la démodulation rend exactement les symboles modulés :
-  c'est la première vérification à faire, et elle prend une ligne.
-
-  Avec un canal, il reste à égaliser : diviser chaque porteuse par la
-  réponse du canal à sa fréquence. Un seul coefficient complexe par
-  porteuse suffit, ce qui est tout l'intérêt de l'OFDM face à un
-  égaliseur temporel.
-
-  Un préfixe plus court que la réponse du canal laisse passer
-  l'interférence entre symboles, que plus aucune égalisation ne défait :
-  c'est la limite que le dimensionnement doit respecter.
+  La formule suppose le champ lointain ; plus près, elle rendrait un
+  gain. L'affaiblissement est donc borné à 0 dB pour R <= LAMBDA/(4 pi).
 
   Exemple :
-     rng(1);
-     symboles = exp(1i * (pi/4 + randi([0 3], 48, 5) * pi/2));
-     signal = ofdmMod(symboles, 64, 16);
-     recus = ofdmDemod(signal, 64, 16, 48);
-     max(max(abs(recus - symboles))) < 1e-10     % 1 : sans canal, on retrouve tout
+     % Documentation de MATLAB.
+     L = fspl(10e3, physconst('LightSpeed') / 10e9)    % 132.4478 dB
 
-  Voir aussi OFDMMOD, EVM.
+  Voir aussi FRIIS, PATHLOSS, RADAREQRNG.
 ```
 
-## `ofdmMod`
+## `matlibre_ofdm_indices`
 
 ```
-OFDMMOD Modulation OFDM avec préfixe cyclique.
-  SIGNAL = OFDMMOD(SYMBOLES,NFFT,PREFIXE) où SYMBOLES est une matrice
-  dont chaque colonne est un symbole OFDM. PREFIXE vaut NFFT/8 par
-  défaut.
+MATLIBRE_OFDM_INDICES Indices des sous-porteuses de données d'une grille OFDM.
+  [DONNEES,NULLIDX,PILOTIDX] = MATLIBRE_OFDM_INDICES(NFFT,NULLIDX,
+  PILOTIDX,FONCTION) vérifie les indices nuls et pilotes (entre 1 et
+  NFFT, distincts) et rend, en colonne et dans l'ordre croissant, les
+  indices qui restent aux données.
 
-  L'OFDM répond au multitrajet en découpant la bande en sous-porteuses
-  assez étroites pour que chacune voie un canal plat. Chaque colonne de
-  symboles devient un symbole temporel par transformée de Fourier
-  inverse, précédé de sa propre fin — le préfixe cyclique.
-
-  Ce préfixe est ce qui fait tout marcher : tant qu'il est plus long que
-  la réponse du canal, la convolution linéaire du canal devient une
-  convolution circulaire, donc une simple multiplication porteuse par
-  porteuse en fréquence. Un seul coefficient par porteuse suffit alors à
-  annuler le canal.
-
-  Il rend aussi chaque symbole indépendant du précédent : le transitoire
-  du canal est contenu dans les premiers échantillons du préfixe, qui
-  sont jetés. Même le premier symbole est correct, sans rien avant lui.
-
-  Le coût est le débit : le préfixe n'apporte aucune information.
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
   Exemple :
-     symboles = exp(1i * (pi/4 + randi([0 3], 48, 20) * pi/2));
-     signal = ofdmMod(symboles, 64, 16);
-     numel(signal)                   % 20 * (64 + 16)
+     d = matlibre_ofdm_indices(64, [1:6 33 60:64].', [12 26 40 54].', 'ofdmmod');
+     numel(d)                    % 48 : les données de 802.11a
 
-  Voir aussi OFDMDEMOD, EVM, RAYLEIGHCHANNEL.
+  Voir aussi OFDMMOD, OFDMDEMOD.
+```
+
+## `matlibre_ofdm_prefixes`
+
+```
+MATLIBRE_OFDM_PREFIXES Longueurs de préfixe cyclique, une par symbole.
+  CP = MATLIBRE_OFDM_PREFIXES(CPLEN,NSYM,NFFT,FONCTION) développe un
+  scalaire en NSYM longueurs, ou vérifie une ligne de NSYM longueurs.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     cp = matlibre_ofdm_prefixes(16, 3, 64, 'ofdmmod')     % 16 16 16
+
+  Voir aussi OFDMMOD, OFDMDEMOD.
+```
+
+## `matlibre_ofdm_surechantillonnage`
+
+```
+MATLIBRE_OFDM_SURECHANTILLONNAGE Refuse un facteur de suréchantillonnage autre que un.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_ofdm_surechantillonnage({'OversamplingFactor', 1}, 'ofdmmod')
+
+  Voir aussi OFDMMOD, OFDMDEMOD.
+```
+
+## `ofdmdemod`
+
+```
+OFDMDEMOD Démodulation OFDM : retire le préfixe, transforme, trie les porteuses.
+  Y = OFDMDEMOD(X,NFFT,CPLEN) démodule le signal X (une colonne par
+  flux) modulé par OFDMMOD sur NFFT sous-porteuses avec des préfixes
+  cycliques de CPLEN échantillons (scalaire, ou ligne d'une longueur par
+  symbole). Y est NDataSC x NSym x NStreams.
+  Y = OFDMDEMOD(X,NFFT,CPLEN,SYMOFFSET) place la fenêtre de la FFT
+  SYMOFFSET échantillons après le début de chaque symbole (CPLEN par
+  défaut : juste après le préfixe ; un scalaire ou une ligne par
+  symbole). Une fenêtre avancée dans le préfixe décale le symbole
+  circulairement ; la rotation de phase qui en résulte sur chaque
+  porteuse est compensée, et l'aller-retour reste exact.
+  Y = OFDMDEMOD(X,NFFT,CPLEN,SYMOFFSET,NULLIDX) écarte les porteuses
+  nulles ; [Y,PILOTS] = OFDMDEMOD(...,NULLIDX,PILOTIDX) rend aussi les
+  pilotes, NPilot x NSym x NStreams.
+
+  Les indices suivent OFDMMOD : de 1 à NFFT, de la fréquence la plus
+  négative à la plus positive. La FFT est celle de MATLAB, sans facteur,
+  inverse exacte de l'IFFT d'OFDMMOD. L'option 'OversamplingFactor'
+  n'est acceptée qu'à sa valeur un.
+
+  Exemple :
+     x = qammod(randi([0 15], 64, 2), 16);
+     y = ofdmdemod(ofdmmod(x, 64, [16 32]), 64, [16 32]);
+     max(abs(y(:) - x(:))) < 1e-12        % 1
+
+  Voir aussi OFDMMOD, QAMDEMOD, FFT.
+```
+
+## `ofdmmod`
+
+```
+OFDMMOD Modulation OFDM, avec préfixe cyclique, porteuses nulles et pilotes.
+  Y = OFDMMOD(X,NFFT,CPLEN) module les sous-porteuses X (NDataSC x NSym
+  x NStreams) sur NFFT sous-porteuses, et précède chaque symbole de son
+  préfixe cyclique de CPLEN échantillons : un scalaire, ou une ligne
+  d'une longueur par symbole. Y a une colonne par flux.
+  Y = OFDMMOD(X,NFFT,CPLEN,NULLIDX) laisse vides les sous-porteuses
+  NULLIDX (bandes de garde, continu) ; Y = OFDMMOD(X,NFFT,CPLEN,
+  NULLIDX,PILOTIDX,PILOTS) place les pilotes PILOTS (NPilot x NSym x
+  NStreams) aux indices PILOTIDX. Les données occupent les indices
+  restants, dans l'ordre croissant.
+
+  Comme MATLAB, les indices vont de 1 à NFFT dans l'ordre des
+  fréquences, de la plus négative à la plus positive : le continu est
+  à l'indice NFFT/2+1 (NFFT pair) ou (NFFT+1)/2 (impair). Chaque symbole
+  est l'IFFT de MATLAB du peigne remis dans l'ordre de la transformée
+  (ifftshift), donc normalisée par 1/NFFT ; OFDMDEMOD en est l'inverse
+  exact. L'option 'OversamplingFactor' n'est acceptée qu'à sa valeur un.
+
+  Le préfixe cyclique change la convolution linéaire du canal en
+  convolution circulaire, tant que la réponse du canal est plus courte
+  que lui : chaque sous-porteuse ne voit plus qu'un gain complexe, que
+  l'on divise.
+
+  Exemple :
+     % La numérologie d'IEEE 802.11a.
+     nullidx = [1:6 33 60:64].'; pilotidx = [12 26 40 54].';
+     x = qammod(randi([0 15], 48, 10), 16, 'UnitAveragePower', true);
+     y = ofdmmod(x, 64, 16, nullidx, pilotidx, ones(4, 10));
+     size(y)                     % 800 x 1 : dix symboles de 80 échantillons
+
+  Voir aussi OFDMDEMOD, QAMMOD, IFFT.
 ```
 
 ## `pathLoss`

@@ -1,20 +1,15 @@
-function [reponse, instrument] = query(instrument, commande)
-%QUERY Envoie une commande puis lit la réponse.
-%   [REPONSE,INSTRUMENT] = QUERY(INSTRUMENT,COMMANDE) enchaîne WRITELINE
-%   et READLINE. C'est la forme à employer pour toute commande qui
-%   interroge : elle ne laisse pas la place à la confusion entre la
-%   réponse attendue et la précédente.
-%
-%   L'instrument est rendu en second : son journal a grandi, et il faut
-%   le reprendre pour que les appels suivants en tiennent compte.
+function [reponse, v] = query(v, commande)
+%QUERY Envoie une requête et lit sa réponse, en texte.
+%   [REPONSE,V] = QUERY(V,COMMANDE) enchaîne WRITELINE et READLINE et rend
+%   la réponse en tableau de caractères, comme le QUERY des anciennes
+%   interfaces de MATLAB. WRITEREAD est la forme moderne. V, une poignée,
+%   est rendu en second pour les programmes qui le reprenaient.
 %
 %   Exemple :
-%      instrument = visadev('TCPIP0::192.168.1.10::inst0::INSTR');
-%      [identite, instrument] = query(instrument, '*IDN?');
-%      [texte, instrument] = query(instrument, 'MEAS:VOLT?');
-%      tension = str2double(texte);
+%      v = visadev('TCPIP0::192.168.1.10::inst0::INSTR');
+%      identite = query(v, '*IDN?');
+%      tension = str2double(query(v, 'MEAS:VOLT?'));
 %
-%   Voir aussi WRITELINE, READLINE, VISADEV.
-    instrument = writeline(instrument, commande);
-    reponse = readline(instrument);
+%   Voir aussi WRITEREAD, WRITELINE, READLINE, VISADEV.
+    reponse = char(writeread(v, commande));
 end

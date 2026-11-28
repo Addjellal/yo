@@ -34,7 +34,7 @@ function [d, p, stats] = manova1(X, groupe, alpha)
     end
     k = max(indices);
     if k < 2
-        error('stats:manova1:Groupes', 'Il faut au moins deux groupes.');
+        error('stats:manova1:Groupes', 'At least two groups are required.');
     end
     moyenneTotale = mean(X, 1);
     W = zeros(p0);          % dispersion intra-groupe

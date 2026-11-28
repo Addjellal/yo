@@ -19,6 +19,6 @@ function verifierPermutation(permutation)
     n = numel(permutation);
     if ~isequal(sort(permutation(:))', 1:n)
         error('comm:intrlv:BadPermutation', ...
-              'Le vecteur doit être une permutation de 1 à %d.', n);
+              'The vector must be a permutation of 1 to %d.', n);
     end
 end

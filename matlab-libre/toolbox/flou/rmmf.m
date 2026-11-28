@@ -22,11 +22,11 @@ function fis = rmmf(fis, genre, indiceVariable, ~, indiceMf)
     entree = estEntree(genre);
     variables = variablesDe(fis, entree);
     if indiceVariable < 1 || indiceVariable > numel(variables)
-        error('fuzzy:rmmf:BadVariable', 'Variable %d inexistante.', indiceVariable);
+        error('fuzzy:rmmf:BadVariable', 'Variable %d does not exist.', indiceVariable);
     end
     v = variables{indiceVariable};
     if indiceMf < 1 || indiceMf > numel(v.mf)
-        error('fuzzy:rmmf:BadMf', 'Fonction d''appartenance %d inexistante.', indiceMf);
+        error('fuzzy:rmmf:BadMf', 'Membership function %d does not exist.', indiceMf);
     end
     v.mf(indiceMf) = [];
     variables{indiceVariable} = v;

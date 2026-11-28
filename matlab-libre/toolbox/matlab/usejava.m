@@ -15,13 +15,13 @@ function disponible = usejava(composant)
 %
 %   Voir aussi ISJAVA, JAVACLASSPATH, JAVAOBJECT, COMPUTER.
     if nargin < 1
-        error('MATLAB:minrhs', 'USEJAVA attend le nom d''un composant.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     composant = lower(char(composant));
     connus = {'jvm', 'awt', 'swing', 'desktop'};
     if ~any(strcmp(composant, connus))
         error('MATLAB:usejava:invalidComponent', ...
-              'Composant inconnu « %s » ; attendus : %s.', ...
+              'Unknown component ''%s''. Expected one of: %s.', ...
               composant, strjoin(connus, ', '));
     end
     disponible = false;

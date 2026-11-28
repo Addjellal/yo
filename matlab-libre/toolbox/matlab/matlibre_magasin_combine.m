@@ -36,7 +36,7 @@ classdef matlibre_magasin_combine < handle
         %READ Un morceau de chacun, côte à côte.
             if ~hasdata(ds)
                 error('MATLAB:datastore:NoMoreData', ...
-                      'L''un des magasins est epuise.');
+                      'One of the datastores has no more data.');
             end
             donnees = cell(1, numel(ds.UnderlyingDatastores));
             for k = 1:numel(ds.UnderlyingDatastores)

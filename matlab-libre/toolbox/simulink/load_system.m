@@ -23,9 +23,22 @@ function modele = load_system(nom)
 %   Voir aussi SAVE_SYSTEM, OPEN_SYSTEM, BDISLOADED, GCS, SIM.
     nom = char(nom);
     [dossier, base, extension] = fileparts(nom);
+    if isempty(dossier) && isempty(extension)
+        % Déjà dans la session : rien à relire, comme dans Simulink.
+        if matlibre_sl_ouverts('connu', nom)
+            modele = matlibre_sl_ouverts('lire', nom);
+            return
+        end
+        % La bibliothèque de blocs de Simulink n'est pas un fichier ici :
+        % ADD_BLOCK connaît ses chemins sans qu'on la charge.
+        if any(strcmpi(nom, {'simulink', 'built-in'}))
+            modele = [];
+            return
+        end
+    end
     if strcmpi(extension, '.slx') || strcmpi(extension, '.mdl')
         modele = matlibre_sl_slx('lire', nom);
-        charge(modele);
+        charge(modele, nom);
         return
     end
     chemin = fullfile(dossier, [base '.m']);
@@ -33,13 +46,15 @@ function modele = load_system(nom)
         for autre = {'.slx', '.mdl'}
             if exist(fullfile(dossier, [base autre{1}]), 'file') == 2
                 modele = matlibre_sl_slx('lire', fullfile(dossier, [base autre{1}]));
-                charge(modele);
+                charge(modele, fullfile(dossier, [base autre{1}]));
                 return
             end
         end
         error('Simulink:Commands:OpenSystemUnknownSystem', ...
               'Invalid Simulink object name: ''%s''.', nom);
     end
+    % retenu avant de changer de dossier : le chemin est relatif à celui-ci
+    fichier = matlibre_sl_nomme('chemin', chemin);
     ancien = pwd();
     if ~isempty(dossier)
         % Le fichier est appelé par son nom de base : il doit être
@@ -50,15 +65,16 @@ function modele = load_system(nom)
     modele = feval(base);
     if ~isstruct(modele) || ~isfield(modele, 'blocs')
         error('Simulink:Commands:InvalidModel', ...
-              'Le fichier ''%s'' ne rend pas un modele.', chemin);
+              'File ''%s'' does not return a model.', chemin);
     end
-    charge(modele);
+    charge(modele, fichier);
 end
 
 % Le modèle est chargé : ses rappels PreLoadFcn puis PostLoadFcn, et le
 % registre de la session.
-function charge(modele)
+function charge(modele, fichier)
     matlibre_sl_rappel(modele, 'PreLoadFcn');
     matlibre_sl_ouverts('inscrire', modele.nom, modele, 0);
+    matlibre_sl_nomme('fichier', modele.nom, fichier);
     matlibre_sl_rappel(modele, 'PostLoadFcn');
 end

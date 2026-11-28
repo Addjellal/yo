@@ -11,9 +11,8 @@ function H = fsurf(fonction, intervalle, varargin)
 %
 %   H = FSURF(...) rend la poignée.
 %
-%   Le rendu de MatLibre est plan : la surface est montrée comme un champ
-%   coloré, à la façon de PCOLOR. FCONTOUR en donne les lignes de niveau,
-%   souvent plus lisible.
+%   La surface est tracée par SURF, en perspective ; FCONTOUR en donne les
+%   lignes de niveau.
 %
 %   Exemples :
 %      fsurf(@(x, y) x .* exp(-x.^2 - y.^2), [-2 2]);

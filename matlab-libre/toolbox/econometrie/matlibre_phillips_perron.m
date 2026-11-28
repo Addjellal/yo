@@ -18,7 +18,7 @@ function [statistique, coefficients] = matlibre_phillips_perron(serie, retards, 
             case 'ts',  colonnes = [ones(T, 1), (2:(T + 1)).'];
             otherwise
                 error('econ:pp:Modele', ...
-                      'Le modèle doit être ''AR'', ''ARD'' ou ''TS''.');
+                      'Model must be ''AR'', ''ARD'', or ''TS''.');
         end
     end
     X = [niveau, colonnes];
@@ -43,6 +43,6 @@ function [statistique, coefficients] = matlibre_phillips_perron(serie, retards, 
                 (sigmaLong - sigmaCourt) * T ^ 2 * ecartType ^ 2 / (2 * variance);
         otherwise
             error('econ:pp:Forme', ...
-                  'La forme du test vaut ''t1'' ou ''t2'', pas ''%s''.', forme);
+                  'Test must be ''t1'' or ''t2'', not ''%s''.', forme);
     end
 end

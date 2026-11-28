@@ -26,14 +26,14 @@ function ber = bersync(EbNodB, erreur, type)
         case {'timing', 'time'}
             if any(abs(erreur) > 0.5)
                 error('comm:bersync:Retard', ...
-                      'Le décalage doit rester entre moins un demi et un demi.');
+                      'The offset must be between -0.5 and 0.5.');
             end
             facteur = 1 - 2 * abs(erreur);
         case {'carrier', 'phase'}
             facteur = cos(erreur);
         otherwise
             error('comm:bersync:Type', ...
-                  'Le type doit être ''timing'' ou ''carrier''.');
+                  'Type must be ''timing'' or ''carrier''.');
     end
     facteur = max(facteur, 0);
     ber = 0.5 * erfc(facteur .* sqrt(EbNo));

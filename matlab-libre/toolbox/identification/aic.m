@@ -1,35 +1,46 @@
-function critere = aic(modele, genre)
-%AIC Critère d'information d'Akaike.
-%   V = AIC(MODELE) rend N log(V) + 2p, où V est l'erreur quadratique, p
-%   le nombre de paramètres et N le nombre d'échantillons.
-%
-%   V = AIC(MODELE,'nAIC') rend le critère normalisé par le nombre
-%   d'échantillons, et V = AIC(MODELE,'BIC') remplace la pénalité par
-%   p log(N), plus sévère : elle croît avec la taille des données, si bien
-%   que le critère finit par désigner le vrai modèle quand il est dans la
-%   liste, ce que le critère d'Akaike ne garantit pas.
+function valeur = aic(varargin)
+%AIC Critère d'information d'Akaike, comme MATLAB.
+%   V = AIC(MODELE) rend le critère normalisé nAIC = log V + 2 np / N, la
+%   valeur par défaut de MATLAB, où V est la perte (l'erreur quadratique
+%   moyenne de prédiction, le déterminant de la covariance des erreurs en
+%   multisortie), np le nombre de paramètres estimés et N le nombre
+%   d'échantillons.
+%   V = AIC(M1,M2,...) rend une ligne, un critère par modèle.
+%   V = AIC(...,MESURE) choisit le critère :
+%      'nAIC'  log V + 2 np / N (défaut)
+%      'aic'   N log V + 2 np + N ny (log(2 pi) + 1), le critère brut
+%      'AICc'  AIC + 2 np (np + 1) / (N - np - 1), corrigé des petits échantillons
+%      'BIC'   N log V + N (ny log(2 pi) + 1) + np log N, de Schwarz
+%   On garde le modèle de plus petit critère. La pénalité de BIC croît
+%   avec N, si bien qu'il finit par désigner le vrai modèle quand il est
+%   dans la liste, ce que le critère d'Akaike ne garantit pas.
 %
 %   Exemple :
 %      rng(1);
 %      u = randn(300, 1);
 %      z = iddata(filter([0 0.5], [1 -0.8], u), u);
-%      aic(arx(z, [2 2 1]))
+%      aic(arx(z, [1 1 1]), arx(z, [3 3 1]))       % nAIC des deux modèles
+%      aic(arx(z, [1 1 1]), 'BIC')
 %
 %   Voir aussi FPE, ARX, POLYEST.
-    if nargin < 2
-        genre = 'aic';
+    mesure = 'nAIC';
+    if ~isempty(varargin) && (ischar(varargin{end}) || isstring(varargin{end}))
+        mesure = char(varargin{end});
+        varargin = varargin(1:end - 1);
     end
-    valeur = matlibre_id_critere(modele, 'MSE');
-    n = matlibre_id_critere(modele, 'nobs');
-    p = matlibre_id_critere(modele, 'nparams');
-    switch lower(char(genre))
-        case 'aic'
-            critere = n * log(max(valeur, realmin)) + 2 * p;
-        case 'naic'
-            critere = log(max(valeur, realmin)) + 2 * p / n;
-        case 'bic'
-            critere = n * log(max(valeur, realmin)) + p * log(n);
-        otherwise
-            error('ident:aic:Genre', 'Critère inconnu : %s.', char(genre));
+    noms = {'nAIC', 'aic', 'AICc', 'BIC'};
+    champs = {'nAIC', 'AIC', 'AICc', 'BIC'};
+    rang = find(strcmpi(mesure, noms), 1);
+    if isempty(rang)
+        error('ident:aic:Mesure', ['Measure must be ''nAIC'', ''aic'', ''AICc'', or ''BIC'', ' ...
+                                   'not ''%s''.'], ...
+              mesure);
+    end
+    if isempty(varargin)
+        error('ident:aic:Modele', 'At least one estimated model is required.');
+    end
+    valeur = zeros(1, numel(varargin));
+    for k = 1:numel(varargin)
+        valeur(k) = matlibre_id_critere(varargin{k}, champs{rang});
     end
 end

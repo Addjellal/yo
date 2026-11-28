@@ -18,7 +18,7 @@ function F = coifwavf(nom)
     ordre = ordreDeNom(nom, 'coif');
     if ordre > 5
         error('wavelet:coifwavf:Ordre', ...
-              'Les coiflettes vont de coif1 à coif5.');
+              'Coiflets go from coif1 to coif5.');
     end
     F = coifletFiltre(ordre) / sqrt(2);
 end

@@ -17,7 +17,7 @@ function [statistique, coefficients] = matlibre_dickey_fuller(serie, retards, mo
     T = numel(lignes);
     if T <= retards + 3
         error('econ:dickey:Observations', ...
-              'La série est trop courte pour %d retards.', retards);
+              'The series is too short for %d lags.', retards);
     end
     y = differences(lignes);
     niveau = serie(lignes);                % y_{t-1}, car differences(k) = y(k+1)-y(k)
@@ -30,7 +30,7 @@ function [statistique, coefficients] = matlibre_dickey_fuller(serie, retards, mo
             case 'ts',  colonnes = [ones(T, 1), (lignes(:) + 1)];
             otherwise
                 error('econ:dickey:Modele', ...
-                      'Le modèle doit être ''AR'', ''ARD'' ou ''TS''.');
+                      'Model must be ''AR'', ''ARD'', or ''TS''.');
         end
     end
     X = [niveau, colonnes];
@@ -53,6 +53,6 @@ function [statistique, coefficients] = matlibre_dickey_fuller(serie, retards, mo
             statistique = T * coefficients(1) / (1 - somme);
         otherwise
             error('econ:dickey:Forme', ...
-                  'La forme du test vaut ''t1'' ou ''t2'', pas ''%s''.', forme);
+                  'Test must be ''t1'' or ''t2'', not ''%s''.', forme);
     end
 end

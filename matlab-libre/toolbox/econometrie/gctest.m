@@ -31,7 +31,7 @@ function [rejet, pValeur, statistique, valeurCritique] = gctest(cause, effet, va
     effet = double(effet(:));
     if numel(cause) ~= numel(effet)
         error('econ:gctest:Longueurs', ...
-              'Les deux séries doivent avoir la même longueur.');
+              'The two series must have the same length.');
     end
     retards = 1;
     avecConstante = true;
@@ -55,7 +55,7 @@ function [rejet, pValeur, statistique, valeurCritique] = gctest(cause, effet, va
     n = numel(effet);
     if retards < 1 || retards >= n - 2
         error('econ:gctest:Retards', ...
-              'Le nombre de retards doit rester entre un et %d.', n - 3);
+              'The number of lags must be between 1 and %d.', n - 3);
     end
     lignes = (retards + 1):n;
     y = effet(lignes);
@@ -76,7 +76,7 @@ function [rejet, pValeur, statistique, valeurCritique] = gctest(cause, effet, va
     liberte = T - size(Xlibre, 2);
     if liberte < 1
         error('econ:gctest:Observations', ...
-              'Il n''y a pas assez d''observations pour ce nombre de retards.');
+              'There are not enough observations for this number of lags.');
     end
     fisher = ((carresContraint - carresLibre) / retards) / (carresLibre / liberte);
     switch loi
@@ -90,7 +90,7 @@ function [rejet, pValeur, statistique, valeurCritique] = gctest(cause, effet, va
             valeurCritique = chi2inv(1 - alpha, retards);
         otherwise
             error('econ:gctest:Loi', ...
-                  'Le test vaut ''chi2'' ou ''f'', pas ''%s''.', loi);
+                  'The test must be ''chi2'' or ''f'', not ''%s''.', loi);
     end
     rejet = pValeur < alpha;
 end

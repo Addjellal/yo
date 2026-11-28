@@ -9,7 +9,7 @@ function [serie, memoire] = matlibre_arima_differencier(y, D, saison)
     if saison > 0
         if numel(serie) <= saison
             error('econ:arima:Saison', ...
-                  'La série est trop courte pour une différence saisonnière.');
+                  'The series is too short for a seasonal difference.');
         end
         memoire.etapes{end+1} = struct('type', 'saison', 'periode', saison, ...
                                        'debut', serie(1:saison));

@@ -34,6 +34,6 @@ function f = facteurFrequence(unite)
         case 'ghz',                                       f = 2 * pi * 1e9;
         case 'rpm',                                       f = 2 * pi / 60;
         otherwise
-            error('control:chgFreqUnit:Unite', 'Unité inconnue : %s.', char(unite));
+            error('control:chgFreqUnit:Unite', 'Unknown unit: %s.', char(unite));
     end
 end

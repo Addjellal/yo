@@ -9,8 +9,7 @@ function [Xc, Yc, Zc] = cylinder(rayon, n)
 %   [X,Y,Z] = CYLINDER(...) rend les trois grilles de coordonnées, sans
 %   rien tracer. Z va de 0 à 1 ; on le met ensuite à l'échelle voulue.
 %
-%   Le rendu de MatLibre est plan : CYLINDER sans sortie montre la
-%   hauteur en couleurs.
+%   CYLINDER sans sortie trace le cylindre avec SURF, en perspective.
 %
 %   Exemples :
 %      cylinder;

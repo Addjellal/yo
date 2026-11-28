@@ -38,7 +38,7 @@ function sortie = matlibre_sl_pile(action, modele)
     end
     if ~isstruct(modele) || ~isfield(modele, 'nom')
         error('Simulink:Commands:InvalidModel', ...
-              'MATLIBRE_SL_PILE attend un modele bati par NEW_SYSTEM.');
+              'MATLIBRE_SL_PILE requires a model built by NEW_SYSTEM.');
     end
     nom = char(modele.nom);
     k = 0;

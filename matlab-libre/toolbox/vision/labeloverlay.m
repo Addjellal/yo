@@ -39,7 +39,7 @@ function B = labeloverlay(A, L, varargin)
     end
     if transparence < 0 || transparence > 1
         error('vision:labeloverlay:Transparence', ...
-              'La transparence est comprise entre 0 et 1.');
+              'Transparency must be between 0 and 1.');
     end
     etiquettes = matlibre_etiquettes_entieres(L);
     nombre = max(etiquettes(:));
@@ -52,7 +52,7 @@ function B = labeloverlay(A, L, varargin)
     [B, classe] = matlibre_image_rvb(A);
     if ~isequal(size(etiquettes), [size(B, 1), size(B, 2)])
         error('vision:labeloverlay:Taille', ...
-              'L''image et les étiquettes n''ont pas la même taille.');
+              'The image and the labels must be the same size.');
     end
     for etiquette = 1:nombre
         if ~isempty(retenues) && ~any(retenues == etiquette)

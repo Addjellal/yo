@@ -60,8 +60,8 @@ classdef creditMigrationCopula
             sommes = sum(obj.Weights .^ 2, 2);
             if any(abs(sommes - 1) > 1e-6)
                 error('risque:migration:Norme', ...
-                      ['La somme des carrés des poids doit valoir un ' ...
-                       'sur chaque ligne.']);
+                      ['The sum of squared weights must be one ' ...
+                       'on each row.']);
             end
             k = 1;
             while k + 1 <= numel(varargin)

@@ -34,7 +34,7 @@ function [rejet, pValeur, statistique, valeurCritique] = waldtest(ecarts, jacobi
 %   Voir aussi LRATIOTEST, OLS, GCTEST.
     if nargin < 3
         error('econ:waldtest:Arguments', ...
-              'Il faut les restrictions, leur jacobienne et la covariance.');
+              'The restrictions, their Jacobian, and the covariance are required.');
     end
     if nargin < 4 || isempty(alpha)
         alpha = 0.05;
@@ -44,7 +44,7 @@ function [rejet, pValeur, statistique, valeurCritique] = waldtest(ecarts, jacobi
     if ~iscell(covariance), covariance = {covariance}; end
     nombre = max([numel(ecarts), numel(jacobien), numel(covariance)]);
     ecarts = matlibre_etendre_cellules(ecarts, nombre, 'restrictions');
-    jacobien = matlibre_etendre_cellules(jacobien, nombre, 'jacobiennes');
+    jacobien = matlibre_etendre_cellules(jacobien, nombre, 'Jacobians');
     covariance = matlibre_etendre_cellules(covariance, nombre, 'covariances');
     statistique = zeros(1, nombre);
     ddl = zeros(1, nombre);
@@ -55,13 +55,13 @@ function [rejet, pValeur, statistique, valeurCritique] = waldtest(ecarts, jacobi
         C = double(covariance{k});
         if size(J, 1) ~= numel(r)
             error('econ:waldtest:Jacobien', ...
-                  ['La jacobienne doit avoir autant de lignes que ' ...
-                   'de restrictions.']);
+                  ['The Jacobian must have as many rows as there are ' ...
+                   'restrictions.']);
         end
         if size(J, 2) ~= size(C, 1) || size(C, 1) ~= size(C, 2)
             error('econ:waldtest:Covariance', ...
-                  ['La covariance doit être carrée, de la taille du ' ...
-                   'nombre de paramètres.']);
+                  ['The covariance must be square, with size equal to the ' ...
+                   'number of parameters.']);
         end
         milieu = J * C * J.';
         statistique(k) = r.' * (milieu \ r);

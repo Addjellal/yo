@@ -26,8 +26,8 @@ function taux = annurate(periodes, versement, valeurActuelle, valeurFuture, term
     bas = 1e-12;
     if ecart(bas) < 0
         error('finance:annurate:Impossible', ...
-              ['Aucun taux positif ne rembourse ce capital : les ' ...
-               'versements ne suffisent pas.']);
+              ['No positive rate repays this principal: the ' ...
+               'payments are not enough.']);
     end
     taux = fzero(ecart, [bas, haut]);
 end

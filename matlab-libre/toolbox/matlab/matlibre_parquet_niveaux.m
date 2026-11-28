@@ -25,7 +25,7 @@ function niveaux = matlibre_parquet_niveaux(octets, largeur, nombre)
     while ecrit < nombre
         if position > numel(octets)
             error('MATLAB:parquet:NiveauxTronques', ...
-                  'Les niveaux de définition s''interrompent avant la fin de la page.');
+                  'Definition levels end before the end of the page.');
         end
         [entete, position] = lireVarint(octets, position);
         if mod(entete, 2) == 0

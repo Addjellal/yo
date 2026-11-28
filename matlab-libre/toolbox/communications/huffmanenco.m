@@ -35,5 +35,5 @@ function indice = trouverSymbole(dictionnaire, symbole)
         end
     end
     error('comm:huffmanenco:Symbole', ...
-          'Un symbole du signal n''est pas dans le dictionnaire.');
+          'A symbol of the signal is not in the dictionary.');
 end

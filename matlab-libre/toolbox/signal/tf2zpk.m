@@ -25,7 +25,7 @@ function [z, p, k] = tf2zpk(b, a)
     % tête de B sont des retards purs, non des zéros du filtre.
     premierA = find(a ~= 0, 1);
     if isempty(premierA)
-        error('signal:tf2zpk:NullDenominator', 'Le dénominateur est nul.');
+        error('signal:tf2zpk:NullDenominator', 'The denominator is zero.');
     end
     a = a(premierA:end);
     premierB = find(b ~= 0, 1);

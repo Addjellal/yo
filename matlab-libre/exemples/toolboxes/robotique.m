@@ -29,16 +29,23 @@ fprintf('  inverse : q = [%.4f %.4f], ecart %.2e\n', ...
         qRetour(1), qRetour(2), norm(qRetour - q));
 assert(norm(qRetour - q) < 1e-12, 'l''inverse doit annuler la directe');
 
-% Deux configurations mènent au même point : coude haut, coude bas. Elles
-% sont symétriques l'une de l'autre par rapport à la droite qui joint
-% l'épaule à l'effecteur.
-qBas = ikine2R(x, y, l1, l2, false);
-[xb, yb] = fkine2R(qBas, l1, l2);
-fprintf('  coude bas : q = [%.4f %.4f], meme point (%.4f, %.4f)\n', ...
-        qBas(1), qBas(2), xb, yb);
-assert(abs(xb - x) < 1e-12 && abs(yb - y) < 1e-12, ...
+% Deux configurations mènent au même point : coude bas (q2 > 0, celle
+% d'où l'on est parti) et coude haut (q2 < 0). Elles sont symétriques
+% l'une de l'autre par rapport à la droite qui joint l'épaule à
+% l'effecteur : le coude passe d'un côté à l'autre de cette droite.
+qHaut = ikine2R(x, y, l1, l2, true);
+[xh, yh] = fkine2R(qHaut, l1, l2);
+fprintf('  coude haut : q = [%.4f %.4f], meme point (%.4f, %.4f)\n', ...
+        qHaut(1), qHaut(2), xh, yh);
+assert(abs(xh - x) < 1e-12 && abs(yh - y) < 1e-12, ...
        'les deux coudes atteignent le meme point');
-assert(abs(qBas(2) + q(2)) < 1e-12, 'et sont opposees sur le coude');
+assert(abs(qHaut(2) + q(2)) < 1e-12, 'et sont opposees sur le coude');
+% Le coude haut est bien au-dessus de la droite épaule-effecteur : le
+% produit vectoriel (effecteur) x (coude) est positif.
+coudeH = l1 * [cos(qHaut(1)) sin(qHaut(1))];
+coudeB = l1 * [cos(q(1)) sin(q(1))];
+assert(x * coudeH(2) - y * coudeH(1) > 0 && x * coudeB(2) - y * coudeB(1) < 0, ...
+       'coude haut a gauche de la droite epaule-effecteur, coude bas a droite');
 
 % L'espace de travail est une couronne : rien à moins de |l1-l2| de
 % l'épaule, rien au-delà de l1+l2. La couronne se referme en disque quand

@@ -47,6 +47,6 @@ function y = evalmf(x, type, parametres)
             y = sum(p(1:n) .* v(1:n)) + p(end);
         otherwise
             error('fuzzy:evalmf:unknown', ...
-                  'Fonction d''appartenance inconnue : ''%s''.', type);
+                  'Unknown membership function: ''%s''.', type);
     end
 end

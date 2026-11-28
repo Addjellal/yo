@@ -15,10 +15,10 @@ fichier est produit par mesure, non écrit à la main.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **682 fonctions natives** couvrant le MATLAB de base, **toutes**
+- **690 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **3042 fonctions de toolbox** réparties en 55 modules, écrites dans le
+- **3146 fonctions de toolbox** réparties en 54 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -39,7 +39,7 @@ fichier est produit par mesure, non écrit à la main.
   MATLAB (tranches, réductions, diffusées, temporaires).
 - **Un générateur de code C** qui traduit l'arbre syntaxique, propage les
   types et les dimensions, et produit du C sans allocation.
-- **Une documentation qui ne ment pas** : 665 fonctions ont leur fiche —
+- **Une documentation qui ne ment pas** : 671 fonctions ont leur fiche —
   syntaxe, description, exemples, voisines —, le bureau les montre dans un
   navigateur d'aide, et chaque exemple est exécuté à chaque passage des
   tests.
@@ -47,15 +47,16 @@ fichier est produit par mesure, non écrit à la main.
   rend les rappels d'application naturels.
 - **Une chaîne d'installation** : scripts de compilation pour Linux,
   macOS et Windows, paquets `.tar.gz`, `.deb` et `.zip`, gestion des
-  toolboxes depuis le langage, intégration continue sur les trois
-  systèmes.
-- **Des tests** : 78 vérifications C++ sur le cœur, 22 suites écrites
+  toolboxes depuis le langage, intégration continue : Ubuntu à chaque
+  poussée, et chaque nuit la batterie entière, les assainisseurs, la
+  couverture, macOS et Windows.
+- **Des tests** : 126 vérifications C++ sur le cœur, 22 suites écrites
   dans le langage — dont une qui contrôle un résultat exact par toolbox,
   une les types de données, une le calcul parallèle, une qui compile puis
   exécute le C produit pour le comparer à l'interpréteur, une qui exécute
-  les 665 exemples de l'aide — et 380 vérifications du bureau natif,
+  les 671 exemples de l'aide — et 413 vérifications du bureau natif,
   pilotées sans ouvrir de fenêtre. `outils/eprouverNatives.sh` appelle en
-  plus chacune des 682 fonctions natives avec des arguments qu'elle
+  plus chacune des 690 fonctions natives avec des arguments qu'elle
   n'attend pas — une cellule, une structure, une poignée, une taille
   absurde, une dimension négative — et vérifie qu'elle rend une erreur au
   lieu de tomber.
@@ -93,15 +94,14 @@ totalité.
    le navigateur d'aide. Ctrl+C interrompt le calcul — y compris
    l'affichage d'un tableau de dix millions d'éléments —, dans le bureau
    comme dans la console. Manquent encore : le concepteur d'applications,
-   l'éditeur de schémas-blocs, l'édition collaborative, les Live Scripts
+   l'édition collaborative, les Live Scripts
    (cellules exécutables mêlées au texte), la comparaison de fichiers, le
    repliement de code et la recherche multi-fichiers.
-2. **L'affichage montre tous les chiffres, MATLAB quatre.** MatLibre
-   démarre en `format long` : `pi` s'écrit `3.141592653589793`, et un
-   `single` `3.1415927` — sept décimales, tout ce qu'il porte. MATLAB
-   démarre en `format short`. C'est le seul écart d'affichage, et
-   `format short` le rétablit ; `format` seul revient à `long`. Le reste
-   s'affiche comme dans la fenêtre de commande de MATLAB : une cellule
+2. **L'affichage est celui de MATLAB.** MatLibre démarre en
+   `format short` : `pi` s'écrit `3.1416`. `format long` montre tous les
+   chiffres, `3.141592653589793`, et `3.1415927` pour un `single` — sept
+   décimales, tout ce qu'il porte ; `format` seul revient à `short`. Le
+   reste s'affiche comme dans la fenêtre de commande de MATLAB : une cellule
    sous son en-tête « 2×2 cell array », ses cases entre accolades —
    `{[  1]}`, `{'Egg'   }`, `{2×3 double}` — ; une structure sous
    « struct with fields: », les noms calés à droite ; un objet sous
@@ -180,7 +180,28 @@ totalité.
    connaît pas est nommé dans l'erreur, avec tous les autres. Les
    sous-systèmes se masquent (`Mask`, `MaskVariables`,
    `MaskValueString`), les bibliothèques se bâtissent avec
-   `new_system(nom, 'Library')` et leurs copies restent liées ; les bus
+   `new_system(nom, 'Library')` et leurs copies restent liées ; un
+   modèle se désigne aussi comme dans MATLAB, par son nom dans la
+   session — `new_system('m')`, `add_block('simulink/Sources/Step',
+   'm/echelon')`, `set_param('m/echelon', 'Time', '2')`,
+   `find_system('m', 'BlockType', 'Gain')` —, ses blocs par leur chemin
+   et tous par leur poignée ; les jeux de configuration s'attachent et
+   s'activent (`Simulink.ConfigSet`, `getActiveConfigSet`,
+   `attachConfigSet`, `setActiveConfigSet`), mais seul le jeu actif
+   s'enregistre dans le fichier ; `Simulink.findBlocks` et
+   `Simulink.findBlocksOfType` cherchent par poignées ; `linio` et
+   `linearize` linéarisent entre des points d'analyse — entrée, sortie,
+   coupure —, autour de l'état initial seulement, et en gardant tous les
+   états du modèle ; un modèle créé dans la session part des réglages
+   d'un modèle neuf de Simulink (pas variable, sorties en Dataset) ; le
+   modèle par valeur part du même solveur, mais garde ses sorties en
+   tableau ; Commented retire un bloc du calcul ou le fait
+   traverser ; `Simulink.BlockDiagram.createSubsystem` et
+   `expandSubsystem` regroupent et déplient des blocs en rebranchant
+   leurs liens — un sous-système masqué, lié, commenté, atomique,
+   conditionnel ou à variantes ne se déplie pas, comme dans Simulink ; il
+   y manque `Simulink.Mask`, `operpoint` et `findop`, et les annotations ;
+   les bus
    se forment et se défont par nom (Bus Creator, Bus Selector), et se
    typent par `Simulink.Bus` et `Simulink.BusElement` ; Data
    Type Conversion convertit en entier, simple ou booléen, avec arrondi
@@ -274,10 +295,10 @@ totalité.
    Jacobi ajoutées au MATLAB de base —, Bessel, l'équi-ondulation de Parks
    et McClellan par échange de Remez, l'ajustement sur gabarit de
    `yulewalk` et l'ajustement sur réponse complexe d'`invfreqz`.
-   L'Image Processing Toolbox en compte 140 — filtrage avec
+   L'Image Processing Toolbox en compte 143 — filtrage avec
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
-   124 : construction et conversion des modèles dans les trois
+   125 : construction et conversion des modèles dans les trois
    représentations — `tf` et `ss` sont des classes, avec les opérateurs
    de MATLAB : `s = tf('s')`, `z = tf('z',Te)`, puis
    `G = 1/(s^2+2*s+1)` s'écrivent comme on les écrit à la main, et
@@ -292,7 +313,7 @@ totalité.
    réglage de PID par la marge de phase. Les deux équations de Riccati
    sont résolues par sous-espace invariant, hamiltonien en continu et
    symplectique en discret, et non par itération. La Communications en
-   compte 145 : les modulations numériques usuelles avec leurs
+   compte 148 : les modulations numériques usuelles avec leurs
    constellations, de Gray comme binaires, les trois modulations
    analogiques, le codage convolutif complet — treillis construit depuis
    les polynômes, décodage de Viterbi à décision dure ou souple, jusqu'au
@@ -308,7 +329,7 @@ totalité.
    classification soustractive de Chiu, les trois générateurs de systèmes
    à partir de données, et l'apprentissage hybride d'ANFIS, qui résout
    exactement la moitié linéaire du problème par moindres carrés.
-   La Computer Vision en compte 112 : points
+   La Computer Vision en compte 113 : points
    d'intérêt de Harris, de Shi et Tomasi et FAST, descripteurs HOG et
    LBP, images intégrales et filtrage par boîtes, géométrie épipolaire
    complète — matrice fondamentale par les huit points normalisés ou par
@@ -318,7 +339,7 @@ totalité.
    détections à des pistes par l'algorithme hongrois. Les autres modules
    offrent entre 4 et 19 fonctions, choisies pour être celles qu'on
    appelle d'abord.
-   La Wavelet Toolbox en compte 129. Les filtres de Daubechies et les
+   La Wavelet Toolbox en compte 134. Les filtres de Daubechies et les
    symlets sont construits par factorisation spectrale du polynôme de
    Daubechies, à n'importe quel ordre : `wfilters('db4')` rend la table
    publiée à 4e-13 près, et le signe du passe-haut est celui de MATLAB.
@@ -334,7 +355,7 @@ totalité.
    chapeau mexicain, Morlet réelle et les huit dérivées de la
    gaussienne, avec les fréquences centrales publiées — 0.25, 0.8125,
    0.2 — retrouvées exactement.
-   La Statistics and Machine Learning Toolbox en compte 293 : dix-huit
+   La Statistics and Machine Learning Toolbox en compte 298 : dix-huit
    lois de probabilité complètes — densité, répartition, quantile,
    tirages, moments, estimation — plus les accès génériques `pdf`,
    `cdf`, `icdf` et `random` par nom de loi. Les quantiles continus
@@ -428,7 +449,7 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test              # 57 vérifications C++ + les suites en langage MATLAB
+make test              # 126 vérifications C++ + les suites en langage MATLAB
 matlibre --test tests/scripts
 ```
 

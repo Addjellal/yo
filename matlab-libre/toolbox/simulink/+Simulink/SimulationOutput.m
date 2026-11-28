@@ -47,7 +47,7 @@ classdef SimulationOutput
             end
             if ~isstruct(donnees) || numel(donnees) ~= 1
                 error('Simulink:Simulation:InvalidSimulationOutput', ...
-                      'Un SimulationOutput se fait d''une structure de variables.');
+                      'A SimulationOutput is built from a structure of variables.');
             end
             if isfield(donnees, 'ErrorMessage')
                 obj.ErrorMessage = donnees.ErrorMessage;
@@ -64,7 +64,7 @@ classdef SimulationOutput
             nom = char(nom);
             if ~isfield(obj.Donnees, nom)
                 error('Simulink:Simulation:UnknownVariable', ...
-                      ['La simulation n''a pas releve de variable ''%s'' ; elle releve : ' ...
+                      ['The simulation did not log a variable ''%s''. It logs: ' ...
                        '%s.'], nom, strjoin(fieldnames(obj.Donnees).', ', '));
             end
             v = obj.Donnees.(nom);
@@ -144,7 +144,8 @@ classdef SimulationOutput
                 case '.'
                     if numel(obj) ~= 1
                         error('Simulink:Simulation:ArrayIndexing', ...
-                              ['Un tableau de SimulationOutput se lit element par element : ' ...
+                              ['An array of SimulationOutput objects is read element by ' ...
+                               'element: ' ...
                                'out(k).%s.'], s(1).subs);
                     end
                     nom = s(1).subs;

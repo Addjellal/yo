@@ -37,8 +37,8 @@ function y = uneDimension(x, f, u, lisse, extrapolation, chemin)
         switch extrapolation
             case 'Error'
                 error('Simscape:Lookup:OutOfRange', ...
-                      ['L''entree de ''%s'' vaut %g, hors de la grille [%g, %g] : son ' ...
-                       'extrapolation est ''Error''.'], chemin, u, x(1), x(end));
+                      ['The input of ''%s'' is %g, outside the grid [%g, %g]: its ' ...
+                       'extrapolation is ''Error''.'], chemin, u, x(1), x(end));
             case 'Nearest'
                 u = min(max(u, x(1)), x(end));
             otherwise

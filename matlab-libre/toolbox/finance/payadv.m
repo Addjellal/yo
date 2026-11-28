@@ -13,7 +13,7 @@ function versement = payadv(taux, periodes, valeurActuelle, valeurFuture, avance
     avance = round(avance);
     if avance < 0 || avance > periodes
         error('finance:payadv:Avance', ...
-              'Le nombre de versements d''avance doit rester entre zéro et %d.', periodes);
+              'The number of advance payments must be between 0 and %d.', periodes);
     end
     % Le capital est remboursé par les A versements d'avance, non
     % actualisés, et par les N-A suivants, actualisés à partir de la

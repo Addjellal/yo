@@ -28,7 +28,7 @@ function p = copulacdf(famille, u, parametre, nu)
             p = mvncdf(norminv(u), zeros(1, size(u, 2)), R);
         case 't'
             if nargin < 4
-                error('stats:copulacdf:Nu', 'La copule de Student demande NU.');
+                error('stats:copulacdf:Nu', 'The t copula requires NU.');
             end
             R = matriceCorrelation(parametre, size(u, 2));
             p = copuleTCdf(u, R, nu);

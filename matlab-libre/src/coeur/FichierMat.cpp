@@ -341,6 +341,10 @@ Element lireElement(Lecteur& l) {
     std::uint32_t premier = l.u32();
     std::uint16_t petiteLongueur = (std::uint16_t)(premier >> 16);
     if (petiteLongueur != 0) {
+        // La forme courte loge au plus quatre octets dans l'étiquette. Une
+        // longueur plus grande, lue d'un fichier abîmé, faisait lire au-delà
+        // de ces quatre octets — hors du tampon du fichier.
+        if (petiteLongueur > 4) abime("a small data element is longer than 4 bytes");
         e.type = premier & 0xFFFFu;
         e.octets = petiteLongueur;
         e.donnees = l.prendre(4);

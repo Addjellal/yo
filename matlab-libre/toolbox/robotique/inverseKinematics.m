@@ -87,7 +87,7 @@ classdef inverseKinematics < handle
             robot = obj.RigidBodyTree;
             if isempty(robot)
                 error('robotics:inverseKinematics:SansArbre', ...
-                      'Le solveur demande un RigidBodyTree.');
+                      'The solver requires a RigidBodyTree.');
             end
             n = matlibre_nddl(robot);
             if nargin < 4 || isempty(poids)

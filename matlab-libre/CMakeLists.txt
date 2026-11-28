@@ -1,8 +1,13 @@
 # MatLibre — clone libre du langage MATLAB.
 #
-# Aucune dépendance obligatoire : un compilateur C++17 suffit. LAPACK, BLAS
-# et FFTW sont utilisés s'ils sont présents, uniquement pour accélérer les
-# gros calculs ; les mêmes algorithmes sont écrits dans src/coeur.
+# Aucune dépendance obligatoire : un compilateur C++17 suffit, Qt6 pour
+# le bureau s'il est la, et LAPACK et BLAS s'ils sont la (MATLIBRE_LAPACK,
+# plus bas). L'algebre lineaire, la FFT, les matrices creuses et les images
+# sont ecrites dans src/, et le restent : LAPACK accelere le produit, la
+# resolution, la SVD et les valeurs propres ; sans lui, le meme calcul se
+# fait par le code du depot. (Les anciennes options MATLIBRE_AVEC_LAPACK,
+# _FFTW, _SUITESPARSE et _OPENCV liaient ces bibliotheques sans qu'aucune
+# ligne du code ne s'en serve ; elles ont ete retirees.)
 cmake_minimum_required(VERSION 3.16)
 project(MatLibre VERSION 0.1.0 LANGUAGES CXX)
 
@@ -41,21 +46,42 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "^[A-Za-z][A-Za-z0-9_]*$" AND NOT CMAKE_BUILD_TY
     "    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release")
 endif()
 
-# Les bibliotheques ci-dessous sont des ACCELERATEURS, pas des dependances :
-# MatLibre a ses propres algorithmes pour tout ce qu'elles font, et les
-# resultats sont les memes. On note celles qui manquent pour les resumer en
-# une ligne a la fin, au lieu de quatre lignes qui ressemblent a des pannes.
-set(MATLIBRE_INTERNES)
-set(MATLIBRE_TROUVEES)
-
-option(MATLIBRE_AVEC_LAPACK "Utiliser LAPACK/BLAS si disponible" ON)
-option(MATLIBRE_AVEC_FFTW   "Utiliser FFTW si disponible"        ON)
 option(MATLIBRE_TESTS       "Construire les tests"               ON)
 
 if(MSVC)
   add_compile_options(/W4 /utf-8 /bigobj)
 else()
-  add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+  # -ffp-contract=off : pas de fusion de a*b+c en une seule operation.
+  # clang la fait par defaut sur ARM64 (macOS) : -70:0.1:90 finissait a
+  # 90.00000000000001, et -2e-3:1e-7:2e-3 ne passait plus par zero. Les
+  # memes chiffres sur toutes les machines valent mieux que l'ulp gagne.
+  add_compile_options(-Wall -Wextra -Wno-unused-parameter -ffp-contract=off)
+endif()
+
+# Assainisseurs et couverture, pour chercher ce que les tests ne voient
+# pas (gcc et clang) :
+#   -DMATLIBRE_ASSAINIR=ON       lectures hors bornes, fuites, comportements
+#                                indefinis (ASan et UBSan)
+#   -DMATLIBRE_ASSAINIR=thread   courses entre fils, pour parfor (TSan)
+#   -DMATLIBRE_COUVERTURE=ON     instrumentation gcov : ce que les tests
+#                                exercent, ligne par ligne
+# Un arbre a part pour chacun : build-asan, build-tsan, build-couverture.
+set(MATLIBRE_ASSAINIR OFF CACHE STRING "ON (address,undefined), thread, ou OFF")
+option(MATLIBRE_COUVERTURE "Instrumenter pour la couverture (gcov)" OFF)
+if(MATLIBRE_ASSAINIR AND NOT MSVC)
+  if(MATLIBRE_ASSAINIR STREQUAL "thread")
+    set(MATLIBRE_FSANITIZE thread)
+  else()
+    set(MATLIBRE_FSANITIZE address,undefined)
+  endif()
+  add_compile_options(-fsanitize=${MATLIBRE_FSANITIZE} -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=${MATLIBRE_FSANITIZE})
+  message(STATUS "MatLibre : assaini (-fsanitize=${MATLIBRE_FSANITIZE})")
+endif()
+if(MATLIBRE_COUVERTURE AND NOT MSVC)
+  add_compile_options(--coverage -g)
+  add_link_options(--coverage)
+  message(STATUS "MatLibre : instrumente pour la couverture (gcov)")
 endif()
 
 # Un arbre de construction lisible : les executables dans bin/, les
@@ -86,33 +112,37 @@ file(GLOB_RECURSE MATLIBRE_SOURCES CONFIGURE_DEPENDS
 add_library(matlibre_coeur STATIC ${MATLIBRE_SOURCES})
 target_include_directories(matlibre_coeur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-if(MATLIBRE_AVEC_LAPACK)
-  find_package(LAPACK QUIET)
-  if(LAPACK_FOUND)
-    target_link_libraries(matlibre_coeur PUBLIC ${LAPACK_LIBRARIES})
-    target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_LAPACK=1)
-    list(APPEND MATLIBRE_TROUVEES "LAPACK/BLAS")
-  else()
-    list(APPEND MATLIBRE_INTERNES "LAPACK/BLAS")
-  endif()
-endif()
-
-if(MATLIBRE_AVEC_FFTW)
-  find_library(FFTW3_LIB fftw3)
-  find_path(FFTW3_INC fftw3.h)
-  if(FFTW3_LIB AND FFTW3_INC)
-    target_link_libraries(matlibre_coeur PUBLIC ${FFTW3_LIB})
-    target_include_directories(matlibre_coeur PUBLIC ${FFTW3_INC})
-    target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_FFTW=1)
-    list(APPEND MATLIBRE_TROUVEES "FFTW")
-  else()
-    list(APPEND MATLIBRE_INTERNES "FFTW")
-  endif()
-endif()
-
 find_package(Threads QUIET)
 if(Threads_FOUND)
   target_link_libraries(matlibre_coeur PUBLIC Threads::Threads)
+endif()
+
+# --- LAPACK et BLAS, facultatifs -------------------------------------------
+#   -DMATLIBRE_LAPACK=AUTO   (par defaut) employes s'ils sont trouves
+#   -DMATLIBRE_LAPACK=ON     exiges : la configuration echoue sans eux
+#   -DMATLIBRE_LAPACK=OFF    jamais : le code du depot sert seul
+# Trouves, ils font le produit matriciel, A\b carre, svd et eig — les
+# routines dont MATLAB se sert ; eig d'une matrice 300 x 300 passe d'un
+# tiers de seconde a quelques millisecondes. OpenBLAS (libopenblas-dev),
+# la reference (liblapack-dev), Accelerate sous macOS conviennent.
+set(MATLIBRE_LAPACK AUTO CACHE STRING "LAPACK et BLAS : AUTO, ON ou OFF")
+set_property(CACHE MATLIBRE_LAPACK PROPERTY STRINGS AUTO ON OFF)
+set(MATLIBRE_LAPACK_LIE OFF)
+if(NOT MATLIBRE_LAPACK STREQUAL "OFF")
+  if(MATLIBRE_LAPACK STREQUAL "ON")
+    find_package(LAPACK REQUIRED)
+  else()
+    find_package(LAPACK QUIET)
+  endif()
+  if(LAPACK_FOUND)
+    target_link_libraries(matlibre_coeur PUBLIC ${LAPACK_LIBRARIES} ${LAPACK_LINKER_FLAGS})
+    target_compile_definitions(matlibre_coeur PRIVATE MATLIBRE_AVEC_LAPACK)
+    set(MATLIBRE_LAPACK_LIE ON)
+    message(STATUS "MatLibre : LAPACK et BLAS employes (${LAPACK_LIBRARIES})")
+  else()
+    message(STATUS "MatLibre : pas de LAPACK, l'algebre lineaire du depot sert seule "
+                   "(apt install libopenblas-dev pour l'accelerer)")
+  endif()
 endif()
 
 add_executable(matlibre ${CMAKE_CURRENT_SOURCE_DIR}/src/console/Principal.cpp)
@@ -125,48 +155,6 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/toolbox/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/matlibre)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/documentation/
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
-
-# --- dépendances optionnelles supplémentaires --------------------------------
-option(MATLIBRE_AVEC_SUITESPARSE "Utiliser SuiteSparse (UMFPACK/CHOLMOD) si disponible" ON)
-option(MATLIBRE_AVEC_OPENCV      "Utiliser OpenCV si disponible"                        ON)
-
-if(MATLIBRE_AVEC_SUITESPARSE)
-  find_library(UMFPACK_LIB umfpack)
-  find_path(UMFPACK_INC umfpack.h PATH_SUFFIXES suitesparse)
-  if(UMFPACK_LIB AND UMFPACK_INC)
-    target_link_libraries(matlibre_coeur PUBLIC ${UMFPACK_LIB})
-    target_include_directories(matlibre_coeur PUBLIC ${UMFPACK_INC})
-    target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_SUITESPARSE=1)
-    list(APPEND MATLIBRE_TROUVEES "SuiteSparse")
-  else()
-    list(APPEND MATLIBRE_INTERNES "SuiteSparse")
-  endif()
-endif()
-
-if(MATLIBRE_AVEC_OPENCV)
-  find_package(OpenCV QUIET COMPONENTS core imgproc imgcodecs)
-  if(OpenCV_FOUND)
-    target_link_libraries(matlibre_coeur PUBLIC ${OpenCV_LIBS})
-    target_include_directories(matlibre_coeur PUBLIC ${OpenCV_INCLUDE_DIRS})
-    target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_OPENCV=1)
-    list(APPEND MATLIBRE_TROUVEES "OpenCV")
-  else()
-    list(APPEND MATLIBRE_INTERNES "OpenCV")
-  endif()
-endif()
-
-# --- resume des accelerateurs -------------------------------------------------
-if(MATLIBRE_TROUVEES)
-  list(JOIN MATLIBRE_TROUVEES ", " MATLIBRE_TEXTE_TROUVEES)
-  message(STATUS "MatLibre : acceleree par ${MATLIBRE_TEXTE_TROUVEES}")
-endif()
-if(MATLIBRE_INTERNES)
-  list(JOIN MATLIBRE_INTERNES ", " MATLIBRE_TEXTE_INTERNES)
-  message(STATUS
-    "MatLibre : ${MATLIBRE_TEXTE_INTERNES} absente(s) — les algorithmes internes "
-    "prennent le relais, rien ne manque a l'execution. Ces bibliotheques ne font "
-    "qu'accelerer les gros calculs.")
-endif()
 
 # --- bureau natif (facultatif : le reste se compile et se teste sans Qt) ------
 #
@@ -252,7 +240,11 @@ if(MATLIBRE_BUREAU)
                      ${CMAKE_CURRENT_SOURCE_DIR}/tests/bureau/test_bureau.cpp)
       target_link_libraries(matlibre_tests_bureau PRIVATE matlibre_bureau)
       add_test(NAME bureau COMMAND matlibre_tests_bureau)
-      set_tests_properties(bureau PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+      # La toolbox est donnee comme aux tests en langage : sans elle, un
+      # arbre de construction range hors du depot (build-asan ailleurs)
+      # ne la trouvait pas, et le test echouait pour une autre raison.
+      set_tests_properties(bureau PROPERTIES ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen;MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
     endif()
 
     # Pas de console derriere la fenetre, sous Windows.
@@ -364,6 +356,13 @@ else()
   set(CPACK_DEBIAN_PACKAGE_SECTION "math")
   set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libstdc++6")
   set(CPACK_DEBIAN_PACKAGE_MAINTAINER "MatLibre")
+  # Lie a LAPACK (ou a Qt), le binaire depend de bibliotheques que la
+  # liste ci-dessus ne nomme pas : dpkg-shlibdeps les lit dans le binaire
+  # lui-meme, et le paquet les declare.
+  find_program(MATLIBRE_DPKG_SHLIBDEPS dpkg-shlibdeps)
+  if((MATLIBRE_LAPACK_LIE OR TARGET matlibre-bureau) AND MATLIBRE_DPKG_SHLIBDEPS)
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+  endif()
 endif()
 include(CPack)
 
@@ -377,6 +376,48 @@ if(MATLIBRE_TESTS)
     target_link_libraries(matlibre_tests PRIVATE matlibre_coeur)
     add_test(NAME unitaires COMMAND matlibre_tests)
   endif()
+  # La ligne de commande : les options se lisent dans n'importe quel ordre
+  # jusqu'au script, « -q » n'est pas pris pour un nom de fichier, et une
+  # option inconnue est refusee (code 2) au lieu d'etre ouverte comme un
+  # script.
+  add_test(NAME console_options
+           COMMAND matlibre -q --path ${CMAKE_CURRENT_SOURCE_DIR}/toolbox -e "disp(6*7)")
+  set_tests_properties(console_options PROPERTIES PASS_REGULAR_EXPRESSION "42")
+  add_test(NAME console_option_inconnue COMMAND matlibre --option-inconnue)
+  set_tests_properties(console_option_inconnue PROPERTIES WILL_FAIL TRUE)
+  if(UNIX)
+    add_test(NAME console_silencieuse
+             COMMAND sh -c "echo 'disp(6*7)' | '$<TARGET_FILE:matlibre>' -q")
+    set_tests_properties(console_silencieuse PROPERTIES
+      PASS_REGULAR_EXPRESSION "42" FAIL_REGULAR_EXPRESSION "MatLibre")
+    # Une entree qui n'est pas un terminal n'appelle ni banniere ni invite,
+    # meme sans -q : comme « matlab -batch », la sortie ne porte que ce que
+    # les commandes ecrivent.
+    add_test(NAME console_tube
+             COMMAND sh -c "echo 'disp(6*7)' | '$<TARGET_FILE:matlibre>'")
+    set_tests_properties(console_tube PROPERTIES
+      PASS_REGULAR_EXPRESSION "42" FAIL_REGULAR_EXPRESSION "MatLibre|>>")
+    # L'edition de ligne, sous un vrai terminal (un pseudo-terminal) :
+    # fleches, historique relu et ecrit, Tab, Ctrl-C, Ctrl-D.
+    add_executable(matlibre_tests_terminal
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/console/test_terminal.cpp)
+    add_test(NAME console_terminal
+             COMMAND matlibre_tests_terminal $<TARGET_FILE:matlibre>
+                     ${CMAKE_CURRENT_SOURCE_DIR}/toolbox)
+  endif()
+  # Les scripts qui passent la minute portent l'etiquette « lent » :
+  # « ctest -LE lent » les laisse de cote — c'est la passe de chaque
+  # poussee dans l'integration continue, et celle qu'on lance pendant le
+  # travail, trois minutes sur quatre coeurs —, la batterie entiere les
+  # prend. test_simulink, vingt-cinq minutes d'un bloc, est coupe en quatre
+  # parts de quatre a neuf minutes (test_simulink, _catalogue, _domaines,
+  # _modeles) ; test_aide, quatre minutes depuis que deux exemples de la
+  # logique floue n'en prennent plus sept ; test_exemples, test_ondelettes,
+  # test_domaines et test_robuste, une a cinq. Le plus long des autres,
+  # test_couverture, 56 s.
+  set(MATLIBRE_TESTS_LENTS
+      test_simulink test_simulink_catalogue test_simulink_domaines test_simulink_modeles
+      test_aide test_exemples test_ondelettes test_domaines test_robuste)
   file(GLOB MATLIBRE_TESTS_M CONFIGURE_DEPENDS
        ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/test_*.m)
   foreach(fichier ${MATLIBRE_TESTS_M})
@@ -386,5 +427,25 @@ if(MATLIBRE_TESTS)
                      --path ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts ${fichier})
     set_tests_properties(langage_${nom} PROPERTIES
       ENVIRONMENT "MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
+    if(nom IN_LIST MATLIBRE_TESTS_LENTS)
+      set_tests_properties(langage_${nom} PROPERTIES LABELS lent)
+    endif()
   endforeach()
+  # Deux .m de meme nom, ou un .m qui masque une fonction native : le
+  # controle de « make test », que CTest — et donc l'integration
+  # continue — ne faisait pas.
+  add_test(NAME outils_doublons
+           COMMAND matlibre --path ${CMAKE_CURRENT_SOURCE_DIR}/toolbox
+                   ${CMAKE_CURRENT_SOURCE_DIR}/outils/verifierDoublons.m)
+  set_tests_properties(outils_doublons PROPERTIES
+    ENVIRONMENT "MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
+  # Les valeurs qu'annoncent les fiches d'aide en commentaire de leurs
+  # exemples (« pi % 3.1416 ») : test_aide execute les exemples sans lire
+  # ces commentaires, verifierValeurs les compare a ce que rend la ligne,
+  # et echoue au premier ecart.
+  add_test(NAME aide_valeurs
+           COMMAND matlibre --path ${CMAKE_CURRENT_SOURCE_DIR}/toolbox
+                   ${CMAKE_CURRENT_SOURCE_DIR}/outils/verifierValeurs.m)
+  set_tests_properties(aide_valeurs PROPERTIES
+    ENVIRONMENT "MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
 endif()

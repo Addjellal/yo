@@ -46,25 +46,6 @@ INTERP1  Interpolation en une dimension.
     Voir aussi INTERP2, SPLINE, PCHIP, POLYFIT.
 ```
 
-## `interp2`
-
-```
-INTERP2  Interpolation sur une grille à deux dimensions.
-    INTERP2(X,Y,Z,XQ,YQ) interpole Z, défini sur la grille (X,Y), aux
-    points demandés.
-
-    Syntaxe
-       zq = interp2(X,Y,Z,xq,yq)
-       zq = interp2(X,Y,Z,xq,yq,methode)
-
-    Exemples
-       [X, Y] = meshgrid(0:4);
-       Z = X + Y;
-       abs(interp2(X, Y, Z, 1.5, 2.5) - 4) < 1e-12
-
-    Voir aussi INTERP1, MESHGRID, SURF, SPLINE.
-```
-
 ## `makima`
 
 ```
@@ -249,7 +230,12 @@ POLYVALM  Évalue un polynôme au sens matriciel.
 
 ```
 PPVAL  Évalue une forme polynomiale par morceaux.
-    PPVAL(PP,XQ) évalue en XQ la forme rendue par SPLINE.
+    PPVAL(PP,XQ) évalue en XQ la forme PP rendue par MKPP, SPLINE, PCHIP
+    ou les générateurs de trajectoires. Pour une forme à valeurs dans R^d
+    (champ dim), le résultat a d lignes, une colonne par point. Comme
+    MATLAB, un point de rupture intérieur prend la valeur du morceau qui
+    commence, et le premier et le dernier morceau se prolongent hors des
+    ruptures.
 
     Syntaxe
        y = ppval(pp,xq)
@@ -258,8 +244,10 @@ PPVAL  Évalue une forme polynomiale par morceaux.
        x = 0:4;  y = x.^2;
        pp = spline(x, y);
        abs(ppval(pp, 2.5) - 6.25) < 1e-6
+       pp = mkpp([0 1 2], [1 0; 2 0; 0 1; 0 2], 2);   % deux composantes
+       ppval(pp, [0.5 1.5])                     % [0.5 1 ; 1 2]
 
-    Voir aussi SPLINE, INTERP1.
+    Voir aussi MKPP, UNMKPP, SPLINE, PCHIP, INTERP1.
 ```
 
 ## `roots`

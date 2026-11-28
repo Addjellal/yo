@@ -17,7 +17,7 @@ function position = matlibre_comm_position(symbole, M, ordre)
         return
     end
     if ~strcmpi(ordre, 'gray')
-        error('comm:ordre:Inconnu', 'L''ordre vaut ''bin'' ou ''gray''.');
+        error('comm:ordre:Inconnu', 'Symbol order must be ''bin'' or ''gray''.');
     end
     table = matlibre_comm_table_gray(M);
     inverse = zeros(1, M);

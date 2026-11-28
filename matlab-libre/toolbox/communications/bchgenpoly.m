@@ -29,7 +29,7 @@ function [genpoly, t] = bchgenpoly(n, k, prim, sortie)
     m = round(log2(n + 1));
     if 2 ^ m - 1 ~= n || m < 3 || m > 16
         error('comm:bchgenpoly:Longueur', ...
-              'La longueur doit valoir 2^m - 1, avec m entre trois et seize.');
+              'The codeword length must be 2^m - 1, with m between 3 and 16.');
     end
     if isempty(prim)
         prim = matlibre_gf_primitif(m);

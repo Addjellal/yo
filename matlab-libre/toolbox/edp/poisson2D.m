@@ -30,17 +30,26 @@ function [u, x, y] = poisson2D(f, nx, ny, largeur, hauteur)
     x = (1:nx) * hx;
     y = (1:ny) * hy;
     n = nx * ny;
-    A = zeros(n, n);
+    % Le laplacien à cinq points en matrice creuse, les inconnues rangées
+    % ligne de la grille par ligne : k = (j - 1)*nx + i.
+    [I, J] = ndgrid(1:nx, 1:ny);
+    k = (J(:) - 1) * nx + I(:);
+    lignes = k;
+    colonnes = k;
+    valeurs = (2 / hx^2 + 2 / hy^2) * ones(n, 1);
+    voisins = {I(:) > 1, -1, 1 / hx^2; I(:) < nx, 1, 1 / hx^2; ...
+               J(:) > 1, -nx, 1 / hy^2; J(:) < ny, nx, 1 / hy^2};
+    for v = 1:size(voisins, 1)
+        dedans = voisins{v, 1};
+        lignes = [lignes; k(dedans)];                         %#ok<AGROW>
+        colonnes = [colonnes; k(dedans) + voisins{v, 2}];     %#ok<AGROW>
+        valeurs = [valeurs; -voisins{v, 3} * ones(nnz(dedans), 1)]; %#ok<AGROW>
+    end
+    A = sparse(lignes, colonnes, valeurs, n, n);
     b = zeros(n, 1);
     for j = 1:ny
         for i = 1:nx
-            k = (j - 1) * nx + i;
-            A(k, k) = 2 / hx^2 + 2 / hy^2;
-            if i > 1,  A(k, k - 1) = -1 / hx^2; end
-            if i < nx, A(k, k + 1) = -1 / hx^2; end
-            if j > 1,  A(k, k - nx) = -1 / hy^2; end
-            if j < ny, A(k, k + nx) = -1 / hy^2; end
-            b(k) = f(x(i), y(j));
+            b((j - 1) * nx + i) = f(x(i), y(j));
         end
     end
     solution = A \ b;

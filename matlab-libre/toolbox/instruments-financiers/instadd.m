@@ -31,7 +31,7 @@ function jeu = instadd(varargin)
     type = char(varargin{debut});
     [champs, classes] = matlibre_modele_instrument(type);
     if isempty(champs)
-        error('finstr:instadd:Type', 'Type d''instrument inconnu : %s.', type);
+        error('finstr:instadd:Type', 'Unknown instrument type: %s.', type);
     end
     donnees = varargin((debut + 1):end);
     jeu = matlibre_jeu_ajouter(jeu, type, champs, classes, donnees);

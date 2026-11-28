@@ -1,13 +1,28 @@
 // Systeme.cpp — environnement, fichiers, chemin de recherche, aide.
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <ctime>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <random>
+#include <mutex>
+#include <cstdio>
 #ifndef _WIN32
+#include <sys/wait.h>
 #include <unistd.h>
+#else
+// GetModuleFileNameA, pour le chemin de l'interpréteur (fnExecutable).
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #endif
 
 #include "matlibre/Affichage.h"
@@ -58,45 +73,134 @@ FONCTION(fnCd) {
     return {};
 }
 
+// Un motif de dir : « * » vaut n'importe quelle suite de caractères, y
+// compris vide, autant de fois qu'il apparaît.
+bool correspondMotif(const std::string& nom, const std::string& motif) {
+    std::size_t n = 0, m = 0, etoile = std::string::npos, reprise = 0;
+    while (n < nom.size()) {
+        if (m < motif.size() && motif[m] == '*') {
+            etoile = m++;
+            reprise = n;
+        } else if (m < motif.size() && motif[m] == nom[n]) {
+            ++m;
+            ++n;
+        } else if (etoile != std::string::npos) {
+            m = etoile + 1;
+            n = ++reprise;
+        } else {
+            return false;
+        }
+    }
+    while (m < motif.size() && motif[m] == '*') ++m;
+    return m == motif.size();
+}
+
+// Une entrée de dir, avec les champs de MATLAB : name, folder, date,
+// bytes, isdir, datenum (l'heure locale de la dernière écriture).
+Valeur entreeDir(const std::string& nom, const fs::path& dossier, const fs::path& chemin) {
+    std::error_code ec;
+    bool repertoire = fs::is_directory(chemin, ec);
+    Valeur s = Valeur::structureVide();
+    s.poserChamp("name", Valeur::texte(nom));
+    s.poserChamp("folder", Valeur::texte(fs::absolute(dossier, ec).lexically_normal().string()));
+    double jours = 0;
+    std::string date;
+    auto ecriture = fs::last_write_time(chemin, ec);
+    if (!ec) {
+        auto systeme = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+            ecriture - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+        std::time_t t = std::chrono::system_clock::to_time_t(systeme);
+        std::tm local{};
+#ifdef _WIN32
+        localtime_s(&local, &t);
+#else
+        localtime_r(&t, &local);
+#endif
+        static const char* mois[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        date = formater("%02d-%s-%04d %02d:%02d:%02d", local.tm_mday, mois[local.tm_mon],
+                        local.tm_year + 1900, local.tm_hour, local.tm_min, local.tm_sec);
+        // datenum : 719529 est le 1er janvier 1970, et l'heure locale compte.
+        std::tm utc{};
+#ifdef _WIN32
+        gmtime_s(&utc, &t);
+#else
+        gmtime_r(&t, &utc);
+#endif
+        utc.tm_isdst = local.tm_isdst;
+        double decalage = std::difftime(std::mktime(&local), std::mktime(&utc));
+        jours = 719529.0 + ((double)t + decalage) / 86400.0;
+    }
+    s.poserChamp("date", Valeur::texte(date));
+    std::error_code e2;
+    double octets = (!repertoire && fs::is_regular_file(chemin, e2)) ? (double)fs::file_size(chemin, e2)
+                                                                       : 0.0;
+    s.poserChamp("bytes", Valeur::scalaire(octets));
+    s.poserChamp("isdir", Valeur::booleen(repertoire));
+    s.poserChamp("datenum", Valeur::scalaire(jours));
+    return s;
+}
+
+// Les entrées d'un dossier qui répondent au filtre, « . » et « .. »
+// compris quand il les admet — un dossier nu, « * » —, comme MATLAB.
+void listerDossier(const fs::path& dossier, const std::string& filtre,
+                   std::vector<Valeur>& entrees) {
+    std::error_code ec;
+    std::vector<Valeur> ici;
+    for (const char* point : {".", ".."})
+        if (filtre.empty() || correspondMotif(point, filtre))
+            ici.push_back(entreeDir(point, dossier, dossier / point));
+    for (const auto& e : fs::directory_iterator(dossier, ec)) {
+        std::string nom = e.path().filename().string();
+        if (!filtre.empty() && !correspondMotif(nom, filtre)) continue;
+        ici.push_back(entreeDir(nom, dossier, e.path()));
+    }
+    std::sort(ici.begin(), ici.end(), [](const Valeur& a, const Valeur& b) {
+        return a.champ("name").versTexte() < b.champ("name").versTexte();
+    });
+    entrees.insert(entrees.end(), ici.begin(), ici.end());
+}
+
+// « dossier/ ** /filtre » : le dossier, puis chacun de ses sous-dossiers,
+// à toute profondeur, dans l'ordre alphabétique.
+void listerRecursif(const fs::path& dossier, const std::string& filtre,
+                    std::vector<Valeur>& entrees) {
+    listerDossier(dossier, filtre, entrees);
+    std::error_code ec;
+    std::vector<fs::path> sous;
+    for (const auto& e : fs::directory_iterator(dossier, ec))
+        if (e.is_directory(ec) && !e.is_symlink(ec)) sous.push_back(e.path());
+    std::sort(sous.begin(), sous.end());
+    for (const auto& d : sous) listerRecursif(d, filtre, entrees);
+}
+
 FONCTION(fnDir) {
     INUTILISE
     std::string motif = args.empty() ? "." : args[0].versTexte();
-    fs::path base = motif;
-    std::string filtre;
-    std::error_code ec;
-    if (!fs::is_directory(base, ec)) {
-        filtre = base.filename().string();
-        base = base.parent_path();
-        if (base.empty()) base = ".";
-    }
-    auto correspond = [&](const std::string& nom) {
-        if (filtre.empty()) return true;
-        // Motif simple avec « * ».
-        std::size_t etoile = filtre.find('*');
-        if (etoile == std::string::npos) return nom == filtre;
-        std::string avant = filtre.substr(0, etoile);
-        std::string apres = filtre.substr(etoile + 1);
-        return nom.size() >= avant.size() + apres.size() &&
-               nom.compare(0, avant.size(), avant) == 0 &&
-               nom.compare(nom.size() - apres.size(), apres.size(), apres) == 0;
-    };
     std::vector<Valeur> entrees;
-    for (const auto& e : fs::directory_iterator(base, ec)) {
-        std::string nom = e.path().filename().string();
-        if (!correspond(nom)) continue;
-        Valeur s = Valeur::structureVide();
-        s.poserChamp("name", Valeur::texte(nom));
-        s.poserChamp("folder", Valeur::texte(e.path().parent_path().string()));
-        s.poserChamp("isdir", Valeur::booleen(e.is_directory()));
-        std::error_code e2;
-        s.poserChamp("bytes",
-                     Valeur::scalaire(e.is_regular_file() ? (double)fs::file_size(e.path(), e2)
-                                                          : 0.0));
-        entrees.push_back(s);
+    std::error_code ec;
+    // « ** » : la recherche récursive de MATLAB, « dossier/ ** /*.m ».
+    std::size_t double_etoile = motif.find("**");
+    if (double_etoile != std::string::npos) {
+        std::string avant = motif.substr(0, double_etoile);
+        std::string apres = motif.substr(double_etoile + 2);
+        while (!apres.empty() && (apres[0] == '/' || apres[0] == '\\')) apres.erase(0, 1);
+        if (apres.find('/') != std::string::npos || apres.find('\\') != std::string::npos ||
+            apres.find("**") != std::string::npos)
+            erreur("MatLibre:dir:Motif",
+                   "MatLibre ne prend « ** » que suivi d'un nom de fichier : dossier/ ** /*.m.");
+        fs::path base = avant.empty() ? fs::path(".") : fs::path(avant);
+        if (fs::is_directory(base, ec)) listerRecursif(base, apres, entrees);
+    } else {
+        fs::path base = motif;
+        std::string filtre;
+        if (!fs::is_directory(base, ec)) {
+            filtre = base.filename().string();
+            base = base.parent_path();
+            if (base.empty()) base = ".";
+        }
+        if (fs::is_directory(base, ec)) listerDossier(base, filtre, entrees);
     }
-    std::sort(entrees.begin(), entrees.end(), [](const Valeur& a, const Valeur& b) {
-        return a.champ("name").versTexte() < b.champ("name").versTexte();
-    });
     if (nargout == 0 && !entrees.empty()) {
         for (const auto& e : entrees) it.sortie() << e.champ("name").versTexte() << "\n";
         return {};
@@ -111,8 +215,11 @@ FONCTION(fnLs) {
     auto r = fnDir(it, a, 1);
     if (r.empty() || !r[0].estStructure()) return {Valeur::texte("")};
     std::string s;
-    for (std::size_t k = 0; k < r[0].nelem(); ++k)
-        s += r[0].champ("name", k).versTexte() + "\n";
+    for (std::size_t k = 0; k < r[0].nelem(); ++k) {
+        std::string nom = r[0].champ("name", k).versTexte();
+        if (nom == "." || nom == "..") continue;   // le ls d'Unix ne les montre pas
+        s += nom + "\n";
+    }
     if (nargout == 0) {
         it.sortie() << s;
         return {};
@@ -216,19 +323,51 @@ FONCTION(fnPathsep) {
 #endif
 }
 
+// Le dossier temporaire, terminé par un séparateur comme dans MATLAB
+// (« /tmp/ ») : « [tempdir 'f.csv'] » est l'usage, et sans le séparateur
+// il désignait /tmpf.csv, à la racine du disque — un fichier que seul
+// l'administrateur peut y écrire.
 FONCTION(fnTempdir) {
     INUTILISE
     std::error_code ec;
-    return {Valeur::texte(fs::temp_directory_path(ec).string())};
+    std::string dossier = fs::temp_directory_path(ec).string();
+    if (dossier.empty()) dossier = ".";
+    const char separateur = (char)fs::path::preferred_separator;
+    if (dossier.back() != '/' && dossier.back() != separateur) dossier += separateur;
+    return {Valeur::texte(dossier)};
 }
 
+// Un nom tiré au hasard, « tp » puis un identifiant à la façon de MATLAB.
+// Le nom d'avant, « matlibre_<processus>_<compteur> », se devinait : un
+// autre utilisateur de la machine pouvait poser d'avance, sous ce nom, un
+// lien symbolique vers l'un de vos fichiers, que websave aurait écrasé.
+// Le compteur, un int statique, était de plus incrémenté sans verrou par
+// les fils d'un parfor, et deux travailleurs pouvaient recevoir le même
+// nom. TEMPNAME(DOSSIER) place le nom dans DOSSIER, qui était ignoré.
 FONCTION(fnTempname) {
     INUTILISE
+    exigerArguments(args, 0, 1, "tempname");
+    static std::mutex verrou;
+    static std::mt19937_64 alea = [] {
+        std::random_device source;
+        std::seed_seq graine{source(), source(), source(), source(),
+                             (unsigned)std::chrono::steady_clock::now()
+                                 .time_since_epoch().count()};
+        return std::mt19937_64(graine);
+    }();
+    unsigned long long a, b;
+    {
+        std::lock_guard<std::mutex> garde(verrou);
+        a = alea();
+        b = alea();
+    }
+    std::string nom = formater("tp%08llx_%04llx_%04llx_%04llx_%012llx", a >> 32,
+                               (a >> 16) & 0xFFFFull, a & 0xFFFFull, b >> 48,
+                               b & 0xFFFFFFFFFFFFull);
     std::error_code ec;
-    static int compteur = 0;
-    fs::path p = fs::temp_directory_path(ec) /
-                 formater("matlibre_%d_%d", (int)identifiantProcessus(), compteur++);
-    return {Valeur::texte(p.string())};
+    fs::path dossier = args.empty() ? fs::temp_directory_path(ec)
+                                    : fs::path(args[0].versTexte());
+    return {Valeur::texte((dossier / nom).string())};
 }
 
 FONCTION(fnGetenv) {
@@ -251,19 +390,45 @@ FONCTION(fnSetenv) {
     return {};
 }
 
+// La sortie de la commande se lit par un tube, sans fichier intermédiaire :
+// un nom fixe dans le dossier temporaire mêlait les sorties de deux appels
+// simultanés (deux sessions, deux travailleurs d'un parfor), et un lien
+// symbolique posé à ce nom par un autre utilisateur faisait écraser le
+// fichier qu'il désigne. La commande est mise entre parenthèses : sans
+// elles, la redirection ne valait que pour sa dernière partie, et
+// « system('echo a; exit 1') » laissait « a » partir sur le terminal.
+// Le code rendu est celui de la commande, comme dans MATLAB — non le
+// statut brut de wait, qui vaut 256 fois le code sous POSIX.
 FONCTION(fnSystem) {
     INUTILISE
     exigerArguments(args, 1, 2, "system");
-    std::string commande = args[0].versTexte();
-    std::string fichier = fs::temp_directory_path().string() + "/matlibre_system.txt";
-    int code = std::system((commande + " > " + fichier + " 2>&1").c_str());
-    std::ifstream f(fichier);
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    std::error_code ec;
-    fs::remove(fichier, ec);
-    if (nargout >= 2) return {Valeur::scalaire(code), Valeur::texte(ss.str())};
-    it.sortie() << ss.str();
+    std::string commande = "(" + args[0].versTexte() + ") 2>&1";
+    std::cout.flush();
+    std::fflush(nullptr);
+#ifdef _WIN32
+    FILE* tube = _popen(commande.c_str(), "r");
+#else
+    FILE* tube = ::popen(commande.c_str(), "r");
+#endif
+    if (!tube)
+        erreur("MATLAB:system:CannotRun",
+               "Unable to run the command: " + args[0].versTexte());
+    std::string sortie;
+    char morceau[4096];
+    std::size_t lus;
+    while ((lus = std::fread(morceau, 1, sizeof morceau, tube)) > 0) sortie.append(morceau, lus);
+#ifdef _WIN32
+    int code = _pclose(tube);
+#else
+    int statut = ::pclose(tube);
+    int code = statut;
+    if (statut != -1) {
+        if (WIFEXITED(statut)) code = WEXITSTATUS(statut);
+        else if (WIFSIGNALED(statut)) code = 128 + WTERMSIG(statut);
+    }
+#endif
+    if (nargout >= 2) return {Valeur::scalaire(code), Valeur::texte(sortie)};
+    it.sortie() << sortie;
     return {Valeur::scalaire(code)};
 }
 
@@ -329,19 +494,53 @@ FONCTION(fnIsmac) {
 
 // ------------------------------------------------------ chemin de recherche
 
+// Les dossiers d'arguments de addpath et rmpath : chacun peut en porter
+// plusieurs, séparés par pathsep — c'est ce que rend genpath.
+static std::vector<std::string> dossiersDuChemin(Arguments args, bool* enFin) {
+#ifdef _WIN32
+    const char separateur = ';';
+#else
+    const char separateur = ':';
+#endif
+    std::vector<std::string> dossiers;
+    for (const auto& a : args) {
+        if (a.estNumerique() && !a.estVide()) {   // l'ancienne forme : 0 tête, 1 fin
+            if (enFin) *enFin = a.scal() != 0;
+            continue;
+        }
+        std::string s = a.versTexte();
+        if (s == "-end" || s == "-END") { if (enFin) *enFin = true; continue; }
+        if (s == "-begin" || s == "-BEGIN") { if (enFin) *enFin = false; continue; }
+        if (s == "-frozen") continue;
+        std::size_t debut = 0;
+        while (debut <= s.size()) {
+            std::size_t fin = s.find(separateur, debut);
+            if (fin == std::string::npos) fin = s.size();
+            if (fin > debut) dossiers.push_back(s.substr(debut, fin - debut));
+            debut = fin + 1;
+        }
+    }
+    return dossiers;
+}
+
+// addpath(D1, ..., DN, POSITION), comme MATLAB : D1 passe en tête, puis
+// D2... ; chaque argument peut porter plusieurs dossiers séparés par
+// pathsep (genpath) ; '-end' les met en fin. Chaque argument était pris
+// pour un seul dossier — « addpath(genpath(d)) » n'ajoutait rien d'utile —,
+// le dernier passait en tête, à l'inverse de MATLAB, si bien qu'une
+// fonction homonyme se résolvait dans le mauvais dossier, et '-end' était
+// ignoré.
 FONCTION(fnAddpath) {
     INUTILISE
-    for (const auto& a : args) {
-        std::string s = a.versTexte();
-        if (s == "-end" || s == "-begin") continue;
-        it.ajouterChemin(s, true);
-    }
+    bool enFin = false;
+    std::vector<std::string> dossiers = dossiersDuChemin(args, &enFin);
+    if (!dossiers.empty()) it.ajouterChemins(dossiers, !enFin);
     return {};
 }
 
 FONCTION(fnRmpath) {
     INUTILISE
-    for (const auto& a : args) it.retirerChemin(a.versTexte());
+    for (const auto& d : dossiersDuChemin(args, nullptr)) it.retirerChemin(d);
     return {};
 }
 
@@ -380,9 +579,14 @@ FONCTION(fnWhich) {
         auto index = it.indexFichiers();
         auto f = index.find(nom);
         std::string courant = it.fichierDossierCourant(nom);
+        // « which fisheriris.mat » : un fichier nommé avec son extension se
+        // cherche dans le dossier courant puis sur le chemin.
+        std::string fichier =
+            nom.find('.') != std::string::npos ? fichierSurChemin(it, nom) : std::string();
         if (f != index.end()) reponse = f->second;
         else if (!courant.empty()) reponse = courant;
         else if (it.natif(nom)) reponse = "built-in (" + nom + ")";
+        else if (!fichier.empty()) reponse = fichier;
         else { reponse = "'" + nom + "' not found."; trouve = false; }
     }
     if (nargout == 0) {
@@ -524,12 +728,12 @@ FONCTION(fnPersistantes) {
     const Valeur& liste = args[1];
     if (liste.classe != Classe::Cellule || (!liste.estVide() && liste.nlignes() != 2))
         erreur("MATLAB:matlibre_persistantes:InvalidInput",
-               "Le second argument est une cellule 2 x n : les cles, puis les valeurs.");
+               "Second input must be a 2-by-n cell array: the names, then the values.");
     for (int k = 0; k < (liste.estVide() ? 0 : liste.ncolonnes()); ++k)
         if (!siens(liste.cellules[2 * (std::size_t)k].versTexte()))
             erreur("MATLAB:matlibre_persistantes:InvalidInput",
-                   "La cle '" + liste.cellules[2 * (std::size_t)k].versTexte() +
-                       "' n'est pas une variable persistante de '" + nom + "'.");
+                   "'" + liste.cellules[2 * (std::size_t)k].versTexte() +
+                       "' is not a persistent variable of '" + nom + "'.");
     for (auto p = it.persistantes.begin(); p != it.persistantes.end();) {
         if (siens(p->first))
             p = it.persistantes.erase(p);
@@ -622,6 +826,10 @@ FONCTION(fnMexext) {
 std::map<std::string, std::string>& fichesAide(Interpreteur& it) {
     static std::map<std::string, std::string> fiches;
     static bool chargees = false;
+    // Chargées une fois, sous verrou : deux fils d'un parfor qui
+    // demandaient de l'aide ensemble remplissaient la même table.
+    static std::mutex verrou;
+    std::lock_guard<std::mutex> garde(verrou);
     if (chargees) return fiches;
     chargees = true;
     std::string racine = it.racineToolbox();

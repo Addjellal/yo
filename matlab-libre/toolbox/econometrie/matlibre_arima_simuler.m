@@ -18,7 +18,7 @@ function [Y, E] = matlibre_arima_simuler(obj, nombre, varargin)
     [phi, theta] = matlibre_arima_polynomes(modele);
     if ~matlibre_racines_admissibles(phi, theta)
         error('econ:arima:Stationnarite', ...
-              'Le modèle n''est pas stationnaire ou pas inversible.');
+              'The model is not stationary or not invertible.');
     end
     p = numel(phi);
     q = numel(theta);

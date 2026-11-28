@@ -24,7 +24,7 @@ function [swa, swd] = swt(x, niveaux, nom)
     n = numel(x);
     if mod(n, 2 ^ niveaux) ~= 0
         error('wavelet:swt:BadLength', ...
-              'La longueur du signal doit être un multiple de 2^N.');
+              'The signal length must be a multiple of 2^N.');
     end
     swa = zeros(niveaux, n);
     swd = zeros(niveaux, n);

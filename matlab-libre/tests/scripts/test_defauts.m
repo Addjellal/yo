@@ -172,13 +172,11 @@ for poignee = {@(x) x^3 - 2*x + 1, @(a,b) (a + b) * (a - b), @(x) -x^2 + 3, ...
                @(a,b,c) a - (b - c), @(x) 1 / (1 + exp(-x))}
     refaite = str2func(func2str(poignee{1}));
     for essai = [0.3 1 2.5]
-        try
-            attendu = poignee{1}(essai, essai + 1, essai + 2);
-            obtenu = refaite(essai, essai + 1, essai + 2);
-        catch
-            attendu = poignee{1}(essai);
-            obtenu = refaite(essai);
-        end
+        % Autant d'arguments que la poignee en declare : un de plus est
+        % refuse, comme dans MATLAB.
+        valeurs = num2cell(essai + (0:nargin(poignee{1}) - 1));
+        attendu = poignee{1}(valeurs{:});
+        obtenu = refaite(valeurs{:});
         assert(abs(attendu - obtenu) < 1e-12);
     end
 end
@@ -695,7 +693,221 @@ J = [1 2; 3 4];
 assert(isequal(I * J, J), 'I et J, poses, sont des variables comme les autres');
 clear I J
 
+%% ----------------- SYSTEM rend le code de la commande, et toute sa sortie
+% Le statut brut de wait valait 256 fois le code sous POSIX : « exit 3 »
+% rendait 768. Et la redirection ne couvrait que la derniere commande
+% d'une suite : la sortie de « echo a; exit 1 » partait sur le terminal,
+% et la sortie rendue etait vide.
+[codeSys, sortieSys] = system('exit 3');
+assert(codeSys == 3 && isempty(sortieSys), 'system rend le code de sortie, non le statut');
+[codeSys, sortieSys] = system('echo bonjour');
+assert(codeSys == 0 && strcmp(strtrim(sortieSys), 'bonjour'));
+if isunix
+    [codeSys, sortieSys] = system('echo premier; echo second >&2; exit 1');
+    assert(codeSys == 1, 'le code est celui de la derniere commande');
+    assert(contains(sortieSys, 'premier') && contains(sortieSys, 'second'), ...
+           'la sortie de chaque commande, erreurs comprises, est rendue');
+end
+clear codeSys sortieSys
+
+%% ---------------- une fonction anonyme refuse un argument de trop
+% « f = @(x) x; f(1,2) » rendait 1 : l'argument en trop passait sans
+% rien dire, la ou MATLAB leve « Too many input arguments ».
+identite = @(x) x;
+constante = @() 3;
+try
+    identite(1, 2);
+    assert(false, 'un argument de trop doit etre refuse');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:TooManyInputs'), e.identifier);
+end
+assert(verifierRefus(@() constante(1)));
+compte = @(x, varargin) numel(varargin);
+assert(compte(1, 2, 3) == 2, 'varargin recoit le reste');
+ignore = @(x, ~) x;
+assert(ignore(1, 2) == 1, 'un ~ compte pour un argument');
+clear identite constante compte ignore
+
+%% ------- NUM2STR garde cinq chiffres significatifs, comme MATLAB
+% Le « %.4g » rendait '3.142' pour pi ; MATLAB documente '3.1416', et
+% garde quatre chiffres apres celui des unites du plus grand element.
+assert(strcmp(num2str(pi), '3.1416'), num2str(pi));
+assert(strcmp(num2str(-pi), '-3.1416'));
+assert(strcmp(num2str(123.456), '123.456'));
+assert(strcmp(num2str(pi * 1000), '3141.5927'));
+assert(strcmp(num2str(0.001234567), '0.0012346'));
+assert(strcmp(num2str(3.14159, 4), '3.142'), 'une precision donnee l''emporte');
+assert(strcmp(num2str(42), '42') && strcmp(num2str(0.1), '0.1'));
+
+%% ----------- SPRINTF('%d') d'une valeur non entiere ou tres grande
+% MATLAB passe en %e quand la valeur n'est pas entiere : '3.500000e+00',
+% non '3.5'. Et un entier au-dela de 2^63 debordait la conversion en
+% long long : 1e20 s'ecrivait -9223372036854775808.
+assert(strcmp(sprintf('%d', 3.5), '3.500000e+00'), sprintf('%d', 3.5));
+assert(strcmp(sprintf('%i', -0.25), '-2.500000e-01'));
+assert(strcmp(sprintf('%d', 42), '42'));
+assert(strcmp(sprintf('%d', 1e20), '100000000000000000000'), sprintf('%d', 1e20));
+assert(strcmp(sprintf('%d', -1e20), '-100000000000000000000'));
+
+%% ------------ un commentaire de bloc jamais referme ne bloque pas
+% « %{ » sans « %} » faisait tourner le lexeur sans fin : le reste du
+% texte est un commentaire, comme dans MATLAB.
+eval(sprintf('valeurAvant = 2;\n%%{\nvaleurApres = 1;'));
+assert(valeurAvant == 2 && ~exist('valeurApres', 'var'));
+clear valeurAvant
+
+%% ------- un emboitement demesure est refuse, il ne fait plus tomber
+% Dix mille parentheses faisaient deborder la pile de l'analyseur, et
+% le programme tombait (erreur de segmentation). Au-dela de 256
+% niveaux, c'est une erreur de syntaxe ; en deca, rien ne change.
+assert(eval([repmat('(', 1, 200) '1' repmat(')', 1, 200)]) == 1);
+try
+    eval([repmat('(', 1, 20000) '1' repmat(')', 1, 20000)]);
+    assert(false, 'vingt mille parentheses doivent etre refusees');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:parseError'), e.identifier);
+end
+
+%% ---------- un tableau trop grand est une erreur, non une fin brutale
+% std::bad_alloc n'etait attrape par aucun try/catch : « 1:1e18 » et
+% « ones(1e6, 1e6) » arretaient la session (« Erreur interne »). Une plage
+% trop longue, un tableau plus grand que la memoire de la machine sont
+% refuses avant d'allouer, comme dans MATLAB ; ce qui echappe a ce
+% controle et manque de memoire leve MATLAB:nomem.
+try
+    trop = 1:1e18; %#ok<NASGU>
+    assert(false, '1:1e18 doit echouer');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:array:SizeLimitExceeded'), e.identifier);
+end
+assert(verifierRefus(@() 1:Inf));
+try
+    ones(1e6, 1e6);
+    assert(false, 'huit teraoctets doivent etre refuses');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:array:SizeLimitExceeded'), e.identifier);
+    assert(contains(e.message, 'maximum array size preference'), e.message);
+end
+
+%% ---------- une taille non representable est refusee, non ramenee a zero
+% « (int)1e10 » valait INT_MIN, ramene a zero : zeros(1e10) rendait un
+% tableau vide sans rien dire, ones(2^31, 1) un 0x1, zeros(NaN) aussi.
+try
+    zeros(1e10);
+    assert(false, 'zeros(1e10) doit echouer');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:array:SizeLimitExceeded'), e.identifier);
+end
+assert(verifierRefus(@() ones(2^31, 1)) && verifierRefus(@() zeros(NaN)));
+assert(verifierRefus(@() rand([2 1e10])));
+assert(isequal(size(zeros(-3)), [0 0]), 'une taille negative vaut zero');
+
+%% ---------- les operateurs unaires refusent ce qui ne porte pas de nombres
+% « -{1} » rendait la cellule, « -@sin » la poignee, « ~struct() » un
+% logique, « -"abc" » des codes ; « -objet » rendait l'objet tel quel.
+assert(verifierRefus(@() -{1}) && verifierRefus(@() +{1}));
+assert(verifierRefus(@() ~struct('a', 1)) && verifierRefus(@() -@sin));
+assert(verifierRefus(@() -"abc"), 'MATLAB refuse le moins sur un string');
+assert(isequal(-'ab', [-97 -98]), 'et l''accepte sur un char');
+try
+    -Compteur(1); %#ok<VUNUS>
+    assert(false, 'Compteur n''a pas de methode uminus');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:UndefinedFunction'), e.identifier);
+end
+
+%% ---------- le moins unaire d'un tableau creux le nie
+% Il rendait la matrice telle quelle ; « 0 - s » et « uminus(s) » la
+% niaient deja.
+creuse = sparse([1 0 2]);
+assert(issparse(-creuse) && isequal(full(-creuse), [-1 0 -2]));
+assert(islogical(~creuse) && isequal(~creuse, [false true false]));
+clear creuse
+
+%% ---------- un operande ne s'evalue qu'une fois, objet ou non
+% Quand l'un des operandes etait un objet, l'expression etait evaluee une
+% seconde fois : « f() + objet » appelait f deux fois.
+global appelsOperande
+appelsOperande = 0;
+somme = compteurCompte() + compteurCompte();
+assert(somme.valeur == 2 && appelsOperande == 2, sprintf('%d appels', appelsOperande));
+appelsOperande = 0;
+assert(verifierRefus(@() -compteurCompte()) && appelsOperande == 1);
+clear global appelsOperande
+clear somme
+
+%% ---------- TEMPNAME : un nom tire au hasard, dans le dossier demande
+% « matlibre_<processus>_<compteur> » se devinait (un lien symbolique
+% pose d'avance faisait ecraser un autre fichier), le compteur n'etait
+% pas protege des fils d'un parfor, et TEMPNAME(DOSSIER) ignorait DOSSIER.
+[dossierTemp, nomTemp] = fileparts(tempname());
+assert(startsWith(nomTemp, 'tp') && numel(nomTemp) > 30, nomTemp);
+assert(~strcmp(tempname(), tempname()));
+[dossierDemande, ~] = fileparts(tempname(fullfile(dossierTemp, 'ici')));
+assert(strcmp(dossierDemande, fullfile(dossierTemp, 'ici')), dossierDemande);
+clear dossierTemp nomTemp dossierDemande
+
+%% ---------- ADDPATH : genpath, l'ordre de MATLAB, '-end' ; RMPATH aussi
+% Chaque argument etait pris pour un seul dossier : addpath(genpath(d))
+% n'ajoutait rien d'utile. Le dernier argument passait en tete, a
+% l'inverse de MATLAB, et '-end' etait ignore.
+racineChemin = tempname();
+mkdir(fullfile(racineChemin, 'a'));
+mkdir(fullfile(racineChemin, 'x'));
+mkdir(fullfile(racineChemin, 'y'));
+ecrireFonction(fullfile(racineChemin, 'a', 'fonctionDeA.m'), 'fonctionDeA', 1);
+ecrireFonction(fullfile(racineChemin, 'x', 'homonymeChemin.m'), 'homonymeChemin', 10);
+ecrireFonction(fullfile(racineChemin, 'y', 'homonymeChemin.m'), 'homonymeChemin', 20);
+addpath(genpath(fullfile(racineChemin, 'a')));
+assert(fonctionDeA() == 1, 'genpath puis addpath');
+addpath(fullfile(racineChemin, 'x'), fullfile(racineChemin, 'y'));
+assert(homonymeChemin() == 10, 'le premier dossier passe en tete');
+addpath(fullfile(racineChemin, 'a'), '-end');
+morceaux = strsplit(path(), pathsep);
+assert(strcmp(morceaux{end}, fullfile(racineChemin, 'a')), '''-end'' met en fin');
+rmpath(genpath(racineChemin));
+assert(~any(startsWith(strsplit(path(), pathsep), racineChemin)), 'rmpath(genpath(...))');
+rmdir(racineChemin, 's');
+clear racineChemin morceaux
+
+%% ---------- HISTCOUNTS compte toutes les valeurs, bords automatiques
+% Le dernier bord, calcule mn + (mx - mn) * n / n, pouvait manquer le
+% maximum d'un ulp : une valeur sur mille n'etait pas comptee.
+for graine = 1:20
+    rng(graine);
+    donneesHisto = randn(1, 1000);
+    assert(sum(histcounts(donneesHisto)) == 1000, sprintf('graine %d', graine));
+end
+clear graine donneesHisto
+
+%% ---------- des arguments absurdes sont refuses, sans faire tomber
+% outils/eprouverNatives.sh : nthroot lisait « re » d'une cellule ou
+% d'une structure au-dela de sa fin, logm ne controlait pas son argument,
+% num2cell decoupait une poignee comme un tableau — erreurs de
+% segmentation.
+assert(verifierRefus(@() nthroot({1, 2}, 1)) && verifierRefus(@() nthroot(1, {1, 2})));
+assert(verifierRefus(@() nthroot(struct(), 1)) && verifierRefus(@() nthroot(@sin, 1)));
+assert(verifierRefus(@() nthroot(1, [])));
+assert(verifierRefus(@() logm(struct())) && verifierRefus(@() logm(@sin)));
+assert(verifierRefus(@() logm("")) && verifierRefus(@() logm(ones(2, 3))));
+assert(iscell(num2cell(@sin, 1)) && isequal(nthroot(-27, 3), -3));
+
 disp('defauts : toutes les verifications passent');
+
+function c = compteurCompte()
+% Un Compteur, en comptant les appels : de quoi voir qu'un operande ne
+% s'evalue qu'une fois.
+    global appelsOperande
+    appelsOperande = appelsOperande + 1;
+    c = Compteur(1);
+end
+
+function ecrireFonction(fichier, nom, valeur)
+% Une fonction d'une ligne qui rend VALEUR.
+    fid = fopen(fichier, 'w');
+    fprintf(fid, 'function r = %s()\n    r = %d;\nend\n', nom, valeur);
+    fclose(fid);
+end
 
 function ok = verifierRefus(f)
 % Vrai si l'appel leve une erreur, faux s'il passe.

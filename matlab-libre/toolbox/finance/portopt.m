@@ -38,7 +38,7 @@ function [risques, rendements, poids] = portopt(rendementsAttendus, covariance, 
         [poidsMin, bon] = matlibre_qp_actif(2 * covariance, zeros(n, 1), A, b, [], []);
         if ~bon
             error('finance:portopt:Contraintes', ...
-                  'Les contraintes ne définissent aucun portefeuille admissible.');
+                  'The constraints define no feasible portfolio.');
         end
         rendementMin = rendementsAttendus.' * poidsMin;
         poidsMax = linprog(-rendementsAttendus, A, b);

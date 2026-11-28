@@ -138,7 +138,7 @@ function d = seuiller(d, sigma, methode, regle)
             seuil = sigma * thselect(d / sigma, 'minimaxi');
         otherwise
             error('wavelet:wdenoise2:Methode', ...
-                  'Méthode inconnue : %s.', methode);
+                  'Unknown method: %s.', methode);
     end
     d = wthresh(d, regle, seuil);
 end

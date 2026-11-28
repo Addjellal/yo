@@ -11,7 +11,7 @@ function [h, v, d] = detcoef2(genre, C, S, niveau)
 %   Voir aussi APPCOEF2, WAVEDEC2, WRCOEF2.
     niveauMax = size(S, 1) - 2;
     if niveau > niveauMax || niveau < 1
-        error('wavelet:detcoef2:BadLevel', 'Niveau hors de la décomposition.');
+        error('wavelet:detcoef2:BadLevel', 'Level is outside the decomposition.');
     end
     position = prod(S(1, :));
     for k = 1:niveauMax - niveau

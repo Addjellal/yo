@@ -31,12 +31,12 @@ function d = duree(contexte, unite)
             champ = 'sf_temps';
         otherwise
             error('Stateflow:UniteTemporelle', ...
-                  'L''unite est ''tick'' ou ''sec'' ; pas ''%s''.', char(unite));
+                  'The unit must be ''tick'' or ''sec'', not ''%s''.', char(unite));
     end
     if ~isstruct(contexte) || ~isfield(contexte, champ) || isnan(contexte.(champ))
         error('Stateflow:TempsInconnu', ...
-              ['La logique temporelle lit le champ %s du contexte, que pose SFSTEP ; ' ...
-               'en secondes, le contexte doit porter l''instant sf_t.'], champ);
+              ['Temporal logic reads context field %s, which SFSTEP sets; ' ...
+               'in seconds, the context must hold the time sf_t.'], champ);
     end
     d = contexte.(champ);
 end

@@ -27,7 +27,7 @@ function [PSNR, MSE, MAXERR, L2RAT] = measerr(X, Xapp, BPS)
     Xapp = double(Xapp);
     if ~isequal(size(X), size(Xapp))
         error('wavelet:measerr:Tailles', ...
-              'Les deux entrées doivent avoir la même taille.');
+              'The two inputs must be the same size.');
     end
     ecart = X(:) - Xapp(:);
     MSE = sum(ecart .^ 2) / numel(ecart);

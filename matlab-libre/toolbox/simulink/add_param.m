@@ -19,12 +19,18 @@ function modele = add_param(modele, varargin)
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'constant', 'c', 'Value', 3);
-%      m = add_param(m, 'StopTime', 2, 'FixedStep', 0.5);
+%      m = add_param(m, 'StopTime', 2, 'Solver', 'ode1', 'FixedStep', 0.5);
 %      r = sim(m);
 %      r.temps(end)                     % 2
 %      numel(r.temps)                   % 5 : de 0 a 2 par pas de 0,5
 %
 %   Voir aussi DELETE_PARAM, SET_PARAM, GET_PARAM, NEW_SYSTEM, SIM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        matlibre_sl_nomme('add_param', nargout, modele, varargin{:});
+        clear modele
+        return
+    end
     if ~isfield(modele, 'parametres')
         modele.parametres = struct();
     end
@@ -32,8 +38,8 @@ function modele = add_param(modele, varargin)
         nom = char(varargin{k});
         if isfield(modele.parametres, nom)
             error('Simulink:Commands:AddParamExiste', ...
-                  ['Le modele porte deja un reglage ''%s'' : employez SET_PARAM ' ...
-                   'pour le changer.'], nom);
+                  ['The model already has a parameter ''%s'': use SET_PARAM ' ...
+                   'to change it.'], nom);
         end
         % Un réglage de la boîte de configuration est vérifié comme par
         % SET_PARAM, et rangé sous son écriture canonique.
@@ -41,8 +47,8 @@ function modele = add_param(modele, varargin)
         if ~isempty(canon)
             if isfield(modele.parametres, canon)
                 error('Simulink:Commands:AddParamExiste', ...
-                      ['Le modele porte deja un reglage ''%s'' : employez SET_PARAM ' ...
-                       'pour le changer.'], canon);
+                      ['The model already has a parameter ''%s'': use SET_PARAM ' ...
+                       'to change it.'], canon);
             end
             modele.parametres.(canon) = matlibre_sl_config('valider', canon, varargin{k + 1});
             continue

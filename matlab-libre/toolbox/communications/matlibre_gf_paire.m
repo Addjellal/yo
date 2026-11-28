@@ -7,7 +7,7 @@ function [a, b, m, prim] = matlibre_gf_paire(a, b)
     if isa(a, 'gf') && isa(b, 'gf')
         if a.m ~= b.m || a.prim_poly ~= b.prim_poly
             error('comm:gf:Corps', ...
-                  'Les deux tableaux ne sont pas du même corps de Galois.');
+                  'The two arrays are not in the same Galois field.');
         end
         m = a.m;
         prim = a.prim_poly;

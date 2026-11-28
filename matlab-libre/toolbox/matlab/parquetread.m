@@ -26,7 +26,7 @@ function T = parquetread(nomFichier, varargin)
 %
 %   Voir aussi PARQUETWRITE, PARQUETINFO, READTABLE, TABLE.
     if nargin < 1
-        error('MATLAB:minrhs', 'PARQUETREAD attend un nom de fichier.');
+        error('MATLAB:minrhs', 'Not enough input arguments.');
     end
     nomFichier = char(nomFichier);
     choix = {};
@@ -35,7 +35,7 @@ function T = parquetread(nomFichier, varargin)
             choix = cellstr(string(varargin{k+1}));
         else
             error('MATLAB:parquet:OptionInconnue', ...
-                  'Option inconnue « %s ».', char(varargin{k}));
+                  'Unknown option ''%s''.', char(varargin{k}));
         end
     end
 
@@ -63,8 +63,8 @@ function T = parquetread(nomFichier, varargin)
         end
         if repetition == 2
             error('MATLAB:parquet:ColonneRepetee', ...
-                  ['La colonne « %s » est répétée — une liste par ligne ; ' ...
-                   'MatLibre lit les colonnes simples.'], noms{end});
+                  ['Column ''%s'' is repeated (one list per row); ' ...
+                   'MatLibre reads flat columns only.'], noms{end});
         end
         niveauxMax(end+1) = repetition;   %#ok<AGROW>
     end
@@ -86,8 +86,8 @@ function T = parquetread(nomFichier, varargin)
             end
             if double(meta.c4) ~= 0
                 error('MATLAB:parquet:Compression', ...
-                      ['Le fichier est compressé (codec %d) ; MatLibre lit ' ...
-                       'le format non compressé.'], double(meta.c4));
+                      ['The file is compressed (codec %d); MatLibre reads ' ...
+                       'uncompressed files only.'], double(meta.c4));
             end
             morceau = lireChunk(octets, meta, physiques(indice), ...
                                 niveauxMax(indice), noms{indice}, ...
@@ -109,7 +109,7 @@ function T = parquetread(nomFichier, varargin)
         end
         if ~lues(k)
             error('MATLAB:parquet:ColonneAbsente', ...
-                  'Aucune donnée pour la colonne « %s ».', noms{k});
+                  'No data for column ''%s''.', noms{k});
         end
         gardes{end+1} = noms{k};                                              %#ok<AGROW>
         donnees{end+1} = convertir(valeurs{k}, physiques(k), convertis(k));   %#ok<AGROW>
@@ -121,7 +121,7 @@ function T = parquetread(nomFichier, varargin)
     T = table(donnees{:}, 'VariableNames', gardes);
     if height(T) ~= nbLignes
         error('MATLAB:parquet:NombreDeLignes', ...
-              'Le pied annonce %d lignes, les pages en portent %d.', nbLignes, height(T));
+              'The footer announces %d rows, but the pages hold %d.', nbLignes, height(T));
     end
 end
 
@@ -136,15 +136,15 @@ function valeurs = lireChunk(octets, meta, physique, niveauMax, nom, classe)
         [entete, suite] = matlibre_thrift_lire(octets, position);
         if double(entete.c1) ~= 0
             error('MATLAB:parquet:PageNonSupportee', ...
-                  ['Seules les pages de données de première version sont lues ; ' ...
-                   'celle-ci est de type %d.'], double(entete.c1));
+                  ['Only version 1 data pages are supported; ' ...
+                   'this one has type %d.'], double(entete.c1));
         end
         taille = double(entete.c3);
         detail = entete.c5;
         if double(detail.c2) ~= 0
             error('MATLAB:parquet:EncodageNonSupporte', ...
-                  ['Seul l''encodage PLAIN est lu ; celui de cette page est %d ' ...
-                   '(un dictionnaire, le plus souvent).'], double(detail.c2));
+                  ['Only PLAIN encoding is supported; this page uses %d ' ...
+                   '(usually a dictionary).'], double(detail.c2));
         end
         nombre = double(detail.c1);
         page = octets(suite:suite+taille-1);
@@ -152,8 +152,8 @@ function valeurs = lireChunk(octets, meta, physique, niveauMax, nom, classe)
         if niveauMax > 0
             if double(detail.c3) ~= 3
                 error('MATLAB:parquet:NiveauxNonSupportes', ...
-                      ['Les niveaux de définition ne sont lus qu''en codage RLE ; ' ...
-                       'celui-ci est %d.'], double(detail.c3));
+                      ['Definition levels are supported only with RLE encoding; ' ...
+                       'this one is %d.'], double(detail.c3));
             end
             longueur = double(typecast(uint8(page(1:4)), 'uint32'));
             niveaux = matlibre_parquet_niveaux(page(5:4+longueur), 1, nombre);
@@ -186,9 +186,9 @@ function pleine = repartir(presentes, presents, physique, nom)
     end
     if physique ~= 5 && physique ~= 4
         error('MATLAB:parquet:ValeursAbsentes', ...
-              ['La colonne « %s » a des valeurs absentes, et sa classe n''a ' ...
-               'pas de valeur pour les dire ; seules les colonnes flottantes ' ...
-               'les portent, sous forme de NaN.'], nom);
+              ['Column ''%s'' has missing values, and its class has ' ...
+               'no value to represent them; only floating-point columns ' ...
+               'hold them, as NaN.'], nom);
     end
     pleine = nan(numel(presents), 1);
     if physique == 4

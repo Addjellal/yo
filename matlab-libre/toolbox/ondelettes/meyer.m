@@ -29,7 +29,7 @@ function [psi, xval] = meyer(bas, haut, n, genre)
     n = round(n);
     if n < 2 || bitand(n, n - 1) ~= 0
         error('wavelet:meyer:Puissance', ...
-              'Le nombre de points doit être une puissance de deux.');
+              'The number of points must be a power of two.');
     end
     genre = lower(char(genre));
     xval = linspace(bas, haut, n);
@@ -50,7 +50,7 @@ function [psi, xval] = meyer(bas, haut, n, genre)
         spectre(loin) = cos(pi / 2 * meyeraux(3 * absw(loin) / (4 * pi) - 1));
         decalage = 0.5;
     else
-        error('wavelet:meyer:Genre', 'Le genre doit être ''psi'' ou ''phi''.');
+        error('wavelet:meyer:Genre', 'Type must be ''psi'' or ''phi''.');
     end
     spectre = spectre .* exp(-1i * w * decalage);
     psi = real(ifft(spectre)) * n / etendue;

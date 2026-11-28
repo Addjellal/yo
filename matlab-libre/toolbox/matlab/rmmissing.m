@@ -27,7 +27,7 @@ function [b, marque] = rmmissing(a, varargin)
     end
     while k <= numel(varargin)
         if k + 1 > numel(varargin)
-            error('rmmissing:Paire', 'Option sans valeur : %s.', char(varargin{k}));
+            error('rmmissing:Paire', 'Value missing for option %s.', char(varargin{k}));
         end
         switch lower(char(varargin{k}))
             case 'minnummissing'

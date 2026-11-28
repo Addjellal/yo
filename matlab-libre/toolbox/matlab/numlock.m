@@ -21,7 +21,7 @@ function etat = numlock(nouvelEtat)
     if nargin > 0
         demande = lower(char(nouvelEtat));
         if ~any(strcmp(demande, {'on', 'off'}))
-            error('MATLAB:numlock:BadState', 'numlock attend ''on'' ou ''off''.');
+            error('MATLAB:numlock:BadState', 'State must be ''on'' or ''off''.');
         end
         if ispc()
             % Rien à faire : sans accès au clavier du système, la demande

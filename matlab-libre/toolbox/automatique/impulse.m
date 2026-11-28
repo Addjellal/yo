@@ -50,9 +50,9 @@ function [y, t] = impulse(varargin)
     end
     plot(courbes{:});
     grid on;
-    xlabel('Temps (s)');
+    xlabel('Time (seconds)');
     ylabel('Amplitude');
-    title('Réponse impulsionnelle');
+    title('Impulse Response');
 end
 
 % La reponse impulsionnelle d'un modele retarde est la meme, decalee : une
@@ -154,7 +154,7 @@ function tracerGrille(modeles, styles, temps)
         autre = ss(modeles{k});
         if ~isequal(size(autre.D), size(reference.D))
             error('Control:analysis:MultipleModels', ...
-                  'Les modeles superposes doivent avoir les memes entrees et sorties.');
+                  'All models must have the same inputs and outputs.');
         end
         [reponses{k}, instants{k}] = reponseImpulsion(modeles{k}, temps);
     end
@@ -171,8 +171,8 @@ function tracerGrille(modeles, styles, temps)
             end
             plot(courbes{:});
             grid on;
-            title(sprintf('De %s vers %s', entrees{j}, sorties{i}));
-            if i == size(cases, 1), xlabel('Temps (s)'); end
+            title(sprintf('From: %s  To: %s', entrees{j}, sorties{i}));
+            if i == size(cases, 1), xlabel('Time (seconds)'); end
             if j == 1, ylabel('Amplitude'); end
         end
     end

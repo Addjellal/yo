@@ -15,11 +15,11 @@ function [arbre, varargout] = wpsplt(arbre, noeud)
     indice = indiceDeNoeud(arbre, noeud);
     if ~any(arbre.noeuds == indice)
         error('wavelet:wpsplt:Absent', ...
-              'Le nœud %d n''est pas dans l''arbre.', indice);
+              'Node %d is not in the tree.', indice);
     end
     if any(arbre.noeuds == arbre.ordre * indice + 1)
         error('wavelet:wpsplt:DejaScinde', ...
-              'Le nœud %d est déjà scindé.', indice);
+              'Node %d is already split.', indice);
     end
     arbre = scinderNoeud(arbre, indice);
     arbre.profondeur = treedpth(arbre);

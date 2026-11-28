@@ -68,13 +68,13 @@ classdef dwtfilterbank
             end
             if ~isempty(obj.SamplingFrequency) && ~isempty(obj.SamplingPeriod)
                 error('wavelet:dwtfilterbank:Cadence', ...
-                      'SamplingFrequency et SamplingPeriod s''excluent.');
+                      'SamplingFrequency and SamplingPeriod are mutually exclusive.');
             end
             obj.Wavelet = char(obj.Wavelet);
             obj.SignalLength = round(double(obj.SignalLength));
             if obj.SignalLength < 2
                 error('wavelet:dwtfilterbank:Longueur', ...
-                      'SignalLength doit valoir au moins deux.');
+                      'SignalLength must be at least two.');
             end
             [Lo_D, Hi_D, Lo_R, Hi_R] = wfilters(obj.Wavelet);
             if strcmpi(obj.FilterType, 'Synthesis')
@@ -91,7 +91,7 @@ classdef dwtfilterbank
             obj.Level = round(double(obj.Level));
             if obj.Level < 1
                 error('wavelet:dwtfilterbank:Niveau', ...
-                      'Level doit valoir au moins un.');
+                      'Level must be at least one.');
             end
         end
 

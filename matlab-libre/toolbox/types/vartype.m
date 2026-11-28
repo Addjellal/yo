@@ -22,7 +22,7 @@ classdef vartype
     methods
         function v = vartype(type)
             if nargin < 1
-                error('MATLAB:vartype:NotEnoughInputs', 'Il faut un type.');
+                error('MATLAB:vartype:NotEnoughInputs', 'Not enough input arguments.');
             end
             v.Type = lower(char(type));
         end

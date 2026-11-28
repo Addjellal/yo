@@ -10,7 +10,7 @@ function [z, p, k, Ts] = zpkdata(sys, forme)
 %   Voir aussi SSDATA, TFDATA, ZPK.
     [num, den, Ts] = tfdata(sys);
     if nargin >= 2 && ~isempty(forme) && ~any(strcmpi(char(forme), {'v', 'vector'}))
-        error('control:zpkdata:BadForm', 'La forme doit être ''v''.');
+        error('control:zpkdata:BadForm', 'Format must be ''v''.');
     end
     [z, p, k] = tf2zp(num, den);
     z = z(:);

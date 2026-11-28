@@ -49,7 +49,7 @@ classdef tabularTextDatastore < handle
             ds.Files = matlibre_datastore_fichiers(chemin, {'.csv', '.txt', '.dat'});
             if isempty(ds.Files)
                 error('MATLAB:datastore:FileNotFound', ...
-                      'Aucun fichier lisible a « %s ».', char(string(chemin)));
+                      'Cannot find files or folders matching: ''%s''.', char(string(chemin)));
             end
             options = matlibre_lire_options(varargin, ...
                 struct('ReadSize', 20000, 'Delimiter', ',', ...
@@ -93,7 +93,7 @@ classdef tabularTextDatastore < handle
         %   fin est une erreur : c'est HASDATA qui dit quand s'arrêter.
             if ~hasdata(ds)
                 error('MATLAB:datastore:NoMoreData', ...
-                      'Il n''y a plus rien a lire. Employez HASDATA ou RESET.');
+                      'No more data to read. Use the HASDATA or RESET methods.');
             end
             dernier = min(ds.Position + ds.ReadSize - 1, height(ds.Cache));
             donnees = ds.Cache(ds.Position:dernier, :);

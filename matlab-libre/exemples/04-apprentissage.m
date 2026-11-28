@@ -17,7 +17,7 @@ fprintf('Centres trouves : %s et %s\n', mat2str(round(centres(1, :), 2)), ...
         mat2str(round(centres(2, :), 2)));
 
 % Analyse en composantes principales.
-[coefficients, scores, valeurs, expliquee] = pca(donnees);
+[coefficients, scores, valeurs, ~, expliquee] = pca(donnees);
 fprintf('Premiere composante : %.1f %% de la variance\n', expliquee(1));
 
 % Arbre de décision, appris puis évalué.

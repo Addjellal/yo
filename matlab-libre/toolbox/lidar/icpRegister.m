@@ -24,12 +24,21 @@ function [R, t, erreur] = icpRegister(source, cible, iterations)
 %   La transformation rendue est toujours rigide : R'R vaut l'identité et
 %   son déterminant vaut un, sans symétrie ni changement d'échelle.
 %
+%   Quand le déplacement est assez petit pour que chaque point ait d'emblée
+%   le bon plus proche voisin, la première itération donne la
+%   transformation exacte (Arun, Huang et Blostein, 1987). Plus loin, sur
+%   une courbe échantillonnée régulièrement, les points peuvent glisser
+%   d'un pas d'échantillonnage : ICP s'arrête alors dans ce minimum local
+%   (Besl et McKay, 1992, ne garantissent pas mieux).
+%
 %   Exemple :
 %      forme = [cos(0:0.1:2*pi).', sin(0:0.1:2*pi).'] .* [2 1];
-%      a = deg2rad(12);
-%      Rv = [cos(a) -sin(a); sin(a) cos(a)];
-%      [R, t] = icpRegister(forme, (Rv * forme.').' + [0.4 -0.25], 60);
-%      rad2deg(atan2(R(2,1), R(1,1)))  % 12
+%      Rv = [cosd(1) -sind(1); sind(1) cosd(1)];
+%      [R, t] = icpRegister(forme, forme * Rv.' + [0.03 -0.02], 60);
+%      atan2d(R(2,1), R(1,1))          % 1, à 1e-14 près : t vaut [0.03 -0.02]
+%      Rv = [cosd(12) -sind(12); sind(12) cosd(12)];
+%      R = icpRegister(forme, forme * Rv.' + [0.4 -0.25], 60);
+%      atan2d(R(2,1), R(1,1))          % 9.25 : minimum local, glissé d'un pas
 %
 %   Voir aussi FITPLANERANSAC, VOXELDOWNSAMPLE, POINTCLOUDFROMRANGES.
     if nargin < 3
@@ -51,7 +60,9 @@ function [R, t, erreur] = icpRegister(source, cible, iterations)
         H = (courant - repmat(cs, size(courant,1), 1)).' * ...
             (appariee - repmat(cc, size(appariee,1), 1));
         [U, ~, V] = svd(H);
-        Rk = V * U.';
+        % Kabsch : sans ce correctif de signe, des appariements presque
+        % alignés donneraient une symétrie (déterminant -1), non une rotation.
+        Rk = V * diag([1, sign(det(V * U.'))]) * U.';
         tk = cc.' - Rk * cs.';
         courant = (Rk * courant.' + repmat(tk, 1, size(courant,1))).';
         R = Rk * R;

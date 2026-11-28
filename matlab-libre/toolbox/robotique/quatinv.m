@@ -21,7 +21,7 @@ function r = quatinv(q)
         carre = sum(m(k, :) .^ 2);
         if carre < eps
             error('robotics:quatinv:Nul', ...
-                  'Un quaternion nul n''a pas d''inverse.');
+                  'A zero quaternion has no inverse.');
         end
         r(k, :) = [m(k, 1), -m(k, 2:4)] / carre;
     end

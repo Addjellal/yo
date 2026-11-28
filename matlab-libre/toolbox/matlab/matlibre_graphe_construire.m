@@ -26,7 +26,7 @@ function [arcs, poids, noms, nombre] = matlibre_graphe_construire(arguments, ori
         A = double(premier);
         if size(A, 1) ~= size(A, 2)
             error('MATLAB:graph:NotSquare', ...
-                  'Une matrice d''adjacence doit être carrée.');
+                  'Adjacency matrix must be square.');
         end
         nombre = size(A, 1);
         for i = 1:nombre
@@ -60,7 +60,7 @@ function [arcs, poids, noms, nombre] = matlibre_graphe_construire(arguments, ori
     t = double(t(:));
     if numel(s) ~= numel(t)
         error('MATLAB:graph:SizeMismatch', ...
-              'Les deux listes de nœuds doivent être de même longueur.');
+              'Source and target node lists must have the same length.');
     end
     arcs = [s, t];
     if numel(arguments) >= 3 && isnumeric(arguments{3}) && ~isempty(arguments{3})
@@ -81,7 +81,7 @@ function indices = nomsVersIndices(liste, noms)
     for k = 1:numel(liste)
         j = find(strcmp(noms, liste{k}), 1);
         if isempty(j)
-            error('MATLAB:graph:UnknownNode', 'Nœud inconnu : %s.', liste{k});
+            error('MATLAB:graph:UnknownNode', 'Unknown node: %s.', liste{k});
         end
         indices(k) = j;
     end

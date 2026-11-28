@@ -131,14 +131,18 @@
 
 ```
 APPCOEF Coefficients d'approximation d'une décomposition WAVEDEC.
-  A = APPCOEF(C,L,ONDELETTE) rend l'approximation du dernier niveau.
-  A = APPCOEF(C,L,ONDELETTE,N) reconstruit celle du niveau N.
+  A = APPCOEF(C,L,'wname') rend l'approximation du dernier niveau.
+  A = APPCOEF(C,L,'wname',N) la reconstruit au niveau N, de 0 (le
+  signal) au dernier ; APPCOEF(C,L,Lo_R,Hi_R,N) avec des filtres donnés.
+  À chaque niveau remonté, IDWT reçoit la longueur que L garde, si bien
+  que les longueurs impaires sont rendues exactement.
 
   Exemple :
      x = sin((1:64) / 8);
      [c, l] = wavedec(x, 3, 'db2');
      a = appcoef(c, l, 'db2');
      numel(a) == l(1)            % 1 : l'approximation la plus grossiere
+     numel(appcoef(c, l, 'db2', 1)) == l(3)
 
   Voir aussi DETCOEF, WAVEDEC, WAVEREC, WRCOEF.
 ```
@@ -147,7 +151,10 @@ APPCOEF Coefficients d'approximation d'une décomposition WAVEDEC.
 
 ```
 APPCOEF2 Coefficients d'approximation d'une image décomposée.
-  A = APPCOEF2(C,S,NOM,N) reconstruit l'approximation du niveau N.
+  A = APPCOEF2(C,S,'wname') rend l'approximation du dernier niveau ;
+  APPCOEF2(C,S,'wname',N) la reconstruit au niveau N, de 0 (l'image)
+  au dernier ; APPCOEF2(C,S,Lo_R,Hi_R,N) avec des filtres donnés. À
+  chaque niveau remonté, IDWT2 reçoit la taille que S garde.
 
   Exemple :
      [C, S] = wavedec2(magic(8), 2, 'haar');
@@ -214,7 +221,8 @@ BIORFILT Banc de filtres biorthogonal à partir des deux filtres d'échelle.
   d'échelle soient alignés à un décalage pair près, faute de quoi le
   demi-bande change de parité et le repliement subsiste — la distorsion
   restant nulle, l'erreur ne se voit qu'à la reconstruction. C'est
-  pourquoi les zéros de complètement s'ajoutent par paires à gauche.
+  pourquoi les deux filtres se complètent, comme dans MATLAB, à une même
+  longueur paire.
 
   Exemple :
      [df, rf] = biorwavf('bior2.2');
@@ -231,7 +239,8 @@ BIORFILT Banc de filtres biorthogonal à partir des deux filtres d'échelle.
 BIORWAVF Filtres d'une ondelette biorthogonale spline.
   [RF,DF] = BIORWAVF('biorNr.Nd') rend le filtre d'échelle de synthèse
   RF et celui d'analyse DF, tous deux de somme un et complétés de zéros
-  pour avoir la même longueur — c'est la convention de MATLAB.
+  centrés pour avoir la même longueur — c'est la convention de MATLAB :
+  bior2.2 rend RF = [0 1 2 1 0]/4.
 
   La construction est celle de Cohen, Daubechies et Feauveau : le
   filtre de synthèse est le spline d'ordre Nr, c'est-à-dire le binôme
@@ -340,7 +349,7 @@ CMORWAVF Ondelette de Morlet complexe.
 COIFLETFILTRE Filtre d'échelle d'une coiflette, par ses conditions.
   H = COIFLETFILTRE(N) rend le filtre d'échelle de coifN, de longueur
   6N et de somme racine de deux, dans l'ordre de synthèse : c'est
-  celui de MATLAB, où le plus gros coefficient tombe à l'indice 4N-1.
+  celui de MATLAB, où le plus gros coefficient tombe à l'indice 2N+1.
 
   Aucune table n'est recopiée : le filtre est la solution du système
   qui définit une coiflette. Avec j l'indice de 0 à 6N-1, m = 2N le
@@ -648,13 +657,18 @@ DEPO2IND Indice d'un nœud d'arbre, à partir de sa profondeur et de sa place.
 ## `detcoef`
 
 ```
-DETCOEF Coefficients de détail d'un niveau donné.
+DETCOEF Coefficients de détail d'une décomposition WAVEDEC.
   D = DETCOEF(C,L,N) extrait le bloc du niveau N dans le vecteur rendu
-  par WAVEDEC. Le niveau 1 est le plus fin.
+  par WAVEDEC. Le niveau 1 est le plus fin. D = DETCOEF(C,L) rend celui
+  du niveau le plus grossier, comme dans MATLAB.
+  D = DETCOEF(C,L,N) avec N vecteur, ou DETCOEF(C,L,N,'cells'), rend un
+  tableau de cellules, un bloc par niveau de N ;
+  [D1,...,Dp] = DETCOEF(C,L,[N1,...,Np]) les rend un par sortie.
 
   Exemple :
      [c, l] = wavedec(1:8, 2, 'db1');
      numel(detcoef(c, l, 1))   % 4
+     d = detcoef(c, l, [1 2]); % {d1, d2}
 
   Voir aussi APPCOEF, WAVEDEC, WRCOEF.
 ```
@@ -765,40 +779,48 @@ DUALTREE Transformée en ondelettes complexes par arbre double.
 
 ```
 DWT Transformée en ondelettes discrète, un niveau.
-  [A,D] = DWT(X,NOM) rend l'approximation et le détail, sous-échantillonnés
-  d'un facteur deux. Les bords sont prolongés périodiquement, ce qui
-  correspond au mode 'per' de MATLAB : A et D comptent chacun
-  NUMEL(X)/2 échantillons.
+  [CA,CD] = DWT(X,'wname') rend l'approximation et le détail de X,
+  sous-échantillonnés d'un facteur deux. [CA,CD] = DWT(X,Lo_D,Hi_D)
+  emploie des filtres de décomposition donnés.
 
-  L'analyse convolue le signal par les filtres de décomposition, ce qui
-  revient à le corréler avec ces mêmes filtres renversés :
+  Les bords sont prolongés selon le mode de DWTMODE — 'sym' (symétrie
+  en demi-point) par défaut, comme dans MATLAB —, ou celui que donne
+  DWT(...,'mode',MODE). L'algorithme est celui de MATLAB : X est
+  prolongé de numel(Lo_D)-1 valeurs de chaque côté, convolué par chaque
+  filtre, et l'on garde un coefficient sur deux à partir du deuxième ;
+  CA et CD comptent floor((numel(X)+numel(Lo_D)-1)/2) coefficients.
+  En mode 'per', le prolongement est périodique et CA compte
+  ceil(numel(X)/2) coefficients.
 
-     A(k) = somme_j Lo_D(N+1-j) X(2k-2+j)
-     D(k) = somme_j Hi_D(N+1-j) X(2k-2+j)
-
-  Pour une ondelette orthogonale, Lo_D renversé est Lo_R : c'est la
-  forme habituelle. Pour une biorthogonale les deux diffèrent, et c'est
-  bien le filtre d'analyse qu'il faut employer ici.
+  CA et CD ont l'orientation de X.
 
   Exemple :
-     [a, d] = dwt([1 2 3 4], 'haar')   % a = [2.1213 4.9497]
-                                       % d = [-0.7071 -0.7071]
+     [a, d] = dwt([1 2 3 4], 'haar')          % a = [2.1213 4.9497]
+     [a, d] = dwt(1:8, 'db2');  numel(a)      % 5 (mode 'sym')
+     [a, d] = dwt(1:8, 'db2', 'mode', 'per'); numel(a)   % 4
 
-  Voir aussi IDWT, WAVEDEC, WFILTERS, SWT, MODWT.
+  Voir aussi IDWT, DWTMODE, WAVEDEC, WFILTERS, WEXTEND, DWT2.
 ```
 
 ## `dwt2`
 
 ```
 DWT2 Transformée en ondelettes discrète bidimensionnelle, un niveau.
-  [CA,CH,CV,CD] = DWT2(X,ONDELETTE) rend l'approximation et les détails
-  horizontal, vertical et diagonal. La transformée est séparable : on
-  applique DWT aux lignes puis aux colonnes.
+  [CA,CH,CV,CD] = DWT2(X,'wname') rend l'approximation et les détails
+  horizontal, vertical et diagonal ; DWT2(X,Lo_D,Hi_D) emploie des
+  filtres donnés, DWT2(...,'mode',MODE) un mode de prolongement (par
+  défaut celui de DWTMODE, 'sym').
+  La transformée est séparable, comme dans MATLAB : les lignes sont
+  filtrées et décimées, puis les colonnes. CH a été filtré en passe-bas
+  le long des lignes et en passe-haut le long des colonnes ; CV
+  l'inverse ; CD en passe-haut dans les deux sens.
+  Un X à trois dimensions (image en couleurs) est traité page par page.
 
   Exemple :
      [a, h, v, d] = dwt2(ones(4), 'db1');   % a = 2*ones(2), h = v = d = 0
+     size(dwt2(magic(8), 'db2'))             % 5 5 en mode 'sym'
 
-  Voir aussi IDWT2, WAVEDEC2, DWT.
+  Voir aussi IDWT2, WAVEDEC2, DWT, DWTMODE.
 ```
 
 ## `dwtfilterbank`
@@ -857,21 +879,29 @@ DWTFILTERBANK Banc de filtres d'une transformée en ondelettes discrète.
 ```
 DWTMODE Mode de prolongement des bords de la transformée discrète.
   DWTMODE affiche le mode courant.
-  DWTMODE(MODE) le change. MODE vaut 'per' (périodique), 'zpd'
-  (zéros), 'sym' (symétrie), 'spd' (prolongement affine), 'sp0'
-  (répétition du bord), 'ppd' (périodique sans ajustement de parité).
-  ST = DWTMODE('status') rend le mode courant sans rien afficher.
+  DWTMODE(MODE) le change, pour DWT, IDWT, WAVEDEC, WAVEREC, DWT2 et
+  leurs voisines. Les modes, comme dans MATLAB :
+     'sym' ou 'symh'   symétrie en demi-point — le défaut
+     'symw'            symétrie en point entier
+     'asym' ou 'asymh' antisymétrie en demi-point
+     'asymw'           antisymétrie en point entier
+     'zpd'             zéros
+     'sp0'             répétition du bord
+     'spd' ou 'sp1'    prolongement affine (pente du bord)
+     'ppd'             périodique
+     'per'             périodique, avec le moins de coefficients
+                       possible : numel(X)/2 par niveau
+  ST = DWTMODE('status') rend le mode courant sans rien afficher ;
   DWTMODE(MODE,'nodisp') change le mode sans l'annoncer.
 
-  MatLibre ne sait analyser qu'en périodique : DWT, WAVEDEC et leurs
-  voisines prolongent le signal par périodicité, ce qui garde le nombre
-  de coefficients égal à celui des échantillons. Le mode est donc lu et
-  conservé, mais seul 'per' est accepté ; demander autre chose lève une
-  erreur au lieu d'analyser autrement que promis.
+  Le mode vaut pour la session ; DWT(...,'mode',MODE) le change pour un
+  seul appel.
 
   Exemple :
-     dwtmode('status')              % 'per'
+     dwtmode('status', 'nodisp')      % 'sym'
      dwtmode('per', 'nodisp');
+     [a, d] = dwt(1:8, 'db2');        % 4 coefficients chacun
+     dwtmode('sym', 'nodisp');
 
   Voir aussi DWT, WAVEDEC, WEXTEND.
 ```
@@ -893,14 +923,21 @@ DYADDOWN Sous-échantillonnage dyadique : un échantillon sur deux.
 
 ```
 DYADUP Suréchantillonnage dyadique : un zéro entre deux échantillons.
-  Y = DYADUP(X) intercale des zéros à partir de l'indice 2 ;
-  DYADUP(X,0) les intercale à partir de l'indice 1.
+  Y = DYADUP(X,EVENODD) insère des zéros dans le vecteur X :
+     EVENODD pair   Y(2k-1) = X(k), Y(2k) = 0 — les zéros aux rangs
+                    pairs, et Y compte 2*numel(X)-1 valeurs ;
+     EVENODD impair Y(2k-1) = 0, Y(2k) = X(k) — les zéros aux rangs
+                    impairs, et Y compte 2*numel(X)+1 valeurs.
+  Y = DYADUP(X) vaut DYADUP(X,1), comme dans MATLAB.
+  Y = DYADUP(X,EVENODD,'c') suréchantillonne les colonnes d'une
+  matrice (des lignes de zéros), 'r' ses lignes (des colonnes de
+  zéros), 'm' les deux ; l'ordre des deux options est libre.
 
   Exemple :
-     dyadup([1 2 3])      % [1 0 2 0 3]
-     dyadup([1 2 3], 0)   % [0 1 0 2 0 3 0]
+     dyadup(1:3)        % 0 1 0 2 0 3 0
+     dyadup(1:3, 0)     % 1 0 2 0 3
 
-  Voir aussi DYADDOWN, IDWT.
+  Voir aussi DYADDOWN, IDWT, UPCOEF.
 ```
 
 ## `fbspwavf`
@@ -958,8 +995,8 @@ FILTRESSPLINES Couple de filtres biorthogonaux splines.
   conjuguée, son inverse et l'inverse de sa conjuguée. C'est ce qui
   garde chaque filtre réel et symétrique.
 
-  Les deux filtres sortent de même longueur, complétés de zéros comme
-  le fait MATLAB, et de somme un.
+  Les deux filtres sortent de même longueur, complétés de zéros centrés
+  comme le fait MATLAB, et de somme un.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
@@ -1055,31 +1092,41 @@ IDUALTREE Reconstruction d'une transformée par arbre double.
 ## `idwt`
 
 ```
-IDWT Reconstruction à partir de l'approximation et du détail.
-  X = IDWT(A,D,NOM) inverse DWT. L'extension étant périodique,
-  l'inverse redistribue chaque coefficient sur les positions que
-  l'analyse avait lues, cette fois avec les filtres de synthèse.
-
-  X = IDWT(A,D,NOM,L) ne garde que les L premiers échantillons : c'est
-  ce qu'il faut quand le signal analysé était de longueur impaire, DWT
-  l'ayant alors prolongé d'un point.
+IDWT Transformée en ondelettes discrète inverse, un niveau.
+  X = IDWT(CA,CD,'wname') reconstruit le signal dont DWT a tiré
+  l'approximation CA et le détail CD. X = IDWT(CA,CD,Lo_R,Hi_R) emploie
+  des filtres de reconstruction donnés.
+  X = IDWT(...,L) rend la partie centrale de longueur L : c'est ainsi
+  qu'on retrouve exactement la longueur du signal d'origine, que DWT ne
+  garde pas. Sans L, X compte 2*numel(CA)-numel(Lo_R)+2 valeurs (en
+  mode 'per', 2*numel(CA)).
+  X = IDWT(...,'mode',MODE) choisit le mode, qui doit être celui de la
+  décomposition ; par défaut, celui de DWTMODE.
+  CA ou CD peut être vide : on reconstruit alors depuis l'autre seul.
 
   Exemple :
-     [a, d] = dwt(1:8, 'db2');
-     max(abs(idwt(a, d, 'db2') - (1:8)))   % nul à l'arrondi près
+     x = 1:7;
+     [a, d] = dwt(x, 'db2');
+     max(abs(idwt(a, d, 'db2', 7) - x))    % 1e-15
 
-  Voir aussi DWT, WAVEREC, WFILTERS.
+  Voir aussi DWT, DWTMODE, WAVEREC, UPCOEF.
 ```
 
 ## `idwt2`
 
 ```
 IDWT2 Reconstruction bidimensionnelle, un niveau.
-  Réciproque de DWT2 : on remonte d'abord les colonnes, puis les lignes.
+  X = IDWT2(CA,CH,CV,CD,'wname') est la réciproque de DWT2 ;
+  IDWT2(CA,CH,CV,CD,Lo_R,Hi_R) emploie des filtres donnés.
+  X = IDWT2(...,S) rend la partie centrale de taille S, ce qui retrouve
+  exactement la taille de l'image d'origine. Sans S, X a la taille
+  2*size(CA)-numel(Lo_R)+2 (2*size(CA) en mode 'per').
+  IDWT2(...,'mode',MODE) choisit le mode ; par défaut celui de DWTMODE.
+  Un détail vide compte pour zéro.
 
   Exemple :
      [a,h,v,d] = dwt2(magic(4), 'db2');
-     max(max(abs(idwt2(a,h,v,d,'db2') - magic(4))))   % nul
+     max(max(abs(idwt2(a,h,v,d,'db2',[4 4]) - magic(4))))   % nul
 
   Voir aussi DWT2, WAVEREC2, IDWT.
 ```
@@ -1216,6 +1263,62 @@ LIRENOEUD Coefficients d'un nœud, vides s'il n'est pas dans l'arbre.
      isempty(lireNoeud(arbre, 999))  % 1 : un noeud absent rend vide
 
   Voir aussi POSERNOEUD, INDICEDENOEUD, WPCOEF.
+```
+
+## `matlibre_mode_ondelette`
+
+```
+MATLIBRE_MODE_ONDELETTE Valide un mode de prolongement des bords.
+  Les modes de MATLAB : 'zpd', 'sym' ou 'symh', 'symw', 'asym' ou
+  'asymh', 'asymw', 'sp0', 'spd' ou 'sp1', 'ppd', 'per'.
+```
+
+## `matlibre_ondelette_arguments`
+
+```
+MATLIBRE_ONDELETTE_ARGUMENTS Ondelette et mode d'une transformée discrète.
+  [F1,F2,MODE,RESTE] = MATLIBRE_ONDELETTE_ARGUMENTS(ARGS,GENRE,NOM) lit,
+  au début de ARGS, soit un nom d'ondelette, soit deux filtres ; GENRE
+  vaut 'd' (filtres de décomposition Lo_D, Hi_D) ou 'r' (reconstruction
+  Lo_R, Hi_R). L'option 'mode',MODE est retirée où qu'elle soit ; à
+  défaut, MODE est celui de DWTMODE. RESTE garde les autres arguments.
+```
+
+## `matlibre_taille_noeud`
+
+```
+MATLIBRE_TAILLE_NOEUD Taille des données d'un nœud d'arbre de paquets.
+  Sert à la reconstruction : IDWT et IDWT2 reçoivent la taille du
+  parent, que les enfants ne laissent pas déduire hors du mode 'per'.
+  Rend la longueur (arbre de signal) ou la taille (arbre d'image), ou
+  un vide si le nœud n'a pas de données.
+```
+
+## `matlibre_upsconv1`
+
+```
+MATLIBRE_UPSCONV1 Suréchantillonnage puis convolution, comme IDWT le fait.
+  Y = MATLIBRE_UPSCONV1(X,F,L,MODE) insère un zéro après chaque
+  coefficient de X, convolue par le filtre de reconstruction F, et
+  garde la partie centrale de longueur L. En mode 'per', le signal
+  suréchantillonné est prolongé par périodicité avant la convolution,
+  et l'on garde L valeurs à partir du rang numel(F).
+  Sans L (vide), L vaut 2*numel(X)-numel(F)+2, ou 2*numel(X) en 'per'.
+  Un X vide donne 0.
+```
+
+## `matlibre_upsconv2`
+
+```
+MATLIBRE_UPSCONV2 Suréchantillonnage puis convolution d'une image.
+  Y = MATLIBRE_UPSCONV2(X,FC,FL,TAILLE,MODE) fait, selon les colonnes
+  puis selon les lignes, ce que MATLIBRE_UPSCONV1 fait d'un vecteur :
+  un zéro entre deux coefficients, la convolution par FC (verticale)
+  puis par FL (horizontale), et la partie centrale de taille TAILLE. En
+  mode 'per', le prolongement est périodique. TAILLE vide : aucune
+  coupe, la convolution entière (ce qu'UPCOEF2 emploie). Un X vide
+  donne 0. Les pages d'un tableau à trois dimensions sont traitées une
+  à une.
 ```
 
 ## `measerr`
@@ -1907,11 +2010,17 @@ TREEDPTH Profondeur d'un arbre de paquets d'ondelettes.
 
 ```
 UPCOEF Reconstruction directe de coefficients sur plusieurs niveaux.
-  Y = UPCOEF('a',X,NOM,N) remonte X comme une approximation sur N
-  niveaux, en mettant les détails à zéro ; 'd' fait l'inverse.
+  Y = UPCOEF('a',X,'wname',N) remonte X comme une approximation sur N
+  niveaux (1 par défaut) ; 'd' le remonte comme un détail au premier
+  niveau, puis comme une approximation. Chaque niveau insère un zéro
+  entre les coefficients et convolue par le filtre de reconstruction,
+  sans rien couper : un niveau rend 2*numel(X)+numel(Lo_R)-2 valeurs.
+  Y = UPCOEF(...,N,L) en garde la partie centrale de longueur L.
+  UPCOEF('a',X,Lo_R,Hi_R,N,L) emploie des filtres donnés.
 
   Exemple :
      upcoef('a', 1, 'haar', 1)   % [0.7071 0.7071]
+     upcoef('a', 1, 'db2', 1)    % Lo_R de db2
 
   Voir aussi WRCOEF, IDWT, WAVEDEC.
 ```
@@ -1920,10 +2029,12 @@ UPCOEF Reconstruction directe de coefficients sur plusieurs niveaux.
 
 ```
 UPCOEF2 Reconstruction directe de coefficients d'image.
-  Y = UPCOEF2('a',X,NOM,N) remonte X comme une approximation sur N
-  niveaux, les détails étant nuls ; 'h', 'v' et 'd' font de même pour
-  les trois détails.
-  Y = UPCOEF2(...,TAILLE) recadre le résultat au centre.
+  Y = UPCOEF2('a',X,'wname',N) remonte X comme une approximation sur N
+  niveaux (1 par défaut) ; 'h', 'v' et 'd' le remontent comme un détail
+  au premier niveau, puis comme une approximation. Chaque niveau insère
+  des zéros et convolue, sans rien couper.
+  Y = UPCOEF2(...,N,S) recadre le résultat au centre, à la taille S ;
+  UPCOEF2(TYPE,X,Lo_R,Hi_R,N,S) emploie des filtres donnés.
 
   C'est l'équivalent bidimensionnel d'UPCOEF : on voit ainsi la forme
   qu'un seul coefficient prend une fois remonté, c'est-à-dire
@@ -1940,9 +2051,10 @@ UPCOEF2 Reconstruction directe de coefficients d'image.
 
 ```
 UPWLEV Remonte d'un niveau une décomposition en ondelettes.
-  [NC,NL,CA] = UPWLEV(C,L,NOM) fusionne l'approximation la plus
+  [NC,NL,CA] = UPWLEV(C,L,'wname') fusionne l'approximation la plus
   grossière avec son détail : la décomposition perd un niveau, et CA
-  rend l'approximation reconstruite.
+  rend l'approximation reconstruite, à la longueur que L garde.
+  UPWLEV(C,L,Lo_R,Hi_R) emploie des filtres donnés.
 
   Exemple :
      x = sin((1:64) / 8);
@@ -1957,9 +2069,10 @@ UPWLEV Remonte d'un niveau une décomposition en ondelettes.
 
 ```
 UPWLEV2 Remonte d'un niveau une décomposition d'image.
-  [NC,NS,CA] = UPWLEV2(C,S,NOM) fusionne l'approximation la plus
+  [NC,NS,CA] = UPWLEV2(C,S,'wname') fusionne l'approximation la plus
   grossière avec ses trois détails : la décomposition perd un niveau,
-  et CA rend l'approximation reconstruite.
+  et CA rend l'approximation reconstruite, à la taille que S garde.
+  UPWLEV2(C,S,Lo_R,Hi_R) emploie des filtres donnés.
 
   Exemple :
      [c, s] = wavedec2(magic(16), 3, 'haar');
@@ -1973,32 +2086,43 @@ UPWLEV2 Remonte d'un niveau une décomposition d'image.
 
 ```
 WAVEDEC Décomposition multiniveaux en ondelettes.
-  [C,L] = WAVEDEC(X,N,NOM) empile les coefficients : approximation de
-  niveau N, puis détails du niveau N au niveau 1. L donne les longueurs.
+  [C,L] = WAVEDEC(X,N,'wname') applique N fois DWT à l'approximation et
+  empile les coefficients : l'approximation du niveau N, puis les
+  détails du niveau N au niveau 1. L donne leurs longueurs, suivies de
+  celle de X. [C,L] = WAVEDEC(X,N,Lo_D,Hi_D) emploie des filtres donnés.
+
+  Les bords suivent le mode de DWTMODE ('sym' par défaut, comme dans
+  MATLAB). Pour un X colonne, C et L sont des colonnes.
 
   Exemple :
      x = sin((1:64) / 8);
      [c, l] = wavedec(x, 3, 'db2');
-     sum(l(1:end-1)) == numel(c)     % 1 : tous les coefficients y sont
+     l                                % [10 10 18 33 64] en mode 'sym'
+     sum(l(1:end-1)) == numel(c)      % 1 : tous les coefficients y sont
      max(abs(waverec(c, l, 'db2') - x)) < 1e-10
 
-  Voir aussi WAVEREC, APPCOEF, DETCOEF, WRCOEF.
+  Voir aussi WAVEREC, APPCOEF, DETCOEF, WRCOEF, DWTMODE, WMAXLEV.
 ```
 
 ## `wavedec2`
 
 ```
 WAVEDEC2 Décomposition multiniveaux d'une image en ondelettes.
-  [C,S] = WAVEDEC2(X,N,NOM) empile les coefficients en un vecteur
+  [C,S] = WAVEDEC2(X,N,'wname') empile les coefficients en un vecteur
   ligne : approximation du niveau N, puis, du niveau N au niveau 1, les
-  détails horizontal, vertical et diagonal. S donne les tailles, une
-  ligne par niveau plus la taille de l'image.
+  détails horizontal, vertical et diagonal. S donne les tailles : celle
+  de l'approximation du niveau N, puis celle des détails de chaque
+  niveau, du N-ième au premier, puis celle de l'image.
+  WAVEDEC2(X,N,Lo_D,Hi_D) emploie des filtres donnés ; les bords
+  suivent DWTMODE ('sym' par défaut).
+  Une image en couleurs (trois pages) donne des tailles à trois
+  colonnes.
 
   Exemple :
      [c, s] = wavedec2(magic(8), 2, 'haar');
      a = appcoef2(c, s, 'haar', 2);
 
-  Voir aussi WAVEREC2, APPCOEF2, DETCOEF2.
+  Voir aussi WAVEREC2, APPCOEF2, DETCOEF2, WRCOEF2.
 ```
 
 ## `wavefun`
@@ -2148,35 +2272,36 @@ WAVENAMES Noms des ondelettes disponibles.
 
 ```
 WAVEREC Reconstruction d'une décomposition multiniveaux.
-  X = WAVEREC(C,L) reconstruit le signal à partir de la décomposition
-  multiniveaux rendue par WAVEDEC, avec l'ondelette de Haar.
-  X = WAVEREC(C,L,NOM) emploie l'ondelette NOM, qui doit être celle de
-  la décomposition — reconstruire avec une autre ne rend pas le signal.
+  X = WAVEREC(C,L,'wname') reconstruit le signal à partir de la
+  décomposition rendue par WAVEDEC ; X = WAVEREC(C,L,Lo_R,Hi_R) emploie
+  des filtres de reconstruction donnés. L'ondelette doit être celle de
+  la décomposition, et le mode de DWTMODE aussi.
 
   La remontée est symétrique de la descente : on part de l'approximation
   la plus grossière, on lui adjoint le détail du niveau le plus profond
-  par IDWT, et le résultat sert d'approximation au niveau suivant.
+  par IDWT, à la longueur que L garde pour ce niveau, et le résultat sert
+  d'approximation au niveau suivant. C'est APPCOEF(C,L,...,0).
 
   La reconstruction est exacte à l'arrondi près pour un banc de filtres
   à reconstruction parfaite, ce qui est la propriété qui définit une
-  ondelette orthogonale ou biorthogonale : les erreurs de repliement
-  introduites par la décimation d'un demi-canal sont exactement annulées
-  par celles de l'autre. Une longueur impaire fait produire à IDWT un
-  point de trop, retiré grâce à L(end) qui garde la longueur d'origine.
+  ondelette orthogonale ou biorthogonale.
 
   Exemple :
      x = sin((1:64) / 8);
      [c, l] = wavedec(x, 3, 'db2');
      max(abs(waverec(c, l, 'db2') - x)) < 1e-10
 
-  Voir aussi WAVEDEC, IDWT, DWT, WENERGY.
+  Voir aussi WAVEDEC, APPCOEF, IDWT, DWT.
 ```
 
 ## `waverec2`
 
 ```
 WAVEREC2 Reconstruction d'une image à partir de sa décomposition.
-  Réciproque de WAVEDEC2.
+  X = WAVEREC2(C,S,'wname') est la réciproque de WAVEDEC2, c'est-à-dire
+  APPCOEF2(C,S,'wname',0) ; WAVEREC2(C,S,Lo_R,Hi_R) avec des filtres
+  donnés. L'ondelette et le mode de DWTMODE doivent être ceux de la
+  décomposition.
 
   Exemple :
      [C, S] = wavedec2(magic(8), 2, 'haar');
@@ -2509,6 +2634,15 @@ WEXTEND Prolonge un signal ou une image aux bords.
 
   COTE vaut 'b' (des deux côtés, par défaut), 'l' ou 'r'.
 
+  Y = WEXTEND('addrow',MODE,X,L) ajoute L lignes en haut et en bas de
+  la matrice X ('u', 'd' ou 'b' pour le côté) ; 'addcol' ajoute des
+  colonnes. Seule cette dimension est touchée, même en mode 'per' :
+  c'est ce que DWT2 emploie.
+
+  Les modes sont ceux de MATLAB, vérifiés contre PyWavelets ; en
+  particulier 'asym' est périodique de période 2N sur [x, -x renversé],
+  et 'asymw' enchaîne les réflexions ponctuelles 2*x(1) - x(1+k).
+
   Exemples :
      wextend('1D', 'zpd',   [1 2 3], 2)   % [0 0 1 2 3 0 0]
      wextend('1D', 'sp0',   [1 2 3], 2)   % [1 1 1 2 3 3 3]
@@ -2516,6 +2650,7 @@ WEXTEND Prolonge un signal ou une image aux bords.
      wextend('1D', 'sym',   [1 2 3], 2)   % [2 1 1 2 3 3 2]
      wextend('1D', 'symw',  [1 2 3], 2)   % [3 2 1 2 3 2 1]
      wextend('1D', 'asym',  [1 2 3], 2)   % [-2 -1 1 2 3 -3 -2]
+     wextend('1D', 'asymw', [1 2 3], 2)   % [-1 0 1 2 3 4 5]
      wextend('1D', 'ppd',   [1 2 3], 2)   % [2 3 1 2 3 1 2]
 
   Voir aussi WKEEP, DWT.
@@ -2685,8 +2820,8 @@ WPCOEF Coefficients d'un nœud d'un arbre de paquets.
 
   Exemple :
      t = wpdec(1:64, 2, 'db2');
-     numel(wpcoef(t, 3))            % 16
-     numel(wpcoef(t, [2 0]))        % 16 : le même nœud
+     numel(wpcoef(t, 3))            % 18 : l'extension symétrique allonge
+     numel(wpcoef(t, [2 0]))        % 18 : le même nœud
 
   Voir aussi WPRCOEF, WPDEC, LEAVES, WPSPLT.
 ```
@@ -2791,7 +2926,7 @@ WPFUN Fonctions de paquets d'ondelettes.
   Exemple :
      [w, x] = wpfun('db2', 3, 7);
      size(w, 1)                     % 4 : W0 à W3
-     trapz(x, w(1, :))              % 1 : W0 est la fonction d'échelle
+     sum(w(1, :)) * (x(2) - x(1))   % 1 : W0 est la fonction d'échelle
      abs(trapz(x, w(2, :)))         % nul : W1 est l'ondelette
 
   Voir aussi WAVEFUN, WPDEC, WPCOEF, WFILTERS.
@@ -2911,23 +3046,37 @@ WPTHCOEF Seuillage des coefficients d'un arbre de paquets.
 
 ```
 WRCOEF Reconstruit une composante d'une décomposition monodimensionnelle.
-  Y = WRCOEF('a',C,L,NOM,N) reconstruit l'approximation du niveau N à
-  la longueur du signal d'origine, les autres coefficients étant mis à
-  zéro. 'd' reconstruit le détail.
+  X = WRCOEF('a',C,L,'wname',N) reconstruit l'approximation du niveau N
+  (de 0 au dernier) à la longueur du signal d'origine ; 'd' reconstruit
+  le détail du niveau N (de 1 au dernier). Sans N, le dernier niveau.
+  X = WRCOEF(TYPE,C,L,Lo_R,Hi_R,N) emploie des filtres donnés.
+  La somme de l'approximation de niveau N et des détails des niveaux 1
+  à N rend le signal.
+
+  L'algorithme est celui de MATLAB : le bloc est remonté niveau par
+  niveau par suréchantillonnage et convolution, à la longueur que L
+  garde pour chaque niveau.
 
   Exemple :
-     [c, l] = wavedec(1:8, 2, 'haar');
-     a2 = wrcoef('a', c, l, 'haar', 2);
+     x = sin((1:64) / 8);
+     [c, l] = wavedec(x, 2, 'db2');
+     a2 = wrcoef('a', c, l, 'db2', 2);
+     d1 = wrcoef('d', c, l, 'db2', 1);  d2 = wrcoef('d', c, l, 'db2', 2);
+     max(abs(a2 + d1 + d2 - x)) < 1e-10
 
-  Voir aussi WAVEDEC, APPCOEF, DETCOEF.
+  Voir aussi WAVEDEC, APPCOEF, DETCOEF, UPCOEF.
 ```
 
 ## `wrcoef2`
 
 ```
 WRCOEF2 Reconstruit une composante d'une décomposition d'image.
-  Y = WRCOEF2('a',C,S,NOM,N) reconstruit l'approximation, 'h', 'v' ou
-  'd' le détail correspondant, à la taille de l'image d'origine.
+  X = WRCOEF2('a',C,S,'wname',N) reconstruit l'approximation du niveau
+  N (de 0 au dernier), 'h', 'v' ou 'd' le détail correspondant du
+  niveau N (de 1 au dernier), à la taille de l'image d'origine. Sans N,
+  le dernier niveau. WRCOEF2(TYPE,C,S,Lo_R,Hi_R,N) avec des filtres
+  donnés. L'approximation de niveau N plus les détails des niveaux 1 à
+  N rendent l'image.
 
   Exemple :
      [C, S] = wavedec2(magic(8), 2, 'haar');

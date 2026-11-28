@@ -66,7 +66,7 @@ function valeur = convertir(valeur, genre)
             nombre = str2double(char(valeur));
             if isnan(nombre)
                 error('MATLAB:ui:NonNumerique', ...
-                      '« %s » ne désigne pas un nombre.', char(valeur));
+                      '''%s'' is not a number.', char(valeur));
             end
             valeur = nombre;
         else

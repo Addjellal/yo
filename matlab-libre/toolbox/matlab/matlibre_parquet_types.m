@@ -35,6 +35,6 @@ function [physique, converti, lecteur] = matlibre_parquet_types(classe)
             physique = 6; converti = 0; lecteur = 'string';
         otherwise
             error('MATLAB:parquet:TypeNonSupporte', ...
-                  'Parquet ne sait pas porter une colonne de classe %s.', classe);
+                  'Parquet cannot store a column of class %s.', classe);
     end
 end

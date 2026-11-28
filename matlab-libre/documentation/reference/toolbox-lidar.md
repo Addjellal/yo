@@ -30,6 +30,13 @@ FITPLANERANSAC Droite (2-D) ou plan (3-D) dominant, par RANSAC.
   modèle — deux pour une droite, trois pour un plan —, compter combien
   de points s'en approchent, et recommencer. Le meilleur tirage gagne.
 
+  Le meilleur modèle est ensuite réajusté sur ses points ralliés, au
+  sens des moindres carrés orthogonaux, comme le recommandent Fischler et
+  Bolles (1981) : le tirage de trois points porte tout leur bruit, le
+  réajustement le moyenne. MODELE est normé : [A B] (ou [A B C]) est un
+  vecteur unitaire, et la distance d'un point au modèle est |MODELE *
+  [P 1]'|.
+
   C'est ce qui le rend insensible aux points aberrants, là où les
   moindres carrés cèdent : une droite ajustée par moindres carrés sur un
   sol semé de parasites passe entre les deux, alors que RANSAC ignore
@@ -77,12 +84,21 @@ ICPREGISTER Recalage rigide 2-D par ICP.
   La transformation rendue est toujours rigide : R'R vaut l'identité et
   son déterminant vaut un, sans symétrie ni changement d'échelle.
 
+  Quand le déplacement est assez petit pour que chaque point ait d'emblée
+  le bon plus proche voisin, la première itération donne la
+  transformation exacte (Arun, Huang et Blostein, 1987). Plus loin, sur
+  une courbe échantillonnée régulièrement, les points peuvent glisser
+  d'un pas d'échantillonnage : ICP s'arrête alors dans ce minimum local
+  (Besl et McKay, 1992, ne garantissent pas mieux).
+
   Exemple :
      forme = [cos(0:0.1:2*pi).', sin(0:0.1:2*pi).'] .* [2 1];
-     a = deg2rad(12);
-     Rv = [cos(a) -sin(a); sin(a) cos(a)];
-     [R, t] = icpRegister(forme, (Rv * forme.').' + [0.4 -0.25], 60);
-     rad2deg(atan2(R(2,1), R(1,1)))  % 12
+     Rv = [cosd(1) -sind(1); sind(1) cosd(1)];
+     [R, t] = icpRegister(forme, forme * Rv.' + [0.03 -0.02], 60);
+     atan2d(R(2,1), R(1,1))          % 1, à 1e-14 près : t vaut [0.03 -0.02]
+     Rv = [cosd(12) -sind(12); sind(12) cosd(12)];
+     R = icpRegister(forme, forme * Rv.' + [0.4 -0.25], 60);
+     atan2d(R(2,1), R(1,1))          % 9.25 : minimum local, glissé d'un pas
 
   Voir aussi FITPLANERANSAC, VOXELDOWNSAMPLE, POINTCLOUDFROMRANGES.
 ```

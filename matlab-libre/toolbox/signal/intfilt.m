@@ -23,7 +23,7 @@ function b = intfilt(l, p, alpha)
 %   Voir aussi INTERP, RESAMPLE, UPFIRDN, DECIMATE, SINC.
     l = round(l);
     if l < 1
-        error('signal:intfilt:BadRate', 'Le facteur d''interpolation doit être positif.');
+        error('signal:intfilt:BadRate', 'The interpolation factor must be positive.');
     end
     if nargin < 3
         alpha = 1;
@@ -39,7 +39,7 @@ function b = intfilt(l, p, alpha)
         noeuds = ((1 - pDemi):pDemi).';
         points = numel(noeuds);
         if alpha <= 0 || alpha > 1
-            error('signal:intfilt:BadAlpha', 'ALPHA doit être dans ]0, 1].');
+            error('signal:intfilt:BadAlpha', 'ALPHA must be in (0, 1].');
         end
     end
     coefficients = zeros(points, l);

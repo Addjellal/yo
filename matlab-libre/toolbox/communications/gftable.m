@@ -26,11 +26,11 @@ function table = gftable(m, prim, p)
     prim = mod(double(gftrunc(prim(:).')), p);
     if numel(prim) - 1 ~= m
         error('comm:gftable:Degre', ...
-              'Le polynôme primitif doit être de degré %d.', m);
+              'The primitive polynomial must have degree %d.', m);
     end
     if gfprimck(prim, p) ~= 1
         error('comm:gftable:Primitif', ...
-              'Le polynôme donné n''est pas primitif.');
+              'The given polynomial is not primitive.');
     end
     nombre = p ^ m;
     table = zeros(nombre, m);

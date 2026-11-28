@@ -23,6 +23,6 @@ function [retards, coefficients] = accorder(retards, coefficients, nom)
     end
     if numel(retards) ~= numel(coefficients)
         error('econ:garch:Retards', ...
-              'Il faut autant de coefficients %s que de retards.', nom);
+              'The number of %s coefficients must match the number of lags.', nom);
     end
 end

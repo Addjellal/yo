@@ -26,6 +26,6 @@ function mot = matlibre_bch_coder(message, generateur, n, k, forme)
             end
         otherwise
             error('comm:bch:Forme', ...
-                  'La forme doit être ''end'', ''beg'' ou ''none''.');
+                  'Parity position must be ''end'', ''beg'', or ''none''.');
     end
 end

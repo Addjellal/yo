@@ -24,19 +24,19 @@ function suite = zadoffChuSeq(racine, longueur)
     racine = round(racine);
     longueur = round(longueur);
     if longueur < 1
-        error('comm:zadoffChuSeq:Longueur', 'La longueur doit être positive.');
+        error('comm:zadoffChuSeq:Longueur', 'The length must be positive.');
     end
     if mod(longueur, 2) == 0
         error('comm:zadoffChuSeq:Parite', ...
-              'La longueur doit être impaire.');
+              'The length must be odd.');
     end
     if racine < 1 || racine >= longueur
         error('comm:zadoffChuSeq:Racine', ...
-              'La racine doit rester entre un et %d.', longueur - 1);
+              'The root must be between 1 and %d.', longueur - 1);
     end
     if gcd(racine, longueur) ~= 1
         error('comm:zadoffChuSeq:Premiers', ...
-              'La racine et la longueur doivent être premières entre elles.');
+              'The root and the length must be relatively prime.');
     end
     m = (0:(longueur - 1)).';
     suite = exp(-1i * pi * racine * m .* (m + 1) / longueur);

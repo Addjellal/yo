@@ -34,6 +34,15 @@ fprintf('  doubler la frequence coute %.2f dB\n', ...
         pathLoss(100, 2 * frequence) - pathLoss(100, frequence));
 assert(abs(pathLoss(100, 2*frequence) - pathLoss(100, frequence) - 20*log10(2)) < 1e-9, ...
        'doubler la frequence coute 6 dB');
+% FSPL est la fonction de MATLAB pour l'espace libre. L'exemple de sa
+% documentation : un radar à 10 GHz, sur 10 km, perd 132,4478 dB.
+Lradar = fspl(10e3, physconst('LightSpeed') / 10e9);
+fprintf('  fspl a 10 GHz sur 10 km : %.4f dB (documentation de MATLAB : 132.4478)\n', Lradar);
+assert(abs(Lradar - 132.4478) < 5e-5, 'l''exemple de la documentation de MATLAB');
+assert(abs(fspl(100, lambda) - pathLoss(100, frequence)) < 1e-12, ...
+       'fspl et pathLoss d''exposant deux coincident');
+assert(fspl(lambda / (8 * pi), lambda) == 0, ...
+       'en champ proche, l''affaiblissement est borne a 0 dB');
 
 %% 2. La capacité de Shannon
 % Elle borne tout : aucun codage, aussi ingénieux soit-il, ne peut faire
@@ -60,29 +69,39 @@ assert(throughputShannon(B, -30) > 0, 'la capacite reste positive');
 assert(throughputShannon(B, -30) < B / 100, 'mais devient negligeable');
 
 %% 3. OFDM : moduler et démoduler
-% Chaque colonne de symboles devient un symbole OFDM temporel. Sans canal,
-% la démodulation doit rendre exactement ce qu'on a mis.
+% La numérologie d'IEEE 802.11a : 64 sous-porteuses, 48 de données, 4
+% pilotes (-21, -7, 7 et 21) et 12 nulles (le continu et les bandes de
+% garde), un préfixe de 16 échantillons. Comme MATLAB, OFDMMOD compte les
+% sous-porteuses de la plus négative à la plus positive, le continu à
+% l'indice 33. Sans canal, la démodulation doit rendre exactement ce
+% qu'on a mis.
 rng(21);
 nfft = 64;
-nPorteuses = 48;
-nSymboles = 20;
 prefixe = 16;
+nSymboles = 20;
+nulles = [1:6, 33, 60:64].';
+pilotes = [12 26 40 54].';
+porteuses = setdiff((1:nfft).', [nulles; pilotes]);
+nPorteuses = numel(porteuses);
 
-% Des symboles QPSK sur les porteuses utiles.
+% Des symboles QPSK sur les porteuses de données, des pilotes BPSK.
 bits = randi([0 3], nPorteuses, nSymboles);
 symboles = exp(1i * (pi/4 + bits * pi/2));
+valeursPilotes = repmat([1; 1; 1; -1], 1, nSymboles);
 
-signal = ofdmMod(symboles, nfft, prefixe);
-recus = ofdmDemod(signal, nfft, prefixe, nPorteuses);
-fprintf('\nOFDM : %d porteuses sur %d points, prefixe de %d :\n', ...
-        nPorteuses, nfft, prefixe);
-fprintf('  %d echantillons pour %d symboles (%d par symbole)\n', ...
+signal = ofdmmod(symboles, nfft, prefixe, nulles, pilotes, valeursPilotes);
+[recus, pilotesRecus] = ofdmdemod(signal, nfft, prefixe, prefixe, nulles, pilotes);
+fprintf('\nOFDM : %d porteuses de donnees et %d pilotes sur %d points, prefixe de %d :\n', ...
+        nPorteuses, numel(pilotes), nfft, prefixe);
+fprintf('  %d echantillons pour %d symboles (%d par symbole, 4 us a 20 MHz)\n', ...
         numel(signal), nSymboles, nfft + prefixe);
 assert(numel(signal) == nSymboles * (nfft + prefixe), ...
        'chaque symbole occupe NFFT + prefixe echantillons');
+assert(nPorteuses == 48, '802.11a porte 48 sous-porteuses de donnees');
 fprintf('  aller-retour sans canal : EVM %.2e %%\n', evm(recus, symboles));
 assert(evm(recus, symboles) < 1e-10, ...
        'sans canal, la demodulation rend exactement les symboles');
+assert(max(abs(pilotesRecus(:) - valeursPilotes(:))) < 1e-12, 'et les pilotes aussi');
 
 %% 4. Pourquoi le préfixe cyclique
 % Un canal multitrajet étale chaque symbole sur le suivant. Le préfixe
@@ -94,10 +113,11 @@ fprintf('\nCanal a %d trajets, prefixe de %d :\n', numel(canal), prefixe);
 
 apresCanal = conv(signal, canal);
 apresCanal = apresCanal(1:numel(signal));
-recus = ofdmDemod(apresCanal, nfft, prefixe, nPorteuses);
-% La réponse du canal aux fréquences des porteuses.
-H = fft(canal, nfft);
-H = H(1:nPorteuses);
+recus = ofdmdemod(apresCanal, nfft, prefixe, prefixe, nulles, pilotes);
+% La réponse du canal aux fréquences des porteuses, dans l'ordre centré
+% d'OFDMMOD.
+H = fftshift(fft(canal, nfft));
+H = H(porteuses);
 egalises = recus ./ H;
 fprintf('  sans egalisation : EVM %.2f %%\n', evm(recus, symboles));
 fprintf('  apres egalisation a un coefficient : EVM %.2e %%\n', ...
@@ -118,10 +138,10 @@ assert(evm(egalises(:, 1), symboles(:, 1)) < 1e-9, ...
 % Un préfixe trop court laisse passer l'interférence : c'est exactement la
 % limite que le dimensionnement doit respecter.
 court = 2;
-signalCourt = ofdmMod(symboles, nfft, court);
+signalCourt = ofdmmod(symboles, nfft, court, nulles, pilotes, valeursPilotes);
 apres = conv(signalCourt, canal);
 apres = apres(1:numel(signalCourt));
-recusCourt = ofdmDemod(apres, nfft, court, nPorteuses);
+recusCourt = ofdmdemod(apres, nfft, court, court, nulles, pilotes);
 egalisesCourt = recusCourt ./ H;
 fprintf('  prefixe de %d, plus court que le canal : EVM %.2f %%\n', ...
         court, evm(egalisesCourt(:, 2:end), symboles(:, 2:end)));

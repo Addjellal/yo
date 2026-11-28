@@ -24,12 +24,12 @@ function [partition, codebook, distorsion, sortiesRelatives] = lloyds(donnees, d
     if nargin < 3 || isempty(tolerance), tolerance = 1e-7; end
     donnees = double(donnees(:)).';
     if isempty(donnees)
-        error('comm:lloyds:Donnees', 'Il faut des données.');
+        error('comm:lloyds:Donnees', 'Data is required.');
     end
     if isscalar(depart)
         n = round(depart);
         if n < 1
-            error('comm:lloyds:Niveaux', 'Il faut au moins un niveau.');
+            error('comm:lloyds:Niveaux', 'At least one level is required.');
         end
         bas = min(donnees);
         haut = max(donnees);

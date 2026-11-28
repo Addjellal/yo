@@ -16,7 +16,7 @@ function s = what(dossier)
     end
     dossier = char(dossier);
     if ~isfolder(dossier)
-        error('MATLAB:what:NotAFolder', 'Dossier introuvable : %s.', dossier);
+        error('MATLAB:what:NotAFolder', 'Folder not found: %s.', dossier);
     end
     s = struct('path', dossier, 'm', {{}}, 'mlx', {{}}, 'mat', {{}}, ...
                'mex', {{}}, 'mdl', {{}}, 'slx', {{}}, 'p', {{}}, ...

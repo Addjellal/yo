@@ -529,7 +529,7 @@ classdef datetime
 %   Voir aussi ISDST, TIMEZONES, DATETIME.
             if isempty(t.TimeZone)
                 error('MATLAB:datetime:UnzonedTzoffset', ...
-                      'TZOFFSET demande une date avec fuseau.');
+                      'TZOFFSET requires datetimes with a time zone.');
             end
             heures = zeros(size(t.Serie));
             for k = 1:numel(t.Serie)
@@ -550,7 +550,7 @@ classdef datetime
 %   Voir aussi TZOFFSET, TIMEZONES.
             if isempty(t.TimeZone)
                 error('MATLAB:datetime:UnzonedIsdst', ...
-                      'ISDST demande une date avec fuseau.');
+                      'ISDST requires datetimes with a time zone.');
             end
             [standard, ~] = datetime.infoZone(t.TimeZone);
             v = false(size(t.Serie));

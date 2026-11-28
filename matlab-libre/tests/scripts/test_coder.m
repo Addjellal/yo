@@ -143,6 +143,8 @@ if ~isempty(compilateur)
     ignore = codegen('cgUniteImaginaire', '-args', {0},                          '-d', dossier);
     ignore = codegen('cgMinMax', '-args', {int8(zeros(1, 4)), int8(zeros(1, 4))}, ...
                      '-nargout', 2, '-d', dossier);
+    ignore = codegen('cgDivisionEntiere', '-args', {int16(0), int16(0), int32(0), int32(0)}, ...
+                     '-nargout', 2, '-d', dossier);
 
     lignesC = {
         '#include <stdio.h>'
@@ -162,6 +164,7 @@ if ~isempty(compilateur)
         '#include "cgComplexeRacine.h"'
         '#include "cgUniteImaginaire.h"'
         '#include "cgMinMax.h"'
+        '#include "cgDivisionEntiere.h"'
         'int main(void) {'
         '    double A[4] = {1, 3, 2, 4};'
         '    double B[4] = {5, 7, 6, 8};'
@@ -217,6 +220,12 @@ if ~isempty(compilateur)
         '        printf("%d %d %d %d %d %d %d %d\n", ey[0], ey[1], ey[2], ey[3],'
         '               ez[0], ez[1], ez[2], ez[3]);'
         '    }'
+        '    {'
+        '        int16_t dy[3];'
+        '        int32_t dz;'
+        '        cgDivisionEntiere(7, 2, 100000, 100000, dy, &dz);'
+        '        printf("%d %d %d %ld\n", dy[0], dy[1], dy[2], (long)dz);'
+        '    }'
         '    return 0;'
         '}'
         };
@@ -236,7 +245,8 @@ if ~isempty(compilateur)
     aCompiler = {'cgScalaire', 'cgMatrice', 'cgBoucle', 'cgEntiers', 'cgDeuxSorties', ...
                  'cgTableauSortie', 'cgSwitch', 'cgCollision', 'cgComplexe', ...
                  'cgComplexeParties', 'cgComplexeVecteur', 'cgComplexeConstruit', ...
-                 'cgComplexeMatrice', 'cgComplexeRacine', 'cgUniteImaginaire', 'cgMinMax'};
+                 'cgComplexeMatrice', 'cgComplexeRacine', 'cgUniteImaginaire', 'cgMinMax', ...
+                 'cgDivisionEntiere'};
     sources = fichierPrincipal;
     for k = 1:numel(aCompiler)
         sources = [sources ' ' fullfile(dossier, [aCompiler{k} '.c'])];  %#ok<AGROW>
@@ -291,6 +301,8 @@ if ~isempty(compilateur)
     attendu{end + 1} = sprintf('%.10g %.10g', real(u), imag(u));
     [ey, ez] = cgMinMax(int8([100 -100 7 0]), int8([120 3 -9 0]));
     attendu{end + 1} = sprintf('%d %d %d %d %d %d %d %d', ey, ez);
+    [dy, dz] = cgDivisionEntiere(int16(7), int16(2), int32(100000), int32(100000));
+    attendu{end + 1} = sprintf('%d %d %d %d', dy, dz);
     for k = 1:numel(attendu)
         if ~strcmp(strtrim(lignes{k}), strtrim(attendu{k}))
             fprintf('ligne %d : C = « %s », MATLAB = « %s »\n', k, lignes{k}, attendu{k});

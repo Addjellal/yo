@@ -20,7 +20,7 @@ function w = symaux(N, sumf)
     if nargin < 2 || isempty(sumf), sumf = 1; end
     N = round(N);
     if N < 1
-        error('wavelet:symaux:BadOrder', 'L''ordre doit valoir au moins un.');
+        error('wavelet:symaux:BadOrder', 'The order must be at least one.');
     end
     w = daubechiesFiltre(N, 'symetrique');
     w = normaliserSomme(w, sumf);

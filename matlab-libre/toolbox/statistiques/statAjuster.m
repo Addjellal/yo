@@ -20,7 +20,7 @@ function varargout = statAjuster(varargin)
                 forme = d;
             elseif ~isequal(d, forme)
                 error('stats:statAjuster:InputSizeMismatch', ...
-                      'Les arguments non scalaires doivent avoir la même taille.');
+                      'Nonscalar arguments must have the same size.');
             end
         end
     end

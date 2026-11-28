@@ -19,7 +19,7 @@ function [arbre, coefficients] = wpjoin(arbre, noeud)
     indice = indiceDeNoeud(arbre, noeud);
     if ~any(arbre.noeuds == indice)
         error('wavelet:wpjoin:Absent', ...
-              'Le nœud %d n''est pas dans l''arbre.', indice);
+              'Node %d is not in the tree.', indice);
     end
     % Les coefficients du nœud sont ceux que ses descendants
     % reconstruisent : refermer une branche ne doit rien perdre.
@@ -43,10 +43,11 @@ function donnees = recomposer(arbre, indice)
     for k = 1:arbre.ordre
         enfants{k} = recomposer(arbre, arbre.ordre * indice + k);
     end
+    taille = matlibre_taille_noeud(arbre, indice);
     if arbre.dimension == 1
-        donnees = idwt(enfants{1}, enfants{2}, arbre.nom);
+        donnees = idwt(enfants{1}, enfants{2}, arbre.nom, taille);
     else
-        donnees = idwt2(enfants{1}, enfants{2}, enfants{3}, enfants{4}, arbre.nom);
+        donnees = idwt2(enfants{1}, enfants{2}, enfants{3}, enfants{4}, arbre.nom, taille);
     end
 end
 

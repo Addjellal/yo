@@ -264,6 +264,37 @@ Valeur transposer(const Valeur& a, bool conjuguee) {
 }
 
 Valeur operationUnaire(const std::string& op, const Valeur& v) {
+    // Une cellule, une structure, une poignée, un texte « string » ou un
+    // objet qui n'a pas sa méthode ne portent pas de nombres : « -{1} »
+    // rendait la cellule telle quelle, « -objet » l'objet, « ~struct() »
+    // un logique, « -"abc" » des codes de caractères. MATLAB refuse.
+    if (v.classe == Classe::Objet) {
+        const char* methode = op == "-" ? "uminus" : (op == "+" ? "uplus" : "not");
+        erreur("MATLAB:UndefinedFunction",
+               formater("Undefined function '%s' for input arguments of type '%s'.", methode,
+                        v.classeNom().c_str()));
+    }
+    if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+        v.classe == Classe::Fonction || v.classe == Classe::Chaine)
+        erreur("MATLAB:UndefinedFunction",
+               formater("Undefined unary operator '%s' for input arguments of type '%s'.",
+                        op.c_str(), v.classeNom().c_str()));
+    // Un tableau creux porte ses nombres dans « creux », non dans « re » :
+    // « -sparse([1 0 2]) » rendait la matrice telle quelle, alors que
+    // « 0 - s » et « uminus(s) » la niaient.
+    if (v.estCreux()) {
+        if (op == "+") return v;
+        if (op == "-") {
+            Valeur r = v;
+            r.creux = std::make_shared<DonneesCreuses>(*v.creux);
+            for (auto& x : r.creux->valeur) x = -x;
+            for (auto& x : r.creux->imaginaire) x = -x;
+            return r;
+        }
+        // « ~ » : un logique plein, comme le rend déjà une comparaison sur un
+        // creux — MatLibre ne range pas de logique en creux.
+        return operationUnaire(op, assurerDense(v));
+    }
     if (op == "+") return v;
     if (op == "-") {
         Valeur a = preparer(v);
@@ -683,6 +714,24 @@ Valeur concatener(const std::vector<Valeur>& elementsBruts, int dimension) {
             if (e.classe == Classe::Cellule) return Valeur::celluleDims({0, 0});
         return Valeur::vide();
     }
+    // Dès qu'un opérande a des éléments, MATLAB omet les vides, quelles
+    // que soient leurs dimensions : [ones(2,1); zeros(1,0)] est la
+    // colonne. Les 1x0 ne comptent que quand tout est vide.
+    bool unNonVide = false;
+    for (const auto& e : elements)
+        if (e.nelem() > 0) unNonVide = true;
+    bool tousVides = !unNonVide;
+    if (unNonVide && elements.size() > 1) {
+        std::vector<Valeur> pleins;
+        for (const auto& e : elements)
+            if (e.nelem() > 0) pleins.push_back(e);
+        if (pleins.size() != elements.size()) {
+            Classe cibleTous = classeConcat(elements);
+            elements.swap(pleins);
+            if (elements.size() == 1 && elements[0].classe != Classe::Chaine)
+                return convertirPour(elements[0], cibleTous);
+        }
+    }
     if (elements.size() == 1 && elements[0].classe != Classe::Chaine) {
         Classe cible = classeConcat(elements);
         return convertirPour(elements[0], cible);
@@ -706,6 +755,13 @@ Valeur concatener(const std::vector<Valeur>& elementsBruts, int dimension) {
             else if (taille != t) {
                 if (cible == Classe::Caractere && dimension == 0 && i == 1) {
                     taille = std::max(taille, t);  // char : complété par des blancs
+                } else if (tousVides) {
+                    // Que des vides, de tailles incompatibles : MATLAB rend
+                    // un 0x0 (documentation de vertcat).
+                    Valeur r = Valeur::vide();
+                    r.classe = cible;
+                    if (cible == Classe::Cellule) return Valeur::celluleDims({0, 0});
+                    return r;
                 } else {
                     erreur("MATLAB:catenate:dimensionMismatch",
                            dimension == 0

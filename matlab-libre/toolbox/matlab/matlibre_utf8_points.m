@@ -35,17 +35,17 @@ function points = matlibre_utf8_points(octets)
             valeur = tete - 240;
         else
             error('MATLAB:unicode:OctetInvalide', ...
-                  'Octet %d invalide en tête d''un caractère UTF-8.', tete);
+                  'Invalid UTF-8 lead byte %d.', tete);
         end
         if k + suite > n
             error('MATLAB:unicode:SuiteTronquee', ...
-                  'La suite UTF-8 s''interrompt avant la fin du caractère.');
+                  'Truncated UTF-8 sequence.');
         end
         for j = 1:suite
             continuation = octets(k + j);
             if continuation < 128 || continuation >= 192
                 error('MATLAB:unicode:OctetInvalide', ...
-                      'Octet %d invalide dans la suite d''un caractère UTF-8.', continuation);
+                      'Invalid UTF-8 continuation byte %d.', continuation);
             end
             valeur = valeur * 64 + (continuation - 128);
         end

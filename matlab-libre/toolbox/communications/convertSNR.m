@@ -22,7 +22,7 @@ function y = convertSNR(x, depuis, vers, varargin)
     rendement = 1;
     for k = 1:2:numel(varargin)
         if k + 1 > numel(varargin)
-            error('comm:convertSNR:PairAttendue', 'Les options vont par paires.');
+            error('comm:convertSNR:PairAttendue', 'Options must be name-value pairs.');
         end
         switch lower(char(varargin{k}))
             case 'bitspersymbol'
@@ -51,7 +51,7 @@ function esno = versEsNo(x, depuis, k, nsamp, R)
             esno = x + 10 * log10(nsamp);
         otherwise
             error('comm:convertSNR:BadUnit', ...
-                  'L''unité doit être ''snr'', ''ebno'' ou ''esno''.');
+                  'Unit must be ''snr'', ''ebno'', or ''esno''.');
     end
 end
 
@@ -65,6 +65,6 @@ function y = depuisEsNo(esno, vers, k, nsamp, R)
             y = esno - 10 * log10(nsamp);
         otherwise
             error('comm:convertSNR:BadUnit', ...
-                  'L''unité doit être ''snr'', ''ebno'' ou ''esno''.');
+                  'Unit must be ''snr'', ''ebno'', or ''esno''.');
     end
 end

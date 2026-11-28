@@ -10,6 +10,9 @@ function close_system(modele, fichier)
 %   reste. C'est le registre de la session qui se vide, celui que lisent
 %   GCS et BDISLOADED.
 %
+%   CLOSE_SYSTEM(NOM,0) ferme sans enregistrer et CLOSE_SYSTEM(NOM,1)
+%   enregistre d'abord, sous le nom du modèle : les drapeaux de MATLAB.
+%
 %   Exemple :
 %      m = new_system('essai');
 %      open_system(m);
@@ -23,6 +26,21 @@ function close_system(modele, fichier)
             return
         end
     end
+    if isnumeric(modele) && isscalar(modele) && ...
+       ~isempty(matlibre_sl_signaux('cle', double(modele)))
+        % une poignée : l'objet qu'elle désigne
+        modele = matlibre_sl_nomme('getfullname', 1, modele);
+    end
+    if (ischar(modele) || isstring(modele)) && any(char(modele) == '/')
+        % un sous-système : sa fenêtre se ferme, le modèle reste ouvert
+        return
+    end
+    % CLOSE_SYSTEM(NOM,0) ferme sans enregistrer, CLOSE_SYSTEM(NOM,1)
+    % enregistre d'abord sous le nom du modèle : la forme de MATLAB.
+    drapeau = [];
+    if nargin >= 2 && (isnumeric(fichier) || islogical(fichier))
+        drapeau = fichier;
+    end
     if ischar(modele) || isstring(modele)
         nom = char(modele);
         connu = matlibre_sl_ouverts('connu', nom);
@@ -35,10 +53,18 @@ function close_system(modele, fichier)
         nom = modele.nom;
         connu = matlibre_sl_ouverts('connu', nom);
     end
-    if nargin >= 2
+    if ~isempty(drapeau)
+        if drapeau && ~isempty(modele)
+            if connu
+                save_system(nom);
+            else
+                save_system(modele);
+            end
+        end
+    elseif nargin >= 2
         if isempty(modele)
             error('Simulink:Commands:InvalidModel', ...
-                  'Le modele ''%s'' n''est pas ouvert : rien a enregistrer.', nom);
+                  'Model ''%s'' is not open: there is nothing to save.', nom);
         end
         save_system(modele, fichier);
     end

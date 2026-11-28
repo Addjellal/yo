@@ -17,7 +17,7 @@ function h = matlibre_graphe_reordonner(g, ordre)
     ordre = ordre(:)';
     if numel(ordre) ~= n || ~isequal(sort(ordre), 1:n)
         error('MATLAB:graph:InvalidNodeOrder', ...
-              'REORDERNODES attend une permutation des %d nœuds.', n);
+              'Node order must be a permutation of the %d nodes.', n);
     end
     nouveau = zeros(1, n);
     nouveau(ordre) = 1:n;

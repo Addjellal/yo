@@ -2,6 +2,7 @@
 #include "Ruban.h"
 
 #include <QAction>
+#include <QTabBar>
 #include <QHBoxLayout>
 #include <QMenu>
 #include <QLabel>
@@ -615,6 +616,18 @@ void Ruban::ajouterGroupe(const QString& onglet, GroupeRuban* groupe) {
     disposition->insertWidget(disposition->count() - 1, groupe);
     groupes_[onglet].push_back(groupe);
     ajusterGroupes();
+}
+
+QSize Ruban::minimumSizeHint() const {
+    QSize taille = QTabWidget::minimumSizeHint();
+    int largeur = tabBar() ? tabBar()->sizeHint().width() : 0;
+    for (auto it = groupes_.cbegin(); it != groupes_.cend(); ++it) {
+        int total = 32 + 8 * qMax(0, it.value().size() - 1);
+        for (GroupeRuban* g : it.value()) total += g->largeurCompacte();
+        largeur = qMax(largeur, total);
+    }
+    taille.setWidth(largeur);
+    return taille;
 }
 
 void Ruban::resizeEvent(QResizeEvent* evenement) {

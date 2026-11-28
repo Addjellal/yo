@@ -31,7 +31,7 @@ function lg = addLayers(lg, couches)
         end
         if any(strcmp(lg.Names, nom))
             error('nnet:layerGraph:NomPris', ...
-                  'Une couche porte déjà le nom « %s ».', nom);
+                  'A layer named ''%s'' already exists.', nom);
         end
         couche.nom = nom;
         lg.Layers{end + 1} = couche;

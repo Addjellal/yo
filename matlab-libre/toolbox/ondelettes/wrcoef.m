@@ -1,38 +1,66 @@
-function y = wrcoef(genre, C, L, nom, niveau)
+function x = wrcoef(genre, C, L, varargin)
 %WRCOEF Reconstruit une composante d'une décomposition monodimensionnelle.
-%   Y = WRCOEF('a',C,L,NOM,N) reconstruit l'approximation du niveau N à
-%   la longueur du signal d'origine, les autres coefficients étant mis à
-%   zéro. 'd' reconstruit le détail.
+%   X = WRCOEF('a',C,L,'wname',N) reconstruit l'approximation du niveau N
+%   (de 0 au dernier) à la longueur du signal d'origine ; 'd' reconstruit
+%   le détail du niveau N (de 1 au dernier). Sans N, le dernier niveau.
+%   X = WRCOEF(TYPE,C,L,Lo_R,Hi_R,N) emploie des filtres donnés.
+%   La somme de l'approximation de niveau N et des détails des niveaux 1
+%   à N rend le signal.
+%
+%   L'algorithme est celui de MATLAB : le bloc est remonté niveau par
+%   niveau par suréchantillonnage et convolution, à la longueur que L
+%   garde pour chaque niveau.
 %
 %   Exemple :
-%      [c, l] = wavedec(1:8, 2, 'haar');
-%      a2 = wrcoef('a', c, l, 'haar', 2);
+%      x = sin((1:64) / 8);
+%      [c, l] = wavedec(x, 2, 'db2');
+%      a2 = wrcoef('a', c, l, 'db2', 2);
+%      d1 = wrcoef('d', c, l, 'db2', 1);  d2 = wrcoef('d', c, l, 'db2', 2);
+%      max(abs(a2 + d1 + d2 - x)) < 1e-10
 %
-%   Voir aussi WAVEDEC, APPCOEF, DETCOEF.
-    if nargin < 4 || isempty(nom), nom = 'haar'; end
-    niveauMax = numel(L) - 2;
-    if nargin < 5 || isempty(niveau), niveau = niveauMax; end
-    Cmodifie = zeros(size(C));
-    if lower(char(genre)) == 'a'
-        if niveau ~= niveauMax
-            % On reconstruit l'approximation d'un niveau intermédiaire en
-            % repartant du niveau le plus grossier.
-            y = wrcoef('a', C, L, nom, niveauMax);
-            for k = niveauMax-1:-1:niveau
-                y = y + wrcoef('d', C, L, nom, k + 1);
-            end
-            return
-        end
-        Cmodifie(1:L(1)) = C(1:L(1));
+%   Voir aussi WAVEDEC, APPCOEF, DETCOEF, UPCOEF.
+    if isempty(varargin)
+        varargin = {'haar'};
+    end
+    [Lo_R, Hi_R, mode, reste] = matlibre_ondelette_arguments(varargin, 'r', 'wrcoef');
+    rmax = numel(L);
+    nmax = rmax - 2;
+    genre = lower(char(genre));
+    if isempty(reste) || isempty(reste{1})
+        niveau = nmax;
     else
-        position = L(1);
-        for k = niveauMax:-1:1
-            n = L(niveauMax - k + 2);
-            if k == niveau
-                Cmodifie(position + (1:n)) = C(position + (1:n));
+        niveau = reste{1};
+    end
+    switch genre
+        case 'a'
+            if ~(niveau >= 0 && niveau <= nmax && niveau == round(niveau))
+                error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
+                      'WRCOEF: the level must be from 0 to %d.', nmax);
             end
-            position = position + n;
+            x = appcoef(C, L, Lo_R, Hi_R, niveau);
+            premier = Lo_R;
+        case 'd'
+            if ~(niveau >= 1 && niveau <= nmax && niveau == round(niveau))
+                error('Wavelet:FunctionArgVal:Invalid_LevVal', ...
+                      'WRCOEF: the level must be from 1 to %d.', nmax);
+            end
+            x = detcoef(C, L, niveau);
+            premier = Hi_R;
+        otherwise
+            error('Wavelet:FunctionArgVal:Invalid_ArgVal', ...
+                  'WRCOEF: type must be ''a'' or ''d''.');
+    end
+    colonne = size(x, 1) > 1;
+    if niveau > 0
+        imin = rmax - niveau;
+        x = matlibre_upsconv1(x, premier, L(imin + 1), mode);
+        for k = 2:niveau
+            x = matlibre_upsconv1(x, Lo_R, L(imin + k), mode);
         end
     end
-    y = waverec(Cmodifie, L, nom);
+    if colonne
+        x = x(:);
+    elseif size(x, 1) > 1
+        x = x.';
+    end
 end

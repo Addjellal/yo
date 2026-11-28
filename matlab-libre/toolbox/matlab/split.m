@@ -37,7 +37,7 @@ function [morceaux, separateurs] = split(texte, separateur, dimension)
         entrees = cellfun(@char, texte(:)', 'UniformOutput', false);
         forme = size(texte);
     else
-        error('MATLAB:split:BadInput', 'split attend du texte.');
+        error('MATLAB:split:BadInput', 'First argument must be text.');
     end
     decoupes = cell(1, numel(entrees));
     trouves = cell(1, numel(entrees));
@@ -48,7 +48,7 @@ function [morceaux, separateurs] = split(texte, separateur, dimension)
             largeur = numel(decoupes{k});
         elseif numel(decoupes{k}) ~= largeur
             error('MATLAB:string:MustHaveSameNumberOfPieces', ...
-                  'Chaque élément doit donner le même nombre de morceaux.');
+                  'All elements must split into the same number of pieces.');
         end
     end
     if nargin < 3 || isempty(dimension)

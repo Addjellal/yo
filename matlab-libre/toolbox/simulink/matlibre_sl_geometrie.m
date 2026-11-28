@@ -53,7 +53,7 @@ function geometrie = matlibre_sl_geometrie(modele)
 %   Voir aussi OPEN_SYSTEM, MATLIBRE_SL_DISPOSITION, MATLIBRE_SL_RANGS.
     if ~isstruct(modele) || ~isfield(modele, 'blocs')
         error('Simulink:geometrie:Modele', ...
-              'MATLIBRE_SL_GEOMETRIE attend un modele bati par NEW_SYSTEM.');
+              'MATLIBRE_SL_GEOMETRIE requires a model built by NEW_SYSTEM.');
     end
     n = numel(modele.blocs);
     [rangs, retours] = matlibre_sl_rangs(modele);

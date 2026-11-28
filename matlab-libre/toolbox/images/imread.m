@@ -27,19 +27,19 @@ function x = imread(nomFichier, format)
     texte = fileread(nomFichier);
     jetons = strsplit(strtrim(regexprep(texte, '#[^\n]*', ' ')));
     if isempty(jetons)
-        error('images:imread:vide', 'Le fichier « %s » est vide.', nomFichier);
+        error('images:imread:vide', 'File ''%s'' is empty.', nomFichier);
     end
     entete = strtrim(jetons{1});
     if ~any(strcmp(entete, {'P2', 'P3'}))
         error('images:imread:format', ...
-              ['Seuls les formats PGM et PPM en texte — P2 et P3 — se ' ...
-               'lisent ; « %s » annonce « %s ».'], nomFichier, entete);
+              ['Only plain-text PGM and PPM formats (P2 and P3) can be ' ...
+               'read; ''%s'' declares ''%s''.'], nomFichier, entete);
     end
     nombres = str2double(jetons(2:end));
     nombres = nombres(~isnan(nombres));
     if numel(nombres) < 3
         error('images:imread:entete', ...
-              'L''en-tete de « %s » est incomplet.', nomFichier);
+              'The header of ''%s'' is incomplete.', nomFichier);
     end
     l = nombres(1);
     h = nombres(2);
@@ -52,7 +52,7 @@ function x = imread(nomFichier, format)
     end
     if numel(donnees) < attendu
         error('images:imread:tronque', ...
-              'Le fichier « %s » annonce %d valeurs et n''en porte que %d.', ...
+              'File ''%s'' declares %d values but holds only %d.', ...
               nomFichier, attendu, numel(donnees));
     end
     donnees = donnees(1:attendu);

@@ -43,5 +43,5 @@ function [entree, indice] = trouverVariable(fis, nom)
         end
     end
     error('fuzzy:trouverVariable:Absente', ...
-          'Aucune variable ne s''appelle ''%s''.', nom);
+          'No variable is named ''%s''.', nom);
 end

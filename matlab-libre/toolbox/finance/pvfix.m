@@ -6,7 +6,7 @@ function valeur = pvfix(taux, periodes, versement, valeurFuture, terme)
 %   période.
 %
 %   Exemple :
-%      pvfix(0.05, 10, 1000)      % 7721 : ce que valent dix versements
+%      pvfix(0.05, 10, 1000)      % 7721.73 : ce que valent dix versements
 %
 %   Voir aussi FVFIX, PVVAR, PAYPER, PV.
     if nargin < 4 || isempty(valeurFuture), valeurFuture = 0; end

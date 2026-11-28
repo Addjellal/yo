@@ -22,7 +22,7 @@ function polynomes = gfprimfd(m, option, p)
     exigerPremier(p, 'gfprimfd');
     m = round(m);
     if m < 1
-        error('comm:gfprimfd:Degre', 'Le degré doit valoir au moins un.');
+        error('comm:gfprimfd:Degre', 'The degree must be at least one.');
     end
     trouves = zeros(0, m + 1);
     cherchePremier = ischar(option) || isstring(option);
@@ -60,7 +60,7 @@ function polynomes = gfprimfd(m, option, p)
         rang = round(option);
         if rang < 1 || rang > size(trouves, 1)
             error('comm:gfprimfd:Rang', ...
-                  'Il n''y a que %d polynômes primitifs de ce degré.', ...
+                  'There are only %d primitive polynomials of this degree.', ...
                   size(trouves, 1));
         end
         polynomes = trouves(rang, :);

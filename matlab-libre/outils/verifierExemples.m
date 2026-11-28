@@ -44,7 +44,7 @@ function verifierExemples(varargin)
         fprintf('  %s : dossier inconnu\n', demandes{kd});
         continue
     end
-    fichiers = dir(fullfile(dossier, '*.m'));
+    fichiers = matlibre_fichiers_module(dossier);
     nSans = 0;
     nCasses = 0;
     nOk = 0;

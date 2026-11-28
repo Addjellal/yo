@@ -28,7 +28,7 @@ function a = polyarea(x, y, dim)
     x = double(x);
     y = double(y);
     if ~isequal(size(x), size(y))
-        error('MATLAB:polyarea:tailles', 'X et Y doivent avoir la même taille.');
+        error('MATLAB:polyarea:tailles', 'X and Y must be the same size.');
     end
     if nargin < 3
         if isvector(x)

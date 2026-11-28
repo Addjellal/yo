@@ -37,7 +37,7 @@ function [Vx, Vy] = opticalFlowHS(I1, I2, varargin)
     B = enGrisFlot(I2);
     if ~isequal(size(A), size(B))
         error('vision:opticalFlowHS:BadSize', ...
-              'Les deux images doivent avoir la même taille.');
+              'The two images must be the same size.');
     end
     noyauX = [-1 1; -1 1] / 4;
     noyauY = [-1 -1; 1 1] / 4;

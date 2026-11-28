@@ -3,8 +3,8 @@ function w = blackmanharris(n)
 %   Coefficients : 0,35875 ; 0,48829 ; 0,14128 ; 0,01168.
 %
 %   Exemple :
-%      w = blackmanharris(64);
-%      max(w)                      % 1 : la fenetre est normalisee a son sommet
+%      w = blackmanharris(65);
+%      max(w)                      % 1 : en son centre, sur une longueur impaire
 %
 %   Voir aussi NUTTALLWIN, FLATTOPWIN, WINDOW.
     n = round(n);

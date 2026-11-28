@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <mutex>
 #include <memory>
 #include <sstream>
 
@@ -191,7 +192,17 @@ std::string formatMatlab(const std::string& formatBrut, const std::vector<Valeur
                         sortie += formater(("%" + drapeaux + largeur + "s").c_str(),
                                            t.c_str());
                     } else if (e.nombre != std::floor(e.nombre)) {
-                        sortie += formater((spec + "g").c_str(), e.nombre);
+                        // Une valeur non entière passe en « %e », comme dans
+                        // MATLAB : sprintf('%d', 3.5) vaut '3.500000e+00'.
+                        // Le « %g » d'avant rendait '3.5', qu'un programme
+                        // relisant la sortie prenait pour un entier mal écrit.
+                        sortie += formater((spec + "e").c_str(), e.nombre);
+                    } else if (std::fabs(e.nombre) >= 9.2e18) {
+                        // Au-delà de 2^63, la conversion en long long déborde
+                        // (comportement indéfini) : 1e20 s'écrivait
+                        // -9223372036854775808. L'entier s'écrit en entier.
+                        sortie += formater(("%" + drapeaux + largeur + ".0f").c_str(),
+                                           e.nombre);
                     } else {
                         sortie += formater((spec + "lld").c_str(), (long long)e.nombre);
                     }
@@ -273,6 +284,16 @@ namespace {
     std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
+// La table des fichiers ouverts est commune au processus, donc aux fils
+// d'un parfor, qui ouvraient, écrivaient et fermaient leurs fichiers dans
+// la même std::map sans verrou — une course, qui pouvait corrompre la
+// table. Tout accès passe désormais par ce verrou, et un flux se prend
+// par un shared_ptr : fermé par un autre fil, il reste valide le temps de
+// la lecture en cours.
+std::mutex& verrouFichiers() {
+    static std::mutex verrou;
+    return verrou;
+}
 std::map<int, std::shared_ptr<std::fstream>>& fichiers() {
     static std::map<int, std::shared_ptr<std::fstream>> table;
     return table;
@@ -280,6 +301,11 @@ std::map<int, std::shared_ptr<std::fstream>>& fichiers() {
 std::map<int, std::string>& nomsFichiers() {
     static std::map<int, std::string> table;
     return table;
+}
+std::shared_ptr<std::fstream> chercherFlux(int fid) {
+    std::lock_guard<std::mutex> garde(verrouFichiers());
+    auto f = fichiers().find(fid);
+    return f == fichiers().end() ? nullptr : f->second;
 }
 
 FONCTION(fnDisp) {
@@ -360,10 +386,9 @@ FONCTION(fnFprintf) {
     if (fid == 1) it.sortie() << texte << std::flush;
     else if (fid == 2) it.erreurSortie() << texte << std::flush;
     else {
-        auto f = fichiers().find(fid);
-        if (f == fichiers().end())
-            erreur("MATLAB:badfid", formater("Invalid file identifier %d.", fid));
-        *f->second << texte;
+        auto f = chercherFlux(fid);
+        if (!f) erreur("MATLAB:badfid", formater("Invalid file identifier %d.", fid));
+        *f << texte;
     }
     if (nargout > 0) return {Valeur::scalaire((double)texte.size())};
     return {};
@@ -401,17 +426,31 @@ FONCTION(fnNum2str) {
     if (args.size() > 1 && (args[1].estTexte() || args[1].estChaine()))
         return {Valeur::texte(formatMatlab(args[1].versTexte(), {v}, 0))};
     int chiffres = args.size() > 1 ? (int)args[1].scal() : 0;
+    // Sans précision donnée, MATLAB garde quatre chiffres après celui des
+    // unités du plus grand élément, cinq significatifs au moins :
+    // num2str(pi) vaut '3.1416', num2str(123.456) '123.456'. Le « %.4g »
+    // d'avant rendait '3.142' et '123.5'.
+    int significatifs = 5;
+    if (chiffres <= 0) {
+        double plusGrand = 0;
+        for (double x : v.re)
+            if (std::isfinite(x)) plusGrand = std::max(plusGrand, std::fabs(x));
+        for (double y : v.im)
+            if (std::isfinite(y)) plusGrand = std::max(plusGrand, std::fabs(y));
+        if (plusGrand > 0)
+            significatifs = std::min(17, std::max((int)std::floor(std::log10(plusGrand)) + 5, 5));
+    }
     auto un = [&](double x, double y) {
         std::string s;
         if (nonFini(x, s)) {
         } else if (chiffres > 0) s = formater("%.*g", chiffres, x);
         else if (x == std::floor(x) && std::fabs(x) < 1e15) s = formater("%.0f", x);
-        else s = formater("%.4g", x);
+        else s = formater("%.*g", significatifs, x);
         if (y != 0) {
             std::string si;
             if (!nonFini(std::fabs(y), si))
                 si = (chiffres > 0) ? formater("%.*g", chiffres, std::fabs(y))
-                                    : formater("%.4g", std::fabs(y));
+                                    : formater("%.*g", significatifs, std::fabs(y));
             s += (y < 0 ? "-" : "+") + si + "i";
         }
         return s;
@@ -870,16 +909,25 @@ FONCTION(fnFopen) {
     if (mode.find('w') != std::string::npos) drapeaux = std::ios::out | std::ios::trunc;
     else if (mode.find('a') != std::string::npos) drapeaux = std::ios::out | std::ios::app;
     else if (mode.find('+') != std::string::npos) drapeaux = std::ios::in | std::ios::out;
-    if (mode.find('b') != std::string::npos) drapeaux |= std::ios::binary;
+    // Binaire par défaut, comme MATLAB : le mode texte se demande par « t »
+    // ('rt', 'wt'). Ouvert en texte, un fichier écrit sous Windows voyait
+    // chaque octet 0x0A devenir 0x0D 0x0A — un Parquet, un fichier écrit
+    // par fwrite, n'étaient plus lisibles. Sous Linux et macOS, rien ne
+    // change : les deux modes y sont le même.
+    if (mode.find('t') == std::string::npos) drapeaux |= std::ios::binary;
     auto f = std::make_shared<std::fstream>(nom, drapeaux);
     if (!f->is_open()) {
         if (nargout >= 2) return {Valeur::scalaire(-1), Valeur::texte("No such file or directory")};
         return {Valeur::scalaire(-1)};
     }
-    static int prochain = 3;
-    int fid = prochain++;
-    fichiers()[fid] = f;
-    nomsFichiers()[fid] = nom;
+    int fid;
+    {
+        std::lock_guard<std::mutex> garde(verrouFichiers());
+        static int prochain = 3;
+        fid = prochain++;
+        fichiers()[fid] = f;
+        nomsFichiers()[fid] = nom;
+    }
     if (nargout >= 2) return {Valeur::scalaire(fid), Valeur::texte("")};
     return {Valeur::scalaire(fid)};
 }
@@ -887,6 +935,7 @@ FONCTION(fnFopen) {
 FONCTION(fnFclose) {
     INUTILISE
     exigerArguments(args, 1, 1, "fclose");
+    std::lock_guard<std::mutex> garde(verrouFichiers());
     if (args[0].estTexte() && args[0].versTexte() == "all") {
         fichiers().clear();
         return {Valeur::scalaire(0)};
@@ -899,18 +948,17 @@ FONCTION(fnFclose) {
     return {Valeur::scalaire(0)};
 }
 
-std::fstream& fluxDe(int fid) {
-    auto f = fichiers().find(fid);
-    if (f == fichiers().end())
-        erreur("MATLAB:badfid", formater("Invalid file identifier %d.", fid));
-    return *f->second;
+std::shared_ptr<std::fstream> fluxDe(int fid) {
+    auto f = chercherFlux(fid);
+    if (!f) erreur("MATLAB:badfid", formater("Invalid file identifier %d.", fid));
+    return f;
 }
 
 FONCTION(fnFgetl) {
     INUTILISE
     exigerArguments(args, 1, 1, "fgetl");
     std::string ligne;
-    if (!std::getline(fluxDe((int)args[0].scal()), ligne)) return {Valeur::scalaire(-1)};
+    if (!std::getline(*fluxDe((int)args[0].scal()), ligne)) return {Valeur::scalaire(-1)};
     if (!ligne.empty() && ligne.back() == '\r') ligne.pop_back();
     return {Valeur::texte(ligne)};
 }
@@ -919,20 +967,21 @@ FONCTION(fnFgets) {
     INUTILISE
     exigerArguments(args, 1, 2, "fgets");
     std::string ligne;
-    if (!std::getline(fluxDe((int)args[0].scal()), ligne)) return {Valeur::scalaire(-1)};
+    if (!std::getline(*fluxDe((int)args[0].scal()), ligne)) return {Valeur::scalaire(-1)};
     return {Valeur::texte(ligne + "\n")};
 }
 
 FONCTION(fnFeof) {
     INUTILISE
     exigerArguments(args, 1, 1, "feof");
-    return {Valeur::booleen(fluxDe((int)args[0].scal()).eof())};
+    return {Valeur::booleen(fluxDe((int)args[0].scal())->eof())};
 }
 
 FONCTION(fnFrewind) {
     INUTILISE
     exigerArguments(args, 1, 1, "frewind");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     f.clear();
     f.seekg(0);
     // Un fichier ouvert en ecriture a lui aussi un curseur a ramener :
@@ -948,7 +997,8 @@ FONCTION(fnFrewind) {
 FONCTION(fnFtell) {
     INUTILISE
     exigerArguments(args, 1, 1, "ftell");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     std::ios::iostate etat = f.rdstate();
     f.clear();
     std::streampos position = f.tellg();
@@ -965,7 +1015,8 @@ FONCTION(fnFtell) {
 FONCTION(fnFseek) {
     INUTILISE
     exigerArguments(args, 2, 3, "fseek");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     std::streamoff decalage = (std::streamoff)args[1].scal();
     std::ios::seekdir depuis = std::ios::beg;
     if (args.size() > 2) {
@@ -982,7 +1033,7 @@ FONCTION(fnFseek) {
         else if (origine == "eof" || origine == "1") depuis = std::ios::end;
         else
             throw ErreurMatlab("MATLAB:fseek:invalidOrigin",
-                               "fseek : l'origine est « bof », « cof » ou « eof ».");
+                               "Invalid origin. Origin must be 'bof', 'cof', or 'eof'.");
     }
     f.clear();
     f.seekg(decalage, depuis);
@@ -1002,7 +1053,8 @@ FONCTION(fnFseek) {
 FONCTION(fnFerror) {
     INUTILISE
     exigerArguments(args, 1, 2, "ferror");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     bool effacer = args.size() > 1 && args[1].versTexte() == "clear";
     std::string message;
     double numero = 0;
@@ -1090,8 +1142,7 @@ static PrecisionES lirePrecision(std::string nom, const char* fonction) {
     Classe classeSource = Classe::Double;
     if (!typeDePrecision(source, p.octets, p.flottant, p.signe, classeSource))
         throw ErreurMatlab(std::string("MATLAB:") + fonction + ":unsupportedPrecision",
-                           std::string(fonction) + " : précision « " + nom +
-                           " » non prise en charge.");
+                           "Unsupported precision '" + nom + "'.");
     p.classe = Classe::Double;
     if (garder) {
         int o; bool fl, si; Classe classeCible;
@@ -1135,7 +1186,8 @@ static void encoderElement(std::ostream& f, double x, const PrecisionES& p) {
 FONCTION(fnFread) {
     INUTILISE
     exigerArguments(args, 1, 3, "fread");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     std::size_t combien = (std::size_t)-1;
     std::size_t rangType = 0;
     if (args.size() > 1) {
@@ -1165,7 +1217,8 @@ FONCTION(fnFread) {
 // second appel poursuit la lecture.
 FONCTION(fnFscanf) {
     exigerArguments(args, 2, 3, "fscanf");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     std::string reste((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     f.clear();
     std::vector<Valeur> passees;
@@ -1193,7 +1246,8 @@ FONCTION(fnFscanf) {
 FONCTION(fnFwrite) {
     INUTILISE
     exigerArguments(args, 2, 3, "fwrite");
-    auto& f = fluxDe((int)args[0].scal());
+    auto flux = fluxDe((int)args[0].scal());
+    auto& f = *flux;
     const Valeur& v = args[1];
     PrecisionES p;
     if (args.size() > 2) p = lirePrecision(args[2].versTexte(), "fwrite");
@@ -1241,19 +1295,25 @@ FONCTION(fnInput) {
 FONCTION(fnFormat) {
     INUTILISE
     if (args.empty()) {
-        // « format » tout seul revient au réglage de départ. Ici c'est
-        // « long » : MatLibre montre par défaut tous les chiffres portés.
-        it.format = Format::Long;
+        // « format » tout seul revient au réglage de départ, « short »
+        // et « loose », comme dans MATLAB.
+        it.format = Format::Court;
         it.formatCompact = false;
         return {};
     }
-    std::string mode = args[0].versTexte();
+    // MATLAB ignore la casse et les blancs : « format longG », « format
+    // longg », « format long g » (deux arguments) et format('long g') se
+    // valent.
+    std::string mode;
+    for (const Valeur& a : args)
+        for (char c : a.versTexte())
+            if (c != ' ') mode += (char)std::tolower((unsigned char)c);
     if (mode == "short") it.format = Format::Court;
     else if (mode == "long") it.format = Format::Long;
-    else if (mode == "shortE" || mode == "short e") it.format = Format::CourtE;
-    else if (mode == "longE" || mode == "long e") it.format = Format::LongE;
-    else if (mode == "shortG" || mode == "short g") it.format = Format::CourtG;
-    else if (mode == "longG" || mode == "long g") it.format = Format::LongG;
+    else if (mode == "shorte") it.format = Format::CourtE;
+    else if (mode == "longe") it.format = Format::LongE;
+    else if (mode == "shortg") it.format = Format::CourtG;
+    else if (mode == "longg") it.format = Format::LongG;
     else if (mode == "hex") it.format = Format::Hex;
     else if (mode == "rat") it.format = Format::Rationnel;
     else if (mode == "bank") it.format = Format::Banque;

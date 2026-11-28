@@ -79,7 +79,7 @@ function bw = unTour(bw, operation)
             bw = logical(imclose(bw, ones(3))) & ~bw;
         otherwise
             error('images:bwmorph:UnknownOperation', ...
-                  'Opération inconnue : %s.', operation);
+                  'Unknown operation: %s.', operation);
     end
 end
 

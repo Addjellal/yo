@@ -84,7 +84,7 @@ classdef scatteredInterpolant
                     varargout{1} = r;
                 otherwise
                     error('MATLAB:scatteredInterpolant:badSubscript', ...
-                          'Un interpolant s''évalue par parenthèses.');
+                          'An interpolant is evaluated with parentheses.');
             end
         end
 

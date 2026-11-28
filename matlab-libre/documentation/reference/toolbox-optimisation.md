@@ -258,22 +258,7 @@ LSQLIN Moindres carrés linéaires avec contraintes de bornes.
 
 ## `lsqnonlin`
 
-```
-LSQNONLIN Moindres carrés non linéaires.
-  X = LSQNONLIN(F,X0) minimise la somme des carrés des composantes de
-  F(X). LSQNONLIN(F,X0,LB,UB) impose des bornes.
-
-  La méthode est celle de Levenberg-Marquardt : le jacobien est estimé
-  par différences finies, et l'amortissement passe de la descente de
-  gradient à Gauss-Newton selon que le pas améliore ou non le critère.
-
-  Exemple :
-     % Ajustement de a*exp(b*t) sur des données exactes.
-     t = (0:0.5:2)';  y = 3 * exp(-0.5 * t);
-     p = lsqnonlin(@(p) p(1) * exp(p(2) * t) - y, [1; -1]);
-
-  Voir aussi LSQCURVEFIT, LSQLIN, FSOLVE, FMINSEARCH.
-```
+_Pas de bloc d'aide._
 
 ## `matlibre_bornes_en_contraintes`
 
@@ -528,11 +513,17 @@ PROB2STRUCT Traduit un problème en matrices pour les solveurs.
 QUADPROG Programmation quadratique : minimise 0.5*x'Hx + f'x.
   X = QUADPROG(H,F) minimise sans contrainte : c'est -H\F.
   X = QUADPROG(H,F,A,B,AEQ,BEQ,LB,UB) impose A*x <= b, Aeq*x = beq et
-  les bornes.
+  les bornes ; X = QUADPROG(...,X0,OPTIONS) accepte le point de départ
+  et les options de MATLAB, dont seul 'Display' est sans effet ici.
+  [X,FVAL,EXITFLAG] = QUADPROG(...) rend aussi la valeur du critère et
+  le drapeau : 1 si X est admissible, -2 sinon.
 
-  Les contraintes d'inégalité et les bornes sont traitées par
-  pénalisation ; le minimum est cherché par Nelder-Mead à partir de la
-  solution non contrainte.
+  Quand H est définie positive, le problème est convexe et MatLibre le
+  résout exactement par une méthode de contraintes actives : chaque pas
+  résout le système de Karush-Kuhn-Tucker des contraintes saturées, et
+  la solution est celle de MATLAB à la précision machine. Sinon, faute
+  de mieux, les contraintes sont pénalisées et le minimum cherché par
+  Nelder-Mead : la solution n'est alors qu'approchée.
 
   Exemple :
      % Le point le plus proche de [1;1], puis le même sous x1+x2 <= 1.

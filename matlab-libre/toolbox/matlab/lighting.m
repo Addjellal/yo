@@ -3,7 +3,7 @@ function lighting(mode)
 %   LIGHTING FLAT, LIGHTING GOURAUD et LIGHTING NONE choisissent, dans
 %   MATLAB, comment la lumière est répartie sur une surface.
 %
-%   Le rendu de MatLibre est plan et ne calcule pas d'éclairage :
+%   MatLibre ne calcule pas d'éclairage :
 %   l'appel est accepté pour qu'un programme tourne sans retouche, et
 %   ne change rien à l'image.
 %

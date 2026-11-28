@@ -56,9 +56,9 @@ function [y, t] = step(varargin)
     end
     plot(courbes{:});
     grid on;
-    xlabel('Temps (s)');
+    xlabel('Time (seconds)');
     ylabel('Amplitude');
-    title('Réponse indicielle');
+    title('Step Response');
 end
 
 function [depart, amplitude] = niveaux(options)
@@ -100,8 +100,8 @@ function [y, t] = reponseEchelon(sys, temps, depart, amplitude)
         gain = dcgain(sys);
         if ~all(isfinite(gain(:)))
             error('control:step:Offset', ...
-                  ['InputOffset demande un gain statique fini ; ce modèle ' ...
-                   'n''en a pas.']);
+                  ['InputOffset requires a finite DC gain; this model ' ...
+                   'does not have one.']);
         end
         if ny == 1 && nu == 1
             y = y + depart * gain;
@@ -130,7 +130,7 @@ function tracerGrille(modeles, styles, temps, depart, amplitude)
         autre = ss(modeles{k});
         if ~isequal(size(autre.D), size(reference.D))
             error('Control:analysis:MultipleModels', ...
-                  'Les modeles superposes doivent avoir les memes entrees et sorties.');
+                  'All models must have the same inputs and outputs.');
         end
         [reponses{k}, instants{k}] = reponseEchelon(modeles{k}, temps, depart, amplitude);
     end
@@ -147,8 +147,8 @@ function tracerGrille(modeles, styles, temps, depart, amplitude)
             end
             plot(courbes{:});
             grid on;
-            title(sprintf('De %s vers %s', entrees{j}, sorties{i}));
-            if i == size(cases, 1), xlabel('Temps (s)'); end
+            title(sprintf('From: %s  To: %s', entrees{j}, sorties{i}));
+            if i == size(cases, 1), xlabel('Time (seconds)'); end
             if j == 1, ylabel('Amplitude'); end
         end
     end

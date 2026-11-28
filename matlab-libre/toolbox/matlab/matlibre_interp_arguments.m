@@ -29,11 +29,11 @@ function [P, v, methode, prolongement] = matlibre_interp_arguments(arguments)
         v = double(arguments{3});
     else
         error('MATLAB:scatteredInterpolant:Arguments', ...
-              'Il faut les points et leurs valeurs.');
+              'The points and their values are required.');
     end
     v = v(:);
     if size(P, 1) ~= numel(v)
         error('MATLAB:scatteredInterpolant:Tailles', ...
-              'Il faut autant de valeurs que de points.');
+              'The number of values must match the number of points.');
     end
 end

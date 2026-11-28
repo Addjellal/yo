@@ -14,7 +14,7 @@ function sysd = d2d(sys, Ts, methode)
 %   Voir aussi C2D, D2C.
     if nargin < 3 || isempty(methode), methode = 'zoh'; end
     if sys.Ts == 0
-        error('control:d2d:NotDiscrete', 'Le modèle doit être discret.');
+        error('control:d2d:NotDiscrete', 'The model must be discrete-time.');
     end
     if abs(sys.Ts - Ts) < eps(Ts)
         sysd = sys;

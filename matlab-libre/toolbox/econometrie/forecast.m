@@ -29,6 +29,6 @@ function [Y, variances] = forecast(modele, horizon, varargin)
         [Y, variances] = matlibre_garch_prevoir(modele, horizon, varargin{:});
     else
         error('econ:forecast:Modele', ...
-              'FORECAST attend un modèle ARIMA ou GARCH.');
+              'FORECAST requires an ARIMA or GARCH model.');
     end
 end

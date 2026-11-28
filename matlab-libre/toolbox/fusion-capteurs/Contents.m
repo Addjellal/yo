@@ -6,4 +6,5 @@
 %   madgwickUpdate      - Attitude en quaternion, par descente de gradient
 %
 % Suivi de plusieurs objets
-%   trackAssign         - Association mesures / pistes, avec seuil
+%   trackAssign         - Association mesures / pistes, optimale, avec seuil
+%   assignmunkres       - Affectation optimale de Munkres (signature de MATLAB)

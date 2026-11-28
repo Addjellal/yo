@@ -6,8 +6,8 @@ function coefficients = wpcoef(arbre, noeud)
 %
 %   Exemple :
 %      t = wpdec(1:64, 2, 'db2');
-%      numel(wpcoef(t, 3))            % 16
-%      numel(wpcoef(t, [2 0]))        % 16 : le même nœud
+%      numel(wpcoef(t, 3))            % 18 : l'extension symétrique allonge
+%      numel(wpcoef(t, [2 0]))        % 18 : le même nœud
 %
 %   Voir aussi WPRCOEF, WPDEC, LEAVES, WPSPLT.
     if nargin < 2 || isempty(noeud)
@@ -17,6 +17,6 @@ function coefficients = wpcoef(arbre, noeud)
     coefficients = lireNoeud(arbre, indice);
     if isempty(coefficients)
         error('wavelet:wpcoef:Absent', ...
-              'Le nœud %d n''est pas dans l''arbre.', indice);
+              'Node %d is not in the tree.', indice);
     end
 end

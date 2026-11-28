@@ -14,11 +14,11 @@ function depos = ind2depo(ordre, indices)
 %   Voir aussi DEPO2IND, WPDEC, LEAVES, TREEDPTH.
     ordre = round(ordre);
     if ordre < 2
-        error('wavelet:ind2depo:Ordre', 'L''ordre doit valoir au moins deux.');
+        error('wavelet:ind2depo:Ordre', 'The order must be at least two.');
     end
     indices = double(indices(:));
     if any(indices < 0) || any(indices ~= round(indices))
-        error('wavelet:ind2depo:Indice', 'Un indice de nœud est un entier positif.');
+        error('wavelet:ind2depo:Indice', 'A node index must be a nonnegative integer.');
     end
     depos = zeros(numel(indices), 2);
     for k = 1:numel(indices)

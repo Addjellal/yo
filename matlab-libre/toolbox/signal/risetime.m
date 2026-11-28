@@ -6,7 +6,8 @@ function [duree, debut, fin] = risetime(x, fs, varargin)
 %   RISETIME(...,'PercentReferenceLevels',[BAS HAUT]) change les seuils.
 %
 %   Exemple :
-%      risetime([0 0 0.5 1 1], 1)   % 0.8 : de 10 % à 90 %
+%      risetime([0 0 0.5 1 1], 1)   % 1.584 : de 10 % à 90 % entre les états
+%                                   % 0,005 et 0,995 que rend STATELEVELS
 %
 %   Voir aussi FALLTIME, SLEWRATE, OVERSHOOT.
     if nargin < 2 || isempty(fs), fs = 1; end

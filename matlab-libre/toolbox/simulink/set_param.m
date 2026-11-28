@@ -43,6 +43,18 @@ function modele = set_param(modele, nom, varargin)
 %   instant sur N, DataLoggingLimitDataPoints et DataLoggingMaxPoints
 %   les derniers.
 %
+%   La forme de MATLAB : SET_PARAM(OBJET,'Param',VALEUR,...), sans sortie,
+%   règle dans la session l'objet que désigne son nom ('modele'), son
+%   chemin ('modele/bloc') ou sa poignée — un modèle, un bloc, un port, ou
+%   une ligne, qui porte les réglages du signal. Position s'y donne en
+%   pixels, comme dans Simulink ; Dirty, que la session tient pour chaque
+%   modèle, s'y règle ('on', 'off'). Changer le rang (Port) d'un Inport ou
+%   d'un Outport décale les autres, pour que les rangs restent 1 à N.
+%
+%   Commented met un bloc en commentaire : 'on' le retire du calcul — ce
+%   qu'il alimentait lit zéro —, 'through' le fait traverser, chaque
+%   sortie rendant l'entrée de même rang ; 'off' le rétablit.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -63,6 +75,16 @@ function modele = set_param(modele, nom, varargin)
 %      get_param(m, 'Solver')                   % 'ode4'
 %
 %   Voir aussi GET_PARAM, ADD_PARAM, ADD_BLOCK, SIM, REPLACE_BLOCK.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        if nargin < 2
+            error('Simulink:Commands:SetParamArguments', ...
+                  'SET_PARAM(OBJECT,NAME,VALUE,...): parameters must be name-value pairs.');
+        end
+        matlibre_sl_nomme('set_param', nargout, modele, nom, varargin{:});
+        clear modele
+        return
+    end
     % Une poignée de port : le signal qui en part, son nom et son journal.
     if isnumeric(nom)
         modele = matlibre_sl_signaux('poser', modele, nom, varargin{:});
@@ -82,8 +104,8 @@ function modele = set_param(modele, nom, varargin)
     end
     i = trouver(modele, feuille);
     if i == 0
-        error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
-               'aucun bloc ne s''appelle ''%s''.'], nom);
+        error('Simulink:Commands:InvSimulinkObjectName', ['Invalid Simulink object name: ' ...
+               'no block is named ''%s''.'], nom);
     end
     b = modele.blocs{i};
     entree = matlibre_sl_catalogue('type', b.type);
@@ -95,16 +117,16 @@ function modele = set_param(modele, nom, varargin)
             j = trouver(modele, nouveau);
             if j ~= 0 && j ~= i
                 error('Simulink:Commands:SetParamNameExists', ...
-                      ['Le modele ''%s'' porte deja un bloc nomme ''%s'' : on ne peut ' ...
-                       'pas lui donner ce nom.'], char(modele.nom), nouveau);
+                      ['Model ''%s'' already has a block named ''%s'': this name cannot ' ...
+                       'be given to it.'], char(modele.nom), nouveau);
             end
             b.nom = nouveau;
             continue
         end
         if strcmpi(champ, 'BlockType') || strcmpi(champ, 'Type')
             error('Simulink:Commands:ParamReadOnly', ...
-                  ['Le type d''un bloc ne se change pas par SET_PARAM : REPLACE_BLOCK ' ...
-                   'le fait, en gardant le cablage.']);
+                  ['The type of a block cannot be changed with SET_PARAM: REPLACE_BLOCK ' ...
+                   'does it, keeping the connections.']);
         end
         % Une variable de masque est un paramètre du bloc masqué, comme
         % dans Simulink.
@@ -116,9 +138,13 @@ function modele = set_param(modele, nom, varargin)
         canon = matlibre_sl_catalogue('parametre', entree, champ);
         if isempty(canon)
             error('Simulink:Commands:ParamUnknown', ...
-                  ['Le bloc ''%s'' (%s) n''a pas de parametre nomme ''%s''. Ses ' ...
-                   'parametres sont : %s.'], b.nom, entree.affiche, champ, ...
+                  ['Block ''%s'' (%s) does not have a parameter named ''%s''. Its ' ...
+                   'parameters are: %s.'], b.nom, entree.affiche, champ, ...
                   strjoin(entree.params(:, 1).', ', '));
+        end
+        if strcmp(canon, 'Commented')
+            valeur = matlibre_sl_parametre('choix', valeur, 'Commented', ...
+                                           {'off', 'on', 'through'});
         end
         b.parametres.(canon) = valeur;
     end
@@ -141,9 +167,9 @@ function modele = reglerModele(modele, couples)
         end
         if any(strcmpi(nom, {'SimulationStatus', 'SimulationTime', 'BlockDiagramType'}))
             error('Simulink:Commands:SetParamReadOnly', ...
-                  ['Le reglage %s du modele ''%s'' se lit, mais ne se regle pas : ' ...
-                   'SimulationCommand lance et arrete la simulation, NEW_SYSTEM fixe le ' ...
-                   'genre du diagramme.'], nom, char(modele.nom));
+                  ['Parameter %s of model ''%s'' is read-only: ' ...
+                   'SimulationCommand starts and stops the simulation, NEW_SYSTEM sets the ' ...
+                   'kind of block diagram.'], nom, char(modele.nom));
         end
         if strcmpi(nom, 'SimulationCommand')
             commander(modele, valeur);
@@ -177,8 +203,8 @@ function modele = reglerModele(modele, couples)
         end
         if isempty(existant)
             error('Simulink:Commands:ParamUnknown', ...
-                  ['Le modele ''%s'' n''a pas de reglage nomme ''%s''. Ses reglages ' ...
-                   'sont : %s ; ADD_PARAM en pose un nouveau.'], char(modele.nom), nom, ...
+                  ['Model ''%s'' does not have a parameter named ''%s''. Its parameters ' ...
+                   'are: %s; ADD_PARAM adds a new one.'], char(modele.nom), nom, ...
                   strjoin(fieldnames(matlibre_sl_config('defauts')).', ', '));
         end
         modele.parametres.(existant) = valeur;
@@ -200,8 +226,8 @@ function commander(modele, commande)
         case {'stop', 'pause', 'continue', 'step'}
         otherwise
             error('Simulink:Commands:SetParamInvalidArgumentValue', ...
-                  ['SimulationCommand vaut update, start, stop, pause, continue ou ' ...
-                   'step ; pas ''%s''.'], char(commande));
+                  ['SimulationCommand must be update, start, stop, pause, continue, or ' ...
+                   'step, not ''%s''.'], char(commande));
     end
 end
 

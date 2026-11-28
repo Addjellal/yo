@@ -11,13 +11,13 @@ function v = nthargout(n, varargin)
 %
 %   Voir aussi FEVAL, DEAL, NARGOUT.
     if isempty(varargin)
-        error('nthargout:Arguments', 'nthargout attend une fonction à appeler.');
+        error('nthargout:Arguments', 'Not enough input arguments.');
     end
     f = varargin{1};
     entrees = varargin(2:end);
     n = double(n(:))';
     if any(n < 1) || any(n ~= fix(n))
-        error('nthargout:Rang', 'Les rangs demandés doivent être des entiers positifs.');
+        error('nthargout:Rang', 'Output positions must be positive integers.');
     end
     demandees = max(n);
     sorties = cell(1, demandees);

@@ -16,9 +16,9 @@ function [fis, info] = tunefis(fis, reglages, X, Y, options)
 %   sortir d'un minimum local, que MatLibre n'a pas ici.
 %
 %   Exemple :
-%      x = (0:0.25:10)';
+%      x = (0:0.5:10)';
 %      y = sin(x);
-%      fis0 = genfis1([x y], 4);
+%      fis0 = genfis1([x y], 3);
 %      [fis, info] = tunefis(fis0, [], x, y);
 %      info.ErreurFinale < info.ErreurInitiale   % vrai
 %
@@ -37,7 +37,7 @@ function [fis, info] = tunefis(fis, reglages, X, Y, options)
     Y = Y(:);
     if size(X, 1) ~= numel(Y)
         error('fuzzy:tunefis:Donnees', ...
-              'Il faut autant de lignes d''entrées que de sorties.');
+              'Input and output data must have the same number of rows.');
     end
     depart = getTunableValues(fis, reglages);
     erreurInitiale = ecart(fis, reglages, depart, X, Y);

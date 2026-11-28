@@ -24,7 +24,7 @@ function [correlations, retards, bornes] = crosscorr(x, y, retardMaximal, nombre
     n = numel(x);
     if numel(y) ~= n
         error('econ:crosscorr:Tailles', ...
-              'Les deux séries doivent avoir la même longueur.');
+              'The two series must have the same length.');
     end
     if nargin < 3 || isempty(retardMaximal)
         retardMaximal = min(20, n - 1);

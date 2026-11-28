@@ -18,6 +18,10 @@ function valeur = get_param(modele, nom, parametre)
 %                   Parent, BlockType, Ports... —, leur type, leurs valeurs
 %                   admises et s'ils se règlent (Attributes)
 %     Mask, MaskType  'off' et '' pour un bloc sans masque
+%     Position, Orientation, BackgroundColor, ShowName, Commented...  les
+%                   réglages que tout bloc porte ; non posés, ils valent
+%                   le défaut de Simulink, et Position le cadre où la mise
+%                   en place range le bloc
 %     CompiledSampleTime  sa période, [période décalage], une fois le
 %                   modèle compilé : [0 0] continue, [0 1] continue fixée
 %                   aux pas mineurs, [Inf 0] constante
@@ -43,6 +47,18 @@ function valeur = get_param(modele, nom, parametre)
 %   une erreur qui le nomme, plutôt que de rendre une valeur vide dont on
 %   ne saurait pas si elle est le réglage ou son absence.
 %
+%   La forme de MATLAB : V = GET_PARAM(OBJET,'Param'), OBJET un modèle de
+%   la session ('modele'), un bloc ('modele/bloc'), une poignée, ou une
+%   cellule de ceux-là. Elle répond comme Simulink : les paramètres du
+%   dialogue et les réglages de configuration en texte ('3', non 3),
+%   BlockType le type de Simulink ('Gain'), Type 'block', 'block_diagram',
+%   'port' ou 'line'. S'y ajoutent Handle, LineHandles, PortConnectivity,
+%   Lines et, pour un port ou une ligne, Line, SrcBlockHandle,
+%   SrcPortHandle, DstBlockHandle, DstPortHandle. Position y est en
+%   pixels. Du modèle se lisent aussi Dirty — 'on' s'il a changé depuis
+%   son fichier — et FileName, le fichier d'où il vient ou vers lequel
+%   on l'a enregistré.
+%
 %   Exemple :
 %      m = new_system('essai');
 %      m = add_block(m, 'gain', 'g', 'Gain', 2);
@@ -52,14 +68,24 @@ function valeur = get_param(modele, nom, parametre)
 %      get_param(m, 'g').type               % 'gain'
 %      get_param(m, 'g', 'Multiplication')  % 'Element-wise(K.*u)', le défaut
 %      get_param(m, 'essai/g', 'Ports')     % [1 1 0 0 0 0 0 0]
-%      get_param(m, 'Solver')               % 'ode1'
+%      get_param(m, 'Solver')               % 'VariableStepAuto'
 %
 %   Voir aussi SET_PARAM, ADD_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
+    % La forme de MATLAB : le modèle désigné par son nom ou sa poignée.
+    if ~isstruct(modele)
+        if nargin ~= 2
+            error('Simulink:Commands:GetParamArguments', ...
+                  ['GET_PARAM(OBJECT,NAME) requires an object, given by its name or handle, and ' ...
+                   'a parameter.']);
+        end
+        valeur = matlibre_sl_nomme('get_param', nargout, modele, nom);
+        return
+    end
     % Une poignée de port : les réglages du signal qui en part.
     if isnumeric(nom)
         if nargin < 3
             error('Simulink:Commands:GetParamArguments', ...
-                  'GET_PARAM(MODELE,PORT,NOM) : il faut nommer le reglage du port.');
+                  'GET_PARAM(MODEL,PORT,NAME) requires the name of the port parameter.');
         end
         valeur = matlibre_sl_signaux('lire', modele, nom, parametre);
         return
@@ -100,8 +126,8 @@ function valeur = get_param(modele, nom, parametre)
         end
     end
     if i == 0
-        error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
-               'aucun bloc ne s''appelle ''%s''.'], nom);
+        error('Simulink:Commands:InvSimulinkObjectName', ['Invalid Simulink object name: ' ...
+               'no block is named ''%s''.'], nom);
     end
     bloc = modele.blocs{i};
     if nargin < 3
@@ -176,7 +202,7 @@ function valeur = get_param(modele, nom, parametre)
     end
     if isempty(canon)
         error('Simulink:Commands:ParamUnknown', ...
-              'Le bloc ''%s'' n''a pas de paramètre ''%s''.', feuille, champ);
+              'Block ''%s'' does not have a parameter named ''%s''.', feuille, champ);
     end
     if isfield(bloc.parametres, canon)
         valeur = bloc.parametres.(canon);
@@ -188,8 +214,48 @@ function valeur = get_param(modele, nom, parametre)
             return
         end
     end
+    [connu, valeur] = defautCommun(modele, bloc, canon);
+    if connu
+        return
+    end
     error('Simulink:Commands:ParamUnknown', ...
-          'Le bloc ''%s'' n''a pas de paramètre ''%s''.', feuille, champ);
+          'Block ''%s'' does not have a parameter named ''%s''.', feuille, champ);
+end
+
+% Ce que vaut un réglage que tout bloc porte quand on ne l'a pas posé : le
+% défaut de Simulink, et pour Position le cadre que la mise en place donne
+% au bloc — celui qu'OPEN_SYSTEM trace.
+function [connu, valeur] = defautCommun(modele, bloc, nom)
+    connu = true;
+    switch nom
+        case 'Position'
+            g = matlibre_sl_geometrie(modele);
+            k = find(strcmp({g.blocs.nom}, char(bloc.nom)), 1);
+            valeur = [g.blocs(k).gauche, g.blocs(k).haut, g.blocs(k).droite, g.blocs(k).bas];
+        case 'Orientation'
+            valeur = 'right';
+        case 'ForegroundColor'
+            valeur = 'black';
+        case 'BackgroundColor'
+            valeur = 'white';
+        case 'ShowName'
+            valeur = 'on';
+        case {'Description', 'Tag', 'Priority', 'AttributesFormatString'}
+            valeur = '';
+        case 'NamePlacement'
+            valeur = 'normal';
+        case 'FontSize'
+            valeur = -1;
+        case 'FontName'
+            valeur = 'auto';
+        case {'DropShadow', 'Commented'}
+            valeur = 'off';
+        case 'UserData'
+            valeur = [];
+        otherwise
+            connu = false;
+            valeur = [];
+    end
 end
 
 % Tous les paramètres d'un bloc, comme les décrit ObjectParameters : ceux
@@ -233,7 +299,7 @@ function valeur = compile(modele, nom, champ)
     k = find(strcmp(c.chemins, [prefixe nom]), 1);
     if isempty(k)
         error('Simulink:Commands:InvSimulinkObjectName', ...
-              ['Nom d''objet Simulink invalide : aucun bloc compile de ''%s'' ne s''appelle ' ...
+              ['Invalid Simulink object name: no compiled block of ''%s'' is named ' ...
                '''%s''.'], char(modele.nom), nom);
     end
     entrees = c.entrees{k};
@@ -259,7 +325,7 @@ function valeur = compile(modele, nom, champ)
             valeur = struct('Inport', complexes(c, entrees), 'Outport', complexes(c, sorties));
         otherwise
             error('Simulink:Commands:ParamUnknown', ...
-                  'Le bloc ''%s'' n''a pas de parametre ''%s''.', nom, champ);
+                  'Block ''%s'' does not have a parameter named ''%s''.', nom, champ);
     end
 end
 

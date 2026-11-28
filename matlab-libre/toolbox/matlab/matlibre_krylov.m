@@ -140,7 +140,7 @@ function [x, drapeau, residu, iterations, residus] = ...
                 rho = rhoNeuf;
             end
         otherwise
-            error('MATLAB:krylov:UnknownMethod', 'Méthode inconnue : %s.', methode);
+            error('MATLAB:krylov:UnknownMethod', 'Unknown method: %s.', methode);
     end
     residu = residus(end);
 end

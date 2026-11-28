@@ -36,7 +36,7 @@ function h = qshiftFiltre(L, K)
 %   Voir aussi DTFILTERS, DUALTREE, WFILTERS.
     if mod(L, 2) ~= 0 || L < 6
         error('wavelet:qshiftFiltre:Longueur', ...
-              'La longueur doit être paire et valoir au moins six.');
+              'The length must be even and at least 6.');
     end
     if nargin < 2 || isempty(K)
         K = max(2, floor(L / 4));

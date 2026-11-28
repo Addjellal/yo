@@ -18,7 +18,7 @@ function polynomes = cyclpoly(n, k, option)
     k = round(double(k));
     degre = n - k;
     if degre < 1 || k < 1
-        error('comm:cyclpoly:BadSize', 'Il faut 1 <= K < N.');
+        error('comm:cyclpoly:BadSize', 'K must satisfy 1 <= K < N.');
     end
     % x^n - 1 vaut x^n + 1 sur GF(2), par puissances croissantes.
     cible = zeros(1, n + 1);
@@ -40,14 +40,14 @@ function polynomes = cyclpoly(n, k, option)
     end
     if isempty(candidats)
         error('comm:cyclpoly:NoCode', ...
-              'Aucun code cyclique [%d,%d] n''existe.', n, k);
+              'No [%d,%d] cyclic code exists.', n, k);
     end
     poids = sum(candidats, 2)';
     if isnumeric(option)
         polynomes = candidats(poids == option, :);
         if isempty(polynomes)
             error('comm:cyclpoly:NoWeight', ...
-                  'Aucun générateur n''a %d termes.', option);
+                  'No generator polynomial has %d terms.', option);
         end
         return
     end

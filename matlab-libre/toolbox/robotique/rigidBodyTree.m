@@ -74,15 +74,15 @@ classdef rigidBodyTree < handle
             end
             nomParent = char(nomParent);
             if ~ischar(corps.Name) || isempty(corps.Name)
-                error('robotics:rigidBodyTree:NomVide', 'Le corps doit porter un nom.');
+                error('robotics:rigidBodyTree:NomVide', 'The body must have a name.');
             end
             if any(strcmp(obj.BodyNames, corps.Name)) || strcmp(corps.Name, obj.BaseName)
                 error('robotics:rigidBodyTree:NomPris', ...
-                      'Un corps porte deja le nom « %s ».', corps.Name);
+                      'A body named ''%s'' already exists.', corps.Name);
             end
             if ~strcmp(nomParent, obj.BaseName) && ~any(strcmp(obj.BodyNames, nomParent))
                 error('robotics:rigidBodyTree:ParentInconnu', ...
-                      'Aucun corps ni base ne se nomme « %s ».', nomParent);
+                      'No body or base is named ''%s''.', nomParent);
             end
             matlibre_poserParent(corps, nomParent);
             if ~strcmp(nomParent, obj.BaseName)
@@ -199,7 +199,7 @@ classdef rigidBodyTree < handle
             q = double(config(:)).';
             if numel(q) ~= obj.matlibre_nddl()
                 error('robotics:rigidBodyTree:Configuration', ...
-                      'La configuration compte %d valeurs, il en faut %d.', ...
+                      'The configuration has %d values; %d are required.', ...
                       numel(q), obj.matlibre_nddl());
             end
         end
@@ -390,7 +390,7 @@ classdef rigidBodyTree < handle
             w = double(torseur(:));
             if numel(w) ~= 6
                 error('robotics:rigidBodyTree:Torseur', ...
-                      'Un torseur compte six composantes : [couple ; force].');
+                      'A wrench must have six elements: [torque; force].');
             end
             if nargin >= 4 && ~isempty(config)
                 % Donné dans le repère du corps : on le ramène à celui de
@@ -422,7 +422,7 @@ classdef rigidBodyTree < handle
             indice = find(strcmp(obj.BodyNames, nom), 1);
             if isempty(indice)
                 error('robotics:rigidBodyTree:CorpsInconnu', ...
-                      'Aucun corps ne se nomme « %s ».', nom);
+                      'No body is named ''%s''.', nom);
             end
         end
 

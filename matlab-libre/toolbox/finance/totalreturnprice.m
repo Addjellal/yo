@@ -18,7 +18,7 @@ function serie = totalreturnprice(prix, dividendes, datesDividendes, dates)
     dates = dates(:);
     if numel(dates) ~= numel(prix)
         error('finance:totalreturnprice:Tailles', ...
-              'Il faut une date par prix.');
+              'One date per price is required.');
     end
     dividendes = double(dividendes(:));
     datesDividendes = matlibre_dates(datesDividendes);

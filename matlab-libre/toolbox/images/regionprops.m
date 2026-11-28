@@ -7,8 +7,9 @@ function s = regionprops(entree, varargin)
 %   'EquivDiameter', 'Extent', 'FilledArea', 'all'.
 %
 %   Exemple :
-%      s = regionprops(bwlabel([1 1 0; 1 1 0; 0 0 1]));
+%      s = regionprops(bwlabel([1 1 0 0; 1 1 0 0; 0 0 0 1]));
 %      s(1).Area   % 4
+%      s(2).Area   % 1 : le pixel isole
 %
 %   Voir aussi BWLABEL, BWCONNCOMP, BWAREAFILT.
     if islogical(entree)

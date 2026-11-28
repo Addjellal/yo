@@ -3,7 +3,7 @@ function obj = matlibre_garch_verifier(obj)
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
     if isnan(obj.Constant)
         error('econ:garch:Incomplet', ...
-              'La constante n''est pas fixée : estimez le modèle d''abord.');
+              'The constant is not set: estimate the model first.');
     end
     if isnan(obj.Offset)
         obj.Offset = 0;
@@ -14,8 +14,8 @@ function obj = matlibre_garch_verifier(obj)
         for j = 1:numel(coefficients)
             if isnan(coefficients{j})
                 error('econ:garch:Incomplet', ...
-                      ['Le coefficient %s numéro %d n''est pas fixé : ' ...
-                       'estimez le modèle d''abord.'], listes{k}, j);
+                      ['Coefficient %s number %d is not set: ' ...
+                       'estimate the model first.'], listes{k}, j);
             end
         end
     end

@@ -27,7 +27,7 @@ function [options, imposees] = matlibre_fit_options(modele, arguments)
             options.(matlibre_option_canonique(courant)) = arguments{k + 1};
             k = k + 2;
         else
-            error('curvefit:fit:Arguments', 'Argument inattendu en position %d.', k);
+            error('curvefit:fit:Arguments', 'Unexpected argument at position %d.', k);
         end
     end
 end

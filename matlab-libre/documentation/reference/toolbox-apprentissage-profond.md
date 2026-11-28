@@ -340,6 +340,37 @@ CLASSIFICATIONLAYER Couche de sortie pour la classification.
 
 ```
 CLASSIFY Classe de plus forte probabilité pour chaque observation.
+  Deux fonctions de MATLAB portent ce nom : l'analyse discriminante de
+  Statistics and Machine Learning Toolbox, et le classement par un
+  réseau de Deep Learning Toolbox. CLASSIFY les distingue à son premier
+  argument, une matrice d'observations ou un réseau.
+
+  Analyse discriminante
+  CLASS = CLASSIFY(SAMPLE,TRAINING,GROUP) range chaque ligne de SAMPLE
+  dans l'un des groupes de TRAINING, dont GROUP donne le groupe de
+  chaque ligne. Chaque groupe est supposé gaussien, avec une
+  covariance commune estimée sur tous les groupes ; CLASS a le type
+  de GROUP.
+  CLASSIFY(...,TYPE) choisit la covariance : 'linear' (défaut),
+  'diaglinear', 'quadratic' (une par groupe), 'diagquadratic',
+  'mahalanobis' (distance à chaque groupe, sans probabilités).
+  CLASSIFY(...,TYPE,PRIOR) fixe les a priori : un vecteur, une
+  structure aux champs prob et group, ou 'empirical' (proportionnels
+  aux effectifs). Ils valent 1/G par défaut.
+  [CLASS,ERR,POSTERIOR,LOGP,COEFF] = CLASSIFY(...) rend aussi l'erreur
+  apparente sur TRAINING (pondérée par les a priori), les probabilités
+  a posteriori, le logarithme de la densité de chaque observation, et
+  les frontières entre groupes : COEFF(I,J) porte const, linear et
+  quadratic, et l'observation x va du côté de I quand
+  const + x*linear + sum((x*quadratic).*x) > 0.
+  MathWorks recommande désormais FITCDISCR, qui fait le même calcul.
+
+  Exemple (iris de Fisher, 1936) :
+     load fisheriris
+     c = classify(meas, meas, species);
+     sum(~strcmp(c, species))      % 3 fleurs mal classées sur 150
+
+  Réseau de neurones
   C = CLASSIFY(RESEAU,X) rend, pour chaque observation de X, l'indice de
   la classe de plus fort score. C est une colonne, une entrée par
   observation.
@@ -360,7 +391,7 @@ CLASSIFY Classe de plus forte probabilité pour chaque observation.
      reseau = trainNetwork(X, Y, couches, trainingOptions('sgdm'));
      [c, s] = classify(reseau, X);
 
-  Voir aussi PREDICTRESEAU, SOFTMAXLAYER, CONFUSIONCHART.
+  Voir aussi FITCDISCR, PREDICTRESEAU, SOFTMAXLAYER, CONFUSIONCHART.
 ```
 
 ## `clippedReluLayer`
@@ -615,9 +646,13 @@ DLCONV Convolution dérivable, à une ou deux dimensions.
     'DilationFactor'  1, l'écartement des coefficients du filtre
     'DataFormat'      le format, quand X n'en porte pas
 
-  Le filtre est retourné avant le produit : DLCONV calcule une
-  convolution au sens propre, comme CONV2. Pour une couche apprise, la
-  convention est sans effet ; elle compte quand on impose un filtre.
+  Comme les couches convolutives de MATLAB, chaque sortie est le produit
+  scalaire des poids et de la fenêtre d'entrée, sans retourner le filtre :
+  c'est une corrélation, celle de FILTER2, et non la convolution au sens
+  propre de CONV2 (qui retourne le filtre). C'est aussi la convention de
+  Keras, PyTorch et ONNX : des poids appris ailleurs donnent les mêmes
+  sorties. Pour une couche apprise sur place, la convention est sans
+  effet ; elle compte dès qu'on impose ou qu'on importe des poids.
 
   L'opération est dérivable par rapport à l'entrée, aux poids et au
   biais : c'est elle qui porte l'apprentissage d'un réseau convolutif.
@@ -626,6 +661,8 @@ DLCONV Convolution dérivable, à une ou deux dimensions.
      x = dlarray(reshape(1:9, 3, 3), 'SS');
      y = dlconv(x, ones(2, 2), 0);
      extractdata(y)      % les sommes de chaque carre de quatre
+     k = [1 2; 3 4];
+     isequal(extractdata(dlconv(x, k, 0)), filter2(k, reshape(1:9, 3, 3), 'valid'))   % 1
 
   Voir aussi DLARRAY, DLGRADIENT, CONVOLUTION2DLAYER, FULLYCONNECT.
 ```

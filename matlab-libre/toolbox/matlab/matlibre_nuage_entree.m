@@ -24,7 +24,7 @@ function [mots, tailles] = matlibre_nuage_entree(arguments)
         tailles = tailles(:)';
         if numel(mots) ~= numel(tailles)
             error('MATLAB:wordcloud:tailles', ...
-                  'Il faut autant de tailles que de mots.');
+                  'The number of sizes must match the number of words.');
         end
         return
     end

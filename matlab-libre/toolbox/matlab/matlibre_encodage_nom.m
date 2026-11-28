@@ -24,7 +24,7 @@ function nom = matlibre_encodage_nom(encodage)
             nom = 'ISO-8859-1';
         otherwise
             error('MATLAB:unicode:EncodageInconnu', ...
-                  ['Encodage « %s » non pris en charge ; MatLibre connaît ' ...
-                   'UTF-8, US-ASCII et ISO-8859-1.'], char(encodage));
+                  ['Unsupported encoding ''%s''. MatLibre supports ' ...
+                   'UTF-8, US-ASCII, and ISO-8859-1.'], char(encodage));
     end
 end

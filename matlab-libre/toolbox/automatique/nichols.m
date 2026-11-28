@@ -41,7 +41,7 @@ function [module, phase, w] = nichols(varargin)
     end
     plot(courbes{:});
     grid on;
-    xlabel('Phase (deg)');
-    ylabel('Gain (dB)');
-    title('Diagramme de Nichols');
+    xlabel('Open-Loop Phase (deg)');
+    ylabel('Open-Loop Gain (dB)');
+    title('Nichols Chart');
 end

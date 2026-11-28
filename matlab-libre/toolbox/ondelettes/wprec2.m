@@ -10,7 +10,7 @@ function x = wprec2(arbre)
 %   Voir aussi WPDEC2, WPREC, WPRCOEF, WPTHCOEF.
     if arbre.dimension ~= 2
         error('wavelet:wprec2:Dimension', ...
-              'WPREC2 attend un arbre d''image ; employez WPREC.');
+              'WPREC2 requires a two-dimensional tree; use WPREC.');
     end
     x = remonter(arbre, 0);
     x = wkeep(x, arbre.taille);
@@ -23,12 +23,13 @@ function donnees = remonter(arbre, indice)
         for k = 1:4
             enfants{k} = remonter(arbre, 4 * indice + k);
         end
-        donnees = idwt2(enfants{1}, enfants{2}, enfants{3}, enfants{4}, arbre.nom);
+        donnees = idwt2(enfants{1}, enfants{2}, enfants{3}, enfants{4}, arbre.nom, ...
+                        matlibre_taille_noeud(arbre, indice));
     else
         donnees = lireNoeud(arbre, indice);
         if isempty(donnees)
             error('wavelet:wprec2:Absent', ...
-                  'Le nœud %d manque : l''arbre est incomplet.', indice);
+                  'Node %d is missing: the tree is incomplete.', indice);
         end
     end
 end

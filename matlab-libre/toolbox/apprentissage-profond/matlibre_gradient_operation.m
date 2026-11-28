@@ -117,7 +117,7 @@ function contributions = matlibre_gradient_operation(noeud, g)
             contributions = matlibre_gradient_agregation(g, d);
         otherwise
             error('nnet:gradient:Operation', ...
-                  'Aucune règle de dérivation pour « %s ».', noeud.operation);
+                  'No differentiation rule for ''%s''.', noeud.operation);
     end
 end
 

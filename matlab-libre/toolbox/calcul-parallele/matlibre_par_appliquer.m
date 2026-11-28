@@ -18,7 +18,7 @@ function sorties = matlibre_par_appliquer(fonction, entrees, options, extraire, 
     for j = 2:numel(entrees)
         if numel(entrees{j}) ~= n
             error('parallel:appliquer:Tailles', ...
-                  'Toutes les entrees doivent avoir le meme nombre d''elements.');
+                  'All inputs must have the same number of elements.');
         end
     end
     nSorties = max(nSorties, 1);
@@ -68,7 +68,7 @@ function sorties = matlibre_par_appliquer(fonction, entrees, options, extraire, 
                 for i = 1:n
                     if ~isscalar(resultats{s, i})
                         error('parallel:appliquer:NonScalaire', ...
-                              ['Un resultat non scalaire demande ' ...
+                              ['A nonscalar result requires ' ...
                                '''UniformOutput'', false.']);
                     end
                     sortie(i) = resultats{s, i};

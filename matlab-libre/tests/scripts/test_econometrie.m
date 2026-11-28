@@ -224,14 +224,18 @@ for essai = 1:20
     if rejets(1), fauxJci = fauxJci + 1; end
 end
 assert(fauxJci <= 4);
+% Les series n'ont pas de derive : le modele H1*, constante restreinte a
+% la relation, est le bon. Sous H1 (derive libre), le dernier test rejette
+% trop souvent une marche aleatoire sans derive — un quart des essais —,
+% ce que le test ne laissait passer qu'avec un tirage favorable.
 unes = 0; deux = 0;
 for essai = 1:20
     commune = cumsum(randn(300, 1));
     rejets = jcitest([commune + randn(300, 1), commune, cumsum(randn(300, 1))], ...
-                     'display', 'off');
+                     'model', 'H1*', 'display', 'off');
     if rejets(1) == 1 && rejets(2) == 0, unes = unes + 1; end
     rejets = jcitest([commune + randn(300, 1), commune + randn(300, 1), commune], ...
-                     'display', 'off');
+                     'model', 'H1*', 'display', 'off');
     if rejets(1) == 1 && rejets(2) == 1 && rejets(3) == 0, deux = deux + 1; end
 end
 assert(unes >= 15 && deux >= 14);
@@ -412,5 +416,23 @@ assert(max(abs(ret2price(rendements, prix(1)) - prix)) < 1e-9);
 [croisees, decalages] = crosscorr(rendements, rendements, 10);
 assert(abs(croisees(decalages == 0) - 1) < 1e-12);
 assert(max(croisees) - 1 < 1e-12);
+
+% Les defauts de MATLAB : modele 'AR' pour adftest et pptest, aucun
+% retard pour pptest — qui se ramene alors a Dickey-Fuller.
+serieDefaut = cumsum(sin(1:120)' + 0.1 * cos((1:120)' * 2.7));
+[~, ~, statDefaut] = adftest(serieDefaut);
+[~, ~, statAR] = adftest(serieDefaut, 'Model', 'AR');
+[~, ~, statPP] = pptest(serieDefaut);
+assert(statDefaut == statAR && abs(statPP - statAR) < 1e-10);
+% Valeurs critiques a la taille effective de l'echantillon, comparees aux
+% surfaces de reponse de MacKinnon (2010) : a T = 50, -1.947, -2.921,
+% -3.502 au seuil de 5 %.
+[~, ~, ~, c50ar] = adftest(randn(51, 1), 'Model', 'AR');
+[~, ~, ~, c50ard] = adftest(randn(51, 1), 'Model', 'ARD');
+[~, ~, ~, c50ts] = adftest(randn(51, 1), 'Model', 'TS');
+assert(abs(c50ar + 1.947) < 0.01 && abs(c50ard + 2.921) < 0.01 && abs(c50ts + 3.502) < 0.01);
+% Hors des tables, la valeur p est bornee a 0.001 ou 0.999, comme MATLAB.
+[~, pTresBas] = adftest(randn(200, 1) * 0 + (-1) .^ (1:200)');
+assert(pTresBas == 0.001);
 
 disp('econometrie : toutes les verifications passent');
