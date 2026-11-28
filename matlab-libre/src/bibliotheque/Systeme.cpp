@@ -14,6 +14,11 @@
 #ifndef _WIN32
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef __APPLE__
+// _NSGetExecutablePath, pour le chemin de l'interpréteur (fnExecutable) :
+// macOS n'a pas /proc.
+#include <mach-o/dyld.h>
+#endif
 #else
 // GetModuleFileNameA, pour le chemin de l'interpréteur (fnExecutable).
 #ifndef WIN32_LEAN_AND_MEAN
@@ -1318,6 +1323,15 @@ FONCTION(fnExecutable) {
     char tampon[32768];
     DWORD n = GetModuleFileNameA(nullptr, tampon, (DWORD)sizeof(tampon));
     if (n > 0 && n < sizeof(tampon)) return {Valeur::texte(std::string(tampon, n))};
+#elif defined(__APPLE__)
+    // Sans /proc, macOS rendait « matlibre », que le lanceur de mcc ne
+    // trouvait pas hors du PATH (test_litterature, sous macOS).
+    char tampon[4096];
+    uint32_t taille = sizeof(tampon);
+    if (_NSGetExecutablePath(tampon, &taille) == 0) {
+        fs::path chemin = fs::weakly_canonical(fs::path(tampon), ec);
+        return {Valeur::texte(ec ? std::string(tampon) : chemin.string())};
+    }
 #else
     fs::path lien = fs::read_symlink("/proc/self/exe", ec);
     if (!ec && !lien.empty()) return {Valeur::texte(lien.string())};
