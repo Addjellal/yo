@@ -909,7 +909,12 @@ FONCTION(fnFopen) {
     if (mode.find('w') != std::string::npos) drapeaux = std::ios::out | std::ios::trunc;
     else if (mode.find('a') != std::string::npos) drapeaux = std::ios::out | std::ios::app;
     else if (mode.find('+') != std::string::npos) drapeaux = std::ios::in | std::ios::out;
-    if (mode.find('b') != std::string::npos) drapeaux |= std::ios::binary;
+    // Binaire par défaut, comme MATLAB : le mode texte se demande par « t »
+    // ('rt', 'wt'). Ouvert en texte, un fichier écrit sous Windows voyait
+    // chaque octet 0x0A devenir 0x0D 0x0A — un Parquet, un fichier écrit
+    // par fwrite, n'étaient plus lisibles. Sous Linux et macOS, rien ne
+    // change : les deux modes y sont le même.
+    if (mode.find('t') == std::string::npos) drapeaux |= std::ios::binary;
     auto f = std::make_shared<std::fstream>(nom, drapeaux);
     if (!f->is_open()) {
         if (nargout >= 2) return {Valeur::scalaire(-1), Valeur::texte("No such file or directory")};
