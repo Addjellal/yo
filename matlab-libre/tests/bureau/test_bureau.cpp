@@ -108,6 +108,7 @@ int main(int argc, char** argv) {
 
     QTemporaryDir travail;
     if (travail.isValid()) QDir::setCurrent(travail.path());
+    const QString dossierTravail = QDir::currentPath();
 
     std::printf("--- bureau ---\n");
     FenetrePrincipale fenetre;
@@ -1243,6 +1244,17 @@ int main(int argc, char** argv) {
         verifier(QString::fromUtf8(relu.readAll()).contains(QLatin1String("ne pas effacer")),
                  "un fichier existant n'est pas ecrase");
         relu.close();
+        // Revenir au dossier de travail avant que « bac » ne soit efface :
+        // sinon le bureau reste dans un dossier qui n'existe plus, getcwd
+        // echoue, et la suite ecrit ses fichiers a la racine du disque — ce
+        // que seul l'administrateur peut faire. Le conteneur de
+        // developpement l'etant, cela passait ; sur le runner de
+        // l'integration continue, « les blocs de la bibliotheque se
+        // simulent tous » echouait sur « Unable to find file
+        // '/essaiBlocs.m' ».
+        envoyer(fenetre, QStringLiteral("cd('%1')").arg(dossierTravail));
+        verifier(attendre([&] { return !fenetre.occupe(); }),
+                 "le bureau revient a son dossier de travail");
     }
 
     // --- Ctrl-F : rechercher et remplacer ---------------------------------
@@ -1359,6 +1371,10 @@ int main(int argc, char** argv) {
         console->effacer();
         envoyer(fenetre, QStringLiteral("clear resultatDeLEssai"));
         verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        // Comme plus haut : revenir au dossier de travail avant d'effacer « bac ».
+        envoyer(fenetre, QStringLiteral("cd('%1')").arg(dossierTravail));
+        verifier(attendre([&] { return !fenetre.occupe(); }),
+                 "le bureau revient a son dossier de travail");
     }
 
     // Une capture, pour qu'un humain puisse regarder ce qui a ete construit.
