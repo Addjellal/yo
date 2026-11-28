@@ -1735,6 +1735,10 @@ end
             sortie = console->toPlainText().mid(avant);
             verifier(sortie.contains(QLatin1String("TOUS LES BLOCS OK")),
                      "et se simulent tous : la bibliotheque ne propose rien qui n'existe");
+            // En cas d'echec, ce que la console a dit : sans cela, le journal
+            // d'une integration continue ne montre pas quel bloc a echoue.
+            if (!sortie.contains(QLatin1String("TOUS LES BLOCS OK")))
+                std::printf("--- console ---\n%s\n", sortie.right(3000).toUtf8().constData());
             QFile::remove(fichierTous);
             QFile::remove(fichierReseau);
 
