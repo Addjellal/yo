@@ -409,12 +409,15 @@ if(MATLIBRE_TESTS)
   # « ctest -LE lent » les laisse de cote — c'est la passe de chaque
   # poussee dans l'integration continue, et celle qu'on lance pendant le
   # travail, trois minutes sur quatre coeurs —, la batterie entiere les
-  # prend. Durees du 27 novembre 2026, « ctest -j3 » sur quatre coeurs :
-  # test_simulink 25 min, test_aide 18, test_exemples 4 min 40 s,
-  # test_ondelettes et test_domaines 2 min 25 s, test_robuste 1 min 25 s ;
-  # le plus long des autres, test_couverture, 56 s.
+  # prend. test_simulink, vingt-cinq minutes d'un bloc, est coupe en quatre
+  # parts de quatre a neuf minutes (test_simulink, _catalogue, _domaines,
+  # _modeles) ; test_aide, quatre minutes depuis que deux exemples de la
+  # logique floue n'en prennent plus sept ; test_exemples, test_ondelettes,
+  # test_domaines et test_robuste, une a cinq. Le plus long des autres,
+  # test_couverture, 56 s.
   set(MATLIBRE_TESTS_LENTS
-      test_simulink test_aide test_exemples test_ondelettes test_domaines test_robuste)
+      test_simulink test_simulink_catalogue test_simulink_domaines test_simulink_modeles
+      test_aide test_exemples test_ondelettes test_domaines test_robuste)
   file(GLOB MATLIBRE_TESTS_M CONFIGURE_DEPENDS
        ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/test_*.m)
   foreach(fichier ${MATLIBRE_TESTS_M})
