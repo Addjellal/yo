@@ -1153,9 +1153,14 @@ rehash;
 cd(ancienRelatif);
 rmdir(dossierAilleurs, 's');
 assert(exist('compteurPersistant', 'file') == 2, 'le dossier relatif reste sur le chemin');
-assert(any(strcmp(strsplit(path, pathsep), dossierPersistant)), 'et il y est en absolu');
-rmpath(dossierPersistant);
-assert(~any(strcmp(strsplit(path, pathsep), dossierPersistant)), 'rmpath le retire');
+% Le chemin absolu est celui que rend pwd : sous macOS, le dossier
+% temporaire passe par un lien symbolique (/var -> /private/var).
+cd(dossierPersistant);
+dossierAbsolu = pwd();
+cd(ancienRelatif);
+assert(any(strcmp(strsplit(path, pathsep), dossierAbsolu)), 'et il y est en absolu');
+rmpath(dossierAbsolu);
+assert(~any(strcmp(strsplit(path, pathsep), dossierAbsolu)), 'rmpath le retire');
 
 % Les fonctions d'un fichier vivent ensemble : une poignée vers l'une
 % d'elles garde le fichier entier, même quand le cache du chemin l'a
