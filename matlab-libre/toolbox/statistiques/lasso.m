@@ -70,6 +70,13 @@ function [B, info] = lasso(X, y, varargin)
     Xc = Xc ./ repmat(echelle, n, 1);
     moyenneY = mean(y);
     yc = y - moyenneY;
+    % Le chemin automatique part de lambdaMax, le plus petit lambda qui
+    % annule tous les coefficients : MATLAB le documente, le premier
+    % modèle n'a aucun prédicteur. Au calcul, le plus fort coefficient y
+    % tombe pile sur le seuil, et selon l'ordre des additions (BLAS ou
+    % boucle) il le dépasse d'un ulp — un coefficient de 1e-16 au lieu
+    % de 0. On pose donc ce premier modèle nul exactement.
+    cheminAutomatique = isempty(lambda);
     if isempty(lambda)
         lambdaMax = max(abs(Xc.' * yc)) / (n * alpha);
         if isempty(rapport)
@@ -92,7 +99,12 @@ function [B, info] = lasso(X, y, varargin)
         l = lambda(j);
         % Descente par coordonnées : à chaque pas, un seul coefficient
         % bouge, et son optimum s'écrit en clair par le seuillage doux.
-        for iteration = 1:maxIter
+        if cheminAutomatique && j == 1
+            iterationsUtiles = 0;
+        else
+            iterationsUtiles = maxIter;
+        end
+        for iteration = 1:iterationsUtiles
             changementMax = 0;
             residu = yc - Xc * beta;
             for i = 1:p
