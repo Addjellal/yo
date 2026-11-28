@@ -955,11 +955,16 @@ Windows, ne trouvait pas le greffon de plateforme `offscreen` : le
 `qt.conf` que pose `windeployqt` envoie Qt chercher ses greffons dans
 `bin/greffons`, où n'est déposé que `windows`, et Qt s'arrêtait sur une
 erreur fatale écrite au débogueur, le processus restant suspendu jusqu'au
-délai (`6b0f75f`, à confirmer par la prochaine nuit : le test reçoit le dossier des greffons de Qt, Qt écrit
-sur la sortie d'erreur, et le délai passe à quinze minutes). Trois tests
+délai (`6b0f75f` : le test reçoit le dossier des greffons de Qt, Qt écrit
+sur la sortie d'erreur, et le délai passe à quinze minutes). Une nuit
+lancée sur la branche l'a confirmé : le bureau y démarre et passe 416
+vérifications sur 418 ; les deux dernières attendaient une minute un
+script qui prend dix secondes sous Linux et davantage sous Windows
+(`d590b4e`). Trois tests
 demandaient plus que ce qui se garantit — un pôle double à 1e-9 (une
 racine double ne se calcule qu'à la racine de la précision près),
 Misra1a à huit chiffres (la tolérance d'arrêt n'en promet pas plus :
-9,3 sous Linux, 7,9 sous Windows) — ou écrivaient dans `/tmp`
-(`d0ade9d`, `3beca73`).
+9,3 sous Linux, 7,9 sous Windows) — ou écrivaient dans `/tmp`, et un
+autre lançait un programme par `./prog`, que `cmd.exe` ne lit pas
+(`d0ade9d`, `3beca73`, `d590b4e`).
 

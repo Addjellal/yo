@@ -202,7 +202,7 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 | `f3629df` | **P9** : `test_simulink` en quatre parts (la section 26, la moitié du temps, coupée elle-même) ; `test_aide` non coupé : deux exemples de `flou` en faisaient l'essentiel (`222a7ee`, 18 → 4 min). |
 | `8c08b70`, `11fc163`, `66086a5` | **P40** : une poignée de fonction n'est plus écrite en `double` dans un `.mat` (avertissement, variable laissée) ; **P42** : `dbstop in f at 3` ; **P41** : les 77 dernières erreurs en français passent en anglais. |
 | `075f958`, `4d97f45`, `c551dd2`, `abfefae`, `f0ba0c2`, `1f737f1`, `3b828d0`, `2aecde8` | Ce que la première intégration continue a montré : Windows ne compilait plus (`Systeme.cpp`) ; `tempdir` sans séparateur final ; la fusion FMA de clang sur ARM64 ; `fopen` en mode texte par défaut (Windows) ; un chemin symbolique de macOS dans `test_langage` ; un seuil de réactivité du bureau trop serré ; le test du bureau écrit sa console quand la bibliothèque échoue, ce qui a montré qu'il laissait le bureau dans un dossier effacé. |
-| `4f12d7d`, `d0ade9d`, `bbb50f1`, `6b0f75f`, `68aa25d`, `3beca73` | Ce que la première nuit sur `main` a montré : sous macOS, l'interpréteur ne connaissait pas son chemin (`/proc` n'y existe pas), et le lanceur de `mcc` était vide ; sous Windows, `path` séparait ses dossiers par « : » au lieu de `pathsep`, et le test du bureau ne trouvait pas le greffon `offscreen` (le `qt.conf` de `windeployqt` envoie Qt dans `greffons/`, où n'est que `windows`) et restait suspendu sans rien écrire ; trois seuils ou messages de test (pôle double, Misra1a, `/tmp` en dur). |
+| `4f12d7d`, `d0ade9d`, `bbb50f1`, `6b0f75f`, `68aa25d`, `3beca73`, `d590b4e` | Ce que la première nuit sur `main` a montré : sous macOS, l'interpréteur ne connaissait pas son chemin (`/proc` n'y existe pas), et le lanceur de `mcc` était vide ; sous Windows, `path` séparait ses dossiers par « : » au lieu de `pathsep`, et le test du bureau ne trouvait pas le greffon `offscreen` (le `qt.conf` de `windeployqt` envoie Qt dans `greffons/`, où n'est que `windows`) et restait suspendu sans rien écrire ; des seuils et des commandes de test (pôle double, Misra1a, `/tmp` en dur, `./prog` que `cmd.exe` ne lit pas, une minute d'attente pour un script qui en prend plus sous Windows). |
 
 ## 4. Les pièces récentes, et où elles sont
 
@@ -422,10 +422,13 @@ verts ; macOS, deux échecs, et Windows, cinq. Leurs causes sont
 corrigées (section 3, la dernière ligne) et éprouvées par une nuit
 lancée à la main sur la branche : macOS y est vert. À relire au prochain
 passage :
-- **Windows** : le bureau, qui doit maintenant démarrer (greffon
-  `offscreen` trouvé) ou, s'il échoue encore, le dire en quinze minutes,
-  messages de Qt compris ; `path` et Misra1a, corrigés après la nuit de
-  vérification ;
+- **Windows** : la nuit de vérification a montré le bureau démarré
+  (greffon `offscreen` trouvé) et 416 vérifications sur 418 ; les deux
+  dernières et le programme C de `test_litterature` sont corrigés depuis
+  (`d590b4e`), à confirmer. Le script qui pose et simule tous les blocs
+  de la bibliothèque y prend plus d'une minute, contre dix secondes sous
+  Linux : une lenteur propre à Windows, à mesurer (le parcours du
+  dossier courant à chaque appel de fonction ?) ;
 - **ASan et la couverture**, qui passent toute la batterie et prennent
   plus d'une heure : leur premier résultat sur `main` n'était pas connu
   à l'écriture de ces lignes (onglet Actions, « matlab-libre nuit »).
