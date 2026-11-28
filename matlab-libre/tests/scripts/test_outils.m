@@ -76,6 +76,20 @@ assert(strcmp(etat(1).name, 'profChaud'));
 dbclear all
 assert(isempty(dbstatus()));
 
+% La forme commande, celle de la fiche : « dbstop in f at 3 » passe le
+% numéro en texte, '3', qu'on prenait pour son code de caractère (51).
+dbstop in profChaud at 4
+etat = dbstatus();
+assert(numel(etat) == 1 && etat(1).line == 4);
+dbclear in profChaud at 4
+assert(isempty(dbstatus()));
+try
+    dbstop('in', 'profChaud', 'at', 'quatre');
+    assert(false, 'un numéro de ligne illisible doit être refusé');
+catch e
+    assert(strcmp(e.identifier, 'MATLAB:dbstop:InvalidInput'));
+end
+
 % Condition mémorisée telle quelle.
 dbstop('in', 'profChaud', 'at', 4, 'if', 'k > 10');
 etat = dbstatus();
