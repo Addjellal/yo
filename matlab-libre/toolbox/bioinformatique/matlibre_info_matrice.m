@@ -16,7 +16,7 @@ function [matrice, info] = matlibre_info_matrice(nom, arguments, fonction)
     etendu = true;
     ordreVoulu = '';
     if mod(numel(arguments), 2) ~= 0
-        error(['bioinfo:' fonction ':Options'], 'Les options vont par paires nom-valeur.');
+        error(['bioinfo:' fonction ':Options'], 'Options must come in name-value pairs.');
     end
     for k = 1:2:numel(arguments)
         switch lower(char(arguments{k}))
@@ -33,7 +33,7 @@ function [matrice, info] = matlibre_info_matrice(nom, arguments, fonction)
         [present, rang] = ismember(ordreVoulu, ordre);
         if ~all(present)
             error(['bioinfo:' fonction ':Order'], ...
-                  'L''ordre contient des symboles hors de la matrice.');
+                  'The order contains symbols that are not in the matrix.');
         end
         matrice = matrice(rang, rang);
         ordre = ordreVoulu;

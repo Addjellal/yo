@@ -25,7 +25,7 @@ function [piste, valeurs, a, e, radians, donne] = ...
         arguments = arguments(2:end);
         if ~any(strcmp(piste, {'gc', 'rh'}))
             error(['map:' fonction ':Piste'], ...
-                  'La piste vaut ''gc'' (grand cercle) ou ''rh'' (loxodromie).');
+                  'Track must be ''gc'' (great circle) or ''rh'' (rhumb line).');
         end
     end
     % Deux matrices de points [lat lon] à la place de quatre vecteurs.
@@ -37,7 +37,7 @@ function [piste, valeurs, a, e, radians, donne] = ...
         arguments = [{p1(:, 1), p1(:, 2), p2(:, 1), p2(:, 2)}, arguments(3:end)];
     end
     if numel(arguments) < nombre
-        error(['map:' fonction ':Arguments'], 'Il manque des arguments.');
+        error(['map:' fonction ':Arguments'], 'Not enough input arguments.');
     end
     valeurs = arguments(1:nombre);
     reste = arguments(nombre + 1:end);
@@ -55,7 +55,7 @@ function [piste, valeurs, a, e, radians, donne] = ...
                     radians = true;
                 otherwise
                     error(['map:' fonction ':Unite'], ...
-                          'Unité d''angle inconnue : %s (degrees, radians).', char(r));
+                          'Unknown angle unit: %s (degrees, radians).', char(r));
             end
         elseif isa(r, 'referenceEllipsoid')
             a = r.SemimajorAxis;
@@ -69,11 +69,11 @@ function [piste, valeurs, a, e, radians, donne] = ...
             donne = true;
         else
             error(['map:' fonction ':Ellipsoide'], ...
-                  'L''ellipsoïde est [a e], un rayon, ou un objet referenceEllipsoid.');
+                  'The ellipsoid must be [a e], a radius, or a referenceEllipsoid object.');
         end
     end
     if ~(a > 0) || ~(e >= 0 && e < 1)
-        error(['map:' fonction ':Ellipsoide'], 'Ellipsoïde invalide : a > 0 et 0 <= e < 1.');
+        error(['map:' fonction ':Ellipsoide'], 'Invalid ellipsoid: a > 0 and 0 <= e < 1 are required.');
     end
     % Taille commune, scalaires étendus.
     taille = [1 1];
@@ -83,7 +83,7 @@ function [piste, valeurs, a, e, radians, donne] = ...
                 taille = size(valeurs{k});
             elseif ~isequal(size(valeurs{k}), taille)
                 error(['map:' fonction ':Tailles'], ...
-                      'Les tableaux doivent avoir la même taille, ou être scalaires.');
+                      'Arrays must have the same size, or be scalars.');
             end
         end
     end

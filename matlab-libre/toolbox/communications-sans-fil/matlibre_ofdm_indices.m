@@ -13,7 +13,7 @@ function [donnees, nullidx, pilotidx] = matlibre_ofdm_indices(nfft, nullidx, pil
 %
 %   Voir aussi OFDMMOD, OFDMDEMOD.
     if ~isscalar(nfft) || nfft < 8 || nfft ~= fix(nfft)
-        error(['comm:' fonction ':NFFT'], 'NFFT est un entier au moins égal à 8.');
+        error(['comm:' fonction ':NFFT'], 'NFFT must be an integer greater than or equal to 8.');
     end
     nullidx = nullidx(:);
     pilotidx = pilotidx(:);
@@ -21,7 +21,7 @@ function [donnees, nullidx, pilotidx] = matlibre_ofdm_indices(nfft, nullidx, pil
     if any(tous < 1) || any(tous > nfft) || any(tous ~= fix(tous)) ...
             || numel(unique(tous)) ~= numel(tous)
         error(['comm:' fonction ':Indices'], ...
-              'Les indices nuls et pilotes sont des entiers distincts entre 1 et NFFT.');
+              'Null and pilot indices must be distinct integers between 1 and NFFT.');
     end
     donnees = setdiff((1:nfft).', tous);
 end

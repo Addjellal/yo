@@ -16,7 +16,7 @@ function resume = summary(modele)
 %   Voir aussi VARBACKTEST, ESBACKTEST, RUNTESTS.
     if ~isa(modele, 'varbacktest') && ~isa(modele, 'esbacktest')
         error('risque:summary:Modele', ...
-              'SUMMARY attend un contrôle de valeur en risque ou de perte moyenne.');
+              'SUMMARY requires a VaR or expected shortfall backtest.');
     end
     if isa(modele, 'varbacktest')
         % La table de MATLAB : niveau observé, comptes, rapport à l'attendu,

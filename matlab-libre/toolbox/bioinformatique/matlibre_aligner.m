@@ -187,7 +187,7 @@ function s = enTexte(s, nomFonction)
     end
     if ~ischar(s)
         error(['bioinfo:' nomFonction ':Sequence'], ...
-              'Les séquences sont des textes (ou des structures à champ Sequence).');
+              'Sequences must be character vectors or structures with a Sequence field.');
     end
     s = upper(s(:)');
 end
@@ -241,7 +241,7 @@ function o = lireOptions(arguments, mode, nomFonction)
         return
     end
     if mod(numel(arguments), 2) ~= 0
-        error(['bioinfo:' nomFonction ':Options'], 'Les options vont par paires nom-valeur.');
+        error(['bioinfo:' nomFonction ':Options'], 'Options must come in name-value pairs.');
     end
     for k = 1:2:numel(arguments)
         valeur = arguments{k + 1};
@@ -250,7 +250,7 @@ function o = lireOptions(arguments, mode, nomFonction)
                 o.alphabet = upper(char(valeur));
                 if ~any(strcmp(o.alphabet, {'AA', 'NT'}))
                     error(['bioinfo:' nomFonction ':Alphabet'], ...
-                          'L''alphabet vaut ''AA'' ou ''NT''.');
+                          'Alphabet must be ''AA'' or ''NT''.');
                 end
             case 'scoringmatrix'
                 if ischar(valeur) || isstring(valeur)
@@ -267,7 +267,7 @@ function o = lireOptions(arguments, mode, nomFonction)
             case 'glocal'
                 if strcmp(mode, 'local')
                     error(['bioinfo:' nomFonction ':Options'], ...
-                          'Glocal est une option de NWALIGN.');
+                          'Glocal is an option of NWALIGN only.');
                 end
                 o.glocal = logical(valeur);
             case 'showscore'
@@ -282,7 +282,7 @@ function o = lireOptions(arguments, mode, nomFonction)
     end
     if ~(o.ouverture >= 0) || ~(o.extension >= 0)
         error(['bioinfo:' nomFonction ':Trou'], ...
-              'GapOpen et ExtendGap sont des pénalités positives.');
+              'GapOpen and ExtendGap must be positive penalties.');
     end
     if isempty(matrice)
         if isempty(nomMatrice)
@@ -303,8 +303,8 @@ function o = lireOptions(arguments, mode, nomFonction)
                 o.ordre = 'ARNDCQEGHILKMFPSTWYV';
             else
                 error(['bioinfo:' nomFonction ':Matrice'], ...
-                      ['La matrice de score doit être carrée et couvrir ', ...
-                       'l''alphabet (%d symboles).'], ...
+                      ['The scoring matrix must be square and cover ', ...
+                       'the alphabet (%d symbols).'], ...
                       numel(o.ordre));
             end
         end

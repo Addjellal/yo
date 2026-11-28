@@ -15,13 +15,13 @@ function o = matlibre_radar_options(arguments, fonction, permis)
     o = struct('RCS', 1, 'Ts', 290, 'Gain', [20 20], 'Loss', 0, 'CustomFactor', 0, ...
                'AtmosphericLoss', 0, 'PropagationFactor', 0, 'unitstr', 'm');
     if mod(numel(arguments), 2) ~= 0
-        error(['phased:' fonction ':Options'], 'Les options vont par paires nom-valeur.');
+        error(['phased:' fonction ':Options'], 'Options must come in name-value pairs.');
     end
     for k = 1:2:numel(arguments)
         nom = char(arguments{k});
         rang = find(strcmpi(nom, permis), 1);
         if isempty(rang)
-            error(['phased:' fonction ':Options'], 'Option inconnue pour %s : %s.', ...
+            error(['phased:' fonction ':Options'], 'Unknown option for %s: %s.', ...
                   upper(fonction), nom);
         end
         valeur = arguments{k + 1};
@@ -33,13 +33,13 @@ function o = matlibre_radar_options(arguments, fonction, permis)
                 end
                 if numel(valeur) ~= 2
                     error(['phased:' fonction ':Gain'], ...
-                          'Gain est un scalaire ou [Gt Gr], en dB.');
+                          'Gain must be a scalar or [Gt Gr], in dB.');
                 end
             case 'unitstr'
                 valeur = lower(char(valeur));
                 if ~any(strcmp(valeur, {'m', 'km', 'mi', 'nmi'}))
                     error(['phased:' fonction ':Unite'], ...
-                          'unitstr vaut ''m'', ''km'', ''mi'' ou ''nmi''.');
+                          'unitstr must be ''m'', ''km'', ''mi'' or ''nmi''.');
                 end
             otherwise
                 valeur = double(valeur);
@@ -47,6 +47,6 @@ function o = matlibre_radar_options(arguments, fonction, permis)
         o.(permis{rang}) = valeur;
     end
     if any(o.RCS(:) <= 0) || any(o.Ts(:) <= 0)
-        error(['phased:' fonction ':Valeur'], 'RCS et Ts doivent être positifs.');
+        error(['phased:' fonction ':Valeur'], 'RCS and Ts must be positive.');
     end
 end

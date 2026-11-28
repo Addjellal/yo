@@ -10,7 +10,7 @@ function [q, r] = matlibre_quat_paire(q, r, fonction)
 %
 %   Voir aussi QUATMULTIPLY, QUATDIVIDE.
     if size(q, 2) ~= 4 || size(r, 2) ~= 4
-        error(['aero:' fonction ':Taille'], 'Les quaternions sont des lignes [w x y z] : M x 4.');
+        error(['aero:' fonction ':Taille'], 'Quaternions must be rows [w x y z]: M-by-4.');
     end
     if size(q, 1) == 1 && size(r, 1) > 1
         q = repmat(q, size(r, 1), 1);
@@ -18,6 +18,6 @@ function [q, r] = matlibre_quat_paire(q, r, fonction)
         r = repmat(r, size(q, 1), 1);
     elseif size(q, 1) ~= size(r, 1)
         error(['aero:' fonction ':Taille'], ...
-              'Q et R ont autant de lignes, ou l''un d''eux une seule.');
+              'Q and R must have the same number of rows, or one of them a single row.');
     end
 end

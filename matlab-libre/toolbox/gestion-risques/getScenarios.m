@@ -14,7 +14,7 @@ function pertes = getScenarios(modele, indices)
 %   Voir aussi CREDITDEFAULTCOPULA, PORTFOLIORISK, RISKCONTRIBUTION.
     if ~matlibre_est_copule(modele)
         error('risque:getScenarios:Modele', ...
-              'GETSCENARIOS attend un modèle de portefeuille de crédit.');
+              'GETSCENARIOS requires a credit portfolio model.');
     end
     pertes = modele.Losses;
     if nargin >= 2 && ~isempty(indices)

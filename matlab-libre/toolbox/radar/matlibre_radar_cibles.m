@@ -22,7 +22,7 @@ function [J, pertes] = matlibre_radar_cibles(fonction, o, varargin)
     J = max(tailles);
     if any(tailles ~= 1 & tailles ~= J)
         error(['phased:' fonction ':Cibles'], ...
-              'Les grandeurs par cible ont une valeur, ou une par cible (%d).', J);
+              'Per-target quantities must have one value, or one per target (%d).', J);
     end
     pertes = sum(atmosphere, 2) - sum(propagation, 2);
 end
@@ -32,6 +32,6 @@ function v = deuxTrajets(v, fonction, nom)
         v = [v(:), v(:)];
     elseif size(v, 2) ~= 2
         error(['phased:' fonction ':' nom], ...
-              '%s est un scalaire, une colonne, [aller retour] ou une matrice J x 2, en dB.', nom);
+              '%s must be a scalar, a column, [outbound return] or a J-by-2 matrix, in dB.', nom);
     end
 end

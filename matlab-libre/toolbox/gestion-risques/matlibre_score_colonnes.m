@@ -30,5 +30,5 @@ function colonnes = matlibre_score_colonnes(donnees)
         return
     end
     error('risque:creditscorecard:Donnees', ...
-          'Les données doivent être une table, une structure ou un tableau de cellules.');
+          'Data must be a table, a structure or a cell array.');
 end

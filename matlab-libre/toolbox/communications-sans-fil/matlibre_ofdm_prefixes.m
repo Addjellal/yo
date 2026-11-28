@@ -12,15 +12,15 @@ function cp = matlibre_ofdm_prefixes(cplen, nSym, nfft, fonction)
     if isscalar(cplen)
         cp = repmat(cplen, 1, nSym);
         if cplen > nfft
-            error(['comm:' fonction ':Prefixe'], 'Un préfixe scalaire ne dépasse pas NFFT.');
+            error(['comm:' fonction ':Prefixe'], 'A scalar cyclic prefix length must not exceed NFFT.');
         end
     elseif isvector(cplen) && numel(cplen) == nSym
         cp = cplen(:).';
     else
         error(['comm:' fonction ':Prefixe'], ...
-              'CPLEN est un scalaire ou une ligne d''une longueur par symbole (%d).', nSym);
+              'CPLEN must be a scalar or a row vector with one length per symbol (%d).', nSym);
     end
     if any(cp < 0) || any(cp ~= fix(cp))
-        error(['comm:' fonction ':Prefixe'], 'Les préfixes sont des entiers positifs ou nuls.');
+        error(['comm:' fonction ':Prefixe'], 'Cyclic prefix lengths must be nonnegative integers.');
     end
 end

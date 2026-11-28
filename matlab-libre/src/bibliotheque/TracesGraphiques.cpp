@@ -585,7 +585,7 @@ FONCTION(fnPlot3) {
         }
     }
     if (identifiants.empty())
-        erreur("MATLAB:plot3:Arguments", "PLOT3 attend au moins X, Y et Z.");
+        erreur("MATLAB:plot3:Arguments", "PLOT3 requires at least X, Y and Z.");
     passerEnEspace(it);
     if (nargout <= 0) return {};
     int numeroFigure = figureCourante(it)->numero;
@@ -2339,8 +2339,8 @@ FONCTION(fnPrint) {
     std::string extension = format.empty() ? extensionDe(fichier) : format;
     if (!extension.empty() && extension != "svg")
         erreur("MATLAB:print:UnsupportedFormat",
-               "MatLibre n'enregistre les figures qu'en SVG ; '" + extension +
-                   "' n'est pas geré. Donnez un nom en .svg.");
+               "MatLibre saves figures as SVG only; the '" + extension +
+                   "' format is not supported. Give a file name ending in .svg.");
     if (extension.empty()) fichier += ".svg";
     std::ofstream f(fichier);
     if (!f) erreur("MATLAB:print:CannotOpen", "Unable to write '" + fichier + "'.");
@@ -2586,7 +2586,7 @@ std::vector<Valeur> nuage(Interpreteur& it, Arguments args, int nargout, bool es
         nombres.push_back(&args[k++]);
     if (nombres.size() < premiers)
         erreur("MATLAB:scatter:NotEnoughInputs",
-               espace ? "scatter3 attend au moins X, Y et Z." : "scatter attend au moins X et Y.");
+               espace ? "scatter3 requires at least X, Y and Z." : "scatter requires at least X and Y.");
     for (const Valeur* v : nombres) exigerNumerique(*v, espace ? "scatter3" : "scatter");
     Serie s;
     s.genre = GenreTrace::Points;

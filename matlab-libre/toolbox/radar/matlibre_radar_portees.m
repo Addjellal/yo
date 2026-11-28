@@ -11,7 +11,7 @@ function [Rt, Rr] = matlibre_radar_portees(portee, fonction)
 %   Voir aussi RADAREQPOW, RADAREQSNR.
     portee = double(portee);
     if any(portee(:) <= 0)
-        error(['phased:' fonction ':Portee'], 'Les portées doivent être positives.');
+        error(['phased:' fonction ':Portee'], 'Ranges must be positive.');
     end
     if size(portee, 2) == 2
         Rt = portee(:, 1);
@@ -21,6 +21,6 @@ function [Rt, Rr] = matlibre_radar_portees(portee, fonction)
         Rr = portee(:);
     else
         error(['phased:' fonction ':Portee'], ...
-              'La portée est un scalaire, [Rt Rr], une colonne ou une matrice J x 2.');
+              'Range must be a scalar, [Rt Rr], a column or a J-by-2 matrix.');
     end
 end

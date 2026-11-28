@@ -23,7 +23,7 @@ function [positions, metriques] = matlibre_coins(I, arguments, critere, fonction
     taille = 5;
     zone = [];
     if mod(numel(arguments), 2) ~= 0
-        error(['vision:' fonction ':Options'], 'Les options vont par paires nom, valeur.');
+        error(['vision:' fonction ':Options'], 'Options must come in name-value pairs.');
     end
     for k = 1:2:numel(arguments)
         switch lower(char(arguments{k}))
@@ -31,15 +31,15 @@ function [positions, metriques] = matlibre_coins(I, arguments, critere, fonction
             case 'filtersize', taille = arguments{k + 1};
             case 'roi',        zone = arguments{k + 1};
             otherwise
-                error(['vision:' fonction ':Option'], '%s ne connaît pas l''option ''%s''.', ...
+                error(['vision:' fonction ':Option'], '%s has no option ''%s''.', ...
                       fonction, char(arguments{k}));
         end
     end
     if ~isscalar(qualite) || qualite < 0 || qualite > 1
-        error(['vision:' fonction ':MinQuality'], 'MinQuality est entre 0 et 1.');
+        error(['vision:' fonction ':MinQuality'], 'MinQuality must be between 0 and 1.');
     end
     if ~isscalar(taille) || taille < 3 || mod(taille, 2) ~= 1
-        error(['vision:' fonction ':FilterSize'], 'FilterSize est un entier impair, au moins 3.');
+        error(['vision:' fonction ':FilterSize'], 'FilterSize must be an odd integer, at least 3.');
     end
     if ndims(I) == 3
         I = rgb2gray(I);
@@ -51,7 +51,7 @@ function [positions, metriques] = matlibre_coins(I, arguments, critere, fonction
         if numel(zone) ~= 4 || zone(1) < 1 || zone(2) < 1 || zone(1) + zone(3) - 1 > size(I, 2) ...
                 || zone(2) + zone(4) - 1 > size(I, 1) || any(zone(3:4) < 3)
             error(['vision:' fonction ':ROI'], ...
-                  'ROI est [x y largeur hauteur], à l''intérieur de l''image.');
+                  'ROI must be [x y width height], inside the image.');
         end
         I = I(zone(2):zone(2) + zone(4) - 1, zone(1):zone(1) + zone(3) - 1);
         decalage = zone(1:2) - 1;

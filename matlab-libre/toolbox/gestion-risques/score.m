@@ -25,7 +25,7 @@ function [scores, points] = score(grille, donnees)
 %   Voir aussi PROBDEFAULT, DISPLAYPOINTS, FORMATPOINTS, VALIDATEMODEL.
     if isempty(grille.ModelVars)
         error('risque:score:Modele', ...
-              'Il faut ajuster le modèle avant de noter.');
+              'Fit the model before scoring.');
     end
     if nargin < 2 || isempty(donnees)
         colonnes = grille.Data;

@@ -18,11 +18,11 @@ function [risqueGlobal, intervalles] = portfolioRisk(modele, niveaux)
 %   Voir aussi CREDITDEFAULTCOPULA, RISKCONTRIBUTION, CONFIDENCEBANDS.
     if ~matlibre_est_copule(modele)
         error('risque:portfolioRisk:Modele', ...
-              'PORTFOLIORISK attend un modèle de portefeuille de crédit.');
+              'PORTFOLIORISK requires a credit portfolio model.');
     end
     if isempty(modele.PortfolioLosses)
         error('risque:portfolioRisk:Simulation', ...
-              'Il faut simuler le modèle avant de mesurer son risque.');
+              'Simulate the model before measuring its risk.');
     end
     if nargin < 2 || isempty(niveaux)
         niveaux = modele.VaRLevel;

@@ -10,11 +10,11 @@ function matlibre_ofdm_surechantillonnage(arguments, fonction)
     for k = 1:2:numel(arguments)
         if ~strcmpi(arguments{k}, 'OversamplingFactor') || k == numel(arguments)
             error(['comm:' fonction ':Option'], ...
-                  'La seule option est ''OversamplingFactor''.');
+                  'The only option is ''OversamplingFactor''.');
         end
         if arguments{k + 1} ~= 1
             error(['comm:' fonction ':Surechantillonnage'], ...
-                  'MatLibre ne suréchantillonne pas encore les symboles OFDM : le facteur vaut un.');
+                  'MatLibre does not oversample OFDM symbols yet: the factor must be one.');
         end
     end
 end

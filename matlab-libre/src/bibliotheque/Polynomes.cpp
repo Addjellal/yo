@@ -631,7 +631,7 @@ static std::vector<Valeur> hermitePublique(Arguments args, const char* nom,
     if (x.size() != y.size())
         erreur("MATLAB:pchip:Tailles", "The number of values must match the number of data sites.");
     if (x.size() < 2)
-        erreur("MATLAB:pchip:Points", "Il faut au moins deux points.");
+        erreur("MATLAB:pchip:Points", "There must be at least two data points.");
     std::vector<double> d = akima ? pentesAkima(x, y, modifie) : pentesPchip(x, y);
     if (args.size() > 2) {
         Valeur r = versDouble(args[2]);

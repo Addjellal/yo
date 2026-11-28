@@ -15,7 +15,7 @@ function [ordre, o] = matlibre_qam_options(M, arguments, fonction, o)
     if ~isscalar(M) || abs(cote - round(cote)) > 1e-9 || abs(log2(M) - round(log2(M))) > 1e-9 ...
             || M < 4
         error(['comm:' fonction ':notSquare'], ...
-              'M est un carré puissance de deux (4, 16, 64...) : MatLibre ne trace pas les constellations en croix.');
+              'M must be an even power of two (4, 16, 64...): MatLibre does not draw cross constellations.');
     end
     ordre = 'gray';
     if ~isempty(arguments) && (~ischar(arguments{1}) && ~isstring(arguments{1}) ...
@@ -27,17 +27,17 @@ function [ordre, o] = matlibre_qam_options(M, arguments, fonction, o)
         v = ordre(:).';
         if numel(v) ~= M || ~isequal(sort(v), 0:M - 1)
             error(['comm:' fonction ':Ordre'], ...
-                  'Un ordre personnalisé est une permutation de 0 à M-1.');
+                  'A custom symbol order must be a permutation of 0 to M-1.');
         end
     end
     noms = fieldnames(o);
     if mod(numel(arguments), 2) ~= 0
-        error(['comm:' fonction ':Options'], 'Les options vont par paires nom, valeur.');
+        error(['comm:' fonction ':Options'], 'Options must come in name-value pairs.');
     end
     for k = 1:2:numel(arguments)
         trouve = find(strcmpi(arguments{k}, noms), 1);
         if isempty(trouve)
-            error(['comm:' fonction ':Option'], '%s ne connaît pas l''option ''%s''.', ...
+            error(['comm:' fonction ':Option'], '%s has no option ''%s''.', ...
                   fonction, char(string(arguments{k})));
         end
         o.(noms{trouve}) = arguments{k + 1};

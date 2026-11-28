@@ -3,7 +3,7 @@ function [pointsParVariable, extremes] = matlibre_score_extremes(grille)
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
     if isempty(grille.ModelVars)
         error('risque:creditscorecard:Modele', ...
-              'Il faut ajuster le modèle avant de parler de points.');
+              'Fit the model before computing points.');
     end
     variables = grille.ModelVars;
     coefficients = grille.ModelCoefficients;

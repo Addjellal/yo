@@ -48,7 +48,7 @@ classdef varbacktest
             end
             if numel(obj.PortfolioData) ~= numel(obj.VaRData)
                 error('risque:varbacktest:Tailles', ...
-                      'Il faut une valeur en risque par observation.');
+                      'There must be one VaR per observation.');
             end
             k = 1;
             while k + 1 <= numel(varargin)

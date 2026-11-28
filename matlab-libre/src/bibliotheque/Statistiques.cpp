@@ -454,7 +454,7 @@ FONCTION(fnHistcounts) {
             exigerNumerique(valeur, "histcounts");
             if (valeur.nelem() < 2)
                 erreur("MATLAB:histcounts:InvalidBinEdges",
-                       "BinEdges porte au moins deux bords.");
+                       "BinEdges must contain at least two edges.");
             bords.assign(valeur.re.begin(), valeur.re.end());
             classesNommees = true;
         } else if (nom == "binlimits" || nom == "binwidth" || nom == "binmethod") {

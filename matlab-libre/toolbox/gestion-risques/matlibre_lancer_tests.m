@@ -24,6 +24,6 @@ function resultats = matlibre_lancer_tests(modele, varargin)
         resultats{2}.Test = 'unconditionalT';
     else
         error('risque:runtests:Modele', ...
-              'RUNTESTS attend un contrôle de valeur en risque ou de perte moyenne.');
+              'RUNTESTS requires a VaR or expected shortfall backtest.');
     end
 end

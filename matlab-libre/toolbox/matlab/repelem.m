@@ -51,7 +51,7 @@ function c = etaler(n, attendu, nom)
 % donner un par élément.
     n = double(n(:))';
     if any(n < 0) || any(n ~= fix(n))
-        error([nom ':Compte'], 'Les comptes doivent être des entiers positifs.');
+        error([nom ':Compte'], 'Replication factors must be nonnegative integers.');
     end
     if isscalar(n)
         c = repmat(n, 1, attendu);
@@ -59,7 +59,7 @@ function c = etaler(n, attendu, nom)
         c = n;
     else
         error([nom ':Compte'], ...
-              'Il faut un compte par élément (%d attendus, %d donnés).', ...
+              'There must be one replication factor per element (%d expected, %d given).', ...
               attendu, numel(n));
     end
 end

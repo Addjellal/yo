@@ -45,8 +45,8 @@ function [grille, V, questions, methode, horsGrille] = lireArguments(args, nom)
     end
     if ~any(strcmp(methode, {'linear', 'nearest', 'pchip', 'makima', 'spline', 'cubic'}))
         error(['MATLAB:' nom ':InvalidMethod'], ...
-              ['%s : la methode est ''linear'', ''nearest'', ''pchip'', ''makima'', ' ...
-               '''spline'' ou ''cubic'' ; pas ''%s''.'], nom, methode);
+              ['%s: the method must be ''linear'', ''nearest'', ''pchip'', ''makima'', ' ...
+               '''spline'' or ''cubic'', not ''%s''.'], nom, methode);
     end
     n2 = (nNum - 1) / 2;
     if nNum >= 3 && n2 == round(n2) && dimensionsDe(args{n2 + 1}) == n2
