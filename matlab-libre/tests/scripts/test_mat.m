@@ -101,6 +101,22 @@ save('comprime.mat', 'm', '-v7');
 assert(isequal(load('clair.mat').m, m));
 assert(isequal(load('comprime.mat').m, m));
 
+%% ------------------------------------------- une poignée ne s'écrit pas
+% MATLAB range une poignée de fonction dans un sous-système du fichier dont
+% le format n'est pas public. Elle s'écrivait en double, sans rien dire, et
+% revenait au chargement comme un nombre : la variable est désormais
+% laissée de côté, avec un avertissement — seule, ou dans une structure.
+fPoignee = @(x) x + 1; gNombre = 3; sAvecPoignee.h = @sin;
+lastwarn('');
+warning('off', 'MatLibre:save:PoigneeNonEcrite');
+save('poignees.mat', 'fPoignee', 'gNombre', 'sAvecPoignee');
+warning('on', 'MatLibre:save:PoigneeNonEcrite');
+[~, idPoignee] = lastwarn();
+assert(strcmp(idPoignee, 'MatLibre:save:PoigneeNonEcrite'));
+relu = load('poignees.mat');
+assert(isequal(fieldnames(relu), {'gNombre'}) && relu.gNombre == 3);
+delete('poignees.mat');
+
 %% ---------------------------------------------------------- whos -file
 inventaire = matlibre_contenu_mat('choix.mat');
 noms = {};

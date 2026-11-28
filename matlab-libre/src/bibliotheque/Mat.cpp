@@ -139,6 +139,34 @@ std::string argNom(const Valeur& v, const char* quoi) {
     return v.versTexte();
 }
 
+// Une poignee de fonction ne s'ecrit pas dans un fichier MAT : MATLAB la
+// range dans un sous-systeme du fichier dont le format n'est pas public.
+// Elle s'ecrivait en double, sans rien dire, et revenait au chargement
+// comme un nombre. Une variable qui en porte une — seule, ou dans une
+// cellule, une structure, un objet — est laissee de cote, avec un
+// avertissement.
+bool contientPoignee(const Valeur& v) {
+    if (v.classe == Classe::Fonction) return true;
+    for (const Valeur& c : v.cellules)
+        if (contientPoignee(c)) return true;
+    if (v.st)
+        for (const auto& champ : v.st->champs)
+            for (const Valeur& c : champ.second)
+                if (contientPoignee(c)) return true;
+    return false;
+}
+
+void avertirPoigneeNonEcrite(Interpreteur& it, const std::string& nom) {
+    const std::string id = "MatLibre:save:PoigneeNonEcrite";
+    const std::string message = "Variable '" + nom +
+                                "' was not saved: MatLibre cannot write function handles "
+                                "to a MAT-file.";
+    it.dernierAvertissement = message;
+    it.dernierAvertissementId = id;
+    if (!it.avertissementsActifs || it.avertissementsEteints.count(id)) return;
+    it.erreurSortie() << "Warning: " << message << "\n";
+}
+
 FONCTION(fnSave) {
     INUTILISE
     if (args.empty())
@@ -207,6 +235,15 @@ FONCTION(fnSave) {
                 if (std::regex_search(nom, r) && deja.insert(nom).second)
                     aEcrire.push_back({nom, it.lireVariable(nom), false, {}});
         }
+    }
+
+    {
+        std::vector<VariableMat> ecrivables;
+        for (VariableMat& v : aEcrire) {
+            if (contientPoignee(v.valeur)) avertirPoigneeNonEcrite(it, v.nom);
+            else ecrivables.push_back(std::move(v));
+        }
+        aEcrire.swap(ecrivables);
     }
 
     if (ascii) {
