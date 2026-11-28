@@ -938,15 +938,34 @@ trouver ce qui suit, corrigé chaque fois avec son test :
 | clang sur ARM64 fusionne `a*b+c` : `-70:0.1:90` finissait à 90,00000000000001 | `test_litterature`, `test_signal` sous macOS | moyenne | `c551dd2` |
 | `fopen` ouvrait en mode texte sauf `'b'` (MATLAB : binaire sauf `'t'`) ; sous Windows, un Parquet écrit ne se relisait pas | `test_parquet` sous Windows | haute sous Windows | `abfefae` |
 | deux exemples de la logique floue prenaient 370 et 58 s | mesure de `test_aide` par module | basse (temps) | `222a7ee` |
+| sous macOS, `matlibre_executable` lisait `/proc/self/exe`, qui n'y existe pas : le lanceur de `mcc` appelait un interpréteur vide | `test_litterature` (compiler) sous macOS | haute sous macOS | `4f12d7d` |
+| `path` joignait ses dossiers par « : » quel que soit le système ; sous Windows, `strsplit(path, pathsep)` n'y trouvait qu'un morceau, et le deux-points d'un lecteur (`D:\...`) coupait chaque dossier | `test_defauts`, `test_langage` sous Windows | moyenne sous Windows | `bbb50f1` |
 
 Le test du bureau « les blocs de la bibliothèque se simulent tous »,
 rouge sur les runners Linux et macOS et vert dans le conteneur, laissait
 le bureau dans un dossier temporaire effacé : la suite écrivait à la
 racine du disque, possible au seul administrateur (`2aecde8`, trouvé par
-la console qu'il écrit désormais en cas d'échec). Restent ouverts, à
-relire au prochain passage de l'intégration continue : sous Windows, le bureau qui
-dépasse son délai et cinq scripts (`test_defauts`, `test_es_texte`,
-`test_mat`, `test_litterature`, `aide_valeurs`), dont le mode texte de
-`fopen` explique sans doute une partie, et `test_graphique`, qui écrit
-dans un chemin en dur (`/tmp/matlibre_test_figure.svg`).
+la console qu'il écrit désormais en cas d'échec).
+
+La première nuit sur `main` (`9370c6a`) a vérifié ces corrections : le
+mode texte de `fopen` expliquait bien les échecs de `test_es_texte`, de
+`test_mat` et d'`aide_valeurs` sous Windows. Elle a montré les deux
+défauts ajoutés au tableau ci-dessus, et que le test du bureau, sous
+Windows, ne trouvait pas le greffon de plateforme `offscreen` : le
+`qt.conf` que pose `windeployqt` envoie Qt chercher ses greffons dans
+`bin/greffons`, où n'est déposé que `windows`, et Qt s'arrêtait sur une
+erreur fatale écrite au débogueur, le processus restant suspendu jusqu'au
+délai (`6b0f75f` : le test reçoit le dossier des greffons de Qt, Qt écrit
+sur la sortie d'erreur, et le délai passe à quinze minutes). Une nuit
+lancée sur la branche l'a confirmé : le bureau y démarre et passe 416
+vérifications sur 418 ; les deux dernières attendaient une minute un
+script qui prend dix secondes sous Linux et davantage sous Windows
+(`d590b4e`). Trois tests
+demandaient plus que ce qui se garantit — un pôle double à 1e-9 (une
+racine double ne se calcule qu'à la racine de la précision près),
+Misra1a à huit chiffres (la tolérance d'arrêt n'en promet pas plus :
+9,3 sous Linux, 7,9 sous Windows) — ou écrivaient dans `/tmp`, et un
+autre lançait un programme par `./prog`, que `cmd.exe` ne lit pas
+(`d0ade9d`, `3beca73`, `d590b4e`). La nuit suivante, sur la branche
+(`2bfcea9`), macOS et Windows sont verts.
 

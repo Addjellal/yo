@@ -224,8 +224,15 @@ yMisra = [10.07 14.73 17.94 23.93 29.61 35.18 40.02 44.82 50.76 55.05 61.01 66.4
 bMisra = [238.94212918 5.5015643181e-4];
 seMisra = [2.7070075241 7.2668688436e-6];
 chiffres = @(b, c) min(-log10(abs(b(:)' - c(:)') ./ abs(c(:)')));
+% Huit chiffres environ, pas davantage : la tolérance d'arrêt par défaut
+% (TolX = 1e-8) n'en promet pas plus, et la somme des carrés est si plate
+% dans la direction où b1 et b2 se compensent qu'un écart de 1e-17 sur
+% elle déplace le minimum à la neuvième décimale. D'une bibliothèque C à
+% l'autre (exp de glibc, d'UCRT), l'arrêt tombe ailleurs : 9,3 chiffres
+% sous Linux, 7,9 sous Windows ; resserrer TolX n'y gagne rien.
 [ajust, qualite] = fit(xMisra, yMisra, fittype('b1*(1-exp(-b2*x))'), 'StartPoint', [500 1e-4]);
-assert(chiffres(coeffvalues(ajust), bMisra) > 8);
+assert(chiffres(coeffvalues(ajust), bMisra) > 7.5, ...
+       sprintf('Misra1a : %.2f chiffres justes seulement', chiffres(coeffvalues(ajust), bMisra)));
 assert(abs(qualite.sse / 1.2455138894e-1 - 1) < 1e-9);
 assert(abs(qualite.rmse / 1.0187876330e-1 - 1) < 1e-9);
 icMisra = confint(ajust);              % b -+ t(0.975, 12) * ecart certifie
@@ -1496,8 +1503,14 @@ if ~isempty(compilateur)
                         'heronLitt.c goertzelLitt.c entiersLitt.c -lm'], compilateur);
     [statut, message] = system(commande);
     assert(statut == 0, message);
-    [statut, sortieC] = system('./principalLitt');
-    assert(statut == 0);
+    % L'interpréteur de commandes de Windows ne lit pas « ./prog ».
+    if ispc
+        programmeC = 'principalLitt.exe';
+    else
+        programmeC = './principalLitt';
+    end
+    [statut, sortieC] = system(programmeC);
+    assert(statut == 0, 'le programme C a échoué (%d) : %s', statut, sortieC);
     lignesC = strsplit(strtrim(sortieC), sprintf('\n'));
     valeursC = sscanf(lignesC{1}, '%f').';
     assert(valeursC(1) == heronLitt(2) && abs(heronLitt(2) - sqrt(2)) <= eps(sqrt(2)));
@@ -1526,7 +1539,8 @@ if isunix
     avant = fileread(source);
     lanceur = mcc('-m', source, '-d', dossierMcc);
     [statut, sortieMcc] = system([lanceur ' 1000']);
-    assert(statut == 0 && strcmp(fileread(source), avant));
+    assert(statut == 0, 'le lanceur de mcc a echoue : %s', sortieMcc);
+    assert(strcmp(fileread(source), avant));
     attendu = sum(1 ./ (1:1000) .^ 2);
     assert(strcmp(strtrim(sortieMcc), sprintf('%.15g 1', attendu)));
     rmdir(dossierMcc, 's');

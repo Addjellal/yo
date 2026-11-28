@@ -41,7 +41,10 @@ assert(double(fi(pi, 1, 16, 8)) == 804 / 256 && fi(pi).FractionLength == 13);
 % Control System
 G = tf(1, [1 2 1]);
 assert(abs(dcgain(G) - 1) < 1e-12);
-assert(max(abs(sort(pole(G)) - [-1; -1])) < 1e-9);
+% Un pôle double ne se calcule qu'à la racine carrée de la précision près
+% (environ 1e-8) : l'erreur dépend de l'algorithme de valeurs propres, et
+% LAPACK d'Accelerate (macOS) la met au-delà de 1e-9.
+assert(max(abs(sort(pole(G)) - [-1; -1])) < 1e-6);
 [m, p] = bode(G, 1);
 assert(abs(m - 0.5) < 1e-9 && abs(p + 90) < 1e-9);
 [A, B, C, D] = tf2ss(1, [1 2 1]);

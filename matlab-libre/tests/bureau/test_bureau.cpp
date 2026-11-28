@@ -101,7 +101,17 @@ static bool envoyer(FenetrePrincipale& fenetre, const QString& commande) {
 int main(int argc, char** argv) {
     // Sortie ligne a ligne : si le test meurt en cours de route, on garde
     // tout ce qui a deja ete verifie au lieu de perdre le tampon.
+    // Sous Windows, _IOLBF vaut un tampon complet : un test tue par son
+    // delai ne montrait rien de ce qu'il avait verifie. Sans tampon, on
+    // voit ou il s'est arrete.
+#ifdef _WIN32
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+#else
     std::setvbuf(stdout, nullptr, _IOLBF, 0);
+#endif
+    // Ecrit avant QApplication : un test qui ne montre meme pas cette ligne
+    // s'est arrete au demarrage de Qt (greffon de plateforme introuvable).
+    std::printf("--- bureau ---\n");
     qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication application(argc, argv);
     theme::appliquer();
@@ -109,8 +119,6 @@ int main(int argc, char** argv) {
     QTemporaryDir travail;
     if (travail.isValid()) QDir::setCurrent(travail.path());
     const QString dossierTravail = QDir::currentPath();
-
-    std::printf("--- bureau ---\n");
     FenetrePrincipale fenetre;
     fenetre.resize(1280, 820);
     fenetre.show();
@@ -1181,7 +1189,8 @@ int main(int argc, char** argv) {
                  "le dossier est cree");
         // Une fonction neuve porte deja son en-tete.
         QFile modele(QDir(bac.path()).filePath(QStringLiteral("ma_fonction.m")));
-        modele.open(QIODevice::ReadOnly | QIODevice::Text);
+        verifier(modele.open(QIODevice::ReadOnly | QIODevice::Text),
+                 "la fonction neuve se relit");
         QString texteModele = QString::fromUtf8(modele.readAll());
         modele.close();
         verifier(texteModele.contains(QLatin1String("function sortie = ma_fonction")),
@@ -1235,12 +1244,14 @@ int main(int argc, char** argv) {
         // Un nom deja pris ne remplace rien en silence.
         fenetre.creerDansDossier(QStringLiteral("script"), QStringLiteral("unique.m"));
         QFile pris(QDir(bac.path()).filePath(QStringLiteral("unique.m")));
-        pris.open(QIODevice::WriteOnly | QIODevice::Text);
+        verifier(pris.open(QIODevice::WriteOnly | QIODevice::Text),
+                 "le fichier deja pris s'ecrit");
         pris.write("% ne pas effacer\n");
         pris.close();
         fenetre.creerDansDossier(QStringLiteral("script"), QStringLiteral("unique.m"));
         QFile relu(QDir(bac.path()).filePath(QStringLiteral("unique.m")));
-        relu.open(QIODevice::ReadOnly | QIODevice::Text);
+        verifier(relu.open(QIODevice::ReadOnly | QIODevice::Text),
+                 "le fichier deja pris se relit");
         verifier(QString::fromUtf8(relu.readAll()).contains(QLatin1String("ne pas effacer")),
                  "un fichier existant n'est pas ecrase");
         relu.close();
@@ -1318,8 +1329,7 @@ int main(int argc, char** argv) {
         QDir(bac.path()).mkdir(QStringLiteral("Fig"));
         for (const char* nom : {"Khinf.mat", "Kbis.mat", "analyse.m"}) {
             QFile f(QDir(bac.path()).filePath(QLatin1String(nom)));
-            f.open(QIODevice::WriteOnly);
-            f.write("1\n");
+            if (f.open(QIODevice::WriteOnly)) f.write("1\n");
             f.close();
         }
         envoyer(fenetre, QStringLiteral("cd('%1')").arg(bac.path()));
@@ -1750,7 +1760,10 @@ end
             }
             avant = console->toPlainText().size();
             envoyer(fenetre, QStringLiteral("run('%1')").arg(fichierTous));
-            verifier(attendre([&] { return !fenetre.occupe(); }, 60000),
+            // Une dizaine de secondes sous Linux ; plus d'une minute sur le
+            // runner Windows de l'integration continue. Le delai borne une
+            // attente qui ne finirait pas, il ne mesure pas la vitesse.
+            verifier(attendre([&] { return !fenetre.occupe(); }, 300000),
                      "les blocs de la bibliotheque se posent tous");
             sortie = console->toPlainText().mid(avant);
             verifier(sortie.contains(QLatin1String("TOUS LES BLOCS OK")),

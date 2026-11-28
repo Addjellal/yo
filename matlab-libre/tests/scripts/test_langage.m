@@ -1158,7 +1158,11 @@ assert(exist('compteurPersistant', 'file') == 2, 'le dossier relatif reste sur l
 cd(dossierPersistant);
 dossierAbsolu = pwd();
 cd(ancienRelatif);
-assert(any(strcmp(strsplit(path, pathsep), dossierAbsolu)), 'et il y est en absolu');
+% (Les chemins vont en arguments : dans le message lui-même, les « \t »
+% d'un chemin Windows deviendraient des tabulations.)
+assert(any(strcmp(strsplit(path, pathsep), dossierAbsolu)), ...
+       'et il y est en absolu : %s attendu, chemin %s', dossierAbsolu, ...
+       strjoin(strsplit(path, pathsep), ' ; '));
 rmpath(dossierAbsolu);
 assert(~any(strcmp(strsplit(path, pathsep), dossierAbsolu)), 'rmpath le retire');
 

@@ -14,6 +14,11 @@
 #ifndef _WIN32
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef __APPLE__
+// _NSGetExecutablePath, pour le chemin de l'interpréteur (fnExecutable) :
+// macOS n'a pas /proc.
+#include <mach-o/dyld.h>
+#endif
 #else
 // GetModuleFileNameA, pour le chemin de l'interpréteur (fnExecutable).
 #ifndef WIN32_LEAN_AND_MEAN
@@ -550,9 +555,18 @@ FONCTION(fnPath) {
         for (const auto& a : args) it.ajouterChemin(a.versTexte(), false);
         return {};
     }
+    // Les dossiers sont séparés par pathsep, comme dans MATLAB : « : » ici,
+    // « ; » sous Windows, où le deux-points d'un lecteur (C:\...) aurait
+    // coupé chaque dossier en deux, et où strsplit(path, pathsep) ne
+    // trouvait qu'un seul morceau.
+#ifdef _WIN32
+    const char* separateur = ";";
+#else
+    const char* separateur = ":";
+#endif
     std::string s;
     for (const auto& d : it.chemin()) {
-        if (!s.empty()) s += ":";
+        if (!s.empty()) s += separateur;
         s += d;
     }
     if (nargout == 0) {
@@ -1318,6 +1332,15 @@ FONCTION(fnExecutable) {
     char tampon[32768];
     DWORD n = GetModuleFileNameA(nullptr, tampon, (DWORD)sizeof(tampon));
     if (n > 0 && n < sizeof(tampon)) return {Valeur::texte(std::string(tampon, n))};
+#elif defined(__APPLE__)
+    // Sans /proc, macOS rendait « matlibre », que le lanceur de mcc ne
+    // trouvait pas hors du PATH (test_litterature, sous macOS).
+    char tampon[4096];
+    uint32_t taille = sizeof(tampon);
+    if (_NSGetExecutablePath(tampon, &taille) == 0) {
+        fs::path chemin = fs::weakly_canonical(fs::path(tampon), ec);
+        return {Valeur::texte(ec ? std::string(tampon) : chemin.string())};
+    }
 #else
     fs::path lien = fs::read_symlink("/proc/self/exe", ec);
     if (!ec && !lien.empty()) return {Valeur::texte(lien.string())};
