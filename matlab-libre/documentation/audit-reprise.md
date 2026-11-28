@@ -864,8 +864,8 @@ votre accord (dépendance, comportement visible, gros fichier remanié).
 | P6 | **Fait.** Intégration continue à la racine du dépôt : rapide à chaque poussée (construction sans avertissement, `ctest -LE lent`), complète chaque nuit (batterie, sans Qt et installation, ASan et UBSan sur toute la batterie hors bureau, TSan, couverture, macOS, Windows) ; le fichier inerte retiré | distribution | ●●● | S | faible | minutes d'Actions (dépôt public : gratuites) |
 | P7 | **Fait.** Un guide « Venir de MATLAB » (`venir-de-matlab.md`) : ce qui diffère (affichage, forme par valeur des modèles, formats d'image, palette), ce qui manque, où chercher | doc | ●●● | S | nul | |
 | P3 | **Fait**, écrite à la main (termios, séquences VT de la console Windows), sans dépendance. Édition de ligne dans la console : flèches, historique rappelable et enregistré, complétion | ergonomie | ●●● | M | faible | dépendance si linenoise |
-| P9 | Découper `test_simulink.m` (quatre fichiers) et `test_aide.m` (deux) : la batterie passerait de 25 à une douzaine de minutes sur quatre cœurs | maintenance | ●●● | M | faible | gros fichier de test |
-| P5 | LAPACK et BLAS facultatifs pour `eig`, `svd`, `A\b`, `*` sur les grandes matrices denses, les algorithmes écrits à la main restant le repli | performance | ●●● | L | moyen (Windows, résultats au dernier chiffre) | dépendance |
+| P9 | **Fait.** `test_simulink.m` en quatre parts (la section 26 coupée elle-même) ; `test_aide.m` non coupé, deux exemples de `flou` en faisaient l'essentiel (18 → 4 min) | maintenance | ●●● | M | faible | gros fichier de test (accordé) |
+| P5 | **Fait.** LAPACK et BLAS facultatifs (`MATLIBRE_LAPACK`, AUTO) pour `eig`, `svd`, `A\b`, `*`, les algorithmes écrits à la main restant le repli ; trois défauts trouvés en route (`zp2sos`, `lasso`, Daubechies) | performance | ●●● | L | moyen (Windows, résultats au dernier chiffre) | dépendance (accordée) |
 | P10 | Écrire et lire le PNG sans dépendance : le DEFLATE existe déjà pour les `.mat`, un PNG en blocs non compressés suffit à écrire | fonction | ●● | M | faible | |
 | P11 | `jsondecode` natif (C++), les tests actuels gardés : 0,54 s → quelques millisecondes pour 4 000 nombres | performance | ●● | M | faible | |
 | P13 | Un scalaire sans allocation dans `Valeur` : un quart du temps d'une boucle scalaire est `malloc`/`free` | performance | ●● | L | moyen (cœur) | gros fichier |
@@ -917,4 +917,34 @@ attend votre accord.
 | P42 | `dbstop in f at 3`, la forme de la fiche, pose le point d'arrêt à la ligne 51 — le code du caractère « 3 » — et l'exécution ne s'y arrête pas | `dbstop in fdbg at 3; dbstatus` → « Breakpoint for fdbg is on line 51. » ; `dbstop('in','fdbg','at',3)` marche | moyenne (le débogueur de la console, sous la forme documentée) | proposé : lire le numéro de ligne en texte comme en nombre ; coût S |
 | P43 | `int64` et `uint64` sont rangés en `double` : au-delà de 2^53 le dernier chiffre se perd, et l'affichage prend un facteur d'échelle | `intmax('int64')` → `1.0e+18 * 9.2234` (MATLAB : `9223372036854775807`) ; jusqu'ici dit seulement pour Coder | moyenne | dit dans le guide ; un vrai stockage entier sur 64 bits toucherait `Valeur` (gros fichier, coût L) |
 | — | La fiche de `new_system` et `couverture.md` disaient que le modèle par valeur part en `ode1` au pas de 0,01, ce que D1 a changé ; `hors-fonctions.md` tenait pour absents l'héritage, les paquets `+dossier` et la lecture des `.slx`, qui marchent ; `architecture.md` donnait 8 µs par instruction scalaire | vérifié sur l'interpréteur | basse | corrigé (P7 et la mise à jour des documents) |
+
+### La reprise du 28 novembre 2026
+
+Accordés : P9, P5 et les constats P40 à P43. **Faits** : P9, P5, P40
+(`8c08b70`), P41 (`66086a5`), P42 (`11fc163`). **P43** (`int64` exact)
+n'est pas commencé : c'est un chantier de plusieurs sessions, dont le plan
+est dans `reprise.md`, section 6.
+
+La première intégration continue (commit `075f958`) et LAPACK ont fait
+trouver ce qui suit, corrigé chaque fois avec son test :
+
+| défaut | preuve | gravité | commit |
+|---|---|---|---|
+| Windows ne compilait plus : `GetModuleFileNameA` sans `<windows.h>` | construction croisée MinGW, `'DWORD' was not declared` | haute (distribution) | `075f958` |
+| `tempdir` rendait `/tmp` sans séparateur : `[tempdir 'f']` désignait `/tmpf`, à la racine du disque | `test_types` rouge sur le runner, non administrateur | moyenne | `4d97f45` |
+| `zp2sos` complétait une section du premier ordre par le début (un pôle seul en 0,5 : `[0 0 1 1 1 -0.5]`) et laissait seule une racine réelle suivie d'une paire | sous LAPACK, `tf2sos` de `butter(4,0.3)` rendait trois sections | haute (résultat faux) | `cf549b6` |
+| le premier modèle du chemin de `lasso` portait un coefficient de 1e-16 | `test_statistiques` sous LAPACK | basse | `df83dd8` |
+| Daubechies d'ordre élevé : racines d'un polynôme déséquilibré (db45 : 2,5e-4 d'écart à l'orthogonalité sous LAPACK) | `test_domaines` sous LAPACK | moyenne | `f4c1cca` |
+| clang sur ARM64 fusionne `a*b+c` : `-70:0.1:90` finissait à 90,00000000000001 | `test_litterature`, `test_signal` sous macOS | moyenne | `c551dd2` |
+| `fopen` ouvrait en mode texte sauf `'b'` (MATLAB : binaire sauf `'t'`) ; sous Windows, un Parquet écrit ne se relisait pas | `test_parquet` sous Windows | haute sous Windows | `abfefae` |
+| deux exemples de la logique floue prenaient 370 et 58 s | mesure de `test_aide` par module | basse (temps) | `222a7ee` |
+
+Restent ouverts, à relire au prochain passage de l'intégration continue :
+le test du bureau « les blocs de la bibliothèque se simulent tous », rouge
+sur les runners Linux et macOS, vert dans le conteneur (il écrit
+désormais la console quand il échoue) ; sous Windows, le bureau qui
+dépasse son délai et cinq scripts (`test_defauts`, `test_es_texte`,
+`test_mat`, `test_litterature`, `aide_valeurs`), dont le mode texte de
+`fopen` explique sans doute une partie, et `test_graphique`, qui écrit
+dans un chemin en dur (`/tmp/matlibre_test_figure.svg`).
 

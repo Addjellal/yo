@@ -94,7 +94,7 @@ Le bureau pose la commande corrigée dans la saisie : Entrée l'exécute.
 | `webread('…/donnees.csv')` | une table | une matrice | Lire le texte, puis `readtable` sur un fichier, si l'on veut une table. |
 | `histogram(x)` | ses bords « ronds » | d'autres bords | Les effectifs automatiques diffèrent pour les mêmes données ; donner `BinEdges` pour comparer. |
 | `fclose('all')` dans un `parfor` | ses fichiers seuls | ceux de tous les travailleurs | Les travailleurs sont des fils d'un même processus, non des processus : la table des fichiers ouverts est commune. |
-| `f = @sin; save('a.mat', 'f')` | la poignée est rangée | écrite comme un nombre, sans avertissement : `load` rend un `double` | Défaut relevé, non corrigé : ne pas confier de poignée de fonction à un `.mat`. Les chaînes `"..."` reviennent en cellules de caractères ; un objet qu'a écrit MATLAB (MCOS) revient en structure témoin, avec un avertissement ; un `.mat` v7.3 (HDF5) ne se lit pas. |
+| `f = @sin; save('a.mat', 'f')` | la poignée est rangée | la variable n'est pas écrite, avec un avertissement | MatLibre ne sait pas écrire une poignée de fonction dans un `.mat` (MATLAB la range dans une partie du fichier dont le format n'est pas public). Les chaînes `"..."` reviennent en cellules de caractères ; un objet qu'a écrit MATLAB (MCOS) revient en structure témoin, avec un avertissement ; un `.mat` v7.3 (HDF5) ne se lit pas. |
 | Ctrl-C pendant un `svd` de grande taille | interrompt | attend la fin | Ctrl-C coupe entre deux instructions, pas au milieu d'une fonction native longue. |
 
 Et deux différences de fond :

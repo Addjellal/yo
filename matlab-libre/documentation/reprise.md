@@ -7,11 +7,13 @@ le rendu sont bâtis), `developpeur.md` (compiler, ajouter une fonction,
 conventions), `reference-matlab/hors-fonctions.md` (ce qui diffère de
 MATLAB, domaine par domaine).
 
-Dernière mise à jour : 27 novembre 2026, au soir, après les propositions
-P6 (intégration continue), P7 (le guide « Venir de MATLAB ») et P3
-(l'édition de la ligne de commande) de l'audit de reprise
-(`audit-reprise.md`), qui suivaient ses quatre décisions et P2, P4. La
-batterie complète passe, 56 tests sur 56.
+Dernière mise à jour : 28 novembre 2026, après les propositions P6
+(intégration continue), P7 (le guide « Venir de MATLAB »), P3 (l'édition
+de la ligne de commande), P9 (`test_simulink` en quatre parts), P5
+(LAPACK facultatif) et les constats P40 à P42 de l'audit de reprise
+(`audit-reprise.md`), et les défauts qu'ont montrés la première
+intégration continue et LAPACK. La batterie complète passe, 59 tests sur
+59, en 10 minutes.
 
 ## 1. Les règles du dépôt
 
@@ -69,20 +71,28 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release      # une fois
 cmake --build build -j4                             # tout, bureau Qt compris
 build/bin/matlibre --path toolbox script.m          # lancer un script
 build/bin/matlibre --path toolbox --path tests/scripts tests/scripts/test_graphique.m
-cd build && ctest -j3 --timeout 7000 > log          # la batterie complète
-cd build && ctest -LE lent -j4                       # sans les six scripts lents : 3 min
+cd build && ctest -j4 --timeout 7000 > log          # la batterie complète
+cd build && ctest -LE lent -j4                       # sans les scripts lents : 3 min
 cd build && ctest -R bureau                          # l'application de bureau, hors écran
 ```
 
-- La batterie compte 56 tests (les 47 scripts, les vérifications C++, le
+- La batterie compte 59 tests (les 50 scripts, les vérifications C++, le
   bureau, cinq tests de la ligne de commande dont `console_terminal` sous
   un pseudo-terminal, les valeurs des fiches d'aide, les doublons de
-  noms) et dure **25 minutes avec `-j3`** : `test_simulink` à lui seul
-  25 minutes, `test_aide` 13 à 18, `test_exemples` 5. ctest lance d'abord
-  les plus longs ; au-delà de trois cœurs, rien ne se gagne tant que
-  `test_simulink` reste d'un bloc (P9 de l'audit). Les six scripts de
-  plus d'une minute portent l'étiquette CTest `lent` (liste dans
+  noms) et dure **10 minutes avec `-j4`**. `test_simulink` est
+  coupé en quatre parts contiguës (`test_simulink`, `_catalogue`,
+  `_domaines`, `_modeles`, de quatre à neuf minutes ; leurs fonctions
+  d'aide dans `tests/scripts/simulink/`) ; `test_aide` tient en quatre
+  minutes depuis que deux exemples de la logique floue n'en prennent
+  plus sept ; ctest lance d'abord les plus longs. Les scripts de plus
+  d'une minute portent l'étiquette CTest `lent` (liste dans
   `CMakeLists.txt`) : `ctest -LE lent` est la passe de travail.
+- **LAPACK** : `MATLIBRE_LAPACK` (AUTO par défaut) l'emploie s'il est
+  trouvé ; le conteneur a OpenBLAS (`libopenblas-dev`), donc l'arbre
+  `build` s'en sert. Le code d'algèbre écrit à la main se construit avec
+  `-DMATLIBRE_LAPACK=OFF` ; un défaut qui ne paraît que d'un côté se
+  cherche dans les deux arbres (zp2sos, lasso et Daubechies ont été
+  trouvés ainsi).
 - **L'intégration continue** (`.github/workflows/` à la racine du dépôt,
   décrite dans `installation.md`) refait à chaque poussée qui touche
   `matlab-libre/` une construction qui doit être **sans aucun
@@ -91,7 +101,12 @@ cd build && ctest -R bureau                          # l'application de bureau, 
   Windows. La nuit ne tourne d'elle-même que depuis `main` ; elle se lance
   aussi à la main, ou en poussant une modification de son fichier. Après
   une poussée, regarder son résultat (outils GitHub de la session :
-  `actions_list`, `get_job_logs`).
+  `actions_list`, `get_job_logs`). Le runner n'est pas administrateur, le
+  conteneur l'est : un test qui écrit hors de son dossier peut passer ici
+  et échouer là-bas (c'est arrivé avec `tempdir`).
+- **Une batterie dans un arbre à part** laisse l'arbre principal libre :
+  `git worktree add /tmp/…/wt HEAD`, construire et lancer ctest là-bas ;
+  on peut alors continuer d'écrire pendant qu'elle tourne.
 - **Ne rien modifier pendant que la batterie tourne** : les `.m` de
   `toolbox/` sont lus au fil de l'exécution, et une fonction réécrite en
   cours de route fait échouer des tests qui n'ont rien à voir (c'est
@@ -183,6 +198,10 @@ cd build && ctest -R bureau                          # l'application de bureau, 
 | `7ea1245` | **P6** : l'intégration continue à la racine du dépôt (`matlab-libre-rapide.yml` à chaque poussée, `matlab-libre-nuit.yml` chaque nuit), l'étiquette CTest `lent`, `outils/couverture.sh`, le test `outils_doublons`. |
 | `85efe68` | **P7** : `venir-de-matlab.md` ; en vérifiant chaque écart, trois documents qui disaient faux (héritage, paquets, `.slx`, coût d'une instruction). |
 | `639d0b7` | **P3** : l'édition de la ligne de commande (`EditionLigne.h`) — flèches, historique filtré et gardé, Tab, Échap, la correction du « Did you mean » posée dans la saisie —, éprouvée sous un pseudo-terminal (`console_terminal`). |
+| `5abfd63` | **P5** : LAPACK et BLAS facultatifs (`MATLIBRE_LAPACK`) pour le produit, `A\b` carré, `svd` et `eig` — `eig` symétrique 300×300 de 0,31 s à 6 ms ; le paquet `.deb` déclare ses dépendances. Il a fait trouver trois défauts : `zp2sos` (sections du premier ordre fausses, `cf549b6`), `lasso` (premier modèle du chemin non nul, `df83dd8`), Daubechies d'ordre élevé (`f4c1cca`). |
+| `f3629df` | **P9** : `test_simulink` en quatre parts (la section 26, la moitié du temps, coupée elle-même) ; `test_aide` non coupé : deux exemples de `flou` en faisaient l'essentiel (`222a7ee`, 18 → 4 min). |
+| `8c08b70`, `11fc163`, `66086a5` | **P40** : une poignée de fonction n'est plus écrite en `double` dans un `.mat` (avertissement, variable laissée) ; **P42** : `dbstop in f at 3` ; **P41** : les 77 dernières erreurs en français passent en anglais. |
+| `075f958`, `4d97f45`, `c551dd2`, `abfefae`, `f0ba0c2`, `1f737f1`, `3b828d0` | Ce que la première intégration continue a montré : Windows ne compilait plus (`Systeme.cpp`) ; `tempdir` sans séparateur final ; la fusion FMA de clang sur ARM64 ; `fopen` en mode texte par défaut (Windows) ; un chemin symbolique de macOS dans `test_langage` ; un seuil de réactivité du bureau trop serré ; le test du bureau écrit sa console quand la bibliothèque échoue. |
 
 ## 4. Les pièces récentes, et où elles sont
 
@@ -391,26 +410,41 @@ l'automatique portent les titres de MATLAB ; D4, ni invite ni bannière
 quand l'entrée n'est pas un terminal. Un test qui vérifie un message
 cherche un fragment de l'anglais, ou l'identifiant.
 
-**Puis les propositions de l'audit**, classées dans son tableau. P2 est
-faite : les fiches annoncent des valeurs justes, et la batterie le
-vérifie (test `aide_valeurs`). P4 est faite : une faute de frappe fait
-proposer la commande corrigée. **P6, P7 et P3 sont faites** (section 3) :
-l'intégration continue tourne à chaque poussée et chaque nuit — regarder
-ses résultats après avoir poussé, la nuit (ASan sur toute la batterie,
-macOS, Windows) n'ayant encore jamais tourné jusqu'au bout avant cette
-session ; le guide `venir-de-matlab.md` existe ; la console édite sa ligne.
+**Puis les propositions de l'audit**, classées dans son tableau. Sont
+faites P2, P4, P6, P7, P3, P9, P5 et les constats P40, P41, P42 (section
+3, et la fin d'`audit-reprise.md`).
 
-**La suite, dans l'ordre du tableau, demande l'accord de l'utilisateur** :
-P9 (découper `test_simulink.m`, quinze mille lignes, et `test_aide.m` :
-une batterie de douze minutes au lieu de vingt-cinq) remanie de gros
-fichiers de test ; P5 (LAPACK facultatif) ajoute une dépendance. Puis
-P10, P11, P13… Et quatre constats de cette reprise, écrits à la fin
-d'`audit-reprise.md` (P40 à P43), changent un comportement visible :
-une poignée de fonction sauvée dans un `.mat` revient en `double` sans
-avertissement (le plus grave) ; des erreurs restent en français malgré
-D3 ; `dbstop in f at 3` pose le point à la ligne 51 ; `int64` perd ses
-derniers chiffres. P22, les détails de l'affichage en `format short`,
-que tout le monde voit depuis D2, reste haut dans la liste.
+**L'intégration continue d'abord.** Sa première nuit, sur le commit
+`075f958`, a construit MatLibre sous **macOS** (Apple clang, Qt de
+Homebrew : 46 tests rapides sur 50) et sous **Windows** (MinGW de MSYS2,
+bureau Qt compris : 38 sur 47) ; TSan est vert. Les causes trouvées sont
+corrigées depuis (section 3). Restent, à relire au prochain passage :
+- le bureau, « les blocs de la bibliothèque … se simulent tous », échoue
+  sur les runners Linux et macOS et passe dans le conteneur (en locale
+  POSIX comme en C.UTF-8, sans fichier `untitled.mat` traînant) ; le test
+  écrit désormais la fin de la console quand il échoue : lire la cause
+  dans le journal ;
+- sous Windows : le bureau dépasse son délai de 30 minutes (une attente
+  qui ne finit pas hors écran) ; `test_defauts` (ligne 463),
+  `test_es_texte` (31), `test_mat` (258), `test_litterature` (228) et une
+  valeur de `aide_valeurs` échouent — la plupart sont sans doute le mode
+  texte de `fopen`, corrigé par `abfefae` ; `test_graphique` écrit dans
+  `/tmp/matlibre_test_figure.svg`, un chemin en dur ;
+- ASan et la couverture n'avaient pas fini à l'écriture de ces lignes.
+
+**La suite du tableau** : P10 (le PNG sans dépendance), P11
+(`jsondecode` natif), P13 (un scalaire sans allocation), P38, P12, P15…
+et **P43** (`int64` et `uint64` exacts), accordé mais non commencé : les
+entiers sont rangés en `double` partout — opérations, indexation,
+concaténation, affichage, conversions, réductions, `.mat`, `sprintf` —,
+et un stockage exact sur 64 bits est un chantier de plusieurs sessions.
+Le plan : un tampon d'entiers à côté de `re` pour les seules classes
+`int64` et `uint64`, une couche d'accès, puis les opérations une à une,
+chacune avec son test (`intmax('int64')` s'affiche
+`9223372036854775807`, `int64(2)^62 + 1` reste exact, la saturation,
+`idivide`, `bitshift` sur `uint64`, `typecast`, l'aller-retour en `.mat`).
+P22, les détails de l'affichage en `format short`, reste haut dans la
+liste.
 
 Les suites d'avant l'audit restent, avec ce qu'il en a appris :
 
@@ -468,15 +502,16 @@ Pour **la suite de l'audit**, coller ce message :
 > `audit-reprise.md`, `etat.md` et `architecture.md`.
 >
 > Les décisions D1 à D4 de l'audit sont appliquées (section 14
-> d'`audit-reprise.md`), ainsi que P2, P4, P6, P7 et P3. Regarde d'abord
-> les derniers résultats de l'intégration continue (rapide et nuit) et
-> corrige ce qui y est rouge. Puis prends les propositions suivantes du
-> tableau de la section 14 dans l'ordre — P9, P5, P10… — et les constats
-> P40 à P43 de sa fin. Un commit par sujet, la batterie complète
+> d'`audit-reprise.md`), ainsi que P2, P4, P6, P7, P3, P9, P5, P40, P41
+> et P42. Regarde d'abord les derniers résultats de l'intégration
+> continue (rapide et nuit : Linux, macOS, Windows, ASan, couverture) et
+> corrige ce qui y est rouge — la section 6 de `reprise.md` dit ce qui
+> restait. Puis prends les propositions suivantes du tableau de la
+> section 14 dans l'ordre — P10, P11, P13… — et P43 (`int64` exact, dont
+> le plan est en section 6). Un commit par sujet, la batterie complète
 > repassée avant de pousser ; demande-moi avant d'ajouter une
 > dépendance, de changer un comportement visible ou de remanier un gros
-> fichier (P9 et P5 sont dans ce cas). À la fin, mets à jour
-> `reprise.md` et `etat.md`.
+> fichier. À la fin, mets à jour `reprise.md` et `etat.md`.
 
 Pour **un nouvel audit complet**, coller celui-ci :
 

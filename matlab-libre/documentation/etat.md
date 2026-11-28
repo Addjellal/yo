@@ -10,15 +10,20 @@ propositions —, `documentation/audit-reprise.md`. Ses quatre décisions
 sont appliquées : un modèle Simulink neuf part en `VariableStepAuto`,
 l'affichage démarre en `format short`, les erreurs des fonctions de
 MATLAB et des toolboxes sont en anglais, et la console n'écrit ni invite
-ni bannière quand son entrée n'est pas un terminal. Cinq de ses
+ni bannière quand son entrée n'est pas un terminal. Plusieurs de ses
 propositions sont faites aussi : les valeurs qu'annoncent les fiches
 d'aide sont vérifiées dans la batterie (P2) ; une faute de frappe dans
 une commande fait proposer la commande corrigée, « Did you mean: »
 (P4) ; l'intégration continue tourne à la racine du dépôt, à chaque
-poussée et chaque nuit (P6) ; un guide dit à qui vient de MATLAB ce qui
-diffère et ce qui manque (`venir-de-matlab.md`, P7) ; la console édite
-sa ligne de commande — flèches, historique filtré et gardé, complétion
-(P3).
+poussée et chaque nuit, sous Linux, macOS et Windows (P6) ; un guide dit
+à qui vient de MATLAB ce qui diffère et ce qui manque
+(`venir-de-matlab.md`, P7) ; la console édite sa ligne de commande —
+flèches, historique filtré et gardé, complétion (P3) ; `test_simulink`
+est coupé en quatre parts (P9) ; LAPACK et BLAS, facultatifs, font
+l'algèbre linéaire dense quand ils sont là (P5) ; une poignée de
+fonction n'est plus écrite en `double` dans un `.mat`, `dbstop in f at 3`
+pose bien son point, et les dernières erreurs en français sont passées
+en anglais (P40 à P42).
 
 ## 1. Ce que MatLibre est aujourd'hui
 
@@ -279,8 +284,8 @@ programme d'école qui montre à quoi il sert.
 | Parquet | `parquetwrite`, `parquetread` et `parquetinfo` écrivent et lisent le format en colonnes : protocole compact Thrift pour les métadonnées, encodage PLAIN pour les données, classes restituées par le type converti, colonnes facultatives lues par leurs niveaux de définition | la compression et l'encodage en dictionnaire, refusés par leur nom ; les colonnes répétées ; les valeurs absentes dans une colonne entière, booléenne ou textuelle, faute de valeur pour les dire |
 | Graphes | `graph` et `digraph` portent les parcours, les plus courts chemins, les composantes, l'arbre couvrant, le flot maximal, la centralité, et désormais l'énumération des cycles et des chemins simples, la base de cycles, la fermeture et la réduction transitives, la condensation, la renumérotation et l'isomorphisme | la réduction transitive d'un graphe à circuits, refusée parce qu'elle n'y est pas unique ; les composantes biconnexes |
 | Boîtes esquissées | 30 boîtes de 2 à 9 fonctions | les compléter domaine par domaine, en gardant la règle : rien sans test |
-| Performance | l'interpréteur est un parcours d'arbre, une instruction scalaire coûte 0,5 µs dont un quart en allocations ; la console démarre en 0,03 s (0,3 avant l'audit) ; `eig` et `svd` sont écrits sans LAPACK, `jsondecode` en langage MATLAB, Simulink interprété bloc par bloc | un scalaire sans allocation, LAPACK facultatif, `jsondecode` natif, Simulink par son programme engendré (P13, P5, P11, P38 de l'audit), puis du bytecode |
-| Durée des tests | cinquante-six tests — les quarante-sept scripts, les vérifications C++, le bureau, la ligne de commande sous tube et sous pseudo-terminal, les valeurs des fiches, les doublons de noms — en 25 minutes avec `ctest -j3` ; `ctest -LE lent` laisse les six scripts de plus d'une minute et tient en trois minutes, et c'est la passe de chaque poussée dans l'intégration continue | elle ne peut descendre sous son plus long script, `test_simulink` (25 minutes) ; le découper en quatre et `test_aide` en deux la ramènerait à une douzaine de minutes (P9 de l'audit, un remaniement de gros fichiers de test, à accorder) |
+| Performance | l'interpréteur est un parcours d'arbre, une instruction scalaire coûte 0,5 µs dont un quart en allocations ; la console démarre en 0,03 s ; avec LAPACK (OpenBLAS), `eig` d'une matrice symétrique 300×300 prend 6 ms (0,31 s sans), `svd` 20 ms, `A\b` 500×500 4 ms ; `jsondecode` est écrit en langage MATLAB, Simulink interprété bloc par bloc | un scalaire sans allocation, `jsondecode` natif, Simulink par son programme engendré (P13, P11, P38 de l'audit), puis du bytecode |
+| Durée des tests | cinquante-neuf tests — les cinquante scripts, les vérifications C++, le bureau, la ligne de commande sous tube et sous pseudo-terminal, les valeurs des fiches, les doublons de noms — en 10 minutes avec `ctest -j4` : `test_simulink` est coupé en quatre parts de quatre à neuf minutes, `test_aide` tient en quatre ; `ctest -LE lent` laisse les scripts de plus d'une minute et tient en trois minutes, et c'est la passe de chaque poussée dans l'intégration continue | la plus longue part de `test_simulink` (la section 1 à 26) borne la batterie ; la couper plus fin ne gagne plus qu'au-delà de quatre cœurs |
 
 Aucun de ces points n'est une régression : ce sont des limites connues,
 écrites dans l'aide des fonctions concernées, qui disent ce qu'elles ne
