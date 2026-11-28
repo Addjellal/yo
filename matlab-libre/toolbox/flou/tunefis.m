@@ -16,9 +16,9 @@ function [fis, info] = tunefis(fis, reglages, X, Y, options)
 %   sortir d'un minimum local, que MatLibre n'a pas ici.
 %
 %   Exemple :
-%      x = (0:0.25:10)';
+%      x = (0:0.5:10)';
 %      y = sin(x);
-%      fis0 = genfis1([x y], 4);
+%      fis0 = genfis1([x y], 3);
 %      [fis, info] = tunefis(fis0, [], x, y);
 %      info.ErreurFinale < info.ErreurInitiale   % vrai
 %
