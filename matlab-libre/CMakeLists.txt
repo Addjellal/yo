@@ -1,12 +1,13 @@
 # MatLibre — clone libre du langage MATLAB.
 #
-# Aucune dépendance obligatoire : un compilateur C++17 suffit, et Qt6 pour
-# le bureau, s'il est la. L'algebre lineaire, la FFT, les matrices creuses
-# et les images sont ecrites dans src/ : aucune bibliotheque de calcul
-# n'est cherchee ni liee. (Les options MATLIBRE_AVEC_LAPACK, _FFTW,
-# _SUITESPARSE et _OPENCV liaient ces bibliotheques sans qu'aucune ligne
-# du code ne s'en serve : elles n'acceleraient rien et ajoutaient des
-# dependances que le paquet .deb ne declarait pas.)
+# Aucune dépendance obligatoire : un compilateur C++17 suffit, Qt6 pour
+# le bureau s'il est la, et LAPACK et BLAS s'ils sont la (MATLIBRE_LAPACK,
+# plus bas). L'algebre lineaire, la FFT, les matrices creuses et les images
+# sont ecrites dans src/, et le restent : LAPACK accelere le produit, la
+# resolution, la SVD et les valeurs propres ; sans lui, le meme calcul se
+# fait par le code du depot. (Les anciennes options MATLIBRE_AVEC_LAPACK,
+# _FFTW, _SUITESPARSE et _OPENCV liaient ces bibliotheques sans qu'aucune
+# ligne du code ne s'en serve ; elles ont ete retirees.)
 cmake_minimum_required(VERSION 3.16)
 project(MatLibre VERSION 0.1.0 LANGUAGES CXX)
 
@@ -110,6 +111,34 @@ target_include_directories(matlibre_coeur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inc
 find_package(Threads QUIET)
 if(Threads_FOUND)
   target_link_libraries(matlibre_coeur PUBLIC Threads::Threads)
+endif()
+
+# --- LAPACK et BLAS, facultatifs -------------------------------------------
+#   -DMATLIBRE_LAPACK=AUTO   (par defaut) employes s'ils sont trouves
+#   -DMATLIBRE_LAPACK=ON     exiges : la configuration echoue sans eux
+#   -DMATLIBRE_LAPACK=OFF    jamais : le code du depot sert seul
+# Trouves, ils font le produit matriciel, A\b carre, svd et eig — les
+# routines dont MATLAB se sert ; eig d'une matrice 300 x 300 passe d'un
+# tiers de seconde a quelques millisecondes. OpenBLAS (libopenblas-dev),
+# la reference (liblapack-dev), Accelerate sous macOS conviennent.
+set(MATLIBRE_LAPACK AUTO CACHE STRING "LAPACK et BLAS : AUTO, ON ou OFF")
+set_property(CACHE MATLIBRE_LAPACK PROPERTY STRINGS AUTO ON OFF)
+set(MATLIBRE_LAPACK_LIE OFF)
+if(NOT MATLIBRE_LAPACK STREQUAL "OFF")
+  if(MATLIBRE_LAPACK STREQUAL "ON")
+    find_package(LAPACK REQUIRED)
+  else()
+    find_package(LAPACK QUIET)
+  endif()
+  if(LAPACK_FOUND)
+    target_link_libraries(matlibre_coeur PUBLIC ${LAPACK_LIBRARIES} ${LAPACK_LINKER_FLAGS})
+    target_compile_definitions(matlibre_coeur PRIVATE MATLIBRE_AVEC_LAPACK)
+    set(MATLIBRE_LAPACK_LIE ON)
+    message(STATUS "MatLibre : LAPACK et BLAS employes (${LAPACK_LIBRARIES})")
+  else()
+    message(STATUS "MatLibre : pas de LAPACK, l'algebre lineaire du depot sert seule "
+                   "(apt install libopenblas-dev pour l'accelerer)")
+  endif()
 endif()
 
 add_executable(matlibre ${CMAKE_CURRENT_SOURCE_DIR}/src/console/Principal.cpp)
@@ -323,6 +352,13 @@ else()
   set(CPACK_DEBIAN_PACKAGE_SECTION "math")
   set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libstdc++6")
   set(CPACK_DEBIAN_PACKAGE_MAINTAINER "MatLibre")
+  # Lie a LAPACK (ou a Qt), le binaire depend de bibliotheques que la
+  # liste ci-dessus ne nomme pas : dpkg-shlibdeps les lit dans le binaire
+  # lui-meme, et le paquet les declare.
+  find_program(MATLIBRE_DPKG_SHLIBDEPS dpkg-shlibdeps)
+  if((MATLIBRE_LAPACK_LIE OR TARGET matlibre-bureau) AND MATLIBRE_DPKG_SHLIBDEPS)
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+  endif()
 endif()
 include(CPack)
 

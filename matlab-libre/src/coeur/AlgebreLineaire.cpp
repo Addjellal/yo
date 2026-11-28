@@ -70,6 +70,243 @@ static Valeur depuis(const Mat<cplx>& m) {
     return v;
 }
 
+// ---------------------------------------------------------------- LAPACK
+//
+// Quand la construction a trouvé LAPACK et BLAS (option CMake
+// MATLIBRE_LAPACK, qui définit MATLIBRE_AVEC_LAPACK), le produit
+// matriciel, la résolution d'un système carré, la SVD et les valeurs
+// propres passent par eux : ce sont les routines dont MATLAB se sert,
+// par blocs, sur un BLAS optimisé — eig d'une matrice 300 x 300 passe
+// d'un tiers de seconde à quelques millisecondes. Sans eux, les
+// algorithmes écrits plus bas font le même calcul, et restent le repli.
+//
+// Les prototypes sont ceux de l'interface Fortran — arguments par
+// adresse, entiers sur 32 bits, et la longueur des arguments caractère
+// passée en fin d'appel, comme gfortran l'attend — : aucun en-tête n'est
+// à trouver.
+#ifdef MATLIBRE_AVEC_LAPACK
+namespace {
+using flen = std::size_t;
+extern "C" {
+void dgemm_(const char*, const char*, const int*, const int*, const int*, const double*,
+            const double*, const int*, const double*, const int*, const double*, double*,
+            const int*, flen, flen);
+void zgemm_(const char*, const char*, const int*, const int*, const int*, const cplx*,
+            const cplx*, const int*, const cplx*, const int*, const cplx*, cplx*, const int*,
+            flen, flen);
+void dgesv_(const int*, const int*, double*, const int*, int*, double*, const int*, int*);
+void zgesv_(const int*, const int*, cplx*, const int*, int*, cplx*, const int*, int*);
+void dsyevd_(const char*, const char*, const int*, double*, const int*, double*, double*,
+             const int*, int*, const int*, int*, flen, flen);
+void zheevd_(const char*, const char*, const int*, cplx*, const int*, double*, cplx*,
+             const int*, double*, const int*, int*, const int*, int*, flen, flen);
+void dgeev_(const char*, const char*, const int*, double*, const int*, double*, double*,
+            double*, const int*, double*, const int*, double*, const int*, int*, flen, flen);
+void zgeev_(const char*, const char*, const int*, cplx*, const int*, cplx*, cplx*, const int*,
+            cplx*, const int*, cplx*, const int*, double*, int*, flen, flen);
+void dgesdd_(const char*, const int*, const int*, double*, const int*, double*, double*,
+             const int*, double*, const int*, double*, const int*, int*, int*, flen);
+void zgesdd_(const char*, const int*, const int*, cplx*, const int*, double*, cplx*,
+             const int*, cplx*, const int*, cplx*, const int*, double*, int*, int*, flen);
+}
+
+void lapackProduit(const Mat<double>& a, const Mat<double>& b, Mat<double>& r) {
+    r = Mat<double>(a.l, b.c);
+    if (a.l == 0 || b.c == 0 || a.c == 0) return;
+    const char n = 'N';
+    const double un = 1.0, zero = 0.0;
+    dgemm_(&n, &n, &a.l, &b.c, &a.c, &un, a.a.data(), &a.l, b.a.data(), &b.l, &zero,
+           r.a.data(), &r.l, 1, 1);
+}
+
+void lapackProduit(const Mat<cplx>& a, const Mat<cplx>& b, Mat<cplx>& r) {
+    r = Mat<cplx>(a.l, b.c);
+    if (a.l == 0 || b.c == 0 || a.c == 0) return;
+    const char n = 'N';
+    const cplx un(1.0, 0.0), zero(0.0, 0.0);
+    zgemm_(&n, &n, &a.l, &b.c, &a.c, &un, a.a.data(), &a.l, b.a.data(), &b.l, &zero,
+           r.a.data(), &r.l, 1, 1);
+}
+
+// A X = B par LU à pivot partiel. Faux quand A est singulière (un pivot
+// exactement nul, la même règle que luInterne) : l'appelant passe alors
+// aux moindres carrés.
+bool lapackResoudre(Mat<double> a, Mat<double>& b) {
+    std::vector<int> pivots((std::size_t)std::max(1, a.l));
+    int info = 0;
+    dgesv_(&a.l, &b.c, a.a.data(), &a.l, pivots.data(), b.a.data(), &b.l, &info);
+    return info == 0;
+}
+
+bool lapackResoudre(Mat<cplx> a, Mat<cplx>& b) {
+    std::vector<int> pivots((std::size_t)std::max(1, a.l));
+    int info = 0;
+    zgesv_(&a.l, &b.c, a.a.data(), &a.l, pivots.data(), b.a.data(), &b.l, &info);
+    return info == 0;
+}
+
+// Valeurs propres d'une matrice symétrique, croissantes, et ses vecteurs
+// propres orthonormés quand VECTEURS n'est pas nul.
+bool lapackSymetrique(Mat<double> a, std::vector<double>& valeurs, Mat<double>* vecteurs) {
+    const char job = vecteurs ? 'V' : 'N', uplo = 'L';
+    const int n = a.l;
+    valeurs.assign((std::size_t)n, 0.0);
+    int info = 0, lwork = -1, liwork = -1, iw = 0;
+    double w = 0;
+    dsyevd_(&job, &uplo, &n, a.a.data(), &n, valeurs.data(), &w, &lwork, &iw, &liwork, &info,
+            1, 1);
+    lwork = std::max(1, (int)w);
+    liwork = std::max(1, iw);
+    std::vector<double> travail((std::size_t)lwork);
+    std::vector<int> itravail((std::size_t)liwork);
+    dsyevd_(&job, &uplo, &n, a.a.data(), &n, valeurs.data(), travail.data(), &lwork,
+            itravail.data(), &liwork, &info, 1, 1);
+    if (info != 0) return false;
+    if (vecteurs) *vecteurs = std::move(a);
+    return true;
+}
+
+bool lapackHermitien(Mat<cplx> a, std::vector<double>& valeurs, Mat<cplx>* vecteurs) {
+    const char job = vecteurs ? 'V' : 'N', uplo = 'L';
+    const int n = a.l;
+    valeurs.assign((std::size_t)n, 0.0);
+    int info = 0, lwork = -1, lrwork = -1, liwork = -1, iw = 0;
+    cplx w;
+    double rw = 0;
+    zheevd_(&job, &uplo, &n, a.a.data(), &n, valeurs.data(), &w, &lwork, &rw, &lrwork, &iw,
+            &liwork, &info, 1, 1);
+    lwork = std::max(1, (int)w.real());
+    lrwork = std::max(1, (int)rw);
+    liwork = std::max(1, iw);
+    std::vector<cplx> travail((std::size_t)lwork);
+    std::vector<double> rtravail((std::size_t)lrwork);
+    std::vector<int> itravail((std::size_t)liwork);
+    zheevd_(&job, &uplo, &n, a.a.data(), &n, valeurs.data(), travail.data(), &lwork,
+            rtravail.data(), &lrwork, itravail.data(), &liwork, &info, 1, 1);
+    if (info != 0) return false;
+    if (vecteurs) *vecteurs = std::move(a);
+    return true;
+}
+
+// Cas général, réel : équilibrage, Hessenberg et QR (dgeev). Une paire
+// conjuguée de vecteurs arrive en deux colonnes, la partie réelle puis la
+// partie imaginaire ; on les rend complexes. LAPACK norme chaque vecteur à
+// 1, sa plus grande composante réelle : la convention de MATLAB.
+bool lapackGeneral(Mat<double> a, std::vector<cplx>& valeurs, Mat<cplx>* vecteurs) {
+    const char jobvl = 'N', jobvr = vecteurs ? 'V' : 'N';
+    const int n = a.l, un = 1;
+    std::vector<double> wr((std::size_t)n), wi((std::size_t)n);
+    Mat<double> vr(vecteurs ? n : 1, vecteurs ? n : 1);
+    const int ldvr = vr.l;
+    int info = 0, lwork = -1;
+    double w = 0, vl = 0;
+    dgeev_(&jobvl, &jobvr, &n, a.a.data(), &n, wr.data(), wi.data(), &vl, &un, vr.a.data(),
+           &ldvr, &w, &lwork, &info, 1, 1);
+    lwork = std::max(1, (int)w);
+    std::vector<double> travail((std::size_t)lwork);
+    dgeev_(&jobvl, &jobvr, &n, a.a.data(), &n, wr.data(), wi.data(), &vl, &un, vr.a.data(),
+           &ldvr, travail.data(), &lwork, &info, 1, 1);
+    if (info != 0) return false;
+    valeurs.resize((std::size_t)n);
+    for (int k = 0; k < n; ++k) valeurs[(std::size_t)k] = cplx(wr[(std::size_t)k], wi[(std::size_t)k]);
+    if (vecteurs) {
+        *vecteurs = Mat<cplx>(n, n);
+        for (int k = 0; k < n; ++k) {
+            if (wi[(std::size_t)k] != 0.0 && k + 1 < n) {
+                for (int i = 0; i < n; ++i) {
+                    (*vecteurs)(i, k) = cplx(vr(i, k), vr(i, k + 1));
+                    (*vecteurs)(i, k + 1) = cplx(vr(i, k), -vr(i, k + 1));
+                }
+                ++k;
+            } else {
+                for (int i = 0; i < n; ++i) (*vecteurs)(i, k) = cplx(vr(i, k), 0.0);
+            }
+        }
+    }
+    return true;
+}
+
+bool lapackGeneral(Mat<cplx> a, std::vector<cplx>& valeurs, Mat<cplx>* vecteurs) {
+    const char jobvl = 'N', jobvr = vecteurs ? 'V' : 'N';
+    const int n = a.l, un = 1;
+    valeurs.assign((std::size_t)n, cplx());
+    Mat<cplx> vr(vecteurs ? n : 1, vecteurs ? n : 1);
+    const int ldvr = vr.l;
+    int info = 0, lwork = -1;
+    cplx w, vl;
+    std::vector<double> rtravail((std::size_t)std::max(1, 2 * n));
+    zgeev_(&jobvl, &jobvr, &n, a.a.data(), &n, valeurs.data(), &vl, &un, vr.a.data(), &ldvr,
+           &w, &lwork, rtravail.data(), &info, 1, 1);
+    lwork = std::max(1, (int)w.real());
+    std::vector<cplx> travail((std::size_t)lwork);
+    zgeev_(&jobvl, &jobvr, &n, a.a.data(), &n, valeurs.data(), &vl, &un, vr.a.data(), &ldvr,
+           travail.data(), &lwork, rtravail.data(), &info, 1, 1);
+    if (info != 0) return false;
+    if (vecteurs) *vecteurs = std::move(vr);
+    return true;
+}
+
+// SVD par diviser pour régner (dgesdd). JOB : 'N' les valeurs seules, 'S'
+// la forme économique, 'A' la forme complète. V est rendue, non V'.
+bool lapackSVD(Mat<double> a, char job, std::vector<double>& s, Mat<double>& U,
+               Mat<double>& V) {
+    const int m = a.l, n = a.c, r = std::min(m, n);
+    s.assign((std::size_t)r, 0.0);
+    const int ucol = job == 'A' ? m : job == 'S' ? r : 1;
+    const int vtl = job == 'A' ? n : job == 'S' ? r : 1;
+    U = Mat<double>(job == 'N' ? 1 : m, ucol);
+    Mat<double> VT(vtl, job == 'N' ? 1 : n);
+    const int ldu = U.l, ldvt = VT.l;
+    std::vector<int> iw((std::size_t)std::max(1, 8 * r));
+    int info = 0, lwork = -1;
+    double w = 0;
+    dgesdd_(&job, &m, &n, a.a.data(), &m, s.data(), U.a.data(), &ldu, VT.a.data(), &ldvt, &w,
+            &lwork, iw.data(), &info, 1);
+    lwork = std::max(1, (int)w);
+    std::vector<double> travail((std::size_t)lwork);
+    dgesdd_(&job, &m, &n, a.a.data(), &m, s.data(), U.a.data(), &ldu, VT.a.data(), &ldvt,
+            travail.data(), &lwork, iw.data(), &info, 1);
+    if (info != 0) return false;
+    if (job != 'N') {
+        V = Mat<double>(n, vtl);
+        for (int i = 0; i < vtl; ++i)
+            for (int j = 0; j < n; ++j) V(j, i) = VT(i, j);
+    }
+    return true;
+}
+
+bool lapackSVD(Mat<cplx> a, char job, std::vector<double>& s, Mat<cplx>& U, Mat<cplx>& V) {
+    const int m = a.l, n = a.c, r = std::min(m, n);
+    s.assign((std::size_t)r, 0.0);
+    const int ucol = job == 'A' ? m : job == 'S' ? r : 1;
+    const int vtl = job == 'A' ? n : job == 'S' ? r : 1;
+    U = Mat<cplx>(job == 'N' ? 1 : m, ucol);
+    Mat<cplx> VT(vtl, job == 'N' ? 1 : n);
+    const int ldu = U.l, ldvt = VT.l;
+    std::vector<int> iw((std::size_t)std::max(1, 8 * r));
+    const std::size_t lrw =
+        job == 'N' ? (std::size_t)std::max(1, 7 * r)
+                   : (std::size_t)std::max(1, r * std::max(5 * r + 7, 2 * std::max(m, n) + 2 * r + 1));
+    std::vector<double> rtravail(lrw);
+    int info = 0, lwork = -1;
+    cplx w;
+    zgesdd_(&job, &m, &n, a.a.data(), &m, s.data(), U.a.data(), &ldu, VT.a.data(), &ldvt, &w,
+            &lwork, rtravail.data(), iw.data(), &info, 1);
+    lwork = std::max(1, (int)w.real());
+    std::vector<cplx> travail((std::size_t)lwork);
+    zgesdd_(&job, &m, &n, a.a.data(), &m, s.data(), U.a.data(), &ldu, VT.a.data(), &ldvt,
+            travail.data(), &lwork, rtravail.data(), iw.data(), &info, 1);
+    if (info != 0) return false;
+    if (job != 'N') {
+        V = Mat<cplx>(n, vtl);
+        for (int i = 0; i < vtl; ++i)
+            for (int j = 0; j < n; ++j) V(j, i) = std::conj(VT(i, j));
+    }
+    return true;
+}
+}  // namespace
+#endif
+
 static void verifierMatrice2D(const Valeur& a, const char* nom) {
     if (a.dims.size() > 2)
         erreur("MATLAB:linalg:matrixMustBe2D",
@@ -99,9 +336,20 @@ Valeur produitMatrice(const Valeur& a, const Valeur& b) {
                "Incorrect dimensions for matrix multiplication. Check that the number of "
                "columns in the first matrix matches the number of rows in the second "
                "matrix.");
+#ifdef MATLIBRE_AVEC_LAPACK
+    if (a.estComplexe() || b.estComplexe()) {
+        Mat<cplx> r;
+        lapackProduit(versComplexe(a), versComplexe(b), r);
+        return depuis(r);
+    }
+    Mat<double> produit;
+    lapackProduit(versReel(a), versReel(b), produit);
+    Valeur r = depuis(produit);
+#else
     if (a.estComplexe() || b.estComplexe())
         return depuis(multiplier(versComplexe(a), versComplexe(b)));
     Valeur r = depuis(multiplier(versReel(a), versReel(b)));
+#endif
     if (a.classe == Classe::Simple || b.classe == Classe::Simple) r.classe = Classe::Simple;
     return r;
 }
@@ -212,6 +460,15 @@ Valeur divisionGauche(const Valeur& a, const Valeur& b) {
                "Matrix dimensions must agree.");
     bool complexe = a.estComplexe() || b.estComplexe();
     if (a.estCarree()) {
+#ifdef MATLIBRE_AVEC_LAPACK
+        if (complexe) {
+            Mat<cplx> x = versComplexe(b);
+            if (lapackResoudre(versComplexe(a), x)) return depuis(x);
+        } else {
+            Mat<double> x = versReel(b);
+            if (lapackResoudre(versReel(a), x)) return depuis(x);
+        }
+#else
         if (complexe) {
             Mat<cplx> lu = versComplexe(a);
             std::vector<int> perm;
@@ -225,6 +482,7 @@ Valeur divisionGauche(const Valeur& a, const Valeur& b) {
             if (luInterne(lu, perm, signe))
                 return depuis(resoudreLU(lu, perm, versReel(b)));
         }
+#endif
         // Matrice singulière : on bascule sur les moindres carrés, qui
         // donnent la solution de norme minimale.
     }
@@ -613,6 +871,19 @@ static void svdEnFacteurs(const Mat<T>& A, int m, int n, bool economique, Valeur
                           Valeur& v) {
     Mat<T> U, V;
     std::vector<double> sv;
+#ifdef MATLIBRE_AVEC_LAPACK
+    if (lapackSVD(A, economique ? 'S' : 'A', sv, U, V)) {
+        const int r = (int)sv.size();
+        Valeur S = economique ? Valeur::matrice(r, r) : Valeur::matrice(m, n);
+        const int ls = economique ? r : m;
+        for (int i = 0; i < r; ++i)
+            S.re[(std::size_t)i + (std::size_t)i * ls] = sv[(std::size_t)i];
+        u = depuis(U);
+        v = depuis(V);
+        s = S;
+        return;
+    }
+#endif
     svdJacobi(A, U, sv, V);
     int r = (int)sv.size();
     if (economique) {
@@ -662,6 +933,15 @@ static Mat<double> plongementReel(const Valeur& a) {
 // Valeurs singulieres d'une matrice, reelle ou complexe.
 static std::vector<double> valeursSingulieres(const Valeur& a) {
     std::vector<double> s;
+#ifdef MATLIBRE_AVEC_LAPACK
+    if (a.estComplexe()) {
+        Mat<cplx> U, V;
+        if (lapackSVD(versComplexe(a), 'N', s, U, V)) return s;
+    } else {
+        Mat<double> U, V;
+        if (lapackSVD(versReel(a), 'N', s, U, V)) return s;
+    }
+#endif
     if (a.estComplexe()) {
         Mat<cplx> U, V;
         svdJacobi(versComplexe(a), U, s, V);
@@ -1131,6 +1411,73 @@ static void qrValeursPropresComplexe(Mat<cplx> H, std::vector<cplx>& valeurs) {
     for (int i = 0; i <= haut; ++i) valeurs[(std::size_t)i] = H(i, i);
 }
 
+#ifdef MATLIBRE_AVEC_LAPACK
+// Les quatre cas de MATLAB : symétrique réelle, hermitienne, générale
+// réelle, générale complexe. Faux si LAPACK n'a pas convergé : les
+// algorithmes écrits à la main prennent alors le relais.
+static Valeur diagonale(const std::vector<double>& v) {
+    const int n = (int)v.size();
+    Valeur D = Valeur::matrice(n, n);
+    for (int i = 0; i < n; ++i) D.re[(std::size_t)i + (std::size_t)i * n] = v[(std::size_t)i];
+    return D;
+}
+
+static Valeur diagonale(const std::vector<cplx>& v) {
+    const int n = (int)v.size();
+    Valeur D;
+    D.dims = {n, n};
+    D.re.assign((std::size_t)n * n, 0.0);
+    D.im.assign((std::size_t)n * n, 0.0);
+    for (int i = 0; i < n; ++i) {
+        D.re[(std::size_t)i + (std::size_t)i * n] = v[(std::size_t)i].real();
+        D.im[(std::size_t)i + (std::size_t)i * n] = v[(std::size_t)i].imag();
+    }
+    D.compacter();
+    return D;
+}
+
+static bool valeursPropresLapack(const Valeur& a, Valeur& valeurs, Valeur* vecteurs) {
+    if (a.estComplexe() && estHermitienne(a)) {
+        std::vector<double> vals;
+        Mat<cplx> vecs;
+        if (!lapackHermitien(versComplexe(a), vals, vecteurs ? &vecs : nullptr)) return false;
+        if (vecteurs) *vecteurs = depuis(vecs);
+        valeurs = vecteurs ? diagonale(vals) : Valeur::colonne(vals);
+        return true;
+    }
+    if (!a.estComplexe() && estSymetrique(a)) {
+        std::vector<double> vals;
+        Mat<double> vecs;
+        if (!lapackSymetrique(versReel(a), vals, vecteurs ? &vecs : nullptr)) return false;
+        if (vecteurs) *vecteurs = depuis(vecs);
+        valeurs = vecteurs ? diagonale(vals) : Valeur::colonne(vals);
+        return true;
+    }
+    std::vector<cplx> vals;
+    Mat<cplx> vecs;
+    const bool ok = a.estComplexe()
+                        ? lapackGeneral(versComplexe(a), vals, vecteurs ? &vecs : nullptr)
+                        : lapackGeneral(versReel(a), vals, vecteurs ? &vecs : nullptr);
+    if (!ok) return false;
+    if (vecteurs) {
+        *vecteurs = depuis(vecs);
+        valeurs = diagonale(vals);
+        return true;
+    }
+    Valeur lambda;
+    lambda.dims = {(int)vals.size(), 1};
+    lambda.re.resize(vals.size());
+    lambda.im.resize(vals.size());
+    for (std::size_t i = 0; i < vals.size(); ++i) {
+        lambda.re[i] = vals[i].real();
+        lambda.im[i] = vals[i].imag();
+    }
+    lambda.compacter();
+    valeurs = lambda;
+    return true;
+}
+#endif
+
 void valeursPropres(const Valeur& a, Valeur& valeurs, Valeur* vecteurs) {
     if (!a.estCarree()) erreur("MATLAB:square", "Matrix must be square.");
     int n = a.nlignes();
@@ -1139,6 +1486,9 @@ void valeursPropres(const Valeur& a, Valeur& valeurs, Valeur* vecteurs) {
         if (vecteurs) *vecteurs = Valeur::vide();
         return;
     }
+#ifdef MATLIBRE_AVEC_LAPACK
+    if (valeursPropresLapack(a, valeurs, vecteurs)) return;
+#endif
     if (a.estComplexe() && estHermitienne(a)) {
         std::vector<double> vals;
         Mat<cplx> vecs;

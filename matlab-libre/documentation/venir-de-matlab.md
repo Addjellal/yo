@@ -103,9 +103,10 @@ Et deux différences de fond :
   compilation à la volée : une instruction scalaire coûte environ une
   demi-microseconde, une boucle est donc plus lente que dans MATLAB. Le
   calcul vectoriel tourne à la vitesse du C++. Vectoriser, la règle de
-  MATLAB, est ici plus impérieuse encore. L'algèbre linéaire est écrite
-  sans LAPACK : `eig` ou `svd` d'une matrice 300×300 prennent une
-  fraction de seconde, là où MATLAB met quelques millisecondes.
+  MATLAB, est ici plus impérieuse encore. L'algèbre linéaire dense passe
+  par LAPACK quand la construction l'a trouvé (`installation.md`) :
+  `eig` d'une matrice 300×300 prend alors quelques millisecondes, comme
+  dans MATLAB ; sans lui, un tiers de seconde.
 - **La langue.** L'aide, l'interface du bureau et les messages propres à
   MatLibre (identifiants `MatLibre:...`) sont en français ; les erreurs
   et avertissements des fonctions de MATLAB, en anglais, comme dans

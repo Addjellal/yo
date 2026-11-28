@@ -47,13 +47,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Paquets (Qt6 pour le bureau)
+      # Qt6 pour le bureau ; OpenBLAS pour LAPACK, que la poussée éprouve
+      # (le code d'algèbre écrit à la main l'est chaque nuit, sans Qt).
+      - name: Paquets (Qt6, OpenBLAS)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq qt6-base-dev libgl1-mesa-dev
+          sudo apt-get install -y -qq qt6-base-dev libgl1-mesa-dev libopenblas-dev
 
       - name: Configurer
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMATLIBRE_LAPACK=ON
 
       # gcc écrit ses avertissements sur la sortie d'erreur : on garde les
       # deux dans le journal, et la construction échoue s'il y en a un.

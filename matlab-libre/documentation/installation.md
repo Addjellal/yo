@@ -2,8 +2,9 @@
 
 Un compilateur C++17 et CMake suffisent. Aucune bibliothèque n'est
 obligatoire : Qt6 (Widgets), s'il est présent, ajoute l'application de
-bureau ; tout le reste — algèbre linéaire, FFT, matrices creuses — est
-écrit dans le dépôt.
+bureau ; LAPACK et BLAS, s'ils sont présents, accélèrent l'algèbre
+linéaire dense ; tout le reste — l'algèbre linéaire elle-même, la FFT,
+les matrices creuses — est écrit dans le dépôt.
 
 ## Compiler
 
@@ -86,13 +87,30 @@ cd build && cpack
 | Bibliothèque | Ce qu'elle apporte | Option CMake |
 | --- | --- | --- |
 | Qt6 Widgets | l'application de bureau `matlibre-bureau` | `MATLIBRE_BUREAU` |
+| LAPACK et BLAS (OpenBLAS, la référence, Accelerate) | le produit matriciel, `A\b` carré, `svd` et `eig` par les routines dont MATLAB se sert | `MATLIBRE_LAPACK` |
 
-Aucune bibliothèque de calcul n'est cherchée. Les options
-`MATLIBRE_AVEC_LAPACK`, `MATLIBRE_AVEC_FFTW`, `MATLIBRE_AVEC_SUITESPARSE`
-et `MATLIBRE_AVEC_OPENCV` ont été retirées le 21 novembre 2026 : elles
-liaient ces bibliothèques sans qu'aucune ligne du code ne s'en serve, et
-le paquet `.deb` héritait de dépendances qu'il ne déclarait pas. Brancher
-LAPACK pour de bon est une proposition de `audit-reprise.md`.
+`MATLIBRE_LAPACK` vaut `AUTO` par défaut : LAPACK est employé s'il est
+trouvé (`apt install libopenblas-dev`, ou `liblapack-dev` ; Accelerate
+sous macOS), et le message de configuration le dit ; `OFF` s'en passe,
+`ON` l'exige. Sans lui, l'algèbre linéaire écrite dans le dépôt fait le
+même calcul. Sur une matrice 300 × 300, avec OpenBLAS sur un seul fil :
+
+| calcul | sans LAPACK | avec | rapport |
+| --- | ---: | ---: | ---: |
+| `eig` d'une matrice symétrique | 0,31 s | 0,006 s | 55 |
+| `eig` d'une matrice quelconque | 0,33 s | 0,045 s | 7 |
+| `svd` | 0,31 s | 0,02 s | 15 |
+| `A\b`, 500 × 500 | 0,048 s | 0,004 s | 13 |
+| `A*B`, 500 × 500 | 0,050 s | 0,005 s | 10 |
+
+Les résultats sont ceux de MATLAB, qui appelle les mêmes routines, au
+dernier chiffre près ; un vecteur propre ou singulier peut changer de
+signe d'un chemin à l'autre, ce qui ne change pas la décomposition. Le
+paquet `.deb` d'une construction liée à LAPACK (ou au bureau) déclare ses
+dépendances, que `dpkg-shlibdeps` lit dans le binaire. Les anciennes
+options `MATLIBRE_AVEC_LAPACK`, `_FFTW`, `_SUITESPARSE` et `_OPENCV`,
+qui liaient ces bibliothèques sans s'en servir, ont été retirées le
+21 novembre 2026 ; FFTW, SuiteSparse et OpenCV ne sont pas employés.
 
 ## Gérer les toolboxes
 

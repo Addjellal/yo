@@ -1,7 +1,9 @@
 # MatLibre — tout ce qui est trop long pour chaque poussée, chaque nuit.
 #
-#   batterie      la batterie complète (25 minutes sur 4 cœurs)
-#   sans-qt       construction sans bureau, installation, archives
+#   batterie      la batterie complète (25 minutes sur 4 cœurs), LAPACK
+#                 (OpenBLAS) compris
+#   sans-qt       construction sans bureau ni LAPACK — l'algèbre écrite à
+#                 la main —, installation, archives
 #   asan          la batterie sous ASan et UBSan, hors bureau : l'audit
 #                 n'avait pu y passer ni test_simulink ni test_aide
 #                 (deux heures), ni les tests de domaine
@@ -50,10 +52,10 @@ jobs:
       - name: Paquets
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq qt6-base-dev libgl1-mesa-dev
+          sudo apt-get install -y -qq qt6-base-dev libgl1-mesa-dev libopenblas-dev
       - name: Construire
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMATLIBRE_LAPACK=ON
           cmake --build build -j4
       - name: Batterie
         working-directory: matlab-libre/build
@@ -75,7 +77,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Construire sans Qt
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMATLIBRE_BUREAU=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMATLIBRE_BUREAU=OFF \
+                -DMATLIBRE_LAPACK=OFF
           cmake --build build -j4
           test ! -e build/bin/matlibre-bureau
       - name: Tests rapides
@@ -91,8 +94,8 @@ jobs:
             -e "disp(exist('tf')); s = evalc('help ode45'); disp(numel(s) > 100)" \
             | tee sortie.txt
           grep -Eq '^ *2$' sortie.txt && grep -Eq '^ *1$' sortie.txt
-      # Sans le bureau, le paquet .deb ne dépend vraiment que de libc6 et
-      # libstdc++6, ce qu'il déclare.
+      # Sans le bureau ni LAPACK, le paquet .deb ne dépend vraiment que de
+      # libc6 et libstdc++6, ce qu'il déclare.
       - name: Archives
         working-directory: matlab-libre/build
         run: cpack
@@ -123,7 +126,7 @@ jobs:
       - name: Construire assaini
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                -DMATLIBRE_ASSAINIR=ON -DMATLIBRE_BUREAU=OFF
+                -DMATLIBRE_ASSAINIR=ON -DMATLIBRE_BUREAU=OFF -DMATLIBRE_LAPACK=OFF
           cmake --build build -j4
       # Quatre fois plus lent : test_simulink approche les deux heures.
       - name: Batterie assainie
@@ -149,7 +152,7 @@ jobs:
       - name: Construire pour TSan
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                -DMATLIBRE_ASSAINIR=thread -DMATLIBRE_BUREAU=OFF
+                -DMATLIBRE_ASSAINIR=thread -DMATLIBRE_BUREAU=OFF -DMATLIBRE_LAPACK=OFF
           cmake --build build -j4
       # Une course signalée rend le code 66 : le test échoue.
       - name: test_parallele
@@ -165,7 +168,7 @@ jobs:
       - name: Construire instrumenté
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
-                -DMATLIBRE_COUVERTURE=ON -DMATLIBRE_BUREAU=OFF
+                -DMATLIBRE_COUVERTURE=ON -DMATLIBRE_BUREAU=OFF -DMATLIBRE_LAPACK=OFF
           cmake --build build -j4
       - name: Batterie instrumentée
         working-directory: matlab-libre/build

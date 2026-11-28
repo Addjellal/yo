@@ -136,10 +136,16 @@ Jacobi (matrices symétriques) ou Hessenberg + QR à décalage de Wilkinson
 (cas général), exponentielle de matrice par mise à l'échelle et
 approximant de Padé.
 
-Rien n'est délégué à LAPACK ni à BLAS : c'est ce qui rend `eig` et `svd`
-lents sur les grandes matrices denses (0,27 s et 0,44 s pour 300×300, où
-MATLAB met quelques millisecondes). Les brancher, en dépendance
-facultative, est une proposition de `audit-reprise.md`.
+Quand la construction a trouvé LAPACK et BLAS (option `MATLIBRE_LAPACK`,
+qui définit `MATLIBRE_AVEC_LAPACK`), le produit (`dgemm`, `zgemm`), la
+résolution d'un système carré (`dgesv`), la SVD (`dgesdd`) et les valeurs
+propres (`dsyevd`, `zheevd`, `dgeev`, `zgeev`) passent par eux, comme
+dans MATLAB : `eig` d'une matrice symétrique 300×300 descend de 0,31 s à
+6 ms. Les prototypes sont ceux de l'interface Fortran, déclarés dans
+`AlgebreLineaire.cpp` ; aucun en-tête n'est à trouver. Les algorithmes
+écrits à la main restent le repli — sans LAPACK, ou s'il ne converge
+pas — et ce qu'ils sont seuls à faire (Cholesky, QR, exponentielle,
+logarithme) ne change pas.
 
 ## Fourier
 
