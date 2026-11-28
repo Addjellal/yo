@@ -70,6 +70,19 @@ assert(max(abs(a - [1 -0.5])) < 1e-12);
 [b, a] = butter(4, 0.3);
 [sos, g] = tf2sos(b, a);
 assert(size(sos, 1) == 2 && size(sos, 2) == 6);
+% Les sections se lisent en puissances de z^-1 : une section du premier
+% ordre se complète par la fin, comme dans MATLAB — par le début, elle
+% portait un retard d'un échantillon, et un pôle seul un dénominateur faux.
+[sosPole, gPole] = zp2sos([], 0.5, 1);
+assert(isequal(sosPole, [1 0 0 1 -0.5 0]) && gPole == 1);
+sosUn = zp2sos(-1, [0.5; 0.25], 2);
+assert(max(abs(sosUn - [1 1 0 1 -0.75 0.125])) < 1e-15);
+% Des zéros réels séparés par une paire complexe — une racine multiple
+% que l'arrondi éclate — se groupent entre eux : deux sections, non trois.
+zEclates = [-1.0002; -1 + 0.0002i; -1 - 0.0002i; -0.9998];
+sosEclates = zp2sos(zEclates, [0.5; 0.5i; -0.5i; 0.1], 1);
+assert(size(sosEclates, 1) == 2);
+assert(max(abs(sos2tf(sosEclates) - real(poly(zEclates)))) < 1e-12);
 [b2, a2] = sos2tf(sos, g);
 assert(max(abs(b - b2)) < 1e-12);
 assert(max(abs(a - a2)) < 1e-12);
