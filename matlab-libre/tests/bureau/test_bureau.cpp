@@ -1760,7 +1760,10 @@ end
             }
             avant = console->toPlainText().size();
             envoyer(fenetre, QStringLiteral("run('%1')").arg(fichierTous));
-            verifier(attendre([&] { return !fenetre.occupe(); }, 60000),
+            // Une dizaine de secondes sous Linux ; plus d'une minute sur le
+            // runner Windows de l'integration continue. Le delai borne une
+            // attente qui ne finirait pas, il ne mesure pas la vitesse.
+            verifier(attendre([&] { return !fenetre.occupe(); }, 300000),
                      "les blocs de la bibliotheque se posent tous");
             sortie = console->toPlainText().mid(avant);
             verifier(sortie.contains(QLatin1String("TOUS LES BLOCS OK")),

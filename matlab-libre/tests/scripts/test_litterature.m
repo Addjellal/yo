@@ -1503,8 +1503,14 @@ if ~isempty(compilateur)
                         'heronLitt.c goertzelLitt.c entiersLitt.c -lm'], compilateur);
     [statut, message] = system(commande);
     assert(statut == 0, message);
-    [statut, sortieC] = system('./principalLitt');
-    assert(statut == 0);
+    % L'interpréteur de commandes de Windows ne lit pas « ./prog ».
+    if ispc
+        programmeC = 'principalLitt.exe';
+    else
+        programmeC = './principalLitt';
+    end
+    [statut, sortieC] = system(programmeC);
+    assert(statut == 0, 'le programme C a échoué (%d) : %s', statut, sortieC);
     lignesC = strsplit(strtrim(sortieC), sprintf('\n'));
     valeursC = sscanf(lignesC{1}, '%f').';
     assert(valeursC(1) == heronLitt(2) && abs(heronLitt(2) - sqrt(2)) <= eps(sqrt(2)));
