@@ -555,9 +555,18 @@ FONCTION(fnPath) {
         for (const auto& a : args) it.ajouterChemin(a.versTexte(), false);
         return {};
     }
+    // Les dossiers sont séparés par pathsep, comme dans MATLAB : « : » ici,
+    // « ; » sous Windows, où le deux-points d'un lecteur (C:\...) aurait
+    // coupé chaque dossier en deux, et où strsplit(path, pathsep) ne
+    // trouvait qu'un seul morceau.
+#ifdef _WIN32
+    const char* separateur = ";";
+#else
+    const char* separateur = ":";
+#endif
     std::string s;
     for (const auto& d : it.chemin()) {
-        if (!s.empty()) s += ":";
+        if (!s.empty()) s += separateur;
         s += d;
     }
     if (nargout == 0) {
