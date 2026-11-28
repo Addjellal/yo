@@ -767,9 +767,11 @@ assert(strcmp(get(poigneeBoite(1), 'String'), 'le sommet'));
 vue = getframe();
 assert(numel(vue.svg) > 0);
 movie(vue, 1);
-savefig('/tmp/matlibre_test_figure');
-assert(exist('/tmp/matlibre_test_figure.svg', 'file') > 0);
-delete('/tmp/matlibre_test_figure.svg');
+% Dans le dossier temporaire du système : /tmp n'existe pas sous Windows.
+figureSauvee = fullfile(tempdir, 'matlibre_test_figure');
+savefig(figureSauvee);
+assert(exist([figureSauvee '.svg'], 'file') > 0);
+delete([figureSauvee '.svg']);
 cla;
 [Xv, Yv, Zv] = meshgrid(-2:0.4:2);
 volume = Xv .* exp(-Xv.^2 - Yv.^2 - Zv.^2);

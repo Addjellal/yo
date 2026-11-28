@@ -225,7 +225,8 @@ bMisra = [238.94212918 5.5015643181e-4];
 seMisra = [2.7070075241 7.2668688436e-6];
 chiffres = @(b, c) min(-log10(abs(b(:)' - c(:)') ./ abs(c(:)')));
 [ajust, qualite] = fit(xMisra, yMisra, fittype('b1*(1-exp(-b2*x))'), 'StartPoint', [500 1e-4]);
-assert(chiffres(coeffvalues(ajust), bMisra) > 8);
+assert(chiffres(coeffvalues(ajust), bMisra) > 8, ...
+       sprintf('Misra1a : %.2f chiffres justes seulement', chiffres(coeffvalues(ajust), bMisra)));
 assert(abs(qualite.sse / 1.2455138894e-1 - 1) < 1e-9);
 assert(abs(qualite.rmse / 1.0187876330e-1 - 1) < 1e-9);
 icMisra = confint(ajust);              % b -+ t(0.975, 12) * ecart certifie
@@ -1526,7 +1527,8 @@ if isunix
     avant = fileread(source);
     lanceur = mcc('-m', source, '-d', dossierMcc);
     [statut, sortieMcc] = system([lanceur ' 1000']);
-    assert(statut == 0 && strcmp(fileread(source), avant));
+    assert(statut == 0, 'le lanceur de mcc a echoue : %s', sortieMcc);
+    assert(strcmp(fileread(source), avant));
     attendu = sum(1 ./ (1:1000) .^ 2);
     assert(strcmp(strtrim(sortieMcc), sprintf('%.15g 1', attendu)));
     rmdir(dossierMcc, 's');

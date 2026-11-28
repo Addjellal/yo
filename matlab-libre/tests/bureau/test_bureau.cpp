@@ -101,7 +101,14 @@ static bool envoyer(FenetrePrincipale& fenetre, const QString& commande) {
 int main(int argc, char** argv) {
     // Sortie ligne a ligne : si le test meurt en cours de route, on garde
     // tout ce qui a deja ete verifie au lieu de perdre le tampon.
+    // Sous Windows, _IOLBF vaut un tampon complet : un test tue par son
+    // delai ne montrait rien de ce qu'il avait verifie. Sans tampon, on
+    // voit ou il s'est arrete.
+#ifdef _WIN32
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+#else
     std::setvbuf(stdout, nullptr, _IOLBF, 0);
+#endif
     qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication application(argc, argv);
     theme::appliquer();
