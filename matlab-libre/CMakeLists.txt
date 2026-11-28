@@ -243,8 +243,41 @@ if(MATLIBRE_BUREAU)
       # La toolbox est donnee comme aux tests en langage : sans elle, un
       # arbre de construction range hors du depot (build-asan ailleurs)
       # ne la trouvait pas, et le test echouait pour une autre raison.
-      set_tests_properties(bureau PROPERTIES ENVIRONMENT
-        "QT_QPA_PLATFORM=offscreen;MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox")
+      #
+      # Sous Windows, le qt.conf que pose windeployqt dans bin/ envoie Qt
+      # chercher ses greffons dans bin/greffons, ou ne se trouve que le
+      # greffon « windows » : le test ne trouvait plus « offscreen », Qt
+      # s'arretait sur une erreur fatale qu'il ecrit au debogueur quand
+      # aucune console n'est attachee, et le test attendait son delai sans
+      # rien dire. On lui donne le dossier des greffons de plateforme de
+      # Qt lui-meme, et Qt ecrit ses messages sur la sortie d'erreur.
+      set(MATLIBRE_ENV_BUREAU
+        "QT_QPA_PLATFORM=offscreen"
+        "MATLIBRE_TOOLBOX=${CMAKE_CURRENT_SOURCE_DIR}/toolbox"
+        "QT_FORCE_STDERR_LOGGING=1")
+      # (qmake le dit ; Debian ne livre pas les cibles CMake des greffons.)
+      if(TARGET Qt6::qmake)
+        get_target_property(MATLIBRE_QMAKE_TESTS Qt6::qmake IMPORTED_LOCATION)
+        if(NOT MATLIBRE_QMAKE_TESTS)
+          # Un Qt qui n'inscrit que l'emplacement par configuration (Release)
+          get_target_property(MATLIBRE_QMAKE_CONFIGS Qt6::qmake IMPORTED_CONFIGURATIONS)
+          list(GET MATLIBRE_QMAKE_CONFIGS 0 MATLIBRE_QMAKE_CONFIG)
+          get_target_property(MATLIBRE_QMAKE_TESTS Qt6::qmake
+                              IMPORTED_LOCATION_${MATLIBRE_QMAKE_CONFIG})
+        endif()
+        execute_process(COMMAND "${MATLIBRE_QMAKE_TESTS}" -query QT_INSTALL_PLUGINS
+                        OUTPUT_VARIABLE MATLIBRE_QT_GREFFONS
+                        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET
+                        RESULT_VARIABLE MATLIBRE_QMAKE_STATUT)
+        if(MATLIBRE_QMAKE_STATUT EQUAL 0 AND EXISTS "${MATLIBRE_QT_GREFFONS}/platforms")
+          list(APPEND MATLIBRE_ENV_BUREAU
+            "QT_QPA_PLATFORM_PLUGIN_PATH=${MATLIBRE_QT_GREFFONS}/platforms")
+        endif()
+      endif()
+      # Une demi-minute ici ; quinze au plus, plutot que la demi-heure de
+      # l'integration continue, si quelque chose le bloque encore.
+      set_tests_properties(bureau PROPERTIES ENVIRONMENT "${MATLIBRE_ENV_BUREAU}"
+                                             TIMEOUT 900)
     endif()
 
     # Pas de console derriere la fenetre, sous Windows.

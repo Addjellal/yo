@@ -109,6 +109,9 @@ int main(int argc, char** argv) {
 #else
     std::setvbuf(stdout, nullptr, _IOLBF, 0);
 #endif
+    // Ecrit avant QApplication : un test qui ne montre meme pas cette ligne
+    // s'est arrete au demarrage de Qt (greffon de plateforme introuvable).
+    std::printf("--- bureau ---\n");
     qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication application(argc, argv);
     theme::appliquer();
