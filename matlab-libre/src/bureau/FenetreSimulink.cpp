@@ -902,11 +902,6 @@ void FenetreSimulink::surBlocOuvert(const QString& nom) {
 }
 
 void FenetreSimulink::surBlocDepose(const QPointF& place) {
-    const QString modele = cibleModele();
-    if (modele.isEmpty()) {
-        poserEtat(QStringLiteral("Choisissez d'abord un modele, a droite."));
-        return;
-    }
     QTreeWidgetItem* item = bibliotheque_->currentItem();
     const QString type = item ? item->data(0, Qt::UserRole).toString() : QString();
     if (type.isEmpty()) {
@@ -919,12 +914,22 @@ void FenetreSimulink::surBlocDepose(const QPointF& place) {
     // Un bloc pose garde la place ou on l'a lache : c'est POSITION qui la
     // retient, et le schema ne se replace donc plus tout seul.
     const double demiL = type == QLatin1String("sum") ? 0.5 : 0.85;
-    QString ligne = QStringLiteral("%1 = add_block(%1, '%2', '%3'").arg(modele, type, nom);
-    if (!parametres.isEmpty()) ligne += QStringLiteral(", ") + parametres;
-    ligne += QStringLiteral(", 'Position', [%1 %2 %3 %4]);")
-                 .arg(ecrireNombre(place.x() - demiL), ecrireNombre(place.y() - 0.5),
-                      ecrireNombre(place.x() + demiL), ecrireNombre(place.y() + 0.5));
-    envoyerModification(ligne, QStringLiteral("« %1 » pose sur la feuille.").arg(nom));
+    QString arguments = QStringLiteral("'%1', '%2'").arg(type, nom);
+    if (!parametres.isEmpty()) arguments += QStringLiteral(", ") + parametres;
+    arguments += QStringLiteral(", 'Position', [%1 %2 %3 %4]")
+                     .arg(ecrireNombre(place.x() - demiL), ecrireNombre(place.y() - 0.5),
+                          ecrireNombre(place.x() + demiL), ecrireNombre(place.y() + 0.5));
+    const QString modele = cibleModele();
+    if (modele.isEmpty()) {
+        // Aucun modele ouvert : comme dans Simulink, le bloc lache sur la
+        // feuille ne se perd pas, il ouvre un modele neuf qui le porte.
+        attendreNouveauModele();
+        emit commandeDemandee(QStringLiteral("matlibre_sl_nouveau(%1);").arg(arguments));
+        poserEtat(QStringLiteral("Un modèle neuf s'ouvre, avec « %1 ».").arg(nom));
+        return;
+    }
+    envoyerModification(QStringLiteral("%1 = add_block(%1, %2);").arg(modele, arguments),
+                        QStringLiteral("« %1 » pose sur la feuille.").arg(nom));
 }
 
 void FenetreSimulink::ajusterVue() {
@@ -940,6 +945,8 @@ void FenetreSimulink::construireBarre() {
 
     QAction* aNouveau = barre->addAction(iconeDessinee(QStringLiteral("modele"), 20),
                                          QStringLiteral("Nouveau modèle"));
+    aNouveau->setToolTip(QStringLiteral(
+        "Ouvrir un modèle vide sur la feuille, comme Simulink : « untitled »"));
     connect(aNouveau, &QAction::triggered, this, &FenetreSimulink::nouveauModele);
     QAction* aOuvrirFichier = barre->addAction(
         iconeDessinee(QStringLiteral("ouvrir"), 20), QStringLiteral("Ouvrir"));
@@ -1063,13 +1070,26 @@ void FenetreSimulink::definirModeles(const QStringList& noms) {
         // chaque commande tapée dans la console la ferait sauter.
         for (int k = 0; k < modeles_->count(); ++k)
             if (modeles_->item(k)->text() == choisi) modeles_->setCurrentRow(k);
+    // Le modele qu'on vient de creer, s'il est arrive : on l'ouvre, comme
+    // Simulink ouvre le modele neuf. Le moteur publie la liste apres
+    // chaque commande ; au-dela de quelques publications sans lui, la
+    // creation a echoue et l'on cesse de l'attendre.
+    if (attenteNouveau_ > 0) {
+        for (int k = 0; k < modeles_->count(); ++k)
+            if (!avantNouveau_.contains(modeles_->item(k)->text())) {
+                modeles_->setCurrentRow(k);
+                attenteNouveau_ = 0;
+                break;
+            }
+        if (attenteNouveau_ > 0) --attenteNouveau_;
+    }
     if (modeles_->currentRow() < 0 && modeles_->count() > 0) modeles_->setCurrentRow(0);
     modeles_->blockSignals(false);
 
     if (noms.isEmpty()) {
         etatModeles_->setText(QStringLiteral(
-            "Aucun modèle dans l'espace de travail. « Nouveau modèle » en écrit "
-            "un ; il paraîtra ici dès qu'il aura été exécuté."));
+            "Aucun modèle dans l'espace de travail. « Nouveau modèle » en ouvre "
+            "un vide ; un bloc glissé sur la feuille aussi."));
     } else {
         etatModeles_->setText(QStringLiteral(
             "%1 modèle(s). Les variables sont partagées : un paramètre écrit "
@@ -1206,32 +1226,14 @@ QString FenetreSimulink::ligneInsertion() const {
     return ligne;
 }
 
-QString FenetreSimulink::squeletteModele() {
-    return QStringLiteral(
-        "%% Un modele Simulink : des blocs, des liens, une simulation.\n"
-        "%  Les variables sont celles de l'espace de travail : un parametre\n"
-        "%  ecrit entre apostrophes est une expression, evaluee au moment de\n"
-        "%  la simulation. Changer K ci-dessous et relancer suffit.\n"
-        "K = 2;\n"
-        "\n"
-        "m = new_system('monModele');\n"
-        "m = add_block(m, 'step', 'consigne', 'Time', 0, 'After', 1);\n"
-        "m = add_block(m, 'sum', 'ecart', 'Signs', '+-');\n"
-        "m = add_block(m, 'gain', 'correcteur', 'Gain', 'K');\n"
-        "m = add_block(m, 'integrator', 'sortie', 'InitialCondition', 0);\n"
-        "m = add_line(m, 'consigne', 'ecart', 1);\n"
-        "m = add_line(m, 'sortie', 'ecart', 2);\n"
-        "m = add_line(m, 'ecart', 'correcteur');\n"
-        "m = add_line(m, 'correcteur', 'sortie');\n");
-}
-
 void FenetreSimulink::montrerBloc() {
     QTreeWidgetItem* item = bibliotheque_->currentItem();
     const QString type = item ? item->data(0, Qt::UserRole).toString() : QString();
     bInserer_->setEnabled(!type.isEmpty());
     if (type.isEmpty()) {
         description_->setText(QStringLiteral(
-            "Choisissez un bloc : sa ligne ADD_BLOCK s'écrira dans l'éditeur."));
+            "Choisissez un bloc, puis glissez-le sur la feuille ; « Insérer » "
+            "écrit plutôt sa ligne ADD_BLOCK dans l'éditeur."));
         return;
     }
     description_->setText(QStringLiteral("%1 — %2\n%3")
@@ -1247,6 +1249,8 @@ void FenetreSimulink::ajusterBoutons() {
 }
 
 void FenetreSimulink::surModeleChoisi() {
+    // Un modele choisi a la main l'emporte sur celui qu'on attendait.
+    attenteNouveau_ = 0;
     // Changer de modele ferme les sous-systemes ouverts : le chemin
     // designait des blocs de l'ancien, et n'a plus de sens dans le neuf.
     chemin_.clear();
@@ -1458,8 +1462,15 @@ void FenetreSimulink::ouvrirDepuis(const QString& chemin) {
                              "est dans l'espace de travail.").arg(chemin));
 }
 
+void FenetreSimulink::attendreNouveauModele() {
+    avantNouveau_.clear();
+    for (int k = 0; k < modeles_->count(); ++k) avantNouveau_ << modeles_->item(k)->text();
+    attenteNouveau_ = 3;
+}
+
 void FenetreSimulink::nouveauModele() {
-    emit nouveauModeleDemande(squeletteModele());
-    poserEtat(QStringLiteral("Un modèle de départ vous attend dans l'éditeur ; "
-                             "exécutez-le et il paraîtra ici."));
+    attendreNouveauModele();
+    emit commandeDemandee(QStringLiteral("matlibre_sl_nouveau();"));
+    poserEtat(QStringLiteral("Un modèle vide s'ouvre sur la feuille : glissez-y des "
+                             "blocs de la bibliothèque."));
 }

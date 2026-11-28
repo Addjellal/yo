@@ -657,7 +657,9 @@ void ToileSimulink::paintEvent(QPaintEvent*) {
         peintre.setPen(QColor(0x80, 0x80, 0x80));
         peintre.drawText(rect(), Qt::AlignCenter,
                          modele_.isEmpty()
-                             ? QStringLiteral("Aucun modèle choisi.")
+                             ? QStringLiteral("Aucun modèle ouvert.\n"
+                                              "« Nouveau modèle » en ouvre un, et un "
+                                              "bloc glissé ici aussi.")
                              : QStringLiteral("« %1 » ne porte encore aucun bloc.\n"
                                               "Glissez-en un depuis la bibliothèque.")
                                    .arg(modele_));

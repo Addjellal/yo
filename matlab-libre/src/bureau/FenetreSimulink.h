@@ -6,8 +6,9 @@
 // est. C'est ce qu'on reproduit, avec la différence qui compte : un
 // modèle MatLibre est une valeur de l'espace de travail, non un fichier
 // binaire. La fenêtre liste donc les modèles que l'espace de travail
-// porte, et la bibliothèque écrit dans l'éditeur la ligne qui pose le
-// bloc.
+// porte. Comme dans Simulink, « Nouveau modèle » ouvre un modèle vide
+// sur la feuille (« untitled », posé dans l'espace de travail), et les
+// blocs de la bibliothèque s'y déposent d'un glisser.
 //
 // L'espace de travail est le même des deux côtés : un gain réglé sur « K »
 // vaut ce que vaut K, et un bloc « vers l'espace de travail » y dépose son
@@ -83,8 +84,9 @@ public:
     void remonter();
     // La ligne qu'insérerait « Insérer », pour le bloc choisi.
     QString ligneInsertion() const;
-    // Le squelette d'un modèle neuf, tel que « Nouveau modèle » l'écrit.
-    static QString squeletteModele();
+    // « Nouveau modèle » : un modèle vide, « untitled », posé dans
+    // l'espace de travail et choisi dès que le moteur le publie.
+    void nouveauModele();
 
     // Les trois chemins, sans boite de dialogue : c'est par la que le
     // test passe, et les boutons ne font que leur choisir un fichier.
@@ -97,8 +99,6 @@ signals:
     void commandeDemandee(const QString& commande);
     // Une ligne à insérer dans l'éditeur, ou à défaut dans la console.
     void insertionDemandee(const QString& ligne);
-    // Un modèle neuf à ouvrir dans un onglet d'éditeur.
-    void nouveauModeleDemande(const QString& squelette);
     // Le schéma d'un modèle : c'est le moteur qui le trace.
     void schemaDemande(const QString& nom);
 
@@ -106,7 +106,6 @@ private slots:
     void ouvrirSchema();
     void simuler();
     void insererBloc();
-    void nouveauModele();
     void enregistrerModele();
     void genererProgramme();
     void ouvrirModele();
@@ -138,6 +137,10 @@ private slots:
 
 private:
     void construireBibliotheque();
+    // Un modèle va naître de la commande qu'on envoie : on retient les
+    // modèles d'avant, et le premier nom neuf que publie le moteur sera
+    // choisi, comme Simulink ouvre le modèle qu'il vient de créer.
+    void attendreNouveauModele();
     // Toute modification part par ici : une seule ligne, precedee de la
     // mise en reserve de l etat courant pour Ctrl+Z.
     void envoyerModification(const QString& corps, const QString& annonce);
@@ -185,4 +188,8 @@ private:
     // Le compte des blocs posés depuis la bibliothèque : de quoi donner
     // un nom neuf à chacun sans écraser le précédent.
     int poses_ = 0;
+    // Les modèles d'avant la création demandée, et le nombre de
+    // publications qu'on attend encore le neuf (zéro : rien n'est attendu).
+    QStringList avantNouveau_;
+    int attenteNouveau_ = 0;
 };

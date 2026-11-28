@@ -98,7 +98,6 @@ private slots:
     // Une ligne venue de la bibliotheque de blocs : dans l'editeur
     // s'il y en a un, dans la console sinon.
     void insererLigne(const QString& ligne);
-    void nouveauModeleSimulink(const QString& squelette);
     void surFigures(const QVector<FigureCopiee>& figures, int courante);
     void surFermetureFigure(int numero);
     void surDossier(const QString& chemin);

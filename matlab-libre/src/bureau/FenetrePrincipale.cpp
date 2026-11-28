@@ -606,9 +606,12 @@ void FenetrePrincipale::construireMenus() {
     connect(bSimulink, &QToolButton::clicked, this, &FenetrePrincipale::montrerSimulink);
     QToolButton* bModele = simulinkGroupe->ajouter(
         QStringLiteral("Nouveau\nmodèle"), QStringLiteral("modele"),
-        QStringLiteral("Ouvrir un modèle de départ dans l'éditeur"));
+        QStringLiteral("Ouvrir un modèle vide dans l'éditeur Simulink"));
+    // Comme le « Blank Model » de MATLAB : la fenêtre Simulink s'ouvre sur
+    // un modèle vide, prêt à recevoir des blocs.
     connect(bModele, &QToolButton::clicked, this, [this] {
-        nouveauModeleSimulink(FenetreSimulink::squeletteModele());
+        montrerSimulink();
+        fenetreSimulink()->nouveauModele();
     });
     ruban_->ajouterGroupe(QStringLiteral("Accueil"), simulinkGroupe);
 
@@ -881,8 +884,6 @@ FenetreSimulink* FenetrePrincipale::fenetreSimulink() {
                 &FenetrePrincipale::envoyerCommande);
         connect(simulink_, &FenetreSimulink::insertionDemandee, this,
                 &FenetrePrincipale::insererLigne);
-        connect(simulink_, &FenetreSimulink::nouveauModeleDemande, this,
-                &FenetrePrincipale::nouveauModeleSimulink);
         connect(simulink_, &FenetreSimulink::schemaDemande, this,
                 &FenetrePrincipale::demanderSchemaSimulink);
         // La fenetre peut naitre apres que le moteur a publie sa liste :
@@ -928,15 +929,6 @@ void FenetrePrincipale::insererLigne(const QString& ligne) {
     editeur->setTextCursor(curseur);
     editeur->setFocus();
     onglets_->setCurrentWidget(editeur);
-}
-
-void FenetrePrincipale::nouveauModeleSimulink(const QString& squelette) {
-    nouveauFichier();
-    Editeur* editeur = editeurCourant();
-    if (editeur) {
-        editeur->setPlainText(squelette);
-        editeur->setFocus();
-    }
 }
 
 void FenetrePrincipale::surProfil(const QVector<LigneProfil>& entrees, double duree) {

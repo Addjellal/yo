@@ -1547,6 +1547,61 @@ int main(int argc, char** argv) {
                          "« Inserer » ecrit la ligne dans l'editeur");
             }
 
+            // Comme dans Simulink : un bloc lache sur la feuille quand aucun
+            // modele n'est ouvert ne se perd pas, il en ouvre un, « untitled » ;
+            // « Nouveau modele » ouvre un modele vide, choisi aussitot ; un
+            // bloc glisse ensuite s'y ajoute. Avant, le bouton ecrivait un
+            // script dans l'editeur, cache derriere la fenetre, et le bloc
+            // lache sans modele etait refuse : rien ne semblait se passer.
+            verifier(simulink->listeModeles()->count() == 0,
+                     "aucun modele n'est encore ouvert");
+            QTreeWidgetItem* blocGain = nullptr;
+            for (int f = 0; f < biblio->topLevelItemCount() && !blocGain; ++f)
+                for (int k = 0; k < biblio->topLevelItem(f)->childCount(); ++k)
+                    if (biblio->topLevelItem(f)->child(k)->data(0, Qt::UserRole).toString() ==
+                        QLatin1String("gain")) {
+                        blocGain = biblio->topLevelItem(f)->child(k);
+                        break;
+                    }
+            verifier(blocGain != nullptr, "la bibliotheque propose un gain");
+            if (blocGain) {
+                auto modeleOuvert = [&](const char* nom, int blocs) {
+                    return attendre([&] {
+                        return !fenetre.occupe() &&
+                               simulink->modeleChoisi() == QLatin1String(nom) &&
+                               simulink->modeleAffiche() == QLatin1String(nom) &&
+                               simulink->schemaAffiche().blocs.size() == blocs;
+                    });
+                };
+                biblio->setCurrentItem(blocGain);
+                emit simulink->toile()->blocDepose(QPointF(4, 2));
+                verifier(modeleOuvert("untitled", 1),
+                         "un bloc lache sans modele ouvre « untitled », qui le porte");
+                simulink->nouveauModele();
+                verifier(modeleOuvert("untitled1", 0),
+                         "« Nouveau modele » ouvre un modele vide, « untitled1 »");
+                emit simulink->toile()->blocDepose(QPointF(4, 2));
+                verifier(modeleOuvert("untitled1", 1),
+                         "un bloc glisse sur la feuille s'ajoute au modele ouvert");
+                // Le bouton du ruban de l'accueil fait de meme, fenetre
+                // Simulink comprise.
+                QToolButton* boutonRuban = nullptr;
+                for (QToolButton* b : fenetre.findChildren<QToolButton*>())
+                    if (b->text() == QString::fromUtf8("Nouveau\nmodèle")) boutonRuban = b;
+                verifier(boutonRuban != nullptr, "le ruban a son bouton « Nouveau modele »");
+                if (boutonRuban) {
+                    boutonRuban->click();
+                    verifier(modeleOuvert("untitled2", 0) && simulink->isVisible(),
+                             "il ouvre la fenetre Simulink sur un modele vide");
+                }
+                envoyer(fenetre, QStringLiteral("clear untitled untitled1 untitled2"));
+                verifier(attendre([&] {
+                             return !fenetre.occupe() &&
+                                    simulink->listeModeles()->count() == 0;
+                         }),
+                         "les modeles d'essai s'effacent");
+            }
+
             // L'espace de travail est partage : un modele cree a la console
             // apparait dans la liste de la fenetre, sans qu'on la rafraichisse.
             envoyer(fenetre, QStringLiteral(
@@ -1579,30 +1634,8 @@ int main(int argc, char** argv) {
                     intrus = true;
             verifier(!intrus, "une structure quelconque n'est pas prise pour un modele");
 
-            // Le squelette du bouton « Nouveau modele » n'est pas un
-            // decor : il tourne.
-            const QString squelette = FenetreSimulink::squeletteModele();
-            verifier(squelette.contains(QLatin1String("new_system")) &&
-                         squelette.contains(QLatin1String("add_line")),
-                     "le modele de depart pose des blocs et les cable");
-            verifier(!squelette.contains(QLatin1String("open_system")),
-                     "et n'appelle pas OPEN_SYSTEM : c'est l'editeur qui dessine");
-            QString fichierSquelette =
-                QDir::current().absoluteFilePath(QStringLiteral("essaiSquelette.m"));
-            {
-                QFile f(fichierSquelette);
-                if (f.open(QIODevice::WriteOnly | QIODevice::Text))
-                    f.write(squelette.toUtf8());
-            }
-            int avant = console->toPlainText().size();
-            envoyer(fenetre, QStringLiteral("run('%1'); disp('SQUELETTE OK')")
-                                 .arg(fichierSquelette));
-            verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
-                     "le modele de depart s'execute");
-            QString sortie = console->toPlainText().mid(avant);
-            verifier(sortie.contains(QLatin1String("SQUELETTE OK")),
-                     "et il va jusqu'au bout, schema et simulation compris");
-            QFile::remove(fichierSquelette);
+            int avant = 0;
+            QString sortie;
 
             // La bibliotheque ne propose que des blocs qui existent : chacun
             // est pose puis simule. Sans ce controle, un bloc offert au
